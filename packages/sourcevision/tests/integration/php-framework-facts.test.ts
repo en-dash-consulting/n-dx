@@ -91,7 +91,7 @@ describe("PHP docroot routes in serverRoutes", () => {
     const { components, imports } = await pipeline(countingPhp(requests));
 
     expect(requests).toHaveLength(1);
-    expect(requests[0].kinds).toEqual(["imports", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks"]);
+    expect(requests[0].kinds).toEqual(["imports", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor"]);
     const route = (file: string, method: "GET" | "POST", path: string, source: string) => ({ file, method, path, source });
     expect(components.serverRoutes).toEqual([
       { file: "cart.php", prefix: "/", routes: [route("cart.php", "GET", "/cart.php", "docroot ."), route("cart.php", "POST", "/cart.php", "docroot .")] },

@@ -405,7 +405,17 @@
             }
           ]
         }
-      ]
+      ],
+      "versionFloor": {
+        "version": "5.4",
+        "rule": "short-echo-tag",
+        "construct": "<?= tag",
+        "source": "https://www.php.net/manual/en/migration54.new-features.php",
+        "position": {
+          "line": 50,
+          "column": 12
+        }
+      }
     },
     {
       "path": "php52/lib/Shop/Cart.php",
@@ -1250,7 +1260,17 @@
           "callee": "call_user_func",
           "strings": []
         }
-      ]
+      ],
+      "versionFloor": {
+        "version": "7.0",
+        "rule": "group-use",
+        "construct": "group use declaration",
+        "source": "https://www.php.net/manual/en/migration70.new-features.php",
+        "position": {
+          "line": 9,
+          "column": 18
+        }
+      }
     },
     {
       "path": "php53/src/Shop/braced.php",
@@ -1444,7 +1464,17 @@
             }
           ]
         }
-      ]
+      ],
+      "versionFloor": {
+        "version": "5.3",
+        "rule": "namespaces",
+        "construct": "namespace",
+        "source": "https://www.php.net/manual/en/migration53.new-features.php",
+        "position": {
+          "line": 2,
+          "column": 0
+        }
+      }
     },
     {
       "path": "php8/src/Orders/OrderService.php",
@@ -1840,7 +1870,17 @@
           "receiver": "(new Repository)",
           "strings": []
         }
-      ]
+      ],
+      "versionFloor": {
+        "version": "8.3",
+        "rule": "typed-class-constants",
+        "construct": "typed class constant",
+        "source": "https://www.php.net/manual/en/migration83.new-features.php",
+        "position": {
+          "line": 38,
+          "column": 4
+        }
+      }
     }
   ],
   "unparsed": [],

@@ -654,6 +654,17 @@ const SdlcIacSchema = z.object({
   remoteState: z.boolean().optional(),
 });
 
+const SdlcVersionFloorsSchema = z.object({
+  files: z.number().int().nonnegative(),
+  floors: z.record(z.string().regex(/^\d+\.\d+$/), z.number().int().positive()),
+  none: z.number().int().nonnegative(),
+  highest: z.string().regex(/^\d+\.\d+$/).optional(),
+});
+
+const SdlcLanguageEcosystemSchema = z.object({
+  versionFloors: SdlcVersionFloorsSchema.optional(),
+});
+
 export const SdlcProfileSchema = z.object({
   schemaVersion: z.string(),
   projectDir: z.string().optional(),
@@ -673,6 +684,7 @@ export const SdlcProfileSchema = z.object({
   containers: z.array(SdlcContainerSchema),
   iac: z.array(SdlcIacSchema),
   parseFailures: z.array(SdlcParseFailureSchema),
+  ecosystem: z.record(z.string().min(1), SdlcLanguageEcosystemSchema).optional(),
 });
 
 // ── Outbound dependencies ───────────────────────────────────────────────────

@@ -1513,6 +1513,26 @@ export interface SdlcIac extends SdlcDetection {
 }
 
 /**
+ * A language's files by observed-syntax version floor (lang-kit's
+ * `VersionFloorFact`): the oldest version whose syntax covers each file.
+ */
+export interface SdlcVersionFloors {
+  /** Files the language pack read. */
+  files: number;
+  /** `major.minor` → files whose floor it is, oldest version first. */
+  floors: Record<string, number>;
+  /** Files no syntax rule dated. */
+  none: number;
+  /** The highest floor: the version the repository's syntax needs. Absent when no file has a floor. */
+  highest?: string;
+}
+
+/** What a language pack reports about a repository's code, beyond the SDLC sections. */
+export interface SdlcLanguageEcosystem {
+  versionFloors?: SdlcVersionFloors;
+}
+
+/**
  * Evidence-based CI/CD maturity for one repository.
  *
  * Every section is present on a written profile, empty where nothing was
@@ -1551,6 +1571,12 @@ export interface SdlcProfile {
    * `SdlcParseFailure`.
    */
   parseFailures: SdlcParseFailure[];
+  /**
+   * Language facts from language packs, keyed by the inventory's language,
+   * lower-cased (`php`). Present only when a pack produced one, so a
+   * repository without such a pack writes the profile it always did.
+   */
+  ecosystem?: Record<string, SdlcLanguageEcosystem>;
 }
 
 // ── Outbound dependencies ───────────────────────────────────────────────────

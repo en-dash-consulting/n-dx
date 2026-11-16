@@ -399,6 +399,42 @@ export function normalizeFlagName(name: string): string {
   return prefix === undefined ? unified : trimLeading(unified.slice(prefix.length), "_");
 }
 
+// ── Version floor (produced) ────────────────────────────────────────────────
+
+/**
+ * The oldest language version a file's syntax needs: the highest version any
+ * of the pack's syntax rules sets for a construct the file uses, with the
+ * construct that set it. Observed syntax only — what the file calls
+ * (functions, classes) and how the runtime is configured play no part, so the
+ * file may need a newer version than this, never an older one.
+ */
+export interface VersionFloorFact {
+  /** Language version as `major.minor`, e.g. `7.4`. */
+  readonly version: string;
+  /** The rule that set it, a stable id (`arrow-functions`). */
+  readonly rule: string;
+  /** The construct in words (`arrow function`). */
+  readonly construct: string;
+  /** URL of the language's own migration guide page that dates the construct. */
+  readonly source: string;
+  /** The construct's first use in the file. */
+  readonly position: SourcePosition;
+}
+
+/**
+ * `major.minor` versions compared numerically: negative when `a` is older, 0
+ * when equal, positive when newer. `7.10` is newer than `7.4`.
+ */
+export function compareLanguageVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
 // ── Resources (produced) ────────────────────────────────────────────────────
 
 /** The provider a resource belongs to. */
@@ -517,6 +553,8 @@ export interface FileFacts {
   readonly configReads?: readonly ConfigReadFact[];
   /** In document order. */
   readonly flagChecks?: readonly FlagCheckFact[];
+  /** Absent when no syntax rule matched: the file uses nothing a rule dates. */
+  readonly versionFloor?: VersionFloorFact;
 }
 
 /** Fact kinds a pack produces today. */
@@ -530,6 +568,7 @@ export const PRODUCED_FACT_KINDS = [
   "entryPoints",
   "configReads",
   "flagChecks",
+  "versionFloor",
 ] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */

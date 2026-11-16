@@ -108,8 +108,7 @@ rules; Python, `routes` through its FastAPI, Flask and Django rules and
 `.htaccess`, each `source` kept in `ServerRoute.source`, and `outboundCalls`) is asked for them in the imports phase's one `analyzeProject` call
 (`PackImportsOptions.framework`), so no file is parsed twice; the facts ride
 on `AnalyzeContext.packFacts`. A run without the imports phase (`--phase`,
-`sv narrate`) reads them once with `readImportsPackFrameworkFacts`, which asks
-the same packs for the same files. `src/analyzers/pack-framework-facts.ts`
+`sv narrate`) reads them with `readImportsPackFrameworkFacts`. `src/analyzers/pack-framework-facts.ts`
 merges them: `withPackRouteGroups` (the one call in `analyzeComponents`) adds
 one `ServerRouteGroup` per file to `serverRoutes`, a method-less route recorded
 as `GET`; `withPackOutbound` (in `analyze`'s output step) adds an
@@ -125,7 +124,8 @@ that `analyzeClassifications` scores (weight 1), recorded as evidence with
 (crontab:4)`; the schedule lives only in that detail. A file with pack signals, or pack evidence last run, is always
 reclassified. Without facts classifications.json is unchanged.
 
-`configReads` and `flagChecks` become config.json, only when present.
+`configReads` and `flagChecks` become config.json, `versionFloor`
+sdlc-profile.json's `ecosystem`, each only when present.
 
 ### Terraform as a database-engine source
 

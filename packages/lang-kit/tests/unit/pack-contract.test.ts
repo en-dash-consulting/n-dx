@@ -9,6 +9,7 @@ import {
   IMPORT_GUARDS,
   PRODUCED_FACT_KINDS,
   SYMBOL_KINDS,
+  compareLanguageVersions,
   isFactKind,
   normalizeFlagName,
   type FlagCheckFact,
@@ -16,10 +17,17 @@ import {
 } from "../../src/index.js";
 
 describe("pack contract", () => {
-  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads and flag checks as produced", () => {
+  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads, flag checks and the version floor as produced", () => {
     expect([...PRODUCED_FACT_KINDS]).toEqual([
-      "imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks",
+      "imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor",
     ]);
+  });
+
+  it("compares language versions numerically, major then minor", () => {
+    expect(compareLanguageVersions("5.3", "7.0")).toBeLessThan(0);
+    expect(compareLanguageVersions("7.10", "7.4")).toBeGreaterThan(0);
+    expect(compareLanguageVersions("8.1", "8.1")).toBe(0);
+    expect(compareLanguageVersions("8", "8.0")).toBe(0);
   });
 
   it("names config sources and flag mechanisms", () => {

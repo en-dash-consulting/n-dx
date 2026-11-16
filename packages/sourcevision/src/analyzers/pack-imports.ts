@@ -68,7 +68,7 @@ export interface PackImportsOptions {
 }
 
 /** The fact kinds a pack's framework rules produce for later phases. */
-export const FRAMEWORK_FACT_KINDS = ["routes", "outboundCalls", "entryPoints", "configReads", "flagChecks"] as const satisfies readonly FactKind[];
+export const FRAMEWORK_FACT_KINDS = ["routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor"] as const satisfies readonly FactKind[];
 
 /** The {@link FRAMEWORK_FACT_KINDS} `entry` produces. */
 export const frameworkKindsOf = (entry: LanguagePackEntry): FactKind[] =>

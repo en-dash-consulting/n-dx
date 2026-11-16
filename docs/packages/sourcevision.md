@@ -165,8 +165,8 @@ All output is written to `.sourcevision/`:
 | `imports.json` | Dependency graph (edges + metadata) |
 | `zones.json` | Architectural zone map with cohesion/coupling metrics |
 | `components.json` | React component catalog |
-| `sdlc-profile.json` | SDLC practices detected, each claim tied to the file proving it |
-| `readiness.json` | Readiness score computed from that profile |
+| `sdlc-profile.json` | SDLC practices detected, each claim tied to the file proving it. With the PHP pack, an optional `ecosystem.php.versionFloors`: PHP files counted by the oldest PHP version whose syntax covers them (`floors`), files no rule dates (`none`) and the `highest` floor |
+| `readiness.json` | Readiness score computed from that profile, with the profile's `ecosystem` carried through unscored |
 | `config.json` | **New.** Where code reads configuration and checks feature flags, per file, with indexes of flags (by normalized name, with the lines each gates) and config keys (with their consumer files). Names, keys and positions only, never values. Written only when a language pack produces config reads or flag checks (the PHP pack does); otherwise absent. Field names are under review. |
 | `llms.txt` | AI-readable codebase summary |
 | `CONTEXT.md` | Detailed AI context document |

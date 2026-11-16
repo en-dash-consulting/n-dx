@@ -10,6 +10,7 @@ export { pack } from "./pack.js";
 export { PHP_PACKAGE } from "./package-paths.js";
 export * from "./php-pack.js";
 export * from "./php-builtins.js";
+export * from "./php-compat.js";
 export * from "./php-docroot.js";
 export * from "./php-docroots.js";
 export * from "./php-cron.js";
