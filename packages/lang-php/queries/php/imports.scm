@@ -70,7 +70,7 @@
   left: (variable_name) @include.assigned
   right: [
     (binary_expression) (string) (encapsed_string) (function_call_expression)
-    (variable_name) (name) (parenthesized_expression)
+    (variable_name) (name) (qualified_name) (parenthesized_expression)
     (class_constant_access_expression) (subscript_expression)
   ] @include.assign_value) @include.assign
 (augmented_assignment_expression
@@ -78,7 +78,7 @@
   operator: _ @include.assign_operator
   right: [
     (binary_expression) (string) (encapsed_string) (function_call_expression)
-    (variable_name) (name) (parenthesized_expression)
+    (variable_name) (name) (qualified_name) (parenthesized_expression)
     (class_constant_access_expression) (subscript_expression)
   ] @include.assign_value) @include.assign
 (assignment_expression left: (variable_name) @include.reassigned)

@@ -34,11 +34,14 @@ items:
     lastModified: "2026-11-14T08:34:39.084Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f3198e15-a42e-4e05-9917-a6be8ff68d36":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-14T08:53:23.454Z"
-    activeIntervals: [{"end":"2026-11-14T08:55:32.374Z","start":"2026-11-14T08:53:23.454Z"},{"start":"2026-11-16T15:46:13.923Z"}]
-    failureReason: "No recorded signal explains this run's failure."
-    lastModified: "2026-11-16T15:46:14.759Z"
+    completedAt: "2026-11-16T15:50:55.709Z"
+    endedAt: "2026-11-16T15:50:55.709Z"
+    activeIntervals: [{"end":"2026-11-14T08:55:32.374Z","start":"2026-11-14T08:53:23.454Z"},{"end":"2026-11-16T15:50:55.709Z","start":"2026-11-16T15:46:13.923Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "imports.scm captures include.assign_value only for path-shaped right-hand sides (binary, string, encapsed_string, function call, variable, name, parenthesized, class constant, subscript); other assignments emit include.reassigned (variable only) so php-autoloaders.ts still treats the variable as unknown. Goldens regenerated; only assign captures changed."
+    lastModified: "2026-11-16T15:50:58.295Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd220c20-0191-4388-b858-0a1454884daa":
     status: "completed"

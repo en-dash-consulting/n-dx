@@ -105,6 +105,28 @@ describe("php legacy class resolution", () => {
     }
   });
 
+  it("follows a path variable assigned a fully qualified constant", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const root = await mkdtemp(join(tmpdir(), "php-autoload-qualified-"));
+    try {
+      await mkdir(join(root, "lib"));
+      await writeFile(
+        join(root, "boot.php"),
+        `<?php\ndefine('LIB_DIR', __DIR__ . '/lib/');\nspl_autoload_register(function ($class) {\n    $path = \\LIB_DIR;\n    require $path . $class . '.php';\n});\nnew Qualified();\n`,
+      );
+      // A second declaration: only the autoloader's pattern can pick lib/.
+      await mkdir(join(root, "old"));
+      await writeFile(join(root, "lib", "Qualified.php"), "<?php\nclass Qualified {}\n");
+      await writeFile(join(root, "old", "Qualified.php"), "<?php\nclass Qualified {}\n");
+      const files = ["boot.php", "lib/Qualified.php", "old/Qualified.php"];
+      const result = await pack.analyzeProject({ projectDir: root, files, kinds: ["imports"] });
+      const boot = result.facts.find((f) => f.path === "boot.php");
+      expect(boot?.imports?.files).toEqual([{ to: "lib/Qualified.php", symbols: ["Qualified"] }]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("treats a path variable last assigned an array, closure or object as unknown", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const root = await mkdtemp(join(tmpdir(), "php-autoload-overwritten-"));
