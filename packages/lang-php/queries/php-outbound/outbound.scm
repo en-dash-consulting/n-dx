@@ -9,7 +9,7 @@
 (function_call_expression
   function: [(name) (qualified_name)] @out.function
   arguments: (arguments (argument) @out.argument)
-  (#match? @out.function "^\\\\?([Cc][Uu][Rr][Ll]_[Ii][Nn][Ii][Tt]|[Cc][Uu][Rr][Ll]_[Ss][Ee][Tt][Oo][Pp][Tt]|[Cc][Uu][Rr][Ll]_[Ss][Ee][Tt][Oo][Pp][Tt]_[Aa][Rr][Rr][Aa][Yy]|[Ff][Ii][Ll][Ee]_[Gg][Ee][Tt]_[Cc][Oo][Nn][Tt][Ee][Nn][Tt][Ss]|[Ff][Oo][Pp][Ee][Nn]|[Ff][Ii][Ll][Ee]|[Gg][Ee][Tt]_[Hh][Ee][Aa][Dd][Ee][Rr][Ss]|[Ff][Ss][Oo][Cc][Kk][Oo][Pp][Ee][Nn]|[Gg][Ee][Tt][Ee][Nn][Vv])$")) @out.call
+  (#match? @out.function "^\\\\?([Cc][Uu][Rr][Ll]_[Ii][Nn][Ii][Tt]|[Cc][Uu][Rr][Ll]_[Ss][Ee][Tt][Oo][Pp][Tt]|[Cc][Uu][Rr][Ll]_[Ss][Ee][Tt][Oo][Pp][Tt]_[Aa][Rr][Rr][Aa][Yy]|[Ff][Ii][Ll][Ee]_[Gg][Ee][Tt]_[Cc][Oo][Nn][Tt][Ee][Nn][Tt][Ss]|[Ff][Oo][Pp][Ee][Nn]|[Ff][Ii][Ll][Ee]|[Gg][Ee][Tt]_[Hh][Ee][Aa][Dd][Ee][Rr][Ss]|[Ff][Ss][Oo][Cc][Kk][Oo][Pp][Ee][Nn]|[Gg][Ee][Tt][Ee][Nn][Vv]|[Mm][Yy][Ss][Qq][Ll]_[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Mm][Yy][Ss][Qq][Ll]_[Pp][Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Mm][Yy][Ss][Qq][Ll][Ii]_[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Pp][Gg]_[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Pp][Gg]_[Pp][Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Oo][Cc][Ii]_[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Oo][Cc][Ii]_[Pp][Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Oo][Cc][Ii]_[Nn][Ee][Ww]_[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Ss][Qq][Ll][Ss][Rr][Vv]_[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Oo][Dd][Bb][Cc]_[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Oo][Dd][Bb][Cc]_[Pp][Cc][Oo][Nn][Nn][Ee][Cc][Tt])$")) @out.call
 
 ; Every `new` with arguments, @out.class its class as written: which class
 ; is a client is known only once the name is qualified (`use … as Http`).
@@ -17,28 +17,41 @@
   [(name) (qualified_name)] @out.class
   (arguments (argument) @out.argument)) @out.call
 
-; Guzzle's request methods, on a receiver as written (`$client`, `$this->http`).
+; Guzzle's request methods and the cache clients' connecting methods
+; (Memcache `connect`/`pconnect`/`addServer`, Memcached `addServer`, Redis
+; `connect`/`pconnect`/`open`/`popen`), on a receiver as written (`$client`,
+; `$this->http`).
 (member_call_expression
   object: (_) @out.receiver
   name: (name) @out.method
   arguments: (arguments (argument) @out.argument)
-  (#match? @out.method "^([Gg][Ee][Tt]|[Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee]|[Hh][Ee][Aa][Dd]|[Oo][Pp][Tt][Ii][Oo][Nn][Ss]|[Rr][Ee][Qq][Uu][Ee][Ss][Tt])([Aa][Ss][Yy][Nn][Cc])?$")) @out.call
+  (#match? @out.method "^(([Gg][Ee][Tt]|[Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee]|[Hh][Ee][Aa][Dd]|[Oo][Pp][Tt][Ii][Oo][Nn][Ss]|[Rr][Ee][Qq][Uu][Ee][Ss][Tt])([Aa][Ss][Yy][Nn][Cc])?|[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Pp][Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Aa][Dd][Dd][Ss][Ee][Rr][Vv][Ee][Rr]|[Oo][Pp][Ee][Nn]|[Pp][Oo][Pp][Ee][Nn])$")) @out.call
 
 (nullsafe_member_call_expression
   object: (_) @out.receiver
   name: (name) @out.method
   arguments: (arguments (argument) @out.argument)
-  (#match? @out.method "^([Gg][Ee][Tt]|[Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee]|[Hh][Ee][Aa][Dd]|[Oo][Pp][Tt][Ii][Oo][Nn][Ss]|[Rr][Ee][Qq][Uu][Ee][Ss][Tt])([Aa][Ss][Yy][Nn][Cc])?$")) @out.call
+  (#match? @out.method "^(([Gg][Ee][Tt]|[Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee]|[Hh][Ee][Aa][Dd]|[Oo][Pp][Tt][Ii][Oo][Nn][Ss]|[Rr][Ee][Qq][Uu][Ee][Ss][Tt])([Aa][Ss][Yy][Nn][Cc])?|[Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Pp][Cc][Oo][Nn][Nn][Ee][Cc][Tt]|[Aa][Dd][Dd][Ss][Ee][Rr][Vv][Ee][Rr]|[Oo][Pp][Ee][Nn]|[Pp][Oo][Pp][Ee][Nn])$")) @out.call
+
+; Doctrine DBAL's `DriverManager::getConnection([...])`, @out.scope its
+; class as written.
+(scoped_call_expression
+  scope: [(name) (qualified_name)] @out.scope
+  name: (name) @out.static_method
+  arguments: (arguments (argument) @out.argument)
+  (#match? @out.static_method "^[Gg][Ee][Tt][Cc][Oo][Nn][Nn][Ee][Cc][Tt][Ii][Oo][Nn]$")) @out.call
 
 ; The array elements a client's options name its target with:
 ; `CURLOPT_URL => …` (curl_setopt_array), `'base_uri' => …` (Guzzle 6+),
-; `'base_url' => …` (Guzzle 5), `'location' => …` (SoapClient without a WSDL).
+; `'base_url' => …` (Guzzle 5), `'location' => …` (SoapClient without a WSDL),
+; `'url'`, `'host'`, `'port'` and `'path'` (Doctrine DBAL and Predis
+; connection parameters).
 (array_element_initializer
   .
   (_) @out.element_key
   .
   (_) @out.element_value
-  (#match? @out.element_key "^(\\\\?CURLOPT_URL|'(base_uri|base_url|location)'|\"(base_uri|base_url|location)\")$")) @out.element
+  (#match? @out.element_key "^(\\\\?CURLOPT_URL|'(base_uri|base_url|location|url|host|port|path)'|\"(base_uri|base_url|location|url|host|port|path)\")$")) @out.element
 
 ; What a variable or property is bound to: every assignment to one
 ; (@out.assigned), and each assignment of a `new` (@out.bound) with its

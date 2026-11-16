@@ -1892,6 +1892,86 @@
               "column": 18
             }
           }
+        ],
+        "sql": [
+          {
+            "name": "sql.call",
+            "nodeType": "function_call_expression",
+            "text": "mysql_query ($sql)",
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 28
+            }
+          },
+          {
+            "name": "sql.name",
+            "nodeType": "name",
+            "text": "mysql_query",
+            "start": {
+              "line": 42,
+              "column": 10
+            },
+            "end": {
+              "line": 42,
+              "column": 21
+            }
+          },
+          {
+            "name": "sql.argument",
+            "nodeType": "argument",
+            "text": "$sql",
+            "start": {
+              "line": 42,
+              "column": 23
+            },
+            "end": {
+              "line": 42,
+              "column": 27
+            }
+          },
+          {
+            "name": "sql.call",
+            "nodeType": "member_call_expression",
+            "text": "$db->query ($sql)",
+            "start": {
+              "line": 43,
+              "column": 8
+            },
+            "end": {
+              "line": 43,
+              "column": 25
+            }
+          },
+          {
+            "name": "sql.name",
+            "nodeType": "name",
+            "text": "query",
+            "start": {
+              "line": 43,
+              "column": 13
+            },
+            "end": {
+              "line": 43,
+              "column": 18
+            }
+          },
+          {
+            "name": "sql.argument",
+            "nodeType": "argument",
+            "text": "$sql",
+            "start": {
+              "line": 43,
+              "column": 20
+            },
+            "end": {
+              "line": 43,
+              "column": 24
+            }
+          }
         ]
       }
     },
@@ -2911,7 +2991,8 @@
               "column": 27
             }
           }
-        ]
+        ],
+        "sql": []
       }
     },
     {
@@ -5087,7 +5168,8 @@
               "column": 26
             }
           }
-        ]
+        ],
+        "sql": []
       }
     },
     {
@@ -5612,7 +5694,8 @@
               "column": 36
             }
           }
-        ]
+        ],
+        "sql": []
       }
     },
     {
@@ -7242,7 +7325,8 @@
               "column": 90
             }
           }
-        ]
+        ],
+        "sql": []
       }
     }
   ],

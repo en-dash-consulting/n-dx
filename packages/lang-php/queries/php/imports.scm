@@ -58,7 +58,8 @@
 
 ; A path kept in a variable (`$file = 'lib/' . $class . '.php'; require $file;`):
 ; each assignment to a plain variable whose right-hand side a path can be
-; built from, with its operator when compound. Arrays, closures, `new` and
+; built from (or SQL text read, src/php-sql.ts: heredoc and nowdoc), with its
+; operator when compound. Arrays, closures, `new` and
 ; other values are not captured, so their text (a 5000-line array) is never
 ; copied; @include.reassigned, the variable alone, marks every assignment so
 ; one of those still makes the variable's value unknown.
@@ -69,7 +70,7 @@
 (assignment_expression
   left: (variable_name) @include.assigned
   right: [
-    (binary_expression) (string) (encapsed_string) (function_call_expression)
+    (binary_expression) (string) (encapsed_string) (heredoc) (nowdoc) (function_call_expression)
     (variable_name) (name) (qualified_name) (parenthesized_expression)
     (class_constant_access_expression) (subscript_expression)
   ] @include.assign_value) @include.assign
@@ -77,7 +78,7 @@
   left: (variable_name) @include.assigned
   operator: _ @include.assign_operator
   right: [
-    (binary_expression) (string) (encapsed_string) (function_call_expression)
+    (binary_expression) (string) (encapsed_string) (heredoc) (nowdoc) (function_call_expression)
     (variable_name) (name) (qualified_name) (parenthesized_expression)
     (class_constant_access_expression) (subscript_expression)
   ] @include.assign_value) @include.assign

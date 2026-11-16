@@ -20,4 +20,5 @@ export * from "./php-include-notices.js";
 export * from "./php-includes.js";
 export * from "./php-outbound.js";
 export * from "./php-resolver.js";
+export * from "./php-sql.js";
 export * from "./php-symbols.js";

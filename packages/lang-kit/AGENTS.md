@@ -105,7 +105,7 @@ runs the call in a worker and terminates it past a budget, so a regression
 fails the test by name instead of hanging the suite.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
-so the Java and Go packs share it without depending on each other.
+so the Java, Go and PHP packs share it without depending on each other.
 
 Detection takes the config override and the
 project file search as arguments (`detectLanguage(rootDir, { override,

@@ -13,7 +13,8 @@
  * PHP's include search order (`php-includes.ts`). Routes are the files under
  * each document root and the `.htaccess` front controllers (`php-docroot.ts`);
  * entry points are CLI scripts and the scripts crontabs run (`php-entry-points.ts`);
- * outbound calls are HTTP, SOAP and environment reads (`php-outbound.ts`).
+ * outbound calls are HTTP, SOAP, database, cache and environment reads
+ * (`php-outbound.ts`); embedded SQL gives table names in memory (`php-sql.ts`).
  *
  * @module lang-php/php-pack
  */
@@ -28,7 +29,8 @@ import { phpEntryPoints } from "./php-entry-points.js";
 import { phpOutbound } from "./php-outbound.js";
 import { phpResolver } from "./php-resolver.js";
 
-const QUERY_NAMES = ["imports", "guards", "definitions", "calls", "references"] as const;
+/** `sql` feeds the embedded-SQL reader (`php-sql.ts`), which stays in memory like the Java and Go packs'. */
+const QUERY_NAMES = ["imports", "guards", "definitions", "calls", "references", "sql"] as const;
 
 /** Query files ship in `queries/php`; see `package-paths.ts`. */
 const queryPath = (file: string): string => join(PHP_PACKAGE.queryDir("php"), file);
@@ -137,6 +139,12 @@ export const phpPack: LanguagePack = {
       verifiedAgainst: ["Composer documentation"],
       verifiedOn: "2026-11-14",
       source: "https://getcomposer.org/doc/04-schema.md#autoload",
+    },
+    // String syntax embedded SQL is read from: single and double quotes, heredoc and nowdoc (closing marker indentable since PHP 7.3).
+    "sql-strings": {
+      verifiedAgainst: ["PHP manual"],
+      verifiedOn: "2026-11-16",
+      source: "https://www.php.net/manual/en/language.types.string.php",
     },
     // PHP's own classes and interfaces, never externals.
     builtins: PHP_BUILTINS_PROVENANCE,

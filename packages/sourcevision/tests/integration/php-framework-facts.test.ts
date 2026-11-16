@@ -30,7 +30,9 @@ const FILES: Record<string, string> = {
   "cart.php": "<?php\nrequire 'inc/functions.php';\necho cart_total();\n",
   "inc/functions.php": "<?php\nfunction cart_total() { return 0; }\n",
   // `.inc.php`: a fragment, not a route.
-  "inc/rates.inc.php": "<?php\n$ch = curl_init('https://rates.example.com/latest');\n$host = getenv('DB_HOST');\n$self = $_SERVER['PHP_SELF'];\n",
+  "inc/rates.inc.php":
+    "<?php\n$ch = curl_init('https://rates.example.com/latest');\n$host = getenv('DB_HOST');\n$self = $_SERVER['PHP_SELF'];\n" +
+    "$db = new PDO('mysql:host=db.internal;dbname=shop');\n$cache = new Redis();\n$cache->connect('cache.internal', 6379);\n",
   "admin/.htaccess": "Deny from all\n",
   "admin/index.php": "<?php\necho 'admin';\n",
   ".htaccess": "RewriteEngine On\nRewriteRule ^shop/(.*)$ index.php?path=$1 [L,QSA]\n",
@@ -111,7 +113,7 @@ describe("PHP docroot routes in serverRoutes", () => {
     );
   });
 
-  it("adds one outbound dependency per PHP call, request keys of $_SERVER left out", async (ctx) => {
+  it("adds one outbound dependency per PHP call (HTTP, env, database, cache), request keys of $_SERVER left out", async (ctx) => {
     await skipUnlessPackRuns(ctx, "php");
     const { outbound } = await pipeline(countingPhp([]));
     const detected = await detectOutbound(dir, inventory);
@@ -128,6 +130,8 @@ describe("PHP docroot routes in serverRoutes", () => {
         confidence: "certain",
       },
       { file: "inc/rates.inc.php", line: 3, kind: "env", target: "DB_HOST", targetSource: "env", client: "getenv", confidence: "certain" },
+      { file: "inc/rates.inc.php", line: 5, kind: "database", target: "db.internal", targetSource: "literal", client: "pdo_mysql", confidence: "certain" },
+      { file: "inc/rates.inc.php", line: 7, kind: "cache", target: "cache.internal:6379", targetSource: "literal", client: "redis", confidence: "certain" },
     ]);
   });
 

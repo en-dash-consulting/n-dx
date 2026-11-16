@@ -1,5 +1,6 @@
 /**
- * Outbound-call rules over the PHP pack: HTTP, SOAP and environment reads.
+ * Outbound-call rules over the PHP pack: HTTP, SOAP, databases, caches and
+ * environment reads.
  *
  * A framework pack (lang-runtime's `FrameworkPack`): its query
  * (`queries/php-outbound/outbound.scm`) runs in the PHP parse only when
@@ -24,6 +25,27 @@
  *   `env`; clients `getenv`, `$_ENV`, `$_SERVER`. An assignment to or `unset`
  *   of one is a write and not reported; a `$_SERVER` key that is not a literal
  *   is not reported, a `getenv`/`$_ENV` one is, with an unknown target.
+ * - `database` (kind `database`; client the PHP extension): `mysql_connect`
+ *   and `mysql_pconnect` (`mysql`), `mysqli_connect` and `new mysqli`
+ *   (`mysqli`, the port appended), `new PDO(dsn)` (`pdo_<driver>` from the
+ *   DSN's prefix, `pdo` when unknown), `pg_connect` and `pg_pconnect`
+ *   (`pgsql`), `oci_connect`, `oci_pconnect` and `oci_new_connect` (`oci8`),
+ *   `sqlsrv_connect` (`sqlsrv`), `odbc_connect` and `odbc_pconnect`
+ *   (`odbc`), and Doctrine DBAL's `DriverManager::getConnection([...])`
+ *   (`doctrine-dbal`; its `url`, else `host` and `port`, else `path`).
+ *   A DSN or connection string (`key=value` separated by `;` or spaces)
+ *   gives its `host`/`server`/`hostaddr` and `port`, else its
+ *   `unix_socket`, else its `dbname`; SQLite gives its path; anything else
+ *   is the value as written ({@link connectionTarget}).
+ * - `cache` (kind `cache`): `connect`, `pconnect` and `addServer` on a
+ *   receiver bound to `new Memcache` (`memcache`), `addServer` on one bound
+ *   to `new Memcached` (`memcached`), `connect`, `pconnect`, `open` and
+ *   `popen` on one bound to `new Redis` (`redis`), each host with its port;
+ *   `new Predis\Client(parameters)` (`predis`; a URI, or `host` and `port`,
+ *   or `path`).
+ *
+ * A database or cache target never keeps a URI's user and password
+ * (`mysql://u:p@db/app` is `mysql://db/app`).
  *
  * Targets: a value computable as an include path is (literals, `.`,
  * constants the repository defines once, variables assigned one in the same
@@ -37,9 +59,10 @@
  *
  * Confidence is `certain`: the functions are PHP's own (called unqualified
  * or with a leading `\`), the classes are qualified as PHP does, and a
- * Guzzle method counts only on a receiver every assignment in its scope (the
- * function body for a variable, the file for a property) binds to a Guzzle
- * client. `mail()` is not an outbound call.
+ * Guzzle, Memcache, Memcached or Redis method counts only on a receiver every
+ * assignment in its scope (the function body for a variable, the file for a
+ * property) binds to a client of that class. `mail()` is not an outbound
+ * call.
  *
  * @module lang-php/php-outbound
  */
@@ -72,6 +95,30 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   guzzle: rule(["Guzzle 7", "Guzzle 5"], "https://docs.guzzlephp.org/en/stable/quickstart.html"),
   // getenv(?string $name), $_ENV; $_SERVER's request indices are listed in the manual.
   env: rule(["PHP manual"], "https://www.php.net/manual/en/reserved.variables.server.php"),
+  // mysql_connect(?string $server = null, …): "hostname:port" or ":/path/to/socket".
+  mysql: rule(["PHP manual"], "https://www.php.net/manual/en/function.mysql-connect.php"),
+  // mysqli_connect / mysqli::__construct(?string $hostname, …, ?string $database, ?int $port, …).
+  mysqli: rule(["PHP manual"], "https://www.php.net/manual/en/mysqli.construct.php"),
+  // PDO::__construct(string $dsn, …); the DSN's prefix names the driver.
+  pdo: rule(["PHP manual"], "https://www.php.net/manual/en/pdo.drivers.php"),
+  // pg_connect(string $connection_string, …): "host=… port=… dbname=…".
+  pgsql: rule(["PHP manual"], "https://www.php.net/manual/en/function.pg-connect.php"),
+  // oci_connect(string $username, string $password, ?string $connection_string, …).
+  oci8: rule(["PHP manual"], "https://www.php.net/manual/en/function.oci-connect.php"),
+  // sqlsrv_connect(string $serverName, array $connectionInfo = []).
+  sqlsrv: rule(["PHP manual"], "https://www.php.net/manual/en/function.sqlsrv-connect.php"),
+  // odbc_connect(string $dsn, …): a DSN name or a "Driver=…;Server=…" string.
+  odbc: rule(["PHP manual"], "https://www.php.net/manual/en/function.odbc-connect.php"),
+  // DriverManager::getConnection(array $params, …): url, host, port, path.
+  dbal: rule(["Doctrine DBAL 2", "Doctrine DBAL 3"], "https://www.doctrine-project.org/projects/doctrine-dbal/en/current/reference/configuration.html"),
+  // Memcache::connect/pconnect/addServer(string $host, int $port, …).
+  memcache: rule(["PHP manual"], "https://www.php.net/manual/en/memcache.addserver.php"),
+  // Memcached::addServer(string $host, int $port, int $weight = 0).
+  memcached: rule(["PHP manual"], "https://www.php.net/manual/en/memcached.addserver.php"),
+  // Redis::connect/pconnect (aliases open/popen)(string $host, int $port = 6379, …).
+  redis: rule(["phpredis 5", "phpredis 6"], "https://github.com/phpredis/phpredis#connect-open"),
+  // new Predis\Client($parameters): a URI string or an array with scheme, host, port, path.
+  predis: rule(["Predis 1", "Predis 2"], "https://github.com/predis/predis#connecting-to-redis"),
 };
 
 // ── Request keys ────────────────────────────────────────────────────────────
@@ -133,6 +180,82 @@ export function envKey(text: string): string | undefined {
   return undefined;
 }
 
+// ── Connection strings ──────────────────────────────────────────────────────
+
+/** `dsn`: a PDO DSN (`driver:…`); `pairs`: a `pg_connect` or ODBC string; `plain`: the value is the target. */
+export type ConnectionForm = "dsn" | "pairs" | "plain";
+
+/** A connection's target, and the PDO driver its DSN names. */
+export interface Connection {
+  readonly target: Target;
+  readonly driver?: string;
+}
+
+/** A connection string that stops right after a host key (`mysql:host=`), the host coming next. */
+const OPEN_HOST_KEY = /(?:^|[;:\s])(?:host|server|hostaddr)\s*=\s*$/i;
+
+/** `user:password@` after a URI's scheme. */
+const CREDENTIALS = /^([A-Za-z][\w+.-]*:\/\/)[^@/]*@/;
+
+/** A URI without its user and password. */
+export const withoutCredentials = (target: string): string => target.replace(CREDENTIALS, "$1");
+
+/** `host:port`, unless the host already names a port or is a socket path. */
+function joinPort(host: string, port: string): string {
+  if (/:\d+$/.test(host) || host.startsWith("/") || /^unix:/i.test(host)) return host;
+  return `${host}:${port}`;
+}
+
+/** `key=value` pairs separated by `;` or whitespace, keys in lowercase, quotes around a value dropped. */
+function keyValues(text: string): Map<string, string> {
+  const pairs = new Map<string, string>();
+  for (const m of text.matchAll(/([A-Za-z_][\w ]*?)\s*=\s*('[^']*'|"[^"]*"|[^;\s]*)/g)) {
+    const key = m[1]!.trim().toLowerCase();
+    if (!pairs.has(key)) pairs.set(key, m[2]!.replace(/^(['"])(.*)\1$/, "$2"));
+  }
+  return pairs;
+}
+
+/** A literal target without a URI's user and password. */
+const credentialFree = (target: Target): Target => (target.targetSource === "literal" ? { ...target, target: withoutCredentials(target.target) } : target);
+
+const literal = (target: string): Target => (target === "" ? UNKNOWN : { target: withoutCredentials(target), targetSource: "literal" });
+
+/**
+ * The target a computed DSN or connection string names: its host
+ * (`host`, `server`, `hostaddr`) with its `port`, else its `unix_socket`,
+ * else its `dbname`; an SQLite DSN's path; a string with no `key=value`
+ * pairs as written.
+ */
+export function connectionTarget(value: string, form: ConnectionForm): Connection {
+  const text = value.trim();
+  if (form === "plain") return { target: literal(text) };
+  let rest = text;
+  let driver: string | undefined;
+  if (form === "dsn") {
+    const prefix = /^([A-Za-z][\w]*):/.exec(text);
+    if (!prefix) return { target: UNKNOWN };
+    driver = prefix[1]!.toLowerCase();
+    rest = text.slice(prefix[0].length);
+    if (driver === "sqlite" || driver === "sqlite2") return { target: literal(rest), driver };
+    if (driver === "uri") return { target: UNKNOWN, driver };
+  }
+  const withDriver = (target: Target): Connection => (driver === undefined ? { target } : { target, driver });
+  if (!rest.includes("=")) return withDriver(literal(rest));
+  const pairs = keyValues(rest);
+  const host = pairs.get("host") ?? pairs.get("server") ?? pairs.get("hostaddr");
+  const port = pairs.get("port");
+  if (host) return withDriver(literal(port && /^\d+$/.test(port) ? joinPort(host, port) : host));
+  return withDriver(literal(pairs.get("unix_socket") ?? pairs.get("dbname") ?? ""));
+}
+
+/** The PDO extension for a DSN's driver prefix (https://www.php.net/manual/en/pdo.drivers.php); `mssql:` and `sybase:` are PDO_DBLIB. */
+const PDO_DRIVERS: Readonly<Record<string, string>> = {
+  cubrid: "pdo_cubrid", dblib: "pdo_dblib", mssql: "pdo_dblib", sybase: "pdo_dblib", firebird: "pdo_firebird", ibm: "pdo_ibm",
+  informix: "pdo_informix", mysql: "pdo_mysql", oci: "pdo_oci", odbc: "pdo_odbc", pgsql: "pdo_pgsql", sqlite: "pdo_sqlite",
+  sqlite2: "pdo_sqlite", sqlsrv: "pdo_sqlsrv",
+};
+
 /** Reads targets in one file. */
 class TargetReader {
   private readonly assignments: Array<Assignment & { readonly scope: Capture | undefined }>;
@@ -173,6 +296,53 @@ class TargetReader {
       prefix += part;
     }
     return UNKNOWN;
+  }
+
+  /**
+   * Where a DSN or connection string written at `at` points: the parsed
+   * value when computable; else, built by concatenation, the target of the
+   * part that fills its open host key (`'mysql:host=' . getenv('DB_HOST')`);
+   * else the target of the argument as a whole (env, config, unknown).
+   */
+  connection(text: string, at: SourcePosition, form: ConnectionForm, depth = 0): Connection {
+    const t = text.trim();
+    if (depth > MAX_DEPTH || t === "") return { target: UNKNOWN };
+    const whole = this.evaluate(t, at, depth);
+    if (whole !== undefined) return connectionTarget(whole, form);
+    const variable = VARIABLE.exec(t);
+    if (variable) {
+      const assigned = this.lastAssignment(variable[1]!, at);
+      return assigned?.value === undefined ? { target: UNKNOWN } : this.connection(assigned.value, assigned.start, form, depth + 1);
+    }
+    const operands = concatenationOperands(t);
+    if (operands === undefined || (operands.length === 1 && interpolatedEnds(t) === undefined)) {
+      const target = this.of(t, at, depth);
+      return { target: target.targetSource === "literal" ? UNKNOWN : target };
+    }
+    let written = "";
+    for (const operand of operands) {
+      const part = this.evaluate(operand, at, depth);
+      if (part !== undefined) {
+        written += part;
+        continue;
+      }
+      const ends = interpolatedEnds(operand);
+      written += ends?.head ?? "";
+      const parsed = connectionTarget(written, form);
+      if (parsed.target.targetSource !== "unknown" || !OPEN_HOST_KEY.test(written)) return parsed;
+      const filled = ends === undefined ? this.of(operand, at, depth + 1) : UNKNOWN;
+      return { ...parsed, target: filled.targetSource === "literal" ? UNKNOWN : filled };
+    }
+    return connectionTarget(written, form);
+  }
+
+  /** `host` joined with the port written at `at` when both are literal. */
+  withPort(host: Target, port: Capture | undefined, at: SourcePosition): Target {
+    const text = argumentText(port);
+    if (host.targetSource !== "literal" || text === undefined) return host;
+    // An integer literal, or a constant or variable holding a numeric string.
+    const value = /^\d+$/.test(text) ? text : this.of(text, at).target;
+    return /^\d+$/.test(value) ? { ...host, target: joinPort(host.target, value) } : host;
   }
 
   /** The value of `text`, with the repository's constants and the variables assigned before `at` in its scope. */
@@ -239,6 +409,8 @@ interface Call {
   readonly class?: Capture;
   readonly receiver?: string;
   readonly method?: string;
+  readonly scope?: Capture;
+  readonly staticMethod?: string;
   readonly arguments: Capture[];
 }
 
@@ -270,7 +442,7 @@ function readCalls(captures: readonly Capture[]): Call[] {
   const calls = new Map<string, { node: Capture; parts: Capture[]; arguments: Map<string, Capture> }>();
   const nodes = captures.filter((c) => c.name === "out.call");
   for (const node of nodes) if (!calls.has(spanKey(node))) calls.set(spanKey(node), { node, parts: [], arguments: new Map() });
-  const parts = captures.filter((c) => ["out.function", "out.class", "out.receiver", "out.method", "out.argument"].includes(c.name));
+  const parts = captures.filter((c) => ["out.function", "out.class", "out.receiver", "out.method", "out.scope", "out.static_method", "out.argument"].includes(c.name));
   // Strict: an argument that is itself a matched call (`new SoapClient(getenv('X'))`) has that call's span, and belongs to the outer one.
   innermostEach(nodes, parts, true).forEach((owner, i) => {
     const call = owner && calls.get(spanKey(owner));
@@ -288,6 +460,8 @@ function readCalls(captures: readonly Capture[]): Call[] {
       class: part("out.class"),
       receiver: part("out.receiver")?.text.replace(/\s+/g, ""),
       method: part("out.method")?.text.toLowerCase(),
+      scope: part("out.scope"),
+      staticMethod: part("out.static_method")?.text.toLowerCase(),
       arguments: [...args.values()].sort(byStart),
     };
   });
@@ -315,10 +489,56 @@ const HTTP_URL = /^https?:\/\//i;
 const STREAM_FUNCTIONS: ReadonlySet<string> = new Set(["file_get_contents", "fopen", "file", "get_headers"]);
 const GUZZLE_VERBS: ReadonlySet<string> = new Set(["get", "post", "put", "patch", "delete", "head", "options"]);
 
+/** Database connection functions: client, the connection argument's place and name, how it is read, and the port argument's. */
+interface DatabaseFunction {
+  readonly client: string;
+  readonly position: number;
+  readonly name: string;
+  readonly form: ConnectionForm;
+  readonly port?: readonly [number, string];
+}
+
+const mysql: DatabaseFunction = { client: "mysql", position: 0, name: "server", form: "plain" };
+const pgsql: DatabaseFunction = { client: "pgsql", position: 0, name: "connection_string", form: "pairs" };
+const oci8: DatabaseFunction = { client: "oci8", position: 2, name: "connection_string", form: "plain" };
+const odbc: DatabaseFunction = { client: "odbc", position: 0, name: "dsn", form: "pairs" };
+/** mysqli's port, after hostname, username, password and database. */
+const MYSQLI_PORT = [4, "port"] as const;
+const MYSQLI: DatabaseFunction = { client: "mysqli", position: 0, name: "hostname", form: "plain", port: MYSQLI_PORT };
+
+const DATABASE_FUNCTIONS: Readonly<Record<string, DatabaseFunction>> = {
+  mysql_connect: mysql,
+  mysql_pconnect: mysql,
+  mysqli_connect: MYSQLI,
+  pg_connect: pgsql,
+  pg_pconnect: pgsql,
+  oci_connect: oci8,
+  oci_pconnect: oci8,
+  oci_new_connect: oci8,
+  sqlsrv_connect: { client: "sqlsrv", position: 0, name: "serverName", form: "plain" },
+  odbc_connect: odbc,
+  odbc_pconnect: odbc,
+};
+
+/** Cache classes, by qualified name in lowercase: client and the methods that name a server (host first, port second). */
+const CACHE_CLASSES: Readonly<Record<string, { readonly client: string; readonly methods: ReadonlySet<string> }>> = {
+  memcache: { client: "memcache", methods: new Set(["connect", "pconnect", "addserver"]) },
+  memcached: { client: "memcached", methods: new Set(["addserver"]) },
+  redis: { client: "redis", methods: new Set(["connect", "pconnect", "open", "popen"]) },
+};
+
+const MYSQLI_CLASS = "mysqli";
+const PDO_CLASS = "pdo";
+const PREDIS_CLIENT = "predis\\client";
+const DBAL_DRIVER_MANAGER = "doctrine\\dbal\\drivermanager";
+
 /** The function names the query's call pattern must match, so a test can hold the two in step. */
-export const PHP_OUTBOUND_FUNCTIONS: readonly string[] = ["curl_init", "curl_setopt", "curl_setopt_array", ...STREAM_FUNCTIONS, "fsockopen", "getenv"];
-/** The Guzzle method names the query's method pattern must match. */
-export const PHP_OUTBOUND_METHODS: readonly string[] = [...GUZZLE_VERBS, "request"].flatMap((m) => [m, `${m}async`]);
+export const PHP_OUTBOUND_FUNCTIONS: readonly string[] = ["curl_init", "curl_setopt", "curl_setopt_array", ...STREAM_FUNCTIONS, "fsockopen", "getenv", ...Object.keys(DATABASE_FUNCTIONS)];
+/** The Guzzle and cache method names the query's method pattern must match. */
+export const PHP_OUTBOUND_METHODS: readonly string[] = [
+  ...[...GUZZLE_VERBS, "request"].flatMap((m) => [m, `${m}async`]),
+  ...new Set(Object.values(CACHE_CLASSES).flatMap((c) => [...c.methods])),
+];
 
 // ── One file ────────────────────────────────────────────────────────────────
 
@@ -332,10 +552,10 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
     facts.push({ kind, ...target, client, confidence: "certain", position });
   };
 
-  // Classes as PHP qualifies them, by the position of the name.
+  // Classes as PHP qualifies them (`new X`, `X::m()`), by the position of the name.
   const classes = new Map<string, string>();
   for (const ref of readPhpReferences(file)) {
-    if (ref.form === "new") classes.set(`${ref.position.line}:${ref.position.column}`, ref.qualified.toLowerCase());
+    if (ref.form === "new" || ref.form === "static") classes.set(`${ref.position.line}:${ref.position.column}`, ref.qualified.toLowerCase());
   }
   const classOf = (c: Capture | undefined): string | undefined => c && classes.get(`${c.start.line}:${c.start.column}`);
 
@@ -358,8 +578,8 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
     return [{ key: key.text.replace(/^['"\\]|['"]$/g, ""), value, argument: elementArguments[i] }];
   });
 
-  // Receivers bound to a Guzzle client: every assignment to them in their scope is one.
-  const assigned = new Map<string, boolean>();
+  // The class of a receiver every assignment in its scope binds to a `new` of that class.
+  const assigned = new Map<string, string | null>();
   const scopeKey = (receiver: string, at: SourcePosition): string => {
     if (!VARIABLE.test(receiver)) return receiver; // a property: the file
     const scope = scopeAt(file, at);
@@ -381,20 +601,44 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
   for (const { target, class: klass } of bound.values()) if (target && klass) boundClass.set(spanKey(target), klass);
   for (const target of captures.filter((c) => c.name === "out.assigned")) {
     const key = scopeKey(target.text.replace(/\s+/g, ""), target.start);
-    const guzzle = classOf(boundClass.get(spanKey(target))) === GUZZLE_CLIENT;
-    assigned.set(key, (assigned.get(key) ?? true) && guzzle);
+    const klass = classOf(boundClass.get(spanKey(target))) ?? null;
+    const earlier = assigned.get(key);
+    assigned.set(key, earlier === undefined || earlier === klass ? klass : null);
   }
-  const isGuzzle = (receiver: string, at: SourcePosition): boolean => assigned.get(scopeKey(receiver, at)) === true;
+  const receiverClass = (receiver: string, at: SourcePosition): string | undefined => assigned.get(scopeKey(receiver, at)) ?? undefined;
+  const port = (host: Target, argument: Capture | undefined, at: SourcePosition): Target => targets.withPort(host, argument, at);
+  const server = (call: Call, at: SourcePosition): Target => {
+    const host = argumentTarget(call, argumentAt(call, 0, "host"));
+    return port(credentialFree(host), argumentAt(call, 1, "port"), at);
+  };
+  /** A connection-parameter array: its `url`, else its `host` with its `port`, else its `path`. */
+  const parameters = (options: Map<string, Element>, at: SourcePosition): Target => {
+    const url = options.get("url");
+    if (url) return credentialFree(targets.of(url.value.text, at));
+    const host = options.get("host");
+    if (host) return targets.withPort(credentialFree(targets.of(host.value.text, at)), options.get("port")?.value, at);
+    const path = options.get("path");
+    return path ? targets.of(path.value.text, at) : UNKNOWN;
+  };
+  const argumentTarget = (call: Call, argument: Capture | undefined): Target => {
+    const text = argumentText(argument);
+    return text === undefined ? UNKNOWN : targets.of(text, call.node.start);
+  };
 
   for (const call of calls) {
     const at = call.node.start;
-    const target = (argument: Capture | undefined): Target => {
+    const target = (argument: Capture | undefined): Target => argumentTarget(call, argument);
+    const connection = (argument: Capture | undefined, form: ConnectionForm): Connection => {
       const text = argumentText(argument);
-      return text === undefined ? UNKNOWN : targets.of(text, at);
+      return text === undefined ? { target: UNKNOWN } : targets.connection(text, at, form);
     };
     if (call.function !== undefined) {
       const name = call.function;
-      if (name === "curl_init") {
+      const database = DATABASE_FUNCTIONS[name];
+      if (database !== undefined) {
+        const host = connection(argumentAt(call, database.position, database.name), database.form).target;
+        add("database", database.client, database.port ? port(host, argumentAt(call, ...database.port), at) : host, at);
+      } else if (name === "curl_init") {
         const url = argumentAt(call, 0, "url");
         if (url) add("http", "curl", target(url), at);
       } else if (name === "curl_setopt") {
@@ -425,13 +669,33 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
         const options = optionsOf(argumentAt(call, 0, "config"), elements);
         const base = options.get("base_uri") ?? options.get("base_url");
         if (base) add("http", "guzzle", targets.of(base.value.text, at), at);
+      } else if (qualified === MYSQLI_CLASS) {
+        add("database", "mysqli", port(connection(argumentAt(call, 0, "hostname"), "plain").target, argumentAt(call, ...MYSQLI_PORT), at), at);
+      } else if (qualified === PDO_CLASS) {
+        const { target: dsn, driver } = connection(argumentAt(call, 0, "dsn"), "dsn");
+        add("database", (driver && PDO_DRIVERS[driver]) ?? "pdo", dsn, at);
+      } else if (qualified === PREDIS_CLIENT) {
+        const given = argumentAt(call, 0, "parameters");
+        const options = optionsOf(given, elements);
+        add("cache", "predis", options.size > 0 ? parameters(options, at) : credentialFree(target(given)), at);
       }
       continue;
     }
-    if (call.receiver !== undefined && call.method !== undefined && isGuzzle(call.receiver, at)) {
+    if (call.scope !== undefined) {
+      if (call.staticMethod === "getconnection" && classOf(call.scope) === DBAL_DRIVER_MANAGER) {
+        add("database", "doctrine-dbal", parameters(optionsOf(argumentAt(call, 0, "params"), elements), at), at);
+      }
+      continue;
+    }
+    if (call.receiver === undefined || call.method === undefined) continue;
+    const receiver = receiverClass(call.receiver, at);
+    if (receiver === GUZZLE_CLIENT) {
       const method = call.method.replace(/async$/, "");
       if (GUZZLE_VERBS.has(method)) add("http", "guzzle", target(argumentAt(call, 0, "uri")), at);
       else if (method === "request") add("http", "guzzle", target(argumentAt(call, 1, "uri")), at);
+    } else if (receiver !== undefined) {
+      const cache = CACHE_CLASSES[receiver];
+      if (cache?.methods.has(call.method)) add("cache", cache.client, server(call, at), at);
     }
   }
 

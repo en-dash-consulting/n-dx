@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { envKey, isRequestKey, PHP_OUTBOUND_FUNCTIONS, PHP_OUTBOUND_METHODS } from "../../src/index.js";
+import { connectionTarget, envKey, isRequestKey, PHP_OUTBOUND_FUNCTIONS, PHP_OUTBOUND_METHODS, withoutCredentials } from "../../src/index.js";
 
 const query = readFileSync(join(import.meta.dirname, "..", "..", "queries", "php-outbound", "outbound.scm"), "utf8");
 
@@ -24,13 +24,39 @@ describe("php outbound query", () => {
     expect(re.test("App\\curl_init")).toBe(false);
   });
 
-  it("matches every Guzzle method, in any case", () => {
+  it("matches every Guzzle and cache method, in any case", () => {
     const re = predicate("out.method");
     for (const name of PHP_OUTBOUND_METHODS) {
       expect(re.test(name), name).toBe(true);
       expect(re.test(name.toUpperCase()), name).toBe(true);
     }
     expect(re.test("send")).toBe(false);
+  });
+});
+
+describe("connectionTarget", () => {
+  it("reads a DSN's driver and host", () => {
+    expect(connectionTarget("mysql:host=db;port=3307;dbname=shop", "dsn")).toEqual({ target: { target: "db:3307", targetSource: "literal" }, driver: "mysql" });
+    expect(connectionTarget("mysql:unix_socket=/tmp/mysql.sock;dbname=shop", "dsn").target.target).toBe("/tmp/mysql.sock");
+    expect(connectionTarget("sqlsrv:Server=mssql,1433;Database=hr", "dsn").target.target).toBe("mssql,1433");
+    expect(connectionTarget("oci:dbname=//oracle:1521/ORCL", "dsn").target.target).toBe("//oracle:1521/ORCL");
+    expect(connectionTarget("sqlite::memory:", "dsn")).toEqual({ target: { target: ":memory:", targetSource: "literal" }, driver: "sqlite" });
+  });
+
+  it("is unknown for a DSN with no host value or no driver", () => {
+    expect(connectionTarget("mysql:host=", "dsn").target.targetSource).toBe("unknown");
+    expect(connectionTarget("no-driver", "dsn").target.targetSource).toBe("unknown");
+  });
+
+  it("reads a pg_connect string's host, quoted or not, and never its password", () => {
+    expect(connectionTarget("host='pg' port=5433 password=secret", "pairs").target.target).toBe("pg:5433");
+    expect(connectionTarget("dbname=local", "pairs").target.target).toBe("local");
+  });
+
+  it("drops a URI's user and password", () => {
+    expect(connectionTarget("mysql://app:secret@db/app", "plain").target.target).toBe("mysql://db/app");
+    expect(withoutCredentials("tcp://:secret@cache:6379")).toBe("tcp://cache:6379");
+    expect(withoutCredentials("https://example.com/a@b")).toBe("https://example.com/a@b");
   });
 });
 
