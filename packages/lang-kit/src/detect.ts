@@ -1,8 +1,8 @@
 /**
  * Language auto-detection.
  *
- * Implements a four-step detection chain to determine the primary project
- * language. The result drives all downstream analyzer decisions.
+ * Implements a detection chain to determine the primary project language.
+ * The result drives all downstream analyzer decisions.
  *
  * Detection order:
  * 1. Explicit override (`options.override`; the caller reads it from config)
@@ -10,12 +10,20 @@
  *    (`go.mod` → Go, `package.json` → TS/JS, `Package.swift`/`*.xcodeproj` → Swift,
  *     `pyproject.toml`/`setup.py`/`requirements.txt`/`Pipfile` → Python,
  *     `*.sln`/`*.csproj` within three levels of the root → C#,
- *     `composer.json` → PHP)
+ *     `composer.json` → PHP; with no other marker at the root, a
+ *     `composer.json` in a direct child directory (`phpBB/`) counts too)
  * 3. Multiple markers present → file-count tiebreak (whichever has more source files)
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No other marker, a `.php` file at the root or a docroot `index.php`
- *    (`public/`, `web/`, `htdocs/`, `www/`, `public_html/`) → PHP
- * 6. Fallback → TypeScript/JS (backward-compatible default)
+ * 5. No other marker, a `.php` file at the root or an `index.php` in a
+ *    direct child directory (a docroot such as `public/`, or an app folder
+ *    such as `catalog/`) → PHP
+ * 6. No marker at the root or one level down → the language with the most
+ *    source files (PHP included), unless that is TypeScript or Terraform
+ *    files match or outnumber it
+ * 7. Fallback → TypeScript/JS (backward-compatible default), or Terraform
+ *    alone when there is no source the fallback is for
+ *
+ * Marker checks never walk deeper than one level below the root, except C#'s.
  *
  * Multi-language detection (`detectLanguages`) returns ALL detected language
  * configs rather than picking a winner. `mergeLanguageConfigs` combines
@@ -37,7 +45,7 @@ import { pythonConfig } from "./python.js";
 import { javaConfig, javaSecondaryConfig } from "./java.js";
 import { terraformConfig } from "./terraform.js";
 import { csharpConfig } from "./csharp.js";
-import { phpConfig, PHP_DOCROOT_DIRECTORIES, PHP_REPOSITORY_ONLY_EXTENSIONS } from "./php.js";
+import { phpConfig, PHP_REPOSITORY_ONLY_EXTENSIONS } from "./php.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -165,8 +173,44 @@ async function hasPhpMarker(rootDir: string): Promise<boolean> {
 }
 
 /**
+ * The root's direct child directories, less dot-directories and
+ * {@link COUNT_SKIP_DIRS} (so `vendor/<pkg>/composer.json` is no marker).
+ * An unreadable root has none.
+ */
+async function childDirectories(rootDir: string): Promise<string[]> {
+  try {
+    const entries = await readdir(rootDir, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !COUNT_SKIP_DIRS.has(e.name))
+      .map((e) => join(rootDir, e.name))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+/** Does some direct child directory of the root hold `fileName`? Never walks deeper. */
+async function childHolds(rootDir: string, fileName: string): Promise<boolean> {
+  for (const dir of await childDirectories(rootDir)) {
+    if (await fileExists(join(dir, fileName))) return true;
+  }
+  return false;
+}
+
+/**
+ * The PHP manifest marker one level down: a `composer.json` in a direct child
+ * directory (phpBB's `phpBB/composer.json`). Callers consult it only when the
+ * root has no other language's marker, so a TypeScript repository with a PHP
+ * subproject keeps its detection.
+ */
+async function hasChildPhpMarker(rootDir: string): Promise<boolean> {
+  return childHolds(rootDir, "composer.json");
+}
+
+/**
  * The weak PHP marker: a `.php` file at the root (`index.php`, or any other),
- * or an `index.php` directly inside one of {@link PHP_DOCROOT_DIRECTORIES}.
+ * or an `index.php` directly inside a direct child directory (a docroot such
+ * as `public/`, or an app folder such as osCommerce's `catalog/`).
  * Consulted only when no other language's marker matched, so a TypeScript
  * repository with a few PHP files keeps its detection. Never walks deeper.
  */
@@ -177,10 +221,7 @@ async function hasWeakPhpMarker(rootDir: string): Promise<boolean> {
   } catch {
     return false; // Unreadable — no marker.
   }
-  for (const docroot of PHP_DOCROOT_DIRECTORIES) {
-    if (await fileExists(join(rootDir, docroot, "index.php"))) return true;
-  }
-  return false;
+  return childHolds(rootDir, "index.php");
 }
 
 /**
@@ -357,49 +398,54 @@ async function markerlessTerraform(search: ProjectFileSearch): Promise<"none" | 
   return (await search([], { count: true })).fallbackSource > 0 ? "beside" : "alone";
 }
 
-/** Which language markers the project root holds. */
-interface RootMarkers {
-  readonly goMod: boolean;
-  readonly packageJson: boolean;
-  readonly swift: boolean;
-  readonly python: boolean;
-  readonly csharp: boolean;
-  readonly php: boolean;
+/**
+ * The language a markerless repository has the most source files of, by
+ * {@link countSourceFiles} (ties to TypeScript, then {@link tiebreakRank}),
+ * when that is a language other than the TypeScript fallback; `undefined`
+ * when TypeScript wins or nothing is counted, leaving the fallback path as it
+ * was. Terraform files are weighed too: when the project search finds at
+ * least as many as the winner has source files, the answer is `undefined` and
+ * the fallback and Terraform rules decide, as before. `terraform` is the
+ * search's count, for the caller to place Terraform beside the winner.
+ */
+async function markerlessMajority(
+  rootDir: string,
+  search: ProjectFileSearch,
+): Promise<{ config: LanguageConfig; terraform: number } | undefined> {
+  const counts = await countSourceFiles(rootDir);
+  const ranked: Array<[number, LanguageConfig]> = [
+    [counts.ts, typescriptConfig],
+    [counts.swift, swiftConfig],
+    [counts.go, goConfig],
+    [counts.cs, csharpConfig],
+    [counts.py, pythonConfig],
+    [counts.php, phpConfig],
+  ];
+  ranked.sort((a, b) => b[0] - a[0] || tiebreakRank(a[1]) - tiebreakRank(b[1]));
+  const [count, config] = ranked[0];
+  if (count === 0 || config === typescriptConfig) return undefined;
+  const { terraform } = await search([config], { count: true });
+  return terraform >= count ? undefined : { config, terraform };
 }
 
-async function readRootMarkers(rootDir: string): Promise<RootMarkers> {
-  const [goMod, packageJson, swift, python, csharp, php] = await Promise.all([
+/**
+ * Every language marker both detectors weigh. `hasPhp` is a root
+ * `composer.json`, or one in a direct child directory when the root has no
+ * other language's marker (Java's included).
+ */
+async function detectMarkers(rootDir: string) {
+  const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasRootPhp, hasJava] = await Promise.all([
     fileExists(join(rootDir, "go.mod")),
     fileExists(join(rootDir, "package.json")),
     hasSwiftMarker(rootDir),
     hasPythonMarker(rootDir),
     hasCSharpMarker(rootDir),
     hasPhpMarker(rootDir),
+    hasJavaMarker(rootDir),
   ]);
-  return { goMod, packageJson, swift, python, csharp, php };
-}
-
-/**
- * The languages whose markers are present, ordered by descending source-file
- * count with ties broken by {@link tiebreakRank} (a stable sort). Empty, and
- * nothing counted, when no marker is present. countSourceFiles is cheap
- * (shallow scan).
- */
-async function rankMarkedLanguages(rootDir: string, found: RootMarkers): Promise<LanguageConfig[]> {
-  if (!(found.goMod || found.packageJson || found.swift || found.python || found.csharp || found.php)) return [];
-  const counts = await countSourceFiles(rootDir);
-  const present: Array<{ config: LanguageConfig; count: number }> = [];
-  if (found.goMod) present.push({ config: goConfig, count: counts.go });
-  if (found.swift) present.push({ config: swiftConfig, count: counts.swift });
-  if (found.python) present.push({ config: pythonConfig, count: counts.py });
-  if (found.csharp) present.push({ config: csharpConfig, count: counts.cs });
-  if (found.php) present.push({ config: phpConfig, count: counts.php });
-  if (found.packageJson) present.push({ config: typescriptConfig, count: counts.ts });
-  present.sort((a, b) => {
-    if (a.count !== b.count) return b.count - a.count;
-    return tiebreakRank(a.config) - tiebreakRank(b.config);
-  });
-  return present.map((p) => p.config);
+  const hasOther = hasGoMod || hasPackageJson || hasSwift || hasPython || hasCSharp || hasJava;
+  const hasPhp = hasRootPhp || (!hasOther && (await hasChildPhpMarker(rootDir)));
+  return { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava };
 }
 
 // ── Detection ───────────────────────────────────────────────────────────────
@@ -407,13 +453,16 @@ async function rankMarkedLanguages(rootDir: string, found: RootMarkers): Promise
 /**
  * Detect the primary project language.
  *
- * Six-step chain:
+ * Seven-step chain:
  * 1. `options.override`
  * 2. Exactly one language marker present → that language
  * 3. Several markers present → file-count tiebreak
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No other marker, a `.php` file at the root or a docroot `index.php` → PHP
- * 6. No markers → TypeScript/JS fallback (Terraform when the repository
+ * 5. No other marker, a `.php` file at the root or an `index.php` in a
+ *    direct child directory → PHP
+ * 6. No marker at all → the language with the most source files, when that
+ *    is not TypeScript and Terraform files do not match it
+ * 7. Otherwise → TypeScript/JS fallback (Terraform when the repository
  *    has Terraform files and no source the fallback is for)
  */
 export async function detectLanguage(rootDir: string, options: DetectLanguageOptions): Promise<LanguageConfig> {
@@ -426,35 +475,51 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   }
 
   // Step 2 & 3: Check for language markers
-  const found = await readRootMarkers(rootDir);
+  const { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava } = await detectMarkers(rootDir);
 
   // Single-marker fast path.
-  const markers = [found.goMod, found.packageJson, found.swift, found.python, found.csharp, found.php].filter(Boolean).length;
+  const markers = [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp].filter(Boolean).length;
   if (markers === 1) {
-    if (found.goMod) return goConfig;
-    if (found.swift) return swiftConfig;
-    if (found.python) return pythonConfig;
-    if (found.csharp) return csharpConfig;
-    if (found.php) return phpConfig;
+    if (hasGoMod) return goConfig;
+    if (hasSwift) return swiftConfig;
+    if (hasPython) return pythonConfig;
+    if (hasCSharp) return csharpConfig;
+    if (hasPhp) return phpConfig;
     return typescriptConfig;
   }
 
   // Step 4: Multiple markers present — file-count tiebreak picks primary.
   if (markers > 1) {
-    return (await rankMarkedLanguages(rootDir, found))[0] ?? typescriptConfig;
+    const counts = await countSourceFiles(rootDir);
+    const candidates: Array<[number, LanguageConfig]> = [];
+    if (hasGoMod) candidates.push([counts.go, goConfig]);
+    if (hasSwift) candidates.push([counts.swift, swiftConfig]);
+    if (hasPython) candidates.push([counts.py, pythonConfig]);
+    if (hasCSharp) candidates.push([counts.cs, csharpConfig]);
+    if (hasPhp) candidates.push([counts.php, phpConfig]);
+    if (hasPackageJson) candidates.push([counts.ts, typescriptConfig]);
+    candidates.sort((a, b) => {
+      if (a[0] !== b[0]) return b[0] - a[0];
+      return tiebreakRank(a[1]) - tiebreakRank(b[1]);
+    });
+    return candidates[0][1] ?? typescriptConfig;
   }
 
   // Step 5: No other markers — a Maven/Gradle root is Java. Checked last so
   // mixed repositories keep their existing primary language.
-  if (await hasJavaMarker(rootDir)) return javaConfig;
+  if (hasJava) return javaConfig;
 
   // Step 6: Then the weak PHP marker, which outranks Terraform too.
   if (await hasWeakPhpMarker(rootDir)) return phpConfig;
 
+  // Step 7: No marker at all → the language with the most source files.
+  const majority = await markerlessMajority(rootDir, options.searchProjectFiles);
+  if (majority) return majority.config;
+
   // Java and PHP outrank Terraform, and so does any of the fallback's source.
   if ((await markerlessTerraform(options.searchProjectFiles)) === "alone") return terraformConfig;
 
-  // Step 7: No markers → fallback to TypeScript/JS
+  // Step 8: No markers, TypeScript the majority or nothing counted → TypeScript/JS
   return typescriptConfig;
 }
 
@@ -474,29 +539,46 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
 export async function detectLanguages(rootDir: string, options: DetectLanguagesOptions): Promise<LanguageConfig[]> {
   // Check for language markers (Swift adds Package.swift / .xcodeproj /
   // .xcworkspace; only one needs to be present).
-  const found = await readRootMarkers(rootDir);
+  const { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava } = await detectMarkers(rootDir);
+  const present: Array<{ config: LanguageConfig; count: number }> = [];
 
-  const hasJava = await hasJavaMarker(rootDir);
-  // Ordered by primary: most source files first, ties broken by the same
-  // TS > Swift > Go preference detectLanguage uses.
-  const configs = await rankMarkedLanguages(rootDir, found);
+  // When any markers are present, count source files so we can order by
+  // primary. countSourceFiles is cheap (shallow scan).
+  if (hasGoMod || hasPackageJson || hasSwift || hasPython || hasCSharp || hasPhp) {
+    const counts = await countSourceFiles(rootDir);
+    if (hasGoMod) present.push({ config: goConfig, count: counts.go });
+    if (hasSwift) present.push({ config: swiftConfig, count: counts.swift });
+    if (hasPython) present.push({ config: pythonConfig, count: counts.py });
+    if (hasCSharp) present.push({ config: csharpConfig, count: counts.cs });
+    if (hasPhp) present.push({ config: phpConfig, count: counts.php });
+    if (hasPackageJson) present.push({ config: typescriptConfig, count: counts.ts });
+  }
 
-  // No markers → Java, then PHP (the weak PHP marker), then the
-  // TypeScript/JS fallback for backward compatibility, with Terraform beside
-  // it; Terraform alone only when there is no fallback source at all (never
-  // beside Java or PHP). Searched with the skip set of the result (see
-  // markerlessTerraform).
-  if (configs.length === 0) {
+  // No markers → Java, then PHP (the weak PHP marker), then the language
+  // with the most source files, then the TypeScript/JS fallback for backward
+  // compatibility, with Terraform beside it; Terraform alone only when there
+  // is no fallback source at all (never beside Java or PHP). Searched with
+  // the skip set of the result (see markerlessTerraform).
+  if (present.length === 0) {
     const markerless = hasJava ? javaConfig : (await hasWeakPhpMarker(rootDir)) ? phpConfig : undefined;
     if (markerless) {
       const { terraform } = await options.searchProjectFiles([markerless], { count: false });
       return terraform > 0 ? [markerless, terraformConfig] : [markerless];
     }
+    const majority = await markerlessMajority(rootDir, options.searchProjectFiles);
+    if (majority) return majority.terraform > 0 ? [majority.config, terraformConfig] : [majority.config];
     const terraform = await markerlessTerraform(options.searchProjectFiles);
     if (terraform === "none") return [typescriptConfig];
     return terraform === "beside" ? [typescriptConfig, terraformConfig] : [terraformConfig];
   }
 
+  // Stable ordering by descending file count, ties broken by the same
+  // TS > Swift > Go preference detectLanguage uses.
+  present.sort((a, b) => {
+    if (a.count !== b.count) return b.count - a.count;
+    return tiebreakRank(a.config) - tiebreakRank(b.config);
+  });
+  const configs = present.map((p) => p.config);
   // Appended last so Java never displaces the primary language. The
   // secondary variant keeps Java from skipping or flagging the primary
   // language's `out/` and `generated/` files.

@@ -110,11 +110,14 @@ so the Java, Go and PHP packs share it without depending on each other.
 Detection takes the config override and the
 project file search as arguments (`detectLanguage(rootDir, { override,
 searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
-the search being the inventory's own walk. A markerless repository is
-Terraform alone only when that walk finds Terraform files and no
+the search being the inventory's own walk. With no other marker at the root,
+a `composer.json` or `index.php` in a direct child directory (`phpBB/`,
+`catalog/`) marks PHP; markers are never read deeper (C#'s aside). A
+repository with no marker is the language with the most source files when
+that is not TypeScript and the walk's Terraform count is lower; otherwise it
+is Terraform alone only when that walk finds Terraform files and no
 `isFallbackSourceFile` file (JS/TS, a language with no config, or PHP with
-no weak PHP marker: a root `.php` or a docroot `index.php`); counts
-are not weighed. Before deciding Terraform alone it searches again with no
+no weak PHP marker); those counts are not weighed. Before deciding Terraform alone it searches again with no
 other config, so source only the fallback skips (`dist/`) keeps the fallback
 and the result's inventory never lists source detection did not count.
 Resolvers, the parser runner, queries and grammars live in the runtime and the

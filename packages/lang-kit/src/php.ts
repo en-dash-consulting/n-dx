@@ -20,8 +20,10 @@ export const PHP_REPOSITORY_ONLY_EXTENSIONS: ReadonlySet<string> = new Set([".in
 
 /**
  * Document-root directories a legacy PHP site keeps all its code under, with
- * nothing PHP at the repository root. An `index.php` directly inside one is
- * the same weak PHP marker a `.php` file at the root is.
+ * nothing PHP at the repository root. lang-php serves routes from them.
+ * Detection is wider: an `index.php` directly inside any direct child
+ * directory of the root, docroot or not, is the weak PHP marker, as a `.php`
+ * file at the root is.
  */
 export const PHP_DOCROOT_DIRECTORIES: readonly string[] = ["public", "web", "htdocs", "www", "public_html"];
 

@@ -219,14 +219,71 @@ describe("PHP detection", () => {
     expect(await detectLanguages(dir, recordingSearch(4, 0))).toEqual([phpConfig, terraformConfig]);
   });
 
-  it.each([
-    ["an index.php below a directory that is no docroot", join("src", "index.php")],
-    ["a docroot with PHP but no index.php", join("public", "api.php")],
-    ["an index.php two levels down", join("site", "htdocs", "index.php")],
-  ])("takes no weak PHP marker from %s", async (_, file) => {
-    await mkdir(join(dir, file, ".."), { recursive: true });
-    await writeFile(join(dir, file), "<?php\n");
+  it("takes no weak PHP marker from an index.php two levels down", async () => {
+    await writeFile(join(dir, "README.md"), "\n");
+    await mkdir(join(dir, "site", "htdocs"), { recursive: true });
+    await writeFile(join(dir, "site", "htdocs", "index.php"), "<?php\n");
+    await mkdir(join(dir, "scripts"));
+    for (const name of ["a.js", "b.js"]) await writeFile(join(dir, "scripts", name), "\n");
     expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([typescriptConfig]);
+  });
+
+  it("takes no Composer marker from a composer.json two levels down or under vendor/", async () => {
+    await mkdir(join(dir, "site", "app"), { recursive: true });
+    await writeFile(join(dir, "site", "app", "composer.json"), "{}\n");
+    await mkdir(join(dir, "vendor", "acme"), { recursive: true });
+    await writeFile(join(dir, "vendor", "acme", "composer.json"), "{}\n");
+    await writeFile(join(dir, "vendor", "composer.json"), "{}\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+  });
+
+  it("detects a phpBB-shaped repository from its app folder's composer.json", async () => {
+    await writeFile(join(dir, "README.md"), "\n");
+    await mkdir(join(dir, "build"));
+    await writeFile(join(dir, "build", "build.xml"), "<project/>\n");
+    await mkdir(join(dir, "tests"));
+    await writeFile(join(dir, "tests", "bootstrap.php"), "<?php\n");
+    await mkdir(join(dir, "phpBB", "includes"), { recursive: true });
+    await writeFile(join(dir, "phpBB", "composer.json"), "{}\n");
+    await writeFile(join(dir, "phpBB", "index.php"), "<?php\n");
+    await writeFile(join(dir, "phpBB", "includes", "functions.php"), "<?php\n");
+    for (const name of ["a.js", "b.js", "c.js", "d.js"]) await writeFile(join(dir, "phpBB", name), "\n");
+    const search = recordingSearch(0);
+    expect(await detectLanguage(dir, search)).toBe(phpConfig);
+    expect(search.calls).toEqual([]);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([phpConfig]);
+  });
+
+  it("detects an osCommerce-shaped repository from its app folder's index.php", async () => {
+    await mkdir(join(dir, "docs"));
+    await writeFile(join(dir, "docs", "install.txt"), "\n");
+    await mkdir(join(dir, "catalog", "admin"), { recursive: true });
+    await writeFile(join(dir, "catalog", "index.php"), "<?php\n");
+    await writeFile(join(dir, "catalog", "admin", "index.php"), "<?php\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(phpConfig);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([phpConfig]);
+  });
+
+  it.each(["php", "legacy"])(
+    "keeps a package.json repository with %s/index.php and %s/composer.json TypeScript",
+    async (sub) => {
+      await writeFile(join(dir, "package.json"), "{}\n");
+      await writeFile(join(dir, "index.ts"), "export {};\n");
+      await mkdir(join(dir, sub));
+      await writeFile(join(dir, sub, "index.php"), "<?php\n");
+      await writeFile(join(dir, sub, "composer.json"), "{}\n");
+      expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+      expect(await detectLanguages(dir, recordingSearch(0))).toEqual([typescriptConfig]);
+    },
+  );
+
+  it("lets a Java root outrank a composer.json one level down", async () => {
+    await writeFile(join(dir, "pom.xml"), "<project/>\n");
+    await mkdir(join(dir, "app"));
+    await writeFile(join(dir, "app", "composer.json"), "{}\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(javaConfig);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([javaConfig]);
   });
 
   it("keeps a package.json repository with public/index.php TypeScript", async () => {
@@ -257,5 +314,59 @@ describe("PHP detection", () => {
   it("is a valid override", async () => {
     expect(VALID_LANGUAGE_IDS).toContain("php");
     expect(await detectLanguage(dir, { override: "php", ...recordingSearch(0) })).toBe(phpConfig);
+  });
+});
+
+
+describe("markerless detection by source count", () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "lang-kit-count-"));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  async function files(subdir: string, ext: string, n: number): Promise<void> {
+    await mkdir(join(dir, subdir), { recursive: true });
+    await Promise.all(Array.from({ length: n }, (_, i) => writeFile(join(dir, subdir, `f${i}${ext}`), "\n")));
+  }
+
+  it("detects a repository with 300 .php and 50 .js files and no marker as PHP", async () => {
+    await files(join("src", "lib"), ".php", 300);
+    await files(join("src", "assets"), ".js", 50);
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(phpConfig);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([phpConfig]);
+  });
+
+  it("picks any configured language the count favours", async () => {
+    await files("pkg", ".go", 5);
+    await files("tools", ".py", 2);
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(goConfig);
+  });
+
+  it("keeps the TypeScript fallback on a tie or a TypeScript majority", async () => {
+    await files("lib", ".php", 3);
+    await files("web", ".ts", 3);
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+  });
+
+  it("places Terraform beside a winner it does not match", async () => {
+    await files("src", ".php", 4);
+    const search = recordingSearch(2, 0);
+    expect(await detectLanguages(dir, search)).toEqual([phpConfig, terraformConfig]);
+    expect(search.calls).toEqual([{ others: [phpConfig], count: true }]);
+    expect(await detectLanguage(dir, recordingSearch(2, 0))).toBe(phpConfig);
+  });
+
+  it("leaves the Terraform rules to decide when Terraform files match the winner", async () => {
+    await files("lambda", ".py", 2);
+    expect(await detectLanguage(dir, recordingSearch(2, 0))).toBe(terraformConfig);
+    expect(await detectLanguages(dir, recordingSearch(2, 0))).toEqual([terraformConfig]);
+  });
+
+  it("never counts .inc, .module or .install toward PHP", async () => {
+    await files("lib", ".inc", 5);
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
   });
 });
