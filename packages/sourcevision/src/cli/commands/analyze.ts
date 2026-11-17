@@ -27,7 +27,7 @@ import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver, JEV_VENDOR } from "@n-dx/llm-client";
 import type { Inventory, RiskAssessmentOptions, RiskJustificationEntry, ZoneType, Zones } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -365,7 +365,9 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
       ...(nameZoneIds.length > 0 ? [`naming ${bold(String(nameZoneIds.length))} zone${nameZoneIds.length === 1 ? "" : "s"}`] : []),
     ];
     info(`${cyan("Background:")} ${parts.join(", ")} — results above are complete; names and insights land in zones.json when it finishes.`);
-    info(`  ${dim(`log: ${narrationLog} · pass --wait to block instead`)}`);
+    // A batch script (no TTY, often --quiet) must still learn that model work outlives the command, so this one line ignores --quiet.
+    if (process.stdout.isTTY) info(`  ${dim(`log: ${narrationLog} · pass --wait to block instead`)}`);
+    else process.stderr.write(`  background zone narration continues after analyze exits; log: ${narrationLog}. Pass --wait to keep it in the run.\n`);
   } catch (err) {
     const manifest = readManifest(absDir);
     manifest.narration = { status: "failed", zones: zoneIds, ...(nameZoneIds.length > 0 ? { names: nameZoneIds } : {}), startedAt, reason: `could not spawn narrator: ${err instanceof Error ? err.message : String(err)}` };
@@ -686,6 +688,11 @@ async function generatePrMarkdownStep(ctx: AnalyzeContext): Promise<void> {
 
 // ── Output generation ────────────────────────────────────────────────
 
+/** Successful calls this run made to a text model (any vendor but TypeSafe's judgment service). */
+export function textModelCalls(run: { llm: { byTaskClass: Record<string, { calls: number; vendor?: string }> } }): number {
+  return Object.values(run.llm.byTaskClass).reduce((n, b) => n + (b.vendor !== undefined && b.vendor !== JEV_VENDOR ? b.calls : 0), 0);
+}
+
 /**
  * Distil and persist the startup primer, best-effort.
  *
@@ -722,13 +729,15 @@ async function writePrimerIfPossible(
       }
       return;
     }
-    // The cascade's calls are judgments, not generation: they prove a Jev
-    // key works, not that a text model is reachable. The primer is prose,
-    // so it is generated only by a generative run (`--narrate`, or the
-    // default without a judgment route); a cached primer is still served.
-    if (snapshotRunLedger().mode === "cascade") {
+    // The cascade's own calls are judgments, not generation: they prove a
+    // Jev key works, not that a text model is reachable. The primer is prose,
+    // so a cascade run generates it only when the run also reached a text
+    // model (its escalations and enrichment scans are recorded on the ledger
+    // under a vendor other than TypeSafe); a cached primer is still served.
+    const ledger = snapshotRunLedger();
+    if (ledger.mode === "cascade" && textModelCalls(ledger) === 0) {
       if (!cachedPrimer) {
-        info(`${dim("[primer]")} skipped — cascade mode; run with --narrate to generate it`);
+        info(`${dim("[primer]")} skipped — cascade mode made no text-model calls; run with --narrate to generate it`);
       }
       return;
     }

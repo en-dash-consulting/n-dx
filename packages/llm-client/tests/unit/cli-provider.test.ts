@@ -178,6 +178,28 @@ describe("createCliClient — stdout error envelope", () => {
     }
   });
 
+  it("reads token usage nested under usage in a single result object (current Claude Code CLI)", async () => {
+    // What `claude -p --output-format json` prints today: one object, counts in `usage`.
+    // Reading only top-level counts recorded every such call as 0 tokens.
+    const body = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "SINGLE_RESULT",
+      usage: { input_tokens: 1200, output_tokens: 80, cache_read_input_tokens: 300 },
+    });
+    const { dir, path } = makeFakeCli(body, 0);
+
+    try {
+      const client = createCliClient({ claudeConfig: { cli_path: path }, maxRetries: 0 });
+      const result = await client.complete({ prompt: "test", model: "claude-haiku-4-5" });
+      expect(result.text).toBe("SINGLE_RESULT");
+      expect(result.tokenUsage).toMatchObject({ input: 1200, output: 80 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("still supports legacy single-envelope JSON form", async () => {
     const envelope = JSON.stringify({
       result: "LEGACY_PAYLOAD",
