@@ -57,6 +57,26 @@ export interface PackDegradation {
   readonly remedy?: string;
 }
 
+/**
+ * The requested files that did not parse cleanly, each list in request order.
+ * A file may be in both `syntaxErrors` and `notUtf8`; every other list is
+ * exclusive. A file in no list parsed cleanly.
+ */
+export interface PackParseReport {
+  /** How many files were requested. */
+  readonly files: number;
+  /** The parser's size limit in bytes; files above it are in `oversized`. */
+  readonly sizeLimitBytes: number;
+  /** Parsed, but the tree holds error-recovery nodes; their facts are read from the partial tree. */
+  readonly syntaxErrors: readonly string[];
+  /** Over `sizeLimitBytes`, so not parsed (a pack may still read imports from a prefix). */
+  readonly oversized: readonly string[];
+  /** Could not be read at all. */
+  readonly unreadable: readonly string[];
+  /** Not valid UTF-8; decoded with replacement characters and parsed. */
+  readonly notUtf8: readonly string[];
+}
+
 /** A pack's answer for one project. */
 export interface PackProjectResult {
   /**
@@ -78,6 +98,11 @@ export interface PackProjectResult {
    * never guessed. Absent when there is nothing to say.
    */
   readonly notices?: readonly string[];
+  /**
+   * The files that did not parse cleanly, for a pack with a parser. Absent
+   * when every file parsed cleanly, or the pack has no parser to report on.
+   */
+  readonly parse?: PackParseReport;
   /**
    * Set when the pack could not run at all — for a grammar-based pack a grammar
    * that is missing or will not load, a query that will not compile, build

@@ -35,7 +35,14 @@ items:
     lastModified: "2026-11-17T00:23:58.070Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7ffab98a-95f7-4d90-86df-e3aad31a3a3c":
-    lastModified: "2026-11-17T00:13:28.030Z"
+    status: "completed"
+    startedAt: "2026-11-17T01:41:56.432Z"
+    completedAt: "2026-11-17T01:51:07.006Z"
+    endedAt: "2026-11-17T01:51:07.006Z"
+    activeIntervals: [{"end":"2026-11-17T01:51:07.006Z","start":"2026-11-17T01:41:56.432Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit PackParseReport on PackProjectResult.parse; lang-runtime createPackEntry classifies syntax-error/oversized/unreadable/non-UTF-8 files; sourcevision writes imports.json summary.parseIssues (absent when clean) and one [<pack>-parse] notice."
+    lastModified: "2026-11-17T01:51:07.006Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "845a96b6-0a33-4fe6-96fb-03a9a6369299":
     lastModified: "2026-11-17T00:13:35.635Z"

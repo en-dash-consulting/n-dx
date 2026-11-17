@@ -16,7 +16,7 @@
 
 ### What it reads
 
-`produces` is `imports`, `symbols` and `calls` (sourcevision does not put `calls` in `callgraph.json` yet; that file covers JavaScript and TypeScript only), from `queries/php/` (provenance per rule in `src/php-pack.ts`), and from frameworks (rules in `src/<id>.ts`, query in `queries/<id>/`) `routes` (`php-docroot`), `entryPoints` (`php-entry`, `src/php-entry-points.ts`), `outboundCalls` (`php-outbound`), `configReads` and `flagChecks` (`php-config`, never a value; fixture `tests/fixtures/php-config/`), `versionFloor` (`php-compat`), `legacyConstructs` (`php-legacy`), `dynamicCode` (`php-dynamic`, `src/php-dynamic-code.ts`). Inline HTML is never captured. Drupal's `.module`/`.install` are parsed too.
+`produces` is `imports`, `symbols` and `calls` (not in `callgraph.json`, which is JS/TS only), from `queries/php/` (provenance per rule in `src/php-pack.ts`), and from frameworks (rules in `src/<id>.ts`, query in `queries/<id>/`) `routes` (`php-docroot`), `entryPoints` (`php-entry`, `src/php-entry-points.ts`), `outboundCalls` (`php-outbound`), `configReads` and `flagChecks` (`php-config`, never a value; fixture `tests/fixtures/php-config/`), `versionFloor` (`php-compat`), `legacyConstructs` (`php-legacy`), `dynamicCode` (`php-dynamic`, `src/php-dynamic-code.ts`). Inline HTML is never captured. Drupal's `.module`/`.install` are parsed too.
 
 - **Imports as written** (`src/php-imports.ts`): `FileReferences.written`, each with its `form` (the four include forms, `use`, `use function`, `use const`). An include's specifier is its path expression as written, quotes included (the parentheses of `require_once("x")` dropped); a `use` gives the qualified name (a group use's prefix joined to each entry) and any `alias`. An include inside a branch, `switch`, loop, function or method body, a short-circuit right operand, `?:` or `match` carries the `conditional` guard (`guards.scm`).
 - **Includes** (`src/php-includes.ts`): a path built only from literals, `.`, `__DIR__`, `__FILE__`, `dirname(x[, n])`, `DIRECTORY_SEPARATOR` and constants the repository defines once (`define()`, file-level `const` outside a namespace; two different values is not computable) resolves to a pack file, symbol `*`; anything else gives no edge. Search: `__DIR__`/constant-anchored paths as named; `./` and `../` against the working directory; other relative paths under each include-path root, then the including file's directory. Working directory, tried in order: the including file's directory, its ancestors holding an `index.php` (entry scripts) nearest first, then the docroot (`src/php-docroots.ts`'s `primaryDocroot`: first `PHP_DOCROOT_DIRECTORIES` entry holding `index.php`, else the root). Roots: literal `set_include_path`/`ini_set('include_path', …)`, `.user.ini`/`.htaccess` (`php_value`) at or above the file nearest first, then any `php.ini`; default `.`; relative roots against the working directory; roots outside the repository are ignored with a notice. `preparePhpImports(...).includes(path)` gives each include's outcome. Fixture: `tests/fixtures/php-legacy-includes/`.
@@ -31,10 +31,10 @@
 - **Embedded SQL** (`src/php-sql.ts`, `queries/php/sql.scm`): `extractPhpEmbeddedSql`, in memory only, as Java's and Go's.
 - **Calls**: function, method, nullsafe and static calls with the receiver or scope as written, and `new` (`construct: true`, the class as callee), with or without an argument list.
 
-Entry point, outbound and legacy rules in detail: [PHP pack rules](../../docs/packages/sourcevision.md#php-pack-rules).
+Rules in detail: [PHP pack rules](../../docs/packages/sourcevision.md#php-pack-rules).
 
 Goldens: `tests/fixtures/language-packs/php/` (`php52/`, `php53/`, `php8/`), updated with `test:update-goldens`.
 
 ### Scripts
 
-`build:grammars` builds the grammar into `build/grammars` (CI and release run it before tests and publish); the grammar tests skip without it unless `SV_REQUIRE_GRAMMARS=1`.
+`build:grammars` builds the grammar into `build/grammars` (CI and release run it first); grammar tests skip without it unless `SV_REQUIRE_GRAMMARS=1`.

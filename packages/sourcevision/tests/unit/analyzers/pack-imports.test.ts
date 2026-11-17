@@ -14,7 +14,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { goConfig, javaConfig, type FileFacts, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
 import { analyzeImports } from "../../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../../src/analyzers/inventory.js";
-import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts } from "../../../src/analyzers/pack-imports.js";
+import {
+  buildPackImportGraph,
+  isPackFile,
+  noticeListedPacks,
+  packsFor,
+  parseIssuesNotice,
+  parseIssuesOf,
+  readPackFrameworkFacts,
+} from "../../../src/analyzers/pack-imports.js";
 import { KNOWN_PACKS, type InstallablePack, type KnownPack } from "../../../src/language/pack-loader.js";
 import type { Inventory } from "../../../src/schema/v1.js";
 
@@ -60,6 +68,16 @@ describe("packsFor", () => {
   });
 });
 
+describe("parseIssuesNotice", () => {
+  it("leads with the file count when no file has syntax errors, and names a size limit that is not whole MiB", () => {
+    const issues = parseIssuesOf({ files: 1, sizeLimitBytes: 512 * 1024, syntaxErrors: [], oversized: ["a.php"], unreadable: [], notUtf8: [] });
+    expect(issues.clean).toBe(0);
+    expect(parseIssuesNotice("php", issues)).toBe(
+      "[php-parse] 1 file: 1 over 512 KiB not parsed; listed in imports.json summary.parseIssues.",
+    );
+  });
+});
+
 describe("isPackFile", () => {
   it("matches a pack's extensions case-insensitively", () => {
     const java = [{ config: javaConfig }];
@@ -96,7 +114,7 @@ describe("buildPackImportGraph", () => {
 
   it("loads no pack, and reports nothing, when no file belongs to one", async () => {
     const { graph, messages } = await run(["src/a.ts"], [knownPack(javaConfig, { error: new Error("must not be loaded") })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([]);
   });
 
@@ -163,6 +181,7 @@ describe("buildPackImportGraph", () => {
       external: [{ package: "java:stdlib:java.util", importedBy: ["src/A.java", "src/B.java"], symbols: ["List", "Map"] }],
       degraded: [],
       unparsed: [],
+      parseIssues: {},
     });
     expect(messages).toEqual([]);
   });
@@ -214,13 +233,38 @@ describe("buildPackImportGraph", () => {
   it("lists the files a pack that ran could not parse, for the caller's fallback parser", async () => {
     const entry = stubEntry(goConfig, { facts: [{ path: "a.go" }], unparsed: ["big.go"] });
     const { graph, messages } = await run(["a.go", "big.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
-    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: ["big.go"] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: ["big.go"], parseIssues: {} });
     expect(messages).toEqual([]);
+  });
+
+  it("records a pack's parse report with sorted, capped examples and warns one line for it", async () => {
+    const syntaxErrors = Array.from({ length: 60 }, (_, i) => `src/e${String(i).padStart(2, "0")}.go`).reverse();
+    const entry = stubEntry(goConfig, {
+      facts: [{ path: "a.go" }],
+      unparsed: ["big.go", "gone.go"],
+      parse: { files: 1204, sizeLimitBytes: 1024 * 1024, syntaxErrors, oversized: ["big.go"], unreadable: ["gone.go"], notUtf8: ["z.go", "src/e00.go"] },
+    });
+    const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
+    const issues = graph.parseIssues.go!;
+    expect(issues).toMatchObject({
+      files: 1204,
+      clean: 1204 - 63,
+      sizeLimitBytes: 1024 * 1024,
+      oversized: { count: 1, examples: ["big.go"] },
+      unreadable: { count: 1, examples: ["gone.go"] },
+      notUtf8: { count: 2, examples: ["src/e00.go", "z.go"] },
+    });
+    expect(issues.syntaxErrors.count).toBe(60);
+    expect(issues.syntaxErrors.examples).toEqual([...syntaxErrors].sort().slice(0, 50));
+    expect(messages).toEqual([
+      "[go-parse] 60 of 1,204 files have syntax errors (facts read from the partial tree); 1 over 1 MiB not parsed; " +
+        "1 unreadable; 2 not UTF-8 (parsed with replacement characters); listed in imports.json summary.parseIssues.",
+    ]);
   });
 
   it("only suggests a missing opt-in pack the project does not list: no warning, no edges", async () => {
     const { graph, messages, suggested } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([]);
     expect(suggested).toEqual(["java"]);
   });
@@ -231,7 +275,7 @@ describe("buildPackImportGraph", () => {
       [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })],
       { listed: ["java"] },
     );
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([
       "Java: pack @n-dx/lang-java is not installed; Java files get inventory only. " +
         "Install it with `ndx sv pack add java`.",
@@ -272,7 +316,7 @@ describe("buildPackImportGraph", () => {
     const requests: PackProjectRequest[] = [];
     const entry = { ...stubEntry(goConfig, { facts: [], unparsed: [] }, requests), produces: [] };
     const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"], unparsed: [], parseIssues: {} });
     expect(requests).toEqual([]);
     expect(messages).toEqual(['Go: the pack does not produce "imports"; Go imports come from the regex import parser.']);
   });
@@ -284,7 +328,7 @@ describe("buildPackImportGraph", () => {
       degraded: { reason: "grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm)", remedy: "Build it." },
     });
     const { graph, messages } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { entry })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([
       "Java: grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm); Java files get inventory only. Build it.",
     ]);

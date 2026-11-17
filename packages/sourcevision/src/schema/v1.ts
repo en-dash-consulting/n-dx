@@ -352,7 +352,40 @@ export interface ImportsSummary {
   circulars: CircularDependency[];
   mostImported: Array<{ path: string; count: number }>;
   avgImportsPerFile: number;
+  /**
+   * Pack id → the files of that language that did not parse cleanly. Absent
+   * when every pack-parsed file parsed cleanly.
+   */
+  parseIssues?: Record<string, PackParseIssues>;
 }
+
+/** One kind of parse problem: how many files, and the first paths in sort order. */
+export interface ParseIssueSample {
+  count: number;
+  /** At most {@link MAX_PARSE_ISSUE_EXAMPLES} paths, sorted. */
+  examples: string[];
+}
+
+/** How one language pack's files parsed. `notUtf8` overlaps `syntaxErrors`; the other kinds are exclusive. */
+export interface PackParseIssues {
+  /** Files of the language handed to the pack. */
+  files: number;
+  /** Files with none of the problems below. */
+  clean: number;
+  /** The parser's size limit in bytes. */
+  sizeLimitBytes: number;
+  /** Parsed with syntax errors; facts were still read from the partial tree. */
+  syntaxErrors: ParseIssueSample;
+  /** Over the size limit, so not parsed. */
+  oversized: ParseIssueSample;
+  /** Could not be read. */
+  unreadable: ParseIssueSample;
+  /** Not valid UTF-8; decoded with replacement characters and parsed. */
+  notUtf8: ParseIssueSample;
+}
+
+/** How many example paths {@link ParseIssueSample} keeps. */
+export const MAX_PARSE_ISSUE_EXAMPLES = 50;
 
 export interface Imports {
   edges: ImportEdge[];

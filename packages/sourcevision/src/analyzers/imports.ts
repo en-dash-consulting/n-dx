@@ -785,9 +785,12 @@ export async function analyzeImports(
     if (inventory.files.some((f) => isTerraformSource(f.path))) withFiles.add(terraformConfig.id);
     await noticeListedPacks(listedPacks, withFiles, { loader: options?.packs?.loader, warn: options?.packs?.warn });
   }
+  let parseIssues: ImportsSummary["parseIssues"];
   if (packFiles.length > 0) {
     const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS, listed: listedPacks ?? [] });
     mergeGraph(graph, edgeMap, externalMap);
+    // Packs re-run on every analysis, so this is never stale; absent when every file parsed cleanly.
+    if (Object.keys(graph.parseIssues).length > 0) parseIssues = graph.parseIssues;
     // Go must never drop to inventory-only: a degraded Go pack hands every Go
     // file (all of them are in the changed set) to the regex parser, and a
     // pack that ran hands it the files it could not parse (generated files
@@ -809,5 +812,6 @@ export async function analyzeImports(
 
   const edges = Array.from(edgeMap.values());
   const external = Array.from(externalMap.values());
-  return sortImports({ edges, external, summary: buildImportSummary(edges, external) });
+  const summary = buildImportSummary(edges, external);
+  return sortImports({ edges, external, summary: parseIssues ? { ...summary, parseIssues } : summary });
 }

@@ -17,6 +17,12 @@
 
 `scripts/build-grammars.mjs --out <dir> [<name>...]` builds the pinned grammars to WASM. Each grammar belongs to exactly one pack, which runs the script from its `build:grammars` script into its own `build/grammars`; `--out` is required, so a bare run builds nothing. A `GRAMMARS` entry's optional `subdir` names the grammar's directory inside its release archive (tree-sitter-php's `php/`); the whole archive is still extracted, and the `src/parser.c` check, `generate` and `build` run there (`grammarBuildSteps`). Every download — grammar sources, the CLI, and the wasi-sdk and binaryen toolchains the CLI compiles with — is SHA-256-pinned in the script, and the toolchains reach the CLI by `TREE_SITTER_WASI_SDK_PATH`/`TREE_SITTER_BINARYEN_PATH` so it downloads nothing itself. Its download cache is this package's `build/`, shared by every pack, so build them all with `pnpm -r --workspace-concurrency=1 run build:grammars`, as CI does; a parallel run is safe, since each build extracts its own copy and renames it into place, but may download a toolchain once per pack. `scripts/update-pack-goldens.mjs` is each pack's `test:update-goldens`.
 
+`createPackEntry` reads each file as bytes and returns lang-kit's `parse`
+report for every file that is not clean: error or missing nodes (facts still
+read), over the size limit (an `oversizedImportSource` recovery included),
+unreadable, or not valid UTF-8 (decoded with replacement characters and
+parsed). sourcevision writes it to imports.json `summary.parseIssues`.
+
 An entry may supply `oversizedImportSource`, a complete declaration prefix for
 files the runner skips for size. A valid prefix contributes imports only, with
 a notice that structure was skipped. Go uses this for generated files so their

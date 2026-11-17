@@ -21,8 +21,24 @@
  */
 
 import { extname } from "node:path";
-import type { FactKind, FileFacts, LanguageConfig, LanguagePackEntry, PackDegradation, PackProjectResult } from "@n-dx/lang-kit";
-import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
+import type {
+  FactKind,
+  FileFacts,
+  LanguageConfig,
+  LanguagePackEntry,
+  PackDegradation,
+  PackParseReport,
+  PackProjectResult,
+} from "@n-dx/lang-kit";
+import {
+  MAX_PARSE_ISSUE_EXAMPLES,
+  type ExternalImport,
+  type ImportEdge,
+  type Inventory,
+  type PackParseIssues,
+  type ParseIssueSample,
+} from "../schema/index.js";
+import { cmp } from "../util/sort.js";
 import {
   INSTALLABLE_PACKS,
   KNOWN_PACKS,
@@ -95,6 +111,47 @@ export interface PackImportGraph {
    * language (Go's regex parser) can run it on them.
    */
   readonly unparsed: string[];
+  /** Pack id → how its files parsed, for each pack that ran and had a file that did not parse cleanly. */
+  readonly parseIssues: Record<string, PackParseIssues>;
+}
+
+const sample = (paths: readonly string[]): ParseIssueSample => ({
+  count: paths.length,
+  examples: [...paths].sort(cmp).slice(0, MAX_PARSE_ISSUE_EXAMPLES),
+});
+
+/** A pack's parse report as imports.json records it: counts, and the first example paths in sort order. */
+export function parseIssuesOf(report: PackParseReport): PackParseIssues {
+  const notClean = new Set([...report.syntaxErrors, ...report.oversized, ...report.unreadable, ...report.notUtf8]);
+  return {
+    files: report.files,
+    clean: report.files - notClean.size,
+    sizeLimitBytes: report.sizeLimitBytes,
+    syntaxErrors: sample(report.syntaxErrors),
+    oversized: sample(report.oversized),
+    unreadable: sample(report.unreadable),
+    notUtf8: sample(report.notUtf8),
+  };
+}
+
+const count = (n: number): string => n.toLocaleString("en-US");
+
+const MIB = 1024 * 1024;
+const sizeText = (bytes: number): string =>
+  bytes % MIB === 0 ? `${count(bytes / MIB)} MiB` : bytes % 1024 === 0 ? `${count(bytes / 1024)} KiB` : `${count(bytes)} bytes`;
+
+/** The one notice line for a pack's parse problems, e.g. `[php-parse] 3 of 1,204 files have syntax errors; 2 over 1 MiB not parsed`. */
+export function parseIssuesNotice(packId: string, issues: PackParseIssues): string {
+  const parts: string[] = [];
+  const { syntaxErrors, oversized, unreadable, notUtf8 } = issues;
+  if (syntaxErrors.count > 0) {
+    parts.push(`${count(syntaxErrors.count)} of ${count(issues.files)} ${issues.files === 1 ? "file" : "files"} ${syntaxErrors.count === 1 ? "has" : "have"} syntax errors (facts read from the partial tree)`);
+  }
+  if (oversized.count > 0) parts.push(`${count(oversized.count)} over ${sizeText(issues.sizeLimitBytes)} not parsed`);
+  if (unreadable.count > 0) parts.push(`${count(unreadable.count)} unreadable`);
+  if (notUtf8.count > 0) parts.push(`${count(notUtf8.count)} not UTF-8 (parsed with replacement characters)`);
+  const lead = syntaxErrors.count > 0 ? "" : `${count(issues.files)} ${issues.files === 1 ? "file" : "files"}: `;
+  return `[${packId}-parse] ${lead}${parts.join("; ")}; listed in imports.json summary.parseIssues.`;
 }
 
 /** Packs whose files the imports phase analyzes, given the extensions it parses. */
@@ -152,6 +209,7 @@ export async function buildPackImportGraph(
   const external = new Map<string, ExternalImport>();
   const degraded: string[] = [];
   const unparsed: string[] = [];
+  const parseIssues: Record<string, PackParseIssues> = {};
 
   const warn = options.warn ?? ((message: string) => console.warn(message));
   /** One notice: what failed, what the language gets instead, how to fix it. */
@@ -205,6 +263,11 @@ export async function buildPackImportGraph(
     options.analysed?.(pack.id);
     unparsed.push(...result.unparsed);
     for (const notice of result.notices ?? []) warn(notice);
+    if (result.parse) {
+      const issues = parseIssuesOf(result.parse);
+      parseIssues[pack.id] = issues;
+      warn(parseIssuesNotice(pack.id, issues));
+    }
     if (framework.length > 0) options.framework?.(result.facts, framework);
 
     for (const { path, imports } of result.facts) {
@@ -224,7 +287,7 @@ export async function buildPackImportGraph(
     }
   }
 
-  return { edges, external: [...external.values()], degraded, unparsed };
+  return { edges, external: [...external.values()], degraded, unparsed, parseIssues };
 }
 
 /**

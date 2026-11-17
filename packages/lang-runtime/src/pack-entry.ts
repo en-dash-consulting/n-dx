@@ -15,18 +15,23 @@
  * the project notices reader that throws loses only its own output, and a
  * symbol `refine` that throws on a file leaves that file the rules' symbols;
  * each is reported as a notice, so imports never depend on them. A file that cannot be read or is over the
- * runner's size limit is listed in `unparsed`.
+ * runner's size limit is listed in `unparsed`. Every file that does not parse
+ * cleanly (syntax errors, oversized, unreadable, not valid UTF-8) is listed in
+ * `parse`, which is absent when all of them do; facts from a file with syntax
+ * errors are still read from its partial tree.
  *
  * @module lang-runtime/pack-entry
  */
 
 import { existsSync } from "node:fs";
+import { isUtf8 } from "node:buffer";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   FactKind,
   FileFacts,
   LanguagePackEntry,
+  PackParseReport,
   PackProjectRequest,
   PackProjectResult,
 } from "@n-dx/lang-kit";
@@ -48,7 +53,7 @@ import {
   type PackSymbolRules,
   type ProjectFactsReader,
 } from "./pack-facts.js";
-import { createTreeSitterRunner, loadGrammar, type RunnablePack, type RunnerOptions, type TreeSitterRunner } from "./runner.js";
+import { createTreeSitterRunner, DEFAULT_MAX_FILE_BYTES, loadGrammar, type RunnablePack, type RunnerOptions } from "./runner.js";
 
 export interface TreeSitterEntryOptions {
   /** The package the pack ships in; its grammar is read from `package.grammarDir()`. */
@@ -135,12 +140,48 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       }
     }
 
-    const { parsed, unparsed, importsOnly, fallbackNotices } = await parseFiles(
-      runner,
-      target,
-      request,
-      wantsImports ? options.oversizedImportSource : undefined,
-    );
+    const parsed: PackSourceFile[] = [];
+    const unparsed: string[] = [];
+    const importsOnly = new Set<string>();
+    const fallbackNotices: string[] = [];
+    const issues = { syntaxErrors: [] as string[], oversized: [] as string[], unreadable: [] as string[], notUtf8: [] as string[] };
+    for (const path of request.files) {
+      let bytes: Buffer;
+      try {
+        bytes = await readFile(join(request.projectDir, path));
+      } catch {
+        unparsed.push(path); // unreadable files are skipped, as for every other language
+        issues.unreadable.push(path);
+        continue;
+      }
+      // Decoding never throws: invalid bytes become U+FFFD and the file is still parsed.
+      if (!isUtf8(bytes)) issues.notUtf8.push(path);
+      const source = bytes.toString("utf8");
+      // A pack may recover a complete import header without parsing the oversized body.
+      let result = await runner.parseSource(target, path, source);
+      if (result.status === "skipped" && wantsImports && options.oversizedImportSource) {
+        try {
+          const prefix = options.oversizedImportSource(source);
+          if (prefix !== undefined) {
+            const recovered = await runner.parseSource(target, path, prefix);
+            if (recovered.status === "parsed" && !recovered.hasErrorNodes && !recovered.hasMissingNodes) {
+              result = recovered;
+              importsOnly.add(path);
+            }
+          }
+        } catch (error) {
+          fallbackNotices.push(`${path} oversized import recovery failed (${errorText(error)}); left unparsed`);
+        }
+      }
+      // A file whose imports came from its declaration prefix is still oversized: its structure was not parsed.
+      if (result.status === "skipped" || importsOnly.has(path)) issues.oversized.push(path);
+      else if (result.hasErrorNodes || result.hasMissingNodes) issues.syntaxErrors.push(path);
+      if (result.status === "parsed") parsed.push({ path, captures: result.captures });
+      else unparsed.push(path);
+    }
+    const parse: PackParseReport | undefined = Object.values(issues).every((paths) => paths.length === 0)
+      ? undefined
+      : { files: request.files.length, sizeLimitBytes: options.runner?.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES, ...issues };
 
     // Prepared for imports, or on a framework's first lookup: a framework that never follows a reference costs nothing.
     let preparedOnce: PreparedResolver | undefined;
@@ -173,67 +214,10 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       ...(options.projectNotices ? readProjectNotices(options.projectNotices, pack, structural, kinds) : []),
       ...(prepared?.notices?.() ?? []),
     ];
-    return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };
+    return { facts, unparsed, ...(notices.length === 0 ? {} : { notices }), ...(parse ? { parse } : {}) };
   } finally {
     runner.dispose();
   }
-}
-
-/** What {@link parseFiles} made of the requested files. */
-interface ParsedFiles {
-  readonly parsed: PackSourceFile[];
-  /** Files that could not be read, or that the runner skipped. */
-  readonly unparsed: string[];
-  /** Oversized files parsed from their declaration prefix alone: they give imports only. */
-  readonly importsOnly: ReadonlySet<string>;
-  /** One per oversized file whose import recovery threw. */
-  readonly fallbackNotices: readonly string[];
-}
-
-/**
- * Read and parse every requested file, in order. With
- * `oversizedImportSource` (passed only when imports are wanted), a file the
- * runner skips is parsed again from the declaration prefix it returns, and
- * kept when that prefix parses without errors.
- */
-async function parseFiles(
-  runner: TreeSitterRunner,
-  target: RunnablePack,
-  request: PackProjectRequest,
-  oversizedImportSource: ((source: string) => string | undefined) | undefined,
-): Promise<ParsedFiles> {
-  const parsed: PackSourceFile[] = [];
-  const unparsed: string[] = [];
-  const importsOnly = new Set<string>();
-  const fallbackNotices: string[] = [];
-  for (const path of request.files) {
-    let source: string;
-    try {
-      source = await readFile(join(request.projectDir, path), "utf-8");
-    } catch {
-      unparsed.push(path); // unreadable files are skipped, as for every other language
-      continue;
-    }
-    // A pack may recover a complete import header without parsing the oversized body.
-    let result = await runner.parseSource(target, path, source);
-    if (result.status === "skipped" && oversizedImportSource) {
-      try {
-        const prefix = oversizedImportSource(source);
-        if (prefix !== undefined) {
-          const recovered = await runner.parseSource(target, path, prefix);
-          if (recovered.status === "parsed" && !recovered.hasErrorNodes && !recovered.hasMissingNodes) {
-            result = recovered;
-            importsOnly.add(path);
-          }
-        }
-      } catch (error) {
-        fallbackNotices.push(`${path} oversized import recovery failed (${errorText(error)}); left unparsed`);
-      }
-    }
-    if (result.status === "parsed") parsed.push({ path, captures: result.captures });
-    else unparsed.push(path);
-  }
-  return { parsed, unparsed, importsOnly, fallbackNotices };
 }
 
 /**

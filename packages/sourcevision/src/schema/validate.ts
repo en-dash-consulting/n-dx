@@ -175,6 +175,21 @@ const CircularDependencySchema = z.object({
   cycle: z.array(z.string()),
 });
 
+const ParseIssueSampleSchema = z.object({
+  count: z.number().int().nonnegative(),
+  examples: z.array(z.string()),
+});
+
+const PackParseIssuesSchema = z.object({
+  files: z.number().int().nonnegative(),
+  clean: z.number().int().nonnegative(),
+  sizeLimitBytes: z.number().int().nonnegative(),
+  syntaxErrors: ParseIssueSampleSchema,
+  oversized: ParseIssueSampleSchema,
+  unreadable: ParseIssueSampleSchema,
+  notUtf8: ParseIssueSampleSchema,
+});
+
 const ImportsSummarySchema = z.object({
   totalEdges: z.number().int().nonnegative(),
   totalExternal: z.number().int().nonnegative(),
@@ -187,6 +202,7 @@ const ImportsSummarySchema = z.object({
     })
   ),
   avgImportsPerFile: z.number().nonnegative(),
+  parseIssues: z.record(z.string(), PackParseIssuesSchema).optional(),
 });
 
 export const ImportsSchema = z.object({
