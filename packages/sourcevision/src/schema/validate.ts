@@ -131,6 +131,13 @@ const FileEntrySchema = z.object({
   role: FileRoleSchema,
   category: z.string(),
   lastModified: z.number().int().nonnegative().optional(),
+  thirdParty: z.string().optional(),
+  mirrorOf: z.string().optional(),
+});
+
+const InventoryExcludedSummarySchema = z.object({
+  files: z.number().int().nonnegative(),
+  byReason: z.record(z.string(), z.number().int().nonnegative()),
 });
 
 const InventorySummarySchema = z.object({
@@ -141,6 +148,8 @@ const InventorySummarySchema = z.object({
   byCategory: z.record(z.string(), z.number().int().nonnegative()),
   skippedExtensions: z.record(z.string(), z.number().int().nonnegative()).optional(),
   analysedLanguages: z.array(z.string()).optional(),
+  thirdParty: InventoryExcludedSummarySchema.optional(),
+  mirrored: InventoryExcludedSummarySchema.optional(),
 });
 
 export const InventorySchema = z.object({
@@ -728,6 +737,9 @@ const SdlcLanguageEcosystemSchema = z.object({
   versionFloors: SdlcVersionFloorsSchema.optional(),
   legacyConstructs: SdlcLegacyConstructsSchema.optional(),
   dynamicCode: SdlcDynamicCodeSchema.optional(),
+  thirdParty: z
+    .object({ legacyConstructs: SdlcLegacyConstructsSchema.optional(), dynamicCode: SdlcDynamicCodeSchema.optional() })
+    .optional(),
 });
 
 export const SdlcProfileSchema = z.object({
@@ -765,6 +777,7 @@ const OutboundDependencySchema = z.object({
   targetSource: z.enum(["literal", "env", "config", "unknown"]),
   client: z.string().min(1),
   confidence: ConfidenceSchema,
+  thirdParty: z.string().optional(),
 });
 
 const DeclaredContractSchema = z.object({

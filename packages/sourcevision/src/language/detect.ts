@@ -98,6 +98,8 @@ export interface InventoryConfigOverride {
   extraSkipDirs?: string[];
   /** Language pack ids the project wants (`sourcevision.packs`); reported on, never changes what is analysed. */
   packs?: string[];
+  /** Globs of copied-in third-party code (`sourcevision.thirdParty`); a leading `!` denies. See analyzers/third-party.ts. */
+  thirdParty?: string[];
 }
 
 /**
@@ -122,6 +124,9 @@ export async function loadInventoryConfig(rootDir: string): Promise<InventoryCon
     }
     if (Array.isArray(s.packs)) {
       out.packs = s.packs.filter((e): e is string => typeof e === "string");
+    }
+    if (Array.isArray(s.thirdParty)) {
+      out.thirdParty = s.thirdParty.filter((e): e is string => typeof e === "string" && e.trim() !== "");
     }
     return out;
   } catch {

@@ -19,6 +19,7 @@ SourceVision runs a 4-phase analysis pipeline:
 sourcevision analyze .                    # full analysis
 sourcevision analyze --fast .             # static only: no model or network calls
 sourcevision analyze --phase zones .      # run specific phase
+sourcevision analyze --third-party='lib/Sheet/**' .  # treat a copied-in library as third-party
 sourcevision serve .                      # interactive browser viewer
 sourcevision validate .                   # validate analysis output
 sourcevision readiness .                  # SDLC readiness scorecard
@@ -321,6 +322,18 @@ ndx start .             # includes viewer in dashboard
 ```
 
 The viewer provides 8 views: Overview, Imports, Zones, Files, Routes, Architecture, Problems, and Suggestions.
+
+## Copied-in third-party code
+
+A library copied into the repository by hand (a spreadsheet library in `lib/`, an old JS framework in `js/`) is not under `vendor/` and no manifest installs it, so analysis used to read it as the application. Inventory now marks such files `thirdParty` with the reason, and `summary.thirdParty` counts them; analyze prints one line with the count per reason. A file is third-party when no deny glob matches it and one of these does:
+
+- a glob in `sourcevision.thirdParty` (project config), reason `config <glob>`;
+- a glob passed as `--third-party=<glob>` or listed in `--third-party-file=<path>` (one per line, or a JSON array), reason `cli <glob>`; a caller with its own library catalogue passes it this way;
+- a built-in fingerprint, reason `library <Name>`: a library's own header in the file's first 2 KiB (a `@package PHPExcel` docblock, a YUI or Highcharts version banner), a directory named as a well-known library (`edit_area`, `tinymce`, `PHPExcel`), or a directory where at least 80% of the files carry one library's header.
+
+Globs use `**`, `*` and `?`; a trailing `/` means the whole directory, and a name without `/` matches at any depth. A glob starting with `!` denies, overriding every rule, so a wrong fingerprint is undone with `"!lib/our-tinymce-plugin/**"`.
+
+A third-party file stays in the inventory, and imports to it still resolve. It is left out of zones (so never a zone entry point), classification and the model escalation pass, primary-language detection, readiness evidence and the call graph (`--include-third-party` maps it). Pack totals in `sdlc-profile.json` `ecosystem.<language>` count it apart, under `thirdParty`. An `outbound.json` call in it is kept, since a copied-in SDK's calls are still the repository's integrations, and marked `thirdParty`.
 
 ## Zone Detection
 

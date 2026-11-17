@@ -85,6 +85,10 @@ export interface AnalyzeContext {
   wait: boolean;
   /** `--include-minified`: map minified bundles in the call graph too. */
   includeMinified?: boolean;
+  /** `--include-third-party`: map third-party and mirror-copy files in the call graph too. */
+  includeThirdParty?: boolean;
+  /** `--third-party=<glob>` and the globs in each `--third-party-file`, in order. */
+  thirdPartyGlobs?: string[];
   /** Final zone ids the cascade left for `sv narrate`; set by the zones phase. */
   pendingNarration?: string[];
   /** Final zone ids whose generated names `sv narrate` still has to produce. */
@@ -209,8 +213,11 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
       {
         ...(previousInventory ? { previousInventory } : {}),
         languageConfig: mergedConfig,
+        ...(ctx.thirdPartyGlobs?.length ? { thirdPartyGlobs: ctx.thirdPartyGlobs } : {}),
       },
     );
+    const excludedLine = describeExcluded(ctx.inventoryResult.summary);
+    if (excludedLine) info(excludedLine);
 
     // Serialize only { files, summary } (strip stats/changedFiles)
     const outPath = join(ctx.svDir, DATA_FILES.inventory);
@@ -241,6 +248,25 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
   } catch (err) {
     failPhase(ctx, 1, "inventory", err);
   }
+}
+
+/**
+ * One line naming how many files analysis treats as third-party or as mirror
+ * copies, and why, e.g. `  412 files marked third-party (library PHPExcel 198,
+ * config js/yui/** 214); left out of zones, classification and totals`.
+ */
+export function describeExcluded(summary: InventoryResult["summary"]): string | undefined {
+  const parts: string[] = [];
+  for (const [label, s] of [["third-party", summary.thirdParty], ["mirror copies", summary.mirrored]] as const) {
+    if (!s) continue;
+    const reasons = Object.entries(s.byReason)
+      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+      .map(([reason, n]) => `${reason} ${n}`)
+      .join(", ");
+    parts.push(`${s.files} ${s.files === 1 ? "file" : "files"} marked ${label} (${reasons})`);
+  }
+  if (parts.length === 0) return undefined;
+  return `  ${parts.join("; ")}; left out of zones, classification, the call graph and migration totals`;
 }
 
 // ── Phase 2: Imports ─────────────────────────────────────────────────
@@ -683,6 +709,9 @@ export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
       includeMinified: ctx.includeMinified,
       onMinifiedLeftOut: (count) =>
         info(`  ${count} minified ${count === 1 ? "file" : "files"} left out of the call graph (--include-minified maps them)`),
+      includeThirdParty: ctx.includeThirdParty,
+      onThirdPartyLeftOut: (count) =>
+        info(`  ${count} third-party ${count === 1 ? "file" : "files"} left out of the call graph (--include-third-party maps them)`),
     });
     const outPath = join(ctx.svDir, DATA_FILES.callGraph);
     writeFileSync(outPath, toCanonicalJSON(callGraph));

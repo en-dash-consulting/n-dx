@@ -28,7 +28,7 @@ import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
-import type { RiskAssessmentOptions, RiskJustificationEntry, ZoneType, Zones } from "../sourcevision-core.js";
+import type { Inventory, RiskAssessmentOptions, RiskJustificationEntry, ZoneType, Zones } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
   runImportsPhase,
@@ -45,6 +45,7 @@ import {
 } from "./analyze-phases.js";
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
+import { markOutboundThirdParty, outsideStructurePredicate, parseThirdPartyGlobFile } from "../../analyzers/third-party.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { enrichTerraformInfrastructure } from "../../analyzers/terraform-infrastructure.js";
@@ -125,6 +126,39 @@ export function resolveAnalyzeTokenEventMetadata(
     vendor,
     model: UNKNOWN_PROVIDER_METADATA,
   };
+}
+
+/**
+ * Third-party globs from the command line, in order: each `--third-party=<glob>`
+ * as written, and the globs in each `--third-party-file=<path>` (one per line,
+ * or a JSON array; relative to the project). A file that cannot be read is an
+ * error: a catalogue that silently did not apply would put the libraries back
+ * into the map.
+ */
+export function parseThirdPartyGlobs(extraArgs: string[], absDir: string): string[] {
+  const globs: string[] = [];
+  for (const a of extraArgs) {
+    if (a.startsWith("--third-party=")) {
+      const glob = a.slice("--third-party=".length).trim();
+      if (glob !== "") globs.push(glob);
+    } else if (a.startsWith("--third-party-file=")) {
+      const path = resolve(absDir, a.slice("--third-party-file=".length));
+      let text: string;
+      try {
+        text = readFileSync(path, "utf-8");
+      } catch (err) {
+        throw new Error(`--third-party-file: cannot read ${path} (${err instanceof Error ? err.message : String(err)})`);
+      }
+      globs.push(...parseThirdPartyGlobFile(text));
+    }
+  }
+  return globs;
+}
+
+/** outbound.json's dependencies with third-party calls marked and mirror-copy calls dropped (third-party.ts). */
+function applicationOutbound<D extends { dependencies: { file: string; thirdParty?: string }[] }>(data: D, inventory: Inventory): D {
+  const dependencies = markOutboundThirdParty(data.dependencies, inventory.files);
+  return dependencies === data.dependencies ? data : { ...data, dependencies };
 }
 
 function parsePhaseFilter(extraArgs: string[]): PhaseFilter {
@@ -455,6 +489,8 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     narrate: extraArgs.includes("--narrate"),
     wait: extraArgs.includes("--wait"),
     includeMinified: extraArgs.includes("--include-minified"),
+    includeThirdParty: extraArgs.includes("--include-third-party"),
+    thirdPartyGlobs: parseThirdPartyGlobs(extraArgs, absDir),
     targetPass: parseTargetPass(extraArgs),
     tokenUsage: emptyAnalyzeTokenUsage(),
     inventoryResult: null,
@@ -798,7 +834,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // Language packs' version floors and legacy constructs join it as
     // `ecosystem`, only when a pack that produces them ran over files of its language.
     const sdlcProfile = withEcosystem(
-      await buildSdlcProfile(ctx.absDir),
+      await buildSdlcProfile(ctx.absDir, { exclude: outsideStructurePredicate(inventory.files) }),
       packEcosystem(await packFrameworkFacts(ctx, inventory), inventory),
     );
     writeFileSync(
@@ -825,7 +861,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // above it. Language packs' outbound calls join the detectors' entries.
     writeFileSync(
       join(ctx.svDir, DATA_FILES.outbound),
-      toCanonicalJSON(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory))),
+      toCanonicalJSON(applicationOutbound(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory)), inventory)),
     );
 
     // Config reads and flag checks, only when a language pack produced them:

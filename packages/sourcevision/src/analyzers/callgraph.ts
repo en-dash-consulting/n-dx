@@ -22,8 +22,9 @@ import type {
   ImportEdge,
 } from "../schema/index.js";
 import { sortCallGraph } from "../util/sort.js";
-import { parseJsTsSource } from "./ts-source.js";
 import { isMinifiedFile, isMinifiedName, MINIFIED_HEAD_BYTES, UNMAPPED_ROLES } from "./minified.js";
+import { parseJsTsSource } from "./ts-source.js";
+import { isOutsideStructure } from "./third-party.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -480,6 +481,10 @@ export interface CallGraphOptions {
   includeMinified?: boolean;
   /** Told how many minified files were left out, when any were. */
   onMinifiedLeftOut?: (count: number) => void;
+  /** `--include-third-party`: map third-party and mirror-copy files too. Forces a full parse. */
+  includeThirdParty?: boolean;
+  /** Told how many third-party and mirror-copy files were left out, when any were. */
+  onThirdPartyLeftOut?: (count: number) => void;
 }
 
 /** True when the file at `path` is minified, by name or by its first bytes. */
@@ -509,11 +514,18 @@ export async function selectCallGraphFiles(
   targetDir: string,
   files: readonly FileEntry[],
   includeMinified = false,
-): Promise<{ files: FileEntry[]; minifiedLeftOut: number }> {
+  includeThirdParty = false,
+): Promise<{ files: FileEntry[]; minifiedLeftOut: number; thirdPartyLeftOut: number }> {
   const selected: FileEntry[] = [];
   let minifiedLeftOut = 0;
+  let thirdPartyLeftOut = 0;
   for (const f of files) {
     if (!JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase())) continue;
+    // Third-party and mirror-copy files (third-party.ts) are not the application's calls.
+    if (!includeThirdParty && isOutsideStructure(f)) {
+      thirdPartyLeftOut++;
+      continue;
+    }
     const unmapped = UNMAPPED_ROLES.has(f.role);
     if (!unmapped && f.role !== "test") {
       selected.push(f);
@@ -526,7 +538,7 @@ export async function selectCallGraphFiles(
     if (includeMinified) selected.push(f);
     else minifiedLeftOut++;
   }
-  return { files: selected, minifiedLeftOut };
+  return { files: selected, minifiedLeftOut, thirdPartyLeftOut };
 }
 
 // ── Main analyzer ─────────────────────────────────────────────────────────
@@ -542,10 +554,11 @@ export async function analyzeCallGraph(
   const fileSetChanged = options?.fileSetChanged ?? true;
 
   // A minified file left out last run has nothing to reuse, so including them parses everything.
-  const canIncremental = prev && changedFiles && !fileSetChanged && !options?.includeMinified;
+  const canIncremental = prev && changedFiles && !fileSetChanged && !options?.includeMinified && !options?.includeThirdParty;
 
-  const mapped = await selectCallGraphFiles(targetDir, inventory.files, options?.includeMinified);
+  const mapped = await selectCallGraphFiles(targetDir, inventory.files, options?.includeMinified, options?.includeThirdParty);
   if (mapped.minifiedLeftOut > 0) options?.onMinifiedLeftOut?.(mapped.minifiedLeftOut);
+  if (mapped.thirdPartyLeftOut > 0) options?.onThirdPartyLeftOut?.(mapped.thirdPartyLeftOut);
 
   // Build import symbol resolution map
   const importSymbolMap = buildImportSymbolMap(imports.edges);

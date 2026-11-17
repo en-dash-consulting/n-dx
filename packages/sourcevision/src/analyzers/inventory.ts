@@ -21,6 +21,7 @@ import {
   MINIFIED_HEAD_BYTES,
   MINIFIED_RULES,
 } from "./minified.js";
+import { markThirdParty } from "./third-party.js";
 import {
   csharpConfig,
   javaConfig,
@@ -471,6 +472,11 @@ export interface InventoryOptions {
   extraExtensions?: string[];
   /** Extra directory names to skip during the walk (in addition to base + language skips). */
   extraSkipDirs?: string[];
+  /**
+   * Third-party globs from the command line (`--third-party`, `--third-party-file`),
+   * applied after `sourcevision.thirdParty` from the project config (third-party.ts).
+   */
+  thirdPartyGlobs?: string[];
 }
 
 export interface InventoryStats {
@@ -647,6 +653,23 @@ export async function analyzeInventory(
       changedFiles.add(relPath);
       added++;
     }
+  }
+
+  // Third-party marks are recomputed every run (a cached entry may carry an old one). A file whose
+  // mark changed is changed for downstream phases: it joins or leaves zones, classification and the call graph.
+  const marked = await markThirdParty(absDir, files, {
+    globs: [
+      ...(inventoryConfig.thirdParty ?? []).map((glob) => ({ glob, source: "config" as const })),
+      ...(options?.thirdPartyGlobs ?? []).map((glob) => ({ glob, source: "cli" as const })),
+    ],
+  });
+  for (let i = 0; i < marked.length; i++) {
+    const before = prevMap.get(marked[i].path);
+    if (before && before.thirdParty !== marked[i].thirdParty && !changedFiles.has(marked[i].path)) {
+      changedFiles.add(marked[i].path);
+      changed++;
+    }
+    files[i] = marked[i];
   }
 
   // Detect deleted files

@@ -23,6 +23,7 @@ import type {
   ClassificationsSummary,
   AnalyzeTokenUsage,
 } from "../schema/index.js";
+import { isOutsideStructure } from "./third-party.js";
 import { BUILTIN_ARCHETYPES } from "./archetypes.js";
 import { sortClassifications } from "../util/sort.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
@@ -99,7 +100,8 @@ export function analyzeClassifications(
     }
   }
 
-  const sourceFiles = inventory.files.filter((f) => f.role === "source");
+  // Third-party and mirror-copy files get no archetype, and so never reach the model escalation pass.
+  const sourceFiles = inventory.files.filter((f) => f.role === "source" && !isOutsideStructure(f));
   const classifications: FileClassification[] = [];
 
   for (const file of sourceFiles) {

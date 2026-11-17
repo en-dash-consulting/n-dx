@@ -63,6 +63,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--deep", description: "Re-analyze sub-packages before root analysis" },
       { flag: "--per-zone", description: "Per-zone enrichment (smaller context, parallelizable)" },
       { flag: "--include-minified", description: "Map minified bundles (*.min.js, long-line files) in callgraph.json too" },
+      { flag: "--third-party=<glob>", description: "Treat files matching <glob> as copied-in third-party code (repeatable; !<glob> denies)" },
+      { flag: "--third-party-file=<path>", description: "Read third-party globs from a file (one per line, or a JSON array)" },
+      { flag: "--include-third-party", description: "Map third-party and mirror-copy files in callgraph.json too" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
     examples: [

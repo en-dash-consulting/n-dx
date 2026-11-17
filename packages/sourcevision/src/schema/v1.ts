@@ -285,6 +285,31 @@ export interface FileEntry {
   category: string;
   /** File mtime in epoch ms — used for incremental analysis caching */
   lastModified?: number;
+  /**
+   * Why this file is third-party code copied into the repository (not
+   * installed by a package manager): `library <Name>` for a built-in
+   * fingerprint, `config <glob>` or `cli <glob>` for a configured glob. Such a
+   * file stays in the inventory and its import edges still resolve, but it is
+   * left out of zones, classification, primary-language detection, readiness
+   * evidence, the call graph and the migration totals. Absent for
+   * first-party files.
+   */
+  thirdParty?: string;
+  /**
+   * The directory this file's directory mirrors: a near-identical copy of
+   * another folder in the same repository, whose identical files are counted
+   * once, in the source. Set only on files whose content matches their
+   * counterpart; the files that differ stay first-party. Absent otherwise.
+   */
+  mirrorOf?: string;
+}
+
+/** Third-party and mirrored files, counted apart from first-party code. */
+export interface InventoryExcludedSummary {
+  /** Files marked third-party. */
+  files: number;
+  /** Files per reason, as in {@link FileEntry.thirdParty} or `mirror <dir> of <dir>`. */
+  byReason: Record<string, number>;
 }
 
 export interface InventorySummary {
@@ -309,6 +334,10 @@ export interface InventorySummary {
    * inventories written before this field existed.
    */
   analysedLanguages?: string[];
+  /** Third-party files ({@link FileEntry.thirdParty}). Absent when there are none. */
+  thirdParty?: InventoryExcludedSummary;
+  /** Mirrored files ({@link FileEntry.mirrorOf}). Absent when there are none. */
+  mirrored?: InventoryExcludedSummary;
 }
 
 export interface Inventory {
@@ -1647,6 +1676,12 @@ export interface SdlcLanguageEcosystem {
   versionFloors?: SdlcVersionFloors;
   legacyConstructs?: SdlcLegacyConstructs;
   dynamicCode?: SdlcDynamicCode;
+  /**
+   * The same counts over third-party and mirror-copy files (inventory
+   * `thirdParty`, `mirrorOf`), kept apart so the sections above describe the
+   * application alone. Absent when those files have none.
+   */
+  thirdParty?: { legacyConstructs?: SdlcLegacyConstructs; dynamicCode?: SdlcDynamicCode };
 }
 
 /**
@@ -1737,6 +1772,12 @@ export interface OutboundDependency {
    * lower would state the same fact in two fields that can then disagree.
    */
   confidence: Confidence;
+  /**
+   * Set when the call is in copied-in third-party code (the file's inventory
+   * `thirdParty` reason): still this repository's integration, but counted
+   * apart from the application's own calls. Absent for first-party calls.
+   */
+  thirdParty?: string;
 }
 
 /**

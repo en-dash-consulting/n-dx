@@ -34,17 +34,24 @@ import type {
   SdlcVersionFloors,
 } from "../schema/index.js";
 import type { PackFrameworkFacts } from "./pack-framework-facts.js";
+import { isOutsideStructure } from "./third-party.js";
 
-/** Facts for files the inventory lists, grouped by language. */
-function byLanguage(facts: PackFrameworkFacts | undefined, inventory: Inventory): Map<string, PackFrameworkFacts[number][]> {
-  const languages = new Map(inventory.files.map((f) => [f.path, f.language.toLowerCase()]));
-  const grouped = new Map<string, PackFrameworkFacts[number][]>();
+type Fact = PackFrameworkFacts[number];
+
+/**
+ * Facts for files the inventory lists, grouped by language: the application's
+ * own, and apart from them those of third-party and mirror-copy files.
+ */
+function byLanguage(facts: PackFrameworkFacts | undefined, inventory: Inventory): Map<string, { own: Fact[]; outside: Fact[] }> {
+  const files = new Map(inventory.files.map((f) => [f.path, f]));
+  const grouped = new Map<string, { own: Fact[]; outside: Fact[] }>();
   for (const fact of facts ?? []) {
-    const language = languages.get(fact.path);
-    if (language === undefined) continue;
-    let list = grouped.get(language);
-    if (list === undefined) grouped.set(language, (list = []));
-    list.push(fact);
+    const file = files.get(fact.path);
+    if (file === undefined) continue;
+    const language = file.language.toLowerCase();
+    let lists = grouped.get(language);
+    if (lists === undefined) grouped.set(language, (lists = { own: [], outside: [] }));
+    (isOutsideStructure(file) ? lists.outside : lists.own).push(fact);
   }
   return grouped;
 }
@@ -175,15 +182,25 @@ const sortedCounts = (counts: ReadonlyMap<string, number>): Record<string, numbe
  */
 export function packEcosystem(facts: PackFrameworkFacts | undefined, inventory: Inventory): Record<string, SdlcLanguageEcosystem> | undefined {
   const ecosystem: Record<string, SdlcLanguageEcosystem> = {};
-  for (const [language, list] of [...byLanguage(facts, inventory)].sort(([a], [b]) => a.localeCompare(b))) {
-    const floors = versionFloors(list);
-    const legacy = legacyConstructs(list);
-    const dynamic = dynamicCode(list);
-    if (floors === undefined && legacy === undefined && dynamic === undefined) continue;
+  for (const [language, { own, outside }] of [...byLanguage(facts, inventory)].sort(([a], [b]) => a.localeCompare(b))) {
+    const floors = versionFloors(own);
+    const legacy = legacyConstructs(own);
+    const dynamic = dynamicCode(own);
+    const outsideLegacy = legacyConstructs(outside);
+    const outsideDynamic = dynamicCode(outside);
+    const thirdParty =
+      outsideLegacy === undefined && outsideDynamic === undefined
+        ? undefined
+        : {
+            ...(outsideLegacy === undefined ? {} : { legacyConstructs: outsideLegacy }),
+            ...(outsideDynamic === undefined ? {} : { dynamicCode: outsideDynamic }),
+          };
+    if (floors === undefined && legacy === undefined && dynamic === undefined && thirdParty === undefined) continue;
     ecosystem[language] = {
       ...(floors === undefined ? {} : { versionFloors: floors }),
       ...(legacy === undefined ? {} : { legacyConstructs: legacy }),
       ...(dynamic === undefined ? {} : { dynamicCode: dynamic }),
+      ...(thirdParty === undefined ? {} : { thirdParty }),
     };
   }
   return Object.keys(ecosystem).length === 0 ? undefined : ecosystem;

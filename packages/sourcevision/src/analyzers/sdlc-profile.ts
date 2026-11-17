@@ -1023,10 +1023,20 @@ function manifestVersionLine(text: string): string | undefined {
  * Deterministic: no LLM, no network, no clock. The only inputs are the files
  * under `root` that survive the project's ignore rules and the walk bounds.
  */
-export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
+export interface SdlcProfileOptions {
+  /**
+   * Project-relative paths that are not the application's own (third-party
+   * and mirror-copy code, `outsideStructurePredicate`): never evidence, so a
+   * copied-in library's test file does not count as the project's tests.
+   */
+  exclude?: (path: string) => boolean;
+}
+
+export async function buildSdlcProfile(root: string, options: SdlcProfileOptions = {}): Promise<SdlcProfile> {
   const ignore = await loadIgnoreFilter(root);
   const walk = walkProject(root, ignore);
-  const files = classify(walk.files);
+  const exclude = options.exclude;
+  const files = classify(exclude ? walk.files.filter((f) => !exclude(f.path)) : walk.files);
   const reader = new Reader(root);
 
   if (walk.truncated) {
