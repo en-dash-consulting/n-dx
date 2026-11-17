@@ -501,7 +501,9 @@ async function isMinifiedOnDisk(targetDir: string, path: string): Promise<boolea
 /**
  * JS/TS files the call graph maps: each whose role is not in
  * {@link UNMAPPED_ROLES}, plus minified ones under `includeMinified`.
- * `minifiedLeftOut` counts the minified files it left out.
+ * A minified file under a test directory keeps role `test` in the
+ * inventory (a vendored `tests/js/jquery.min.js`), so test files are
+ * checked here too. `minifiedLeftOut` counts the minified files it left out.
  */
 export async function selectCallGraphFiles(
   targetDir: string,
@@ -512,11 +514,15 @@ export async function selectCallGraphFiles(
   let minifiedLeftOut = 0;
   for (const f of files) {
     if (!JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase())) continue;
-    if (!UNMAPPED_ROLES.has(f.role)) {
+    const unmapped = UNMAPPED_ROLES.has(f.role);
+    if (!unmapped && f.role !== "test") {
       selected.push(f);
       continue;
     }
-    if (!(await isMinifiedOnDisk(targetDir, f.path))) continue;
+    if (!(await isMinifiedOnDisk(targetDir, f.path))) {
+      if (!unmapped) selected.push(f); // an ordinary test file
+      continue;
+    }
     if (includeMinified) selected.push(f);
     else minifiedLeftOut++;
   }

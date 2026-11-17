@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeCallGraph } from "../../src/analyzers/callgraph.js";
+import { analyzeComponents } from "../../src/analyzers/components.js";
 import { runCallGraphPhase, runImportsPhase, runInventoryPhase, type AnalyzeContext } from "../../src/cli/commands/analyze-phases.js";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { emptyAnalyzeTokenUsage } from "../../src/cli/sourcevision-core.js";
@@ -79,6 +80,38 @@ describe("minified bundles and the call graph", () => {
 
     const included = await analyzeCallGraph(project, inventory, imports, { includeMinified: true });
     expect(filesOf(included)).toEqual(["js/app.min.js", "public/js/jquery.min.js", "src/app.js", "theme/js/plugins.js"]);
+  });
+
+  it("leaves out a minified bundle vendored under a test directory, which keeps role test", async () => {
+    project = makeProject({
+      ...PLAIN,
+      "tests/js/jquery.min.js": minifiedLine("tq", 200),
+      "tests/js/qunit.js": minifiedLine("qu", 200),
+      "tests/app.test.js": "function checks() {\n  return 1;\n}\n",
+    });
+    const inventory = await analyzeInventory(project);
+    expect(inventory.files.find((f) => f.path === "tests/js/jquery.min.js")?.role).toBe("test");
+    const imports = await analyzeImports(project, inventory);
+    const leftOut: number[] = [];
+    const graph = await analyzeCallGraph(project, inventory, imports, { onMinifiedLeftOut: (n) => leftOut.push(n) });
+    expect(filesOf(graph)).toEqual(["src/app.js", "tests/app.test.js"]);
+    expect(leftOut).toEqual([2]);
+    const included = await analyzeCallGraph(project, inventory, imports, { includeMinified: true });
+    expect(filesOf(included)).toEqual(["src/app.js", "tests/app.test.js", "tests/js/jquery.min.js", "tests/js/qunit.js"]);
+  });
+
+  it("the components phase does not parse generated or asset files", async () => {
+    const widget = "export function Widget() {\n  return <div />;\n}\n";
+    project = makeProject({
+      ...PLAIN,
+      "src/Widget.jsx": widget,
+      "public/js/Banner.jsx": widget.replace("Widget", "Banner"),
+      "src/generated/Panel.jsx": widget.replace("Widget", "Panel"),
+    });
+    const inventory = await analyzeInventory(project);
+    const imports = await analyzeImports(project, inventory);
+    const components = await analyzeComponents(project, inventory, imports);
+    expect(components.components.map((c) => c.file).sort()).toEqual(["src/Widget.jsx"]);
   });
 
   it("drops minified functions a previous --include-minified run kept, on an incremental run", async () => {

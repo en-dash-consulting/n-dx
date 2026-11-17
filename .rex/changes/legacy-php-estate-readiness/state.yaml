@@ -5,10 +5,14 @@ items:
     lastModified: "2026-11-17T00:13:35.635Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0db6172b-4827-4226-98b5-60ca5841656c":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-17T01:07:12.108Z"
-    activeIntervals: [{"start":"2026-11-17T01:07:12.108Z"}]
-    lastModified: "2026-11-17T01:07:15.860Z"
+    completedAt: "2026-11-17T01:17:37.890Z"
+    endedAt: "2026-11-17T01:17:37.890Z"
+    activeIntervals: [{"end":"2026-11-17T01:17:37.890Z","start":"2026-11-17T01:07:12.108Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Minified files (name or long line in first 64 KiB) get role generated; call graph and components skip generated/asset; --include-minified re-admits minified files to the call graph; log line counts those left out; docs say callgraph.json is JS/TS only."
+    lastModified: "2026-11-17T01:17:37.890Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4e33c0c3-8233-4480-92eb-d1d74a089ed8":
     status: "completed"
