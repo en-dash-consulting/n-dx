@@ -356,6 +356,14 @@ export interface LLMClassifyResult {
 const LLM_BATCH_SIZE = 30;
 
 /**
+ * Files per escalation call. Escalations are queued across Jev batches and
+ * sent this many at a time: one text-model call per batch that had any
+ * ambiguous file used to make the pass ~30× slower than Jev on a large
+ * legacy repository, for calls of one to a few files each.
+ */
+export const ESCALATION_BATCH_SIZE = 40;
+
+/**
  * Enrich unclassified files by asking the LLM to assign archetypes.
  * Runs after the algorithmic pass. Files the LLM can't classify stay null.
  */
@@ -403,6 +411,27 @@ export async function enrichClassificationsWithLLM(
   // Valid archetype IDs for validation
   const validIds = new Set(classifications.archetypes.map((a) => a.id));
 
+  // Escalation: a file Jev leaned on but not confidently goes to the text
+  // model with more evidence than Jev was given — its leading doc comment.
+  // A confident `none` is a real answer and stays unclassified. Queued across
+  // batches and sent ESCALATION_BATCH_SIZE at a time.
+  const pending: FileClassification[] = [];
+  let escalated = 0;
+  let escalationCalls = 0;
+  const escalate = async (all: boolean): Promise<"auth-error" | void> => {
+    while (pending.length >= ESCALATION_BATCH_SIZE || (all && pending.length > 0)) {
+      const chunk = pending.splice(0, ESCALATION_BATCH_SIZE);
+      escalationCalls++;
+      const label = ` escalation ${escalationCalls}`;
+      console.log(`  [classify]${label} ${chunk.length} ambiguous file(s) escalated to the text model with headers`);
+      const headers = collectFileHeaders(chunk.map((f) => f.path), opts?.projectDir);
+      const result = await classifyBatchWithLLM(chunk, archetypeCatalog, validIds, label, tokenUsage, headers);
+      if (result === "auth-error") return "auth-error";
+      if (result) updatedFiles.push(...result);
+    }
+  };
+
+  let stopped = false;
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
     const batchLabel = batches.length > 1 ? ` batch ${batchIdx + 1}/${batches.length}` : "";
@@ -416,20 +445,22 @@ export async function enrichClassificationsWithLLM(
     }
 
     const judged = await classifyBatchWithJev(batch, archetypeCatalog, batchLabel, tokenUsage, projectLanguages);
-    if (judged === "auth-error") break;
+    if (judged === "auth-error") {
+      stopped = true;
+      break;
+    }
     if (!judged) continue;
     updatedFiles.push(...judged.results);
-
-    // Escalation: a file Jev leaned on but not confidently goes to the text
-    // model with more evidence than Jev was given — its leading doc comment.
-    // A confident `none` is a real answer and stays unclassified.
-    if (judged.escalate.length > 0) {
-      console.log(`  [classify]${batchLabel} ${judged.escalate.length} ambiguous file(s) escalated to the text model with headers`);
-      const headers = collectFileHeaders(judged.escalate.map((f) => f.path), opts?.projectDir);
-      const result = await classifyBatchWithLLM(judged.escalate, archetypeCatalog, validIds, batchLabel, tokenUsage, headers);
-      if (result === "auth-error") break;
-      if (result) updatedFiles.push(...result);
+    pending.push(...judged.escalate);
+    escalated += judged.escalate.length;
+    if ((await escalate(false)) === "auth-error") {
+      stopped = true;
+      break;
     }
+  }
+  if (!stopped) await escalate(true);
+  if (escalated > 0) {
+    console.log(`  [classify] ${escalated} ambiguous file(s) escalated in ${escalationCalls} text-model call(s)`);
   }
   markBatch("classification", batches.length, batches.length);
 
@@ -558,9 +589,12 @@ const JEV_NONE = "none";
 /**
  * Probability on `none` at which "no archetype fits" is taken as the answer
  * rather than as uncertainty. Below it, and below {@link JEV_MIN_PROBABILITY}
- * for any other option, the file is escalated to the text model.
+ * for any other option, the file is escalated to the text model. 0.45, not
+ * the earlier 0.6: on a real legacy repository nearly every batch escalated,
+ * yet most files still ended with no archetype, so the text model added
+ * little for most of the run's model time.
  */
-const JEV_CONFIDENT_NONE = 0.6;
+const JEV_CONFIDENT_NONE = 0.45;
 
 /** Outcome of one Jev classification batch. */
 export interface JevClassifyBatch {

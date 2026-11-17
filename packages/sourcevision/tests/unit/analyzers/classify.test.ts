@@ -815,3 +815,48 @@ describe("buildJevClassifyRequest", () => {
     });
   });
 });
+
+describe("enrichClassificationsWithLLM — escalations across batches", () => {
+  beforeEach(() => {
+    mockedCallClaude.mockReset();
+    mockedAskJev.mockReset();
+    mockedGetJudgmentRoute.mockReset();
+    mockedGetJudgmentRoute.mockReturnValue("typesafe");
+  });
+
+  it("queues ambiguous files from every Jev batch into as few text-model calls as fit", async () => {
+    // 90 unclassified files: three Jev batches of 30, each answering every file unsure.
+    const paths = Array.from({ length: 90 }, (_, i) => `src/file${String(i).padStart(2, "0")}.ts`);
+    const base = analyzeClassifications(makeInventory([...paths, "src/index.ts"]), emptyImports);
+    mockedAskJev.mockImplementation(async (request: { questions: Record<string, unknown> }) => ({
+      model: "jev-1.13.0",
+      answers: Object.fromEntries(
+        Object.keys(request.questions).map((id) => [id, { type: "choice" as const, confidence: 0.5, choice: "service", probabilities: { service: 0.3, none: 0.3, utility: 0.4 } }]),
+      ),
+      tokenUsage: { input: 10, output: 1 },
+    }));
+    // A non-empty answer, so no attempt is retried; the file named need not be in the chunk.
+    mockedCallClaude.mockResolvedValue({ text: '[{"path":"src/elsewhere.ts","archetype":"utility","reason":"x"}]' });
+
+    await enrichClassificationsWithLLM(base, makeInventory([...paths, "src/index.ts"]), emptyImports);
+
+    expect(mockedAskJev).toHaveBeenCalledTimes(3);
+    // 90 escalations at ESCALATION_BATCH_SIZE (40): 40 + 40 + 10, not one call per Jev batch.
+    expect(mockedCallClaude).toHaveBeenCalledTimes(3);
+    const sizes = mockedCallClaude.mock.calls.map((c) => new Set(String(c[0]).match(/src\/file\d\d\.ts/g) ?? []).size);
+    expect(sizes).toEqual([40, 40, 10]);
+    expect(new Set(mockedCallClaude.mock.calls.flatMap((c) => String(c[0]).match(/src\/file\d\d\.ts/g) ?? [])).size).toBe(90);
+  });
+
+  it("takes a none at 0.45 as the answer, not an escalation", async () => {
+    const base = analyzeClassifications(makeInventory(["src/a.ts", "src/index.ts"]), emptyImports);
+    mockedAskJev.mockResolvedValueOnce({
+      model: "jev-1.13.0",
+      answers: { f0: { type: "choice", confidence: 0.5, choice: "none", probabilities: { none: 0.45, service: 0.3, utility: 0.25 } } },
+      tokenUsage: { input: 10, output: 1 },
+    });
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/a.ts", "src/index.ts"]), emptyImports);
+    expect(mockedCallClaude).not.toHaveBeenCalled();
+    expect(result.updatedFiles).toEqual([]);
+  });
+});
