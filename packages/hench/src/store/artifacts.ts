@@ -4,7 +4,7 @@
  *
  * Two consumers must agree on this list:
  * - `hench init` gitignores these paths (`cli/commands/init.ts`)
- * - the pre-run git gate discounts them (`agent/lifecycle/shared.ts`)
+ * - the pre-run git gate discounts them (`agent/lifecycle/pre-run-commit-gate.ts`)
  *
  * Both are needed. Gitignoring keeps the paths out of `git status` on a
  * freshly initialized project; the discount is what makes the gate correct on
@@ -244,17 +244,6 @@ export async function repoRelativePrefix(projectDir: string): Promise<string> {
 }
 
 /**
- * Extract the working-tree path from one `git status --porcelain` line.
- *
- * Porcelain v1 format is two status characters, a space, then the path.
- * Rename and copy entries (status `R`/`C`) carry `old -> new`; the second
- * half is the path that exists on disk. Paths containing spaces or other
- * special characters are wrapped in double quotes, which are stripped here so
- * the result compares against real path strings. The arrow split is gated on
- * the status characters rather than applied unconditionally, so a filename
- * that merely contains " -> " is not truncated.
- */
-/**
  * Split `git status --porcelain` output into lines without damaging them.
  *
  * **Never `trim()` porcelain output.** The XY status field is two columns wide
@@ -320,7 +309,17 @@ function splitPorcelainPaths(line: string): { from?: string; to: string } {
   return { to: unquotePorcelainPath(path) };
 }
 
-/** The path a porcelain line leaves behind: the new path of an R/C line. */
+/**
+ * Extract the working-tree path from one `git status --porcelain` line.
+ *
+ * Porcelain v1 format is two status characters, a space, then the path.
+ * Rename and copy entries (status `R`/`C`) carry `old -> new`; the second
+ * half is the path that exists on disk. Paths containing spaces or other
+ * special characters are wrapped in double quotes, which are stripped here so
+ * the result compares against real path strings. The arrow split is gated on
+ * the status characters rather than applied unconditionally, so a filename
+ * that merely contains " -> " is not truncated.
+ */
 export function parsePorcelainPath(line: string): string {
   return splitPorcelainPaths(line).to;
 }

@@ -35,6 +35,7 @@ import { killWithFallback, spawnManaged } from "./exec-gateway.js";
 import type { ManagedChild } from "./exec-gateway.js";
 import { isPidAlive } from "./registry.js";
 import type { ProjectRecord } from "./registry.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 export type ChildState =
   /** Spawned; waiting for the port file or the first health check. */
@@ -92,7 +93,10 @@ export interface SupervisorOptions {
   token?: string | null;
 }
 
-const DEFAULTS: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin" | "ndxBinOf">> = {
+/** The options with no default; every other one (the timings) is filled from {@link DEFAULTS}. */
+type UndefaultedOption = "log" | "tokenFile" | "token" | "ndxBin" | "ndxBinOf";
+
+const DEFAULTS: Required<Omit<SupervisorOptions, UndefaultedOption>> = {
   portFileTimeoutMs: 20_000,
   healthTimeoutMs: 3_000,
   stopGraceMs: 5_000,
@@ -125,9 +129,9 @@ export async function checkProjectHealth(
   token: string | null = null,
 ): Promise<{ ok: boolean; projectDir: string | null; error: string | null }> {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/status`, {
+    const res = await fetch(loopbackUrl(port, "/api/status"), {
       signal: AbortSignal.timeout(timeoutMs),
-      headers: token ? { "X-Ndx-Token": token } : {},
+      headers: tokenHeaders(token),
     });
     if (!res.ok) return { ok: false, projectDir: null, error: `HTTP ${res.status}` };
     const body = (await res.json()) as { projectDir?: unknown };
@@ -194,7 +198,7 @@ async function stopForeignPid(pid: number, graceMs: number): Promise<void> {
 /** Supervises the server process for one registered project. */
 export class ProjectSupervisor {
   readonly record: ProjectRecord;
-  private readonly opts: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin" | "ndxBinOf">> & Pick<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin" | "ndxBinOf">;
+  private readonly opts: typeof DEFAULTS & Pick<SupervisorOptions, UndefaultedOption>;
 
   private handle: ManagedChild | null = null;
   private state: ChildState = "stopped";
@@ -224,6 +228,18 @@ export class ProjectSupervisor {
     };
   }
 
+  /** `GET /api/status` on `port`, with this supervisor's timeout and token. */
+  private probe(port: number): ReturnType<typeof checkProjectHealth> {
+    return checkProjectHealth(port, this.opts.healthTimeoutMs, this.opts.token ?? null);
+  }
+
+  /** Record a health check that answered: healthy, and seen, as of now. */
+  private markHealthy(): void {
+    this.state = "healthy";
+    this.lastHealthAt = new Date().toISOString();
+    this.record.lastSeen = this.lastHealthAt;
+  }
+
   /** Run `fn` after whatever lifecycle operation is currently in flight. */
   private serialize(fn: () => Promise<void>): Promise<void> {
     const next = this.inFlight.then(fn, fn);
@@ -249,7 +265,7 @@ export class ProjectSupervisor {
     return this.serialize(async () => {
       const { pid, port } = this.record;
       if (pid && port && isPidAlive(pid)) {
-        const health = await checkProjectHealth(port, this.opts.healthTimeoutMs, this.opts.token ?? null);
+        const health = await this.probe(port);
         if (health.ok && !adopt) {
           this.opts.log?.(`[hub] ${this.record.id}: replacing server pid ${pid} started from a recorded binary`);
           await this.stopNow();
@@ -258,9 +274,7 @@ export class ProjectSupervisor {
         }
         if (health.ok) {
           this.attached = true;
-          this.state = "healthy";
-          this.lastHealthAt = new Date().toISOString();
-          this.record.lastSeen = this.lastHealthAt;
+          this.markHealthy();
           this.lastError = null;
           this.opts.log?.(`[hub] attached ${this.record.id} (pid ${pid}, port ${port})`);
           return;
@@ -284,11 +298,9 @@ export class ProjectSupervisor {
   healthCheck(): Promise<void> {
     return this.serialize(async () => {
       if (this.state === "stopped" || this.record.port === null) return;
-      const health = await checkProjectHealth(this.record.port, this.opts.healthTimeoutMs, this.opts.token ?? null);
+      const health = await this.probe(this.record.port);
       if (health.ok) {
-        this.state = "healthy";
-        this.lastHealthAt = new Date().toISOString();
-        this.record.lastSeen = this.lastHealthAt;
+        this.markHealthy();
         this.lastError = null;
         return;
       }
@@ -356,11 +368,9 @@ export class ProjectSupervisor {
       const port = readPortFile(this.record.repoRoot);
       if (port !== null) {
         this.record.port = port;
-        const health = await checkProjectHealth(port, this.opts.healthTimeoutMs, this.opts.token ?? null);
+        const health = await this.probe(port);
         if (health.ok) {
-          this.state = "healthy";
-          this.lastHealthAt = new Date().toISOString();
-          this.record.lastSeen = this.lastHealthAt;
+          this.markHealthy();
           this.opts.log?.(`[hub] ${this.record.id} up (pid ${handle.pid}, port ${port})`);
           return;
         }

@@ -6,6 +6,17 @@ export interface ParsedRoute {
   subId: string | null;
 }
 
+/**
+ * The page a bare URL opens on, and the one shown under the settings overlay
+ * when a settings route is opened directly: the landing page whenever it
+ * exists (it is a cross-cutting view, so it does in every scope), else the
+ * first valid view.
+ */
+export function defaultView(validViews: Set<ViewId>): ViewId {
+  if (validViews.has("home")) return "home";
+  return validViews.values().next().value as ViewId;
+}
+
 const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs", "commands"]);
 
 /**
@@ -43,6 +54,21 @@ function isProductSubPath(sub: string): boolean {
   return AREA_PATH.test(sub) || PLACE_PATH.test(sub);
 }
 
+/**
+ * Capture `group` of `re` in a tab, URI-decoded (the tab carries it as it sits
+ * in the address). Null when the tab does not match, and when the capture is
+ * malformed: a hand-edited address like `/product/area/%E0` names nothing.
+ */
+function decodedTabCapture(tab: string | null, re: RegExp, group: number): string | null {
+  const raw = tab && re.exec(tab)?.[group];
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
+
 /** The Product tab that opens placement mode for `changeId`. */
 export function placementTab(changeId: string): string {
   return `place/${encodeURIComponent(changeId)}`;
@@ -50,41 +76,23 @@ export function placementTab(changeId: string): string {
 
 /** The change a `place/<id>` tab places, or null when the tab is not placement mode's. */
 export function placeChangeOfTab(tab: string | null): string | null {
-  const id = tab && PLACE_PATH.exec(tab)?.[1];
-  if (!id) return null;
-  try {
-    return decodeURIComponent(id);
-  } catch {
-    // A hand-edited address with a malformed escape names no change.
-    return null;
-  }
+  return decodedTabCapture(tab, PLACE_PATH, 1);
 }
 
 /**
- * The slug an `area/<slug>` tab names, decoded (the tab carries it as it sits
- * in the address), or null when the tab is not an area's or the slug is malformed.
+ * The slug an `area/<slug>` tab names, decoded, or null when the tab is not
+ * an area's or the slug is malformed.
  */
 export function areaSlugOfTab(tab: string | null): string | null {
-  const slug = tab && AREA_PATH.exec(tab)?.[1];
-  if (!slug) return null;
-  try {
-    return decodeURIComponent(slug);
-  } catch {
-    // A hand-edited address like `/product/area/%E0` names no area.
-    return null;
-  }
+  return decodedTabCapture(tab, AREA_PATH, 1);
 }
 
-/** The capability `area/<slug>/capability/<id>` selects in the area, or null. */
+/**
+ * The capability `area/<slug>/capability/<id>` selects in the area, or null.
+ * A malformed id is no selection: the area shows.
+ */
 export function areaCapabilityOfTab(tab: string | null): string | null {
-  const id = tab && AREA_PATH.exec(tab)?.[2];
-  if (!id) return null;
-  try {
-    return decodeURIComponent(id);
-  } catch {
-    // A hand-edited address like `/capability/%E0` is no selection: the area shows.
-    return null;
-  }
+  return decodedTabCapture(tab, AREA_PATH, 2);
 }
 
 /**
@@ -219,9 +227,7 @@ export function parseLegacyHashRoute(hash: string, validViews: Set<ViewId>): Par
   if (legacyAlias && validViews.has(legacyAlias)) return { view: legacyAlias, subId: null };
   const normalizedBase = normalizeHashView(base);
   const normalizedPath = sub ? `/${normalizedBase}/${sub}` : `/${normalizedBase}`;
-  const parsed = parsePathnameRoute(normalizedPath, validViews);
-  if (!parsed) return null;
-  return parsed;
+  return parsePathnameRoute(normalizedPath, validViews);
 }
 
 export function resolveLocationRoute(

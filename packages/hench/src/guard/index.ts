@@ -70,7 +70,7 @@
 
 import type { GuardConfig } from "./contracts.js";
 import { DEFAULT_WRITE_SHRINK_MIN_BYTES, DEFAULT_WRITE_SHRINK_RATIO } from "./contracts.js";
-import { validatePath, simpleGlobMatch, GuardError } from "./paths.js";
+import { validatePath, GuardError } from "./paths.js";
 import { assertNotCredentialCommand, validateCommand, resolveShellKind } from "./commands.js";
 import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";

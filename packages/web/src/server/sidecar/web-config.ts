@@ -9,17 +9,18 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
+import { isRecord } from "../../shared/index.js";
 
 type Json = Record<string, unknown>;
 
 function readJson(path: string): Json {
   if (!existsSync(path)) return {};
   const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Json) : {};
+  return isRecord(parsed) ? parsed : {};
 }
 
 function asRecord(value: unknown): Json | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Json) : undefined;
+  return isRecord(value) ? value : undefined;
 }
 
 /** A config file's path and its `web` section, local config first. */

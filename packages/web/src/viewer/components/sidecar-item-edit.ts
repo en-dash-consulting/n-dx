@@ -61,7 +61,7 @@ export function itemEditEdits(itemEdit: ItemEdit, draft: ItemEditDraft): Sidecar
 }
 
 /** A list field's entries, each marked removed, added or kept. */
-export function listDiff(before: readonly string[], after: readonly string[]): Array<{ text: string; mark: "removed" | "added" | "kept" }> {
+function listDiff(before: readonly string[], after: readonly string[]): Array<{ text: string; mark: "removed" | "added" | "kept" }> {
   return [
     ...before.filter((entry) => !after.includes(entry)).map((text) => ({ text, mark: "removed" as const })),
     ...after.map((text) => ({ text, mark: before.includes(text) ? "kept" as const : "added" as const })),

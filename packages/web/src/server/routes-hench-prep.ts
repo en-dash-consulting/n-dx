@@ -42,14 +42,15 @@ import { errorResponse, jsonResponse, readBody } from "./response-utils.js";
 import { resolveNdxBin } from "./routes-commands.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { buildLlmCatalog } from "./routes-llm.js";
-import { collectHeldRuns, loadHenchConfig } from "./routes-hench.js";
+import { collectHeldRuns } from "./routes-hench.js";
+import { loadHenchConfig } from "./hench-config-fields.js";
 import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { PAIR_REVIEW_SUPPORTED } from "./llm-review.js";
 import { isV2Tree, loadPRDSync, summaryField } from "./prd-io.js";
 import { checkSavedRun, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
 import { indexedUnitRefusal, unitRefusal } from "./runnable-units.js";
-import { itemTypeOf } from "../shared/index.js";
+import { isRecord, itemTypeOf } from "../shared/index.js";
 import {
   collectCompletedIds,
   findItem,
@@ -197,6 +198,24 @@ function refuseBusy(res: ServerResponse): true {
   return true;
 }
 
+/** What a caller inside this server is told while {@link PREP_MAX_IN_FLIGHT} spawns are running. */
+const BUSY_FAILURE = "too many prepare requests in flight";
+
+/** A failed run for a caller inside this server: the reason, then the tail of stderr when there is any. */
+function failureOf(run: NdxRun): string {
+  return `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}`;
+}
+
+/** A run's stdout as a JSON object; null when it is not JSON, or not an object. */
+function stdoutObject(run: NdxRun): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(run.stdout);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function admissionOf(req: IncomingMessage): PrepAdmission | null {
   const header = parseHubAdmissionHeader(req.headers[HUB_ADMISSION_HEADER]);
   if (!header) return null;
@@ -286,6 +305,18 @@ function resetDeferredArgs(entry: PrdEntry | null): string[] {
   return resetsDeferred(entry?.item.status) ? ["--reset-deferred"] : [];
 }
 
+/** The request body as a JSON object, or null once it has answered 400 because it is not one. */
+async function readObjectBody(req: IncomingMessage, res: ServerResponse): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed: unknown = JSON.parse(await readBody(req, res));
+    if (!isRecord(parsed)) throw new Error("not an object");
+    return parsed;
+  } catch {
+    errorResponse(res, 400, "Invalid JSON in request body");
+    return null;
+  }
+}
+
 /** PUT /api/hench/prep/:taskId — save or clear the task's own run settings. */
 async function handleSave(
   req: IncomingMessage,
@@ -294,15 +325,8 @@ async function handleSave(
   taskId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(await readBody(req, res));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    body = parsed as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readObjectBody(req, res);
+  if (!body) return true;
 
   const version = body["version"];
   if (typeof version !== "string" || version.length === 0) {
@@ -366,12 +390,8 @@ async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: Server
     jsonResponse(res, 502, { error: `Could not resolve the run: ${run.failure}`, stderr: tail(run.stderr) });
     return true;
   }
-  let resolved: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(run.stdout);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    resolved = parsed as Record<string, unknown>;
-  } catch {
+  const resolved = stdoutObject(run);
+  if (!resolved) {
     jsonResponse(res, 502, { error: "Could not resolve the run: the resolve output was not JSON", stderr: tail(run.stderr) });
     return true;
   }
@@ -409,21 +429,16 @@ export async function resolveTaskRun(
   if (refusal) return { ok: false, failure: refusal };
   const checked = await validateRunOptions(ctx.projectDir, options);
   if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
-  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: BUSY_FAILURE };
   const run = await runNdx(
     ctx,
     ["work", `--task=${taskId}`, "--resolve", ...resetDeferredArgs(prdEntryOf(ctx, taskId)), ...runOptionArgs(checked.options), ctx.projectDir],
     PREP_RESOLVE_TIMEOUT_MS,
     signal,
   );
-  if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
-  try {
-    const parsed: unknown = JSON.parse(run.stdout);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    return { ok: true, resolution: parsed as Record<string, unknown> };
-  } catch {
-    return { ok: false, failure: "the resolve output was not JSON" };
-  }
+  if (run.failure) return { ok: false, failure: failureOf(run) };
+  const resolution = stdoutObject(run);
+  return resolution ? { ok: true, resolution } : { ok: false, failure: "the resolve output was not JSON" };
 }
 
 /**
@@ -441,14 +456,14 @@ export async function previewTaskRun(
   if (refusal) return { ok: false, failure: refusal };
   const checked = await validateRunOptions(ctx.projectDir, options);
   if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
-  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: BUSY_FAILURE };
   const run = await runNdx(
     ctx,
     ["work", `--task=${taskId}`, "--dry-run", ...runOptionArgs(checked.options), ...resetDeferredArgs(prdEntryOf(ctx, taskId)), ctx.projectDir],
     PREP_PREVIEW_TIMEOUT_MS,
     signal,
   );
-  if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
+  if (run.failure) return { ok: false, failure: failureOf(run) };
   return { ok: true, brief: run.stdout };
 }
 
@@ -467,36 +482,24 @@ export async function diagnoseTaskRun(
   dir: string,
   signal?: AbortSignal,
 ): Promise<{ ok: true; diagnosis: Record<string, unknown> } | { ok: false; failure: string }> {
-  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: BUSY_FAILURE };
   const run = await runNdx(
     ctx,
     ["hench", "runs", "diagnose", runId, "--format=json", dir],
     PREP_RESOLVE_TIMEOUT_MS,
     signal,
   );
-  if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
-  try {
-    const parsed: unknown = JSON.parse(run.stdout);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    return { ok: true, diagnosis: parsed as Record<string, unknown> };
-  } catch {
-    return { ok: false, failure: "the diagnose output was not JSON" };
-  }
+  if (run.failure) return { ok: false, failure: failureOf(run) };
+  const diagnosis = stdoutObject(run);
+  return diagnosis ? { ok: true, diagnosis } : { ok: false, failure: "the diagnose output was not JSON" };
 }
 
 /** POST /api/hench/prep/:taskId/preview */
 async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
   const refusal = preparationRefusal(ctx, taskId);
   if (refusal) { errorResponse(res, 400, refusal); return true; }
-  let body: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(await readBody(req, res));
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    body = parsed as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readObjectBody(req, res);
+  if (!body) return true;
   const checked = await validateRunOptions(ctx.projectDir, body["options"]);
   if (!checked.ok) {
     jsonResponse(res, 400, { error: checked.error, key: checked.key });

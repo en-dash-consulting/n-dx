@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { cp, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { PLANNING_COMMIT_SUBJECT } from "../../src/agent/lifecycle/shared.js";
+import { PLANNING_COMMIT_SUBJECT } from "../../src/agent/lifecycle/pre-run-commit-gate.js";
 import type { RunRecord } from "../../src/schema/index.js";
 import { cleanupProjectDir, commitGitFixtureBaseline, setupProjectDir } from "../helpers/index.js";
 

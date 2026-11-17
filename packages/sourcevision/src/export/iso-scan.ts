@@ -13,7 +13,7 @@
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { join, relative, dirname, extname, basename, resolve, sep } from "node:path";
+import { join, relative, dirname, extname, basename, sep } from "node:path";
 
 // ── Language and directory knowledge ────────────────────────────────────────
 
@@ -653,9 +653,4 @@ export function scanProject(root: string): ScanResult {
     totalLines: [...meta.values()].reduce((sum, m) => sum + m.lineCount, 0),
     aliasCount,
   };
-}
-
-/** Resolve a directory argument to an absolute path. */
-export function resolveRoot(dir: string): string {
-  return resolve(dir);
 }

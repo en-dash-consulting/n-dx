@@ -8,10 +8,10 @@ import type { ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse } from "../response-utils.js";
+import { jsonResponse } from "../response-utils.js";
 import { isV2Tree, loadPRDSync } from "../prd-io.js";
 import { markRunnableUnits } from "../runnable-units.js";
-import { findNextTask, collectCompletedIds } from "./rex-route-helpers.js";
+import { findNextTask, collectCompletedIds, loadPRDOr404 } from "./rex-route-helpers.js";
 
 import {
   computeStats,
@@ -146,11 +146,8 @@ export function routePrdReads(
 
   // GET /api/rex/prd — full PRD document
   if (path === "prd" && method === "GET") {
-    const doc = loadPRDSync(ctx.rexDir);
-    if (!doc) {
-      errorResponse(res, 404, "No PRD data found");
-      return true;
-    }
+    const doc = loadPRDOr404(ctx, res);
+    if (!doc) return true;
     markRunnableUnits(doc.items, doc.product);
     jsonResponse(res, 200, doc);
     return true;
@@ -158,11 +155,8 @@ export function routePrdReads(
 
   // GET /api/rex/stats — tree stats
   if (path === "stats" && method === "GET") {
-    const doc = loadPRDSync(ctx.rexDir);
-    if (!doc) {
-      errorResponse(res, 404, "No PRD data found");
-      return true;
-    }
+    const doc = loadPRDOr404(ctx, res);
+    if (!doc) return true;
     const stats = computeStats(doc.items);
     jsonResponse(res, 200, {
       title: doc.title,
@@ -176,11 +170,8 @@ export function routePrdReads(
 
   // GET /api/rex/dashboard — dashboard data (overall + per-epic + next task + priority distribution)
   if (path === "dashboard" && method === "GET") {
-    const doc = loadPRDSync(ctx.rexDir);
-    if (!doc) {
-      errorResponse(res, 404, "No PRD data found");
-      return true;
-    }
+    const doc = loadPRDOr404(ctx, res);
+    if (!doc) return true;
     return (async () => {
       const stats = computeStats(doc.items);
       const completedIds = collectCompletedIds(doc.items);
@@ -208,11 +199,8 @@ export function routePrdReads(
 
   // GET /api/rex/next — next actionable task, skipping tasks other worktrees hold
   if (path === "next" && method === "GET") {
-    const doc = loadPRDSync(ctx.rexDir);
-    if (!doc) {
-      errorResponse(res, 404, "No PRD data found");
-      return true;
-    }
+    const doc = loadPRDOr404(ctx, res);
+    if (!doc) return true;
     return (async () => {
       const completedIds = collectCompletedIds(doc.items);
       const { task: next, skipped } = await findNextUnclaimedTask(ctx, doc.items, completedIds);

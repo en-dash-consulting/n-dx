@@ -9,7 +9,11 @@ import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
-import type {Proposal} from "@n-dx/rex";// ── Types ────────────────────────────────────────────────────────────
+import type { Proposal } from "@n-dx/rex";
+import { toggled } from "../set-toggle.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
+
+// ── Types ────────────────────────────────────────────────────────────
 
 export interface AnalyzePanelProps {
   /** Called when proposals are accepted and PRD should be refreshed. */
@@ -139,8 +143,7 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
       });
 
       if (!res.ok && res.status !== 409) {
-        const errBody = await res.json().catch(() => ({ error: "Analysis failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Analysis failed"));
       }
 
       cancelPollRef.current = pollAnalyzeStatus(applyAnalyzeResult);
@@ -163,8 +166,7 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       const data = await res.json();
@@ -188,15 +190,7 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
   }, [selectedIndices, proposals, acceptedIndices, onPrdChanged]);
 
   const toggleProposal = useCallback((index: number) => {
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
+    setSelectedIndices((prev) => toggled(prev, index));
   }, []);
 
   const selectAll = useCallback(() => {

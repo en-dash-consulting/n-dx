@@ -221,9 +221,11 @@ function readDocumentVisibility(): TabVisibilityState {
 
 // ─── Event handlers ─────────────────────────────────────────────────────────
 
-function handleVisibilityChange(): void {
-  const newState = readDocumentVisibility();
-
+/**
+ * Move to `newState`: record the transition, then tell the configured
+ * `onChange` and every subscriber. No-op when the state is unchanged.
+ */
+function transitionTo(newState: TabVisibilityState): void {
   if (newState === currentState) return;
 
   const previousState = currentState;
@@ -241,42 +243,18 @@ function handleVisibilityChange(): void {
   notifyListeners(snapshot);
 }
 
+function handleVisibilityChange(): void {
+  transitionTo(readDocumentVisibility());
+}
+
 /** Focus handler for the fallback detection path. */
 function handleWindowFocus(): void {
-  if (currentState === "visible") return;
-
-  const previousState = currentState;
-  currentState = "visible";
-  stateChangedAt = Date.now();
-
-  recordTransition(previousState, "visible");
-
-  const snapshot = buildSnapshot();
-
-  if (config.onChange) {
-    config.onChange(snapshot, previousState);
-  }
-
-  notifyListeners(snapshot);
+  transitionTo("visible");
 }
 
 /** Blur handler for the fallback detection path. */
 function handleWindowBlur(): void {
-  if (currentState === "hidden") return;
-
-  const previousState = currentState;
-  currentState = "hidden";
-  stateChangedAt = Date.now();
-
-  recordTransition(previousState, "hidden");
-
-  const snapshot = buildSnapshot();
-
-  if (config.onChange) {
-    config.onChange(snapshot, previousState);
-  }
-
-  notifyListeners(snapshot);
+  transitionTo("hidden");
 }
 
 // ─── Cleanup helpers ────────────────────────────────────────────────────────
@@ -355,6 +333,64 @@ export function onVisibilityChange(
   listeners.push(listener);
   return () => {
     listeners = listeners.filter((l) => l !== listener);
+  };
+}
+
+/**
+ * Debounce delay before acting on a tab becoming visible again (ms).
+ * Prevents thrashing when the user rapidly switches between tabs.
+ */
+const VISIBILITY_RESUME_DEBOUNCE_MS = 100;
+
+/** Callbacks for {@link onDebouncedVisibilityChange}. */
+export interface DebouncedVisibilityHandlers {
+  /** The tab went hidden. Called at once, after cancelling any pending resume. */
+  onHidden: () => void;
+  /** The tab became visible and stayed so for the resume debounce. */
+  onVisible: () => void;
+}
+
+/**
+ * Subscribe to visibility changes with the suspend/resume timing the polling
+ * manager and the visibility gates share: hiding acts immediately, to stop
+ * work as fast as possible; showing waits `resumeDebounceMs`, so a quick
+ * alt-tab sequence does not thrash.
+ *
+ * Returns a disposer that cancels a pending resume and unsubscribes. Once it
+ * has run, neither handler fires again — even for a change already being
+ * dispatched when it was called.
+ */
+export function onDebouncedVisibilityChange(
+  handlers: DebouncedVisibilityHandlers,
+  resumeDebounceMs: number = VISIBILITY_RESUME_DEBOUNCE_MS,
+): () => void {
+  let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+  let disposed = false;
+
+  function clearResumeTimer(): void {
+    if (resumeTimer !== null) {
+      clearTimeout(resumeTimer);
+      resumeTimer = null;
+    }
+  }
+
+  const unsubscribe = onVisibilityChange((snapshot) => {
+    if (disposed) return;
+    clearResumeTimer();
+    if (snapshot.isVisible) {
+      resumeTimer = setTimeout(() => {
+        resumeTimer = null;
+        handlers.onVisible();
+      }, resumeDebounceMs);
+    } else {
+      handlers.onHidden();
+    }
+  });
+
+  return () => {
+    disposed = true;
+    clearResumeTimer();
+    unsubscribe();
   };
 }
 

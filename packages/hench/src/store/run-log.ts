@@ -21,9 +21,9 @@
  */
 
 import { join, resolve } from "node:path";
-import { mkdir, open, readFile, writeFile } from "node:fs/promises";
-import type { WriteStream } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createLineRedactor } from "../prd/llm-gateway.js";
+import { openAppendStream } from "./append-stream.js";
 
 const LOG_DIR_NAME = ".run-logs";
 const GITIGNORE_ENTRY = ".run-logs/";
@@ -161,26 +161,9 @@ export async function openRunLog(
   await prepareLogDir(projectDir);
 
   const path = runLogPath(projectDir, runId, startedAt);
-  // open() first, so an unwritable path rejects here — where the caller can
-  // still decide what to do — rather than as an async 'error' event later.
-  // Closing the stream closes the handle.
-  const handle = await open(path, "w", 0o600);
-  const stream: WriteStream = handle.createWriteStream({ encoding: "utf-8" });
-
-  let failure: Error | null = null;
-  let closed = false;
-  /** Set while close() is waiting, so an error can settle it too. */
-  let settleClose: ((error: Error | null) => void) | null = null;
-
-  // An unhandled 'error' on a stream is thrown on the stream's own tick,
-  // which would crash the run from inside an output call. Record it instead;
-  // close() reports it and the caller re-writes the file whole.
-  stream.on("error", (error: Error) => {
-    failure ??= error;
-    const settle = settleClose;
-    settleClose = null;
-    settle?.(failure);
-  });
+  // A write error is recorded, not thrown; close() reports it and the caller
+  // re-writes the file whole.
+  const file = await openAppendStream(path);
 
   // One redactor for the life of the stream. It is stateful on purpose: a
   // PEM private key spans lines, so a per-line scrub cannot see one, and the
@@ -188,17 +171,13 @@ export async function openRunLog(
   const redactor = createLineRedactor();
 
   const writeLines = (lines: readonly string[]): void => {
-    for (const line of lines) stream.write(line + "\n");
+    for (const line of lines) file.write(line + "\n");
   };
 
   const appendLine = (line: string): void => {
     // Once the stream has failed every further write would fail the same way;
     // the complete file comes from the end-of-run fallback instead.
-    if (closed || failure) return;
-    // Deliberately no backpressure handling: the agent loop must never wait
-    // on disk. Node buffers what the fd cannot take yet and drains it in
-    // order, so the file stays correct — only its tail lags.
-    //
+    if (file.done) return;
     // Scrubbed exactly as persistRunLog scrubs, through the same redactor:
     // this is the writer a real run uses and persistRunLog only the fallback,
     // so redacting there alone would leak every credential to the live log —
@@ -211,29 +190,10 @@ export async function openRunLog(
 
   for (const line of prefixLines) appendLine(line);
 
-  const close = (): Promise<Error | null> =>
-    new Promise((resolve) => {
-      if (closed) {
-        resolve(failure);
-        return;
-      }
-      closed = true;
-      if (failure) {
-        stream.destroy();
-        resolve(failure);
-        return;
-      }
-      // Whatever the redactor is still holding — a `BEGIN` whose `END` never
-      // arrived because the run ended or was killed mid-key. Dropping it
-      // would lose output; it is released scrubbed line by line.
-      writeLines(redactor.flush());
-      settleClose = resolve;
-      stream.end(() => {
-        const settle = settleClose;
-        settleClose = null;
-        settle?.(failure);
-      });
-    });
+  // Whatever the redactor is still holding — a `BEGIN` whose `END` never
+  // arrived because the run ended or was killed mid-key. Dropping it would
+  // lose output; it is released scrubbed line by line before the file ends.
+  const close = (): Promise<Error | null> => file.close(() => writeLines(redactor.flush()));
 
   return { path, appendLine, close };
 }

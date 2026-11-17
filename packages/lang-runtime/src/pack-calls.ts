@@ -10,7 +10,7 @@
  * @module lang-runtime/pack-calls
  */
 
-import type { CallFact, StringArgument } from "@n-dx/lang-kit";
+import type { CallFact, SourceSpan, StringArgument } from "@n-dx/lang-kit";
 import type { Capture, SourcePosition } from "./pack.js";
 
 export const atOrBefore = (a: SourcePosition, b: SourcePosition): boolean =>
@@ -19,7 +19,7 @@ export const atOrBefore = (a: SourcePosition, b: SourcePosition): boolean =>
 const samePosition = (a: SourcePosition, b: SourcePosition): boolean => a.line === b.line && a.column === b.column;
 
 /** True when `inner` lies within `outer`. */
-export const contains = (outer: Capture, inner: Capture): boolean =>
+export const contains = (outer: SourceSpan, inner: SourceSpan): boolean =>
   atOrBefore(outer.start, inner.start) && atOrBefore(inner.end, outer.end);
 
 /** The smallest of `candidates` that contains `inner`. */

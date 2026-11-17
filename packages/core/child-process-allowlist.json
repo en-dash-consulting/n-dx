@@ -14,18 +14,6 @@
       "reason": "Tree termination \u2014 part of the same foundation abstraction. It needs raw spawn for `taskkill /T /F` (the Windows analogue of signalling a process group) and cannot route through exec.ts's spawnCli without creating an import cycle, since exec.ts consumes this module for its timeout kill."
     },
     {
-      "path": "packages/llm-client/src/cli-provider.ts",
-      "reason": "CLI streaming providers \u2014 need raw spawn for event-by-event parsing"
-    },
-    {
-      "path": "packages/llm-client/src/codex-cli-provider.ts",
-      "reason": "CLI streaming providers \u2014 need raw spawn for event-by-event parsing"
-    },
-    {
-      "path": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-      "reason": "CLI streaming providers \u2014 need raw spawn for event-by-event parsing"
-    },
-    {
       "path": "packages/core/bin/rex.js",
       "reason": "Orchestration layer \u2014 spawns CLIs directly (no library imports)"
     },
@@ -56,14 +44,6 @@
     {
       "path": "packages/core/mcp-shim.js",
       "reason": "Spawns the sub-package's own stdio MCP server with `stdio: \"inherit\"`, so the editor's stdin and stdout reach it unmediated. Deliberately a direct spawn rather than win-spawn's spawnCli: that wraps in cmd.exe on Windows for `.cmd` shims, and an extra process between an editor and its MCP server is exactly what must not be in the way."
-    },
-    {
-      "path": "packages/core/config.js",
-      "reason": "Orchestration layer \u2014 spawns CLIs directly (no library imports)"
-    },
-    {
-      "path": "packages/core/export.js",
-      "reason": "Orchestration layer \u2014 spawns CLIs directly (no library imports)"
     },
     {
       "path": "packages/core/pair-programming.js",
@@ -110,19 +90,11 @@
       "reason": "The test runner's copy of hench's validation slot: reads the machine id with `ioreg` (macOS) or `reg` (Windows) exactly as hench's `runLookup` does through llm-client's exec — no shell, so a missing binary is ENOENT on every platform, which the shared directory rule depends on. It runs before the runner rebuilds stale packages, so it cannot depend on llm-client being built. The lookups are injectable, so the parity test compares both copies on fake sources and runs the real lookup only once per copy."
     },
     {
-      "path": "packages/hench/src/process/memory-monitor.ts",
-      "reason": "Process monitoring \u2014 needs raw execFile for system commands (vm_stat, sysctl)"
-    },
-    {
       "path": "packages/rex/src/store/branch-naming.ts",
       "reason": "Git operations \u2014 need execFileSync/execFile for git CLI calls"
     },
     {
       "path": "packages/sourcevision/src/analyzers/branch-work-collector.ts",
-      "reason": "Git operations \u2014 need execFileSync/execFile for git CLI calls"
-    },
-    {
-      "path": "packages/sourcevision/src/analyzers/branch-work-filter.ts",
       "reason": "Git operations \u2014 need execFileSync/execFile for git CLI calls"
     },
     {
@@ -146,15 +118,7 @@
       "reason": "Generated artifact: the standalone iso-map skill, bundled from packages/sourcevision/src/export/ by scripts/build-iso-skill.mjs. It inherits the git usage above; edit the TypeScript, not this file."
     },
     {
-      "path": "packages/sourcevision/src/util/exec-cli.ts",
-      "reason": "Windows-safe CLI helper \u2014 wraps execFileSync with cmd.exe routing for .cmd shims"
-    },
-    {
       "path": "packages/web/src/server/routes-hench.ts",
-      "reason": "Web server routes \u2014 spawn CLI subprocesses for domain tool execution"
-    },
-    {
-      "path": "packages/web/src/server/routes-sourcevision.ts",
       "reason": "Web server routes \u2014 spawn CLI subprocesses for domain tool execution"
     },
     {
@@ -170,20 +134,8 @@
       "reason": "Install identity (`ndx which`) \u2014 reads the install checkout's branch and short SHA with `git rev-parse`. Orchestration tier, and it must answer even when nothing is initialized, so it cannot route through llm-client's exec helpers (a Foundation-tier dependency the report does not otherwise need)."
     },
     {
-      "path": "packages/core/codex-integration.js",
-      "reason": "Codex integration \u2014 writes .codex/config.toml, .agents/skills, AGENTS.md"
-    },
-    {
       "path": "packages/core/assistant-integration.js",
       "reason": "Assistant integration \u2014 runs `git check-ignore` to detect gitignored skill directories (the #284 skill-tracking hint)"
-    },
-    {
-      "path": "scripts/preflight.mjs",
-      "reason": "CI preflight script \u2014 runs build/test/check steps via child processes"
-    },
-    {
-      "path": "scripts/profile-prd-tree-write.mjs",
-      "reason": "Performance profiling script \u2014 measures PRD write latency via pnpm exec"
     },
     {
       "path": "packages/graview-face/dev/ndx-door.ts",

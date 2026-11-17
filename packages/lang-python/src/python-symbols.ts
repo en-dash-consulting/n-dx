@@ -15,8 +15,6 @@ const samePosition = (a: SourceSpan["start"], b: SourceSpan["start"]): boolean =
 
 const sameSpan = (a: SourceSpan, b: SourceSpan): boolean => samePosition(a.start, b.start) && samePosition(a.end, b.end);
 
-const within = (outer: SourceSpan, inner: SourceSpan): boolean => atOrBefore(outer.start, inner.start) && atOrBefore(inner.end, outer.end);
-
 /** A plain string literal's text (`"a"`, `'a'`, `u"a"`, `r'a'`, triple-quoted); undefined for anything else. */
 const PLAIN_STRING = /^[rRuU]?("""|'''|"|')([^\\]*)\1$/s;
 
@@ -30,7 +28,7 @@ export function stringLiteralValue(text: string): string | undefined {
  * or tuple of plain string literals; undefined otherwise.
  */
 function readExports(symbol: SymbolFact, captures: readonly Capture[]): string[] | undefined {
-  const value = captures.find((c) => c.name === "all.value" && within(symbol.span, spanOf(c)));
+  const value = captures.find((c) => c.name === "all.value" && contains(symbol.span, c));
   if (value === undefined) return undefined;
   const names: string[] = [];
   for (const item of captures) {
@@ -71,8 +69,8 @@ function refinePythonSymbols(symbols: readonly SymbolFact[], file: PackSourceFil
     // A function whose nearest enclosing class or function is a class is a method.
     let owner: SymbolFact | undefined;
     for (const other of scopes) {
-      if (other === symbol || !within(other.span, symbol.span)) continue;
-      if (owner === undefined || within(owner.span, other.span)) owner = other;
+      if (other === symbol || !contains(other.span, symbol.span)) continue;
+      if (owner === undefined || contains(owner.span, other.span)) owner = other;
     }
     const kind = symbol.kind === "function" && owner?.kind === "class" ? "method" : symbol.kind;
     const decorated = readDecorators(symbol.span, definitions);

@@ -13,6 +13,7 @@ import { gunzipSync } from "node:zlib";
 import { normalizeRunTokens, type RunRecord, type RunTokens } from "../hench-gateway.js";
 import type { SnapshotEdge, SnapshotNode, SourceSlice, Warn } from "../types.js";
 import { byString } from "../canonical.js";
+import { errorMessage } from "../error-message.js";
 
 export const RUNS_DIRNAME = "runs";
 
@@ -30,7 +31,7 @@ function readRun(path: string, warn: Warn): RunRecord | undefined {
     const parsed = JSON.parse(text) as RunRecord;
     return typeof parsed.id === "string" && typeof parsed.taskId === "string" ? parsed : undefined;
   } catch (error) {
-    warn(`Could not read run ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    warn(`Could not read run ${path}: ${errorMessage(error)}`);
     return undefined;
   }
 }

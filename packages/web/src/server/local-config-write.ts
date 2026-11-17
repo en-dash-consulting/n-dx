@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { isLocalConfigTracked, resolveLayout } from "@n-dx/llm-client";
+import { isRecord } from "../shared/index.js";
 
 type Json = Record<string, unknown>;
 
@@ -24,8 +25,6 @@ export class LocalConfigError extends Error {
     this.name = "LocalConfigError";
   }
 }
-
-const isRecord = (value: unknown): value is Json => !!value && typeof value === "object" && !Array.isArray(value);
 
 /**
  * Edit the `key` block of the local config file: `update` receives a copy of

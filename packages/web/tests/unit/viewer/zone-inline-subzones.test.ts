@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import type { Zone } from "../../../src/schema/v1.js";
 import type { ZoneData, FileInfo, FlowEdge, BoxRect, FileConnectionMap, ExpandedSubZones } from "../../../src/viewer/views/zone-types.js";
-import { convertSubZones } from "../../../src/viewer/views/zones.js";
+import { convertSubZones } from "../../../src/viewer/views/zones-model.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -6,9 +6,10 @@ import {
   BarChart,
   PatternBadge,
   getZoneColorByIndex,
+  zoneNeedsAttention,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { formatSince } from "../utils/format.js";
+import { errorMessage, formatSince } from "../utils/format.js";
 import { narrationNotice } from "./narration-notice.js";
 import { IsoMapHero } from "./iso-map.js";
 import { DeliveryPanel, deliveryAnalysisStamp } from "./delivery.js";
@@ -95,8 +96,7 @@ function priorityCounts(steps: NextStep[]): [string, number][] {
  * Collapsed by default to one summary line — the count by priority and the
  * top step's title — so the map above it stays the first thing on the page.
  * The open state is remembered per browser.
- */
-/**
+ *
  * `embedded`: inside a dashboard tile, which already names it — always open,
  * no caret or heading of its own, the counts and Copy all kept.
  */
@@ -151,7 +151,7 @@ export function NextStepsPanel({ embedded = false }: { embedded?: boolean } = {}
       );
       setCapture("done");
     } catch (err) {
-      setCaptureMsg(String(err instanceof Error ? err.message : err));
+      setCaptureMsg(errorMessage(err));
       setCapture("error");
     }
   }, [steps]);
@@ -298,6 +298,15 @@ const LANG_COLORS: Record<string, string> = {
   Go: "#00add8",
 };
 
+/** The facts the isometric map's caption lists: zones, imports and the branch, when known. */
+function isoMapFacts({ zones, imports, manifest }: LoadedData): string[] {
+  return [
+    `${zones?.zones.length ?? 0} zones`,
+    imports ? `${imports.edges.length.toLocaleString()} imports` : "",
+    manifest?.gitBranch ?? "",
+  ].filter(Boolean);
+}
+
 /** Green ≥ 0.7, orange ≥ 0.4, red below — higher is better. */
 function healthColor(score: number): string {
   return score >= 0.7 ? "var(--green)" : score >= 0.4 ? "var(--orange)" : "var(--red)";
@@ -340,18 +349,10 @@ function StatTile({ glyph, label, value, sub, tone, meter, info, onOpen }: StatT
 
 export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }: OverviewProps) {
   const lead = variant === "lead";
-  const { manifest, inventory, imports, zones, components } = data;
+  const { manifest, inventory, imports, zones } = data;
 
-  if (!manifest && !inventory && !imports && !zones) {
-    return h("div", { class: "loading" }, "No data loaded. Use 'sourcevision serve' or drop files.");
-  }
-
-  const hasZones = zones && zones.zones.length > 0;
-  const hasImports = imports && imports.edges.length > 0;
-  const showGettingStarted = manifest && (!hasImports || !hasZones);
-
-  // Calculate overall health metrics
-  const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
+  // The memos run before the no-data return below, so every render calls the
+  // same hooks in the same order.
 
   // Top zones by size
   const topZones = useMemo(() => {
@@ -367,8 +368,16 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
   // Zones needing attention count
   const attentionCount = useMemo(() => {
     if (!zones) return 0;
-    return zones.zones.filter(z => z.cohesion < 0.4 || z.coupling > 0.5).length;
+    return zones.zones.filter(zoneNeedsAttention).length;
   }, [zones]);
+
+  if (!manifest && !inventory && !imports && !zones) {
+    return h("div", { class: "loading" }, "No data loaded. Use 'sourcevision serve' or drop files.");
+  }
+
+  const hasZones = zones && zones.zones.length > 0;
+  const hasImports = imports && imports.edges.length > 0;
+  const showGettingStarted = manifest && (!hasImports || !hasZones);
 
   const narration = manifest ? narrationNotice(manifest.narration) : null;
 
@@ -415,11 +424,7 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
     hasZones && !lead
       ? h(IsoMapHero, {
           analysisStamp: isoMapAnalysisStamp(data),
-          facts: [
-            `${zones!.zones.length} zones`,
-            imports ? `${imports.edges.length.toLocaleString()} imports` : "",
-            manifest?.gitBranch ?? "",
-          ].filter(Boolean),
+          facts: isoMapFacts(data),
           onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
         })
       : null,
@@ -546,17 +551,13 @@ export function MapPanel({ data, navigateTo, opened = false, onExpand }: {
   opened?: boolean;
   onExpand?: () => void;
 }): ComponentChild {
-  const { zones, imports, manifest } = data;
+  const { zones } = data;
   if (!zones || zones.zones.length === 0) {
     return h("p", { class: "stage-tile-empty" }, "No zones yet — run an analysis to draw the map.");
   }
   return h(IsoMapHero, {
     analysisStamp: isoMapAnalysisStamp(data),
-    facts: [
-      `${zones.zones.length} zones`,
-      imports ? `${imports.edges.length.toLocaleString()} imports` : "",
-      manifest?.gitBranch ?? "",
-    ].filter(Boolean),
+    facts: isoMapFacts(data),
     onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
     onExpand: opened ? undefined : onExpand,
     hosted: opened,
@@ -642,7 +643,7 @@ export function CodebaseStats({ data, onStat }: { data: LoadedData; onStat?: (st
   const { inventory, imports, zones } = data;
   const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
   const attentionCount = useMemo(
-    () => (zones ? zones.zones.filter((z) => z.cohesion < 0.4 || z.coupling > 0.5).length : 0),
+    () => (zones ? zones.zones.filter(zoneNeedsAttention).length : 0),
     [zones],
   );
   return h("div", { class: "overview-stats", role: "list", "aria-label": "Codebase summary" },
@@ -782,7 +783,7 @@ export function HealthDetail({ data, openTile, setDetail }: HealthDetailProps): 
   const files = useMemo(() => new Map((inventory?.files ?? []).map((f) => [f.path, f])), [inventory]);
   const attention = useMemo(
     () => (zones?.zones ?? [])
-      .filter((z) => z.cohesion < 0.4 || z.coupling > 0.5)
+      .filter(zoneNeedsAttention)
       .sort((a, b) => (a.cohesion - a.coupling) - (b.cohesion - b.coupling)),
     [zones],
   );

@@ -37,7 +37,7 @@ import type {
   PreparedResolver,
   SourcePosition,
 } from "@n-dx/lang-runtime";
-import { innermostEach } from "@n-dx/lang-runtime";
+import { contains, innermostEach } from "@n-dx/lang-runtime";
 import { readTestArtifactGrants, type TestArtifactGrants } from "./java-test-artifacts.js";
 
 // ── Facts read from one file's captures ─────────────────────────────────────
@@ -73,11 +73,6 @@ function before(a: SourcePosition, b: SourcePosition): boolean {
   return a.line < b.line || (a.line === b.line && a.column < b.column);
 }
 
-/** `inner` lies within `outer` (bounds inclusive). */
-function within(inner: Capture, outer: Capture): boolean {
-  return !before(inner.start, outer.start) && !before(outer.end, inner.end);
-}
-
 /** Spans not contained in another span, in document order: one sweep over spans sorted by start, then widest first. */
 function outermostSpans(spans: readonly Capture[]): Capture[] {
   const sorted = [...spans].sort((a, b) => {
@@ -89,7 +84,7 @@ function outermostSpans(spans: readonly Capture[]): Capture[] {
   const result: Capture[] = [];
   for (const span of sorted) {
     const last = result[result.length - 1];
-    if (!last || !within(span, last)) result.push(span);
+    if (!last || !contains(last, span)) result.push(span);
   }
   return result;
 }
@@ -103,7 +98,7 @@ function insideAny(c: Capture, outer: readonly Capture[]): boolean {
     if (before(c.start, outer[mid]!.start)) hi = mid;
     else lo = mid + 1;
   }
-  return lo > 0 && within(c, outer[lo - 1]!);
+  return lo > 0 && contains(outer[lo - 1]!, c);
 }
 
 const startsWithCapital = (segment: string): boolean => /^[A-Z]/.test(segment);
@@ -178,7 +173,7 @@ function readFacts(file: PackSourceFile): JavaFileFacts {
   const imports = importCaptures
     .filter((c) => c.name === "import.declaration")
     .flatMap((decl): JavaImport[] => {
-      const inside = importCaptures.filter((c) => c !== decl && within(c, decl));
+      const inside = importCaptures.filter((c) => c !== decl && contains(decl, c));
       const name = inside.find((c) => c.name === "import.name");
       if (!name) return [];
       return [
@@ -199,7 +194,7 @@ function readFacts(file: PackSourceFile): JavaFileFacts {
     const span = declCaptures[i]!;
     const name = declCaptures[i + 1]!;
     if (!DECLARATION_KINDS.has(span.name) || name.name !== "type.name") continue;
-    while (open.length > 0 && !within(span, open[open.length - 1]!.span)) open.pop();
+    while (open.length > 0 && !contains(open[open.length - 1]!.span, span)) open.pop();
     const parent = open[open.length - 1];
     const qualified = parent ? `${parent.qualified}.${name.text}` : name.text;
     declared.push(qualified);

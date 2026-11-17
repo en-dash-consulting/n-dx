@@ -131,13 +131,21 @@ export interface SidecarManagerOptions {
   mountKeys?: boolean;
 }
 
+/** How long the hub waits on one `ndx extensions …` question before giving up on it. */
+export const NDX_CLI_TIMEOUT_MS = 30_000;
+
+/** Why an `ndx extensions …` call gave no answer: its stderr, else the spawn error, else its exit code. */
+export function ndxCliFailureDetail(result: Awaited<ReturnType<typeof exec>>): string {
+  return result.stderr.trim() || result.error?.message || `exit code ${result.exitCode ?? "null"}`;
+}
+
 /**
  * The plan function for a hub that knows where n-dx's CLI is: spawn
  * `<node> <ndxCli> extensions sidecar <name> --json` from `cwd` and parse it.
  * `cwd` is the n-dx home, so the `project` discovery source finds nothing: a
  * sidecar is served machine-wide, from the user, global and dev sources.
  */
-export function ndxCliPlanner(ndxCli: string, cwd: string, timeoutMs = 30_000): PlanSidecar {
+export function ndxCliPlanner(ndxCli: string, cwd: string, timeoutMs = NDX_CLI_TIMEOUT_MS): PlanSidecar {
   return async (name) => {
     const result = await exec(process.execPath, [ndxCli, "extensions", "sidecar", name, "--json"], { cwd, timeout: timeoutMs });
     const lastLine = result.stdout.trim().split("\n").pop() ?? "";
@@ -154,8 +162,7 @@ export function ndxCliPlanner(ndxCli: string, cwd: string, timeoutMs = 30_000): 
     if (body && typeof body.error === "string") {
       return { ok: false, reason: typeof body.reason === "string" ? body.reason : "error", error: body.error };
     }
-    const detail = result.stderr.trim() || result.error?.message || `exit code ${result.exitCode ?? "null"}`;
-    return { ok: false, reason: "error", error: `Could not ask n-dx for the ${name} sidecar: ${detail}` };
+    return { ok: false, reason: "error", error: `Could not ask n-dx for the ${name} sidecar: ${ndxCliFailureDetail(result)}` };
   };
 }
 
@@ -387,9 +394,12 @@ export class SidecarManager {
     await Promise.all(Array.from(this.sidecars.values(), (s) => this.stopSidecar(s)));
   }
 
+  private get crashWindowMs(): number {
+    return this.opts.crashWindowMs ?? SIDECAR_CRASH_WINDOW_MS;
+  }
+
   private recentCrashes(s: Sidecar): number[] {
-    const windowMs = this.opts.crashWindowMs ?? SIDECAR_CRASH_WINDOW_MS;
-    const since = this.now() - windowMs;
+    const since = this.now() - this.crashWindowMs;
     s.crashes = s.crashes.filter((at) => at > since);
     return s.crashes;
   }
@@ -423,7 +433,7 @@ export class SidecarManager {
     const limit = this.opts.crashLimit ?? SIDECAR_CRASH_LIMIT;
     const crashes = this.recentCrashes(s);
     if (crashes.length >= limit) {
-      const windowMs = this.opts.crashWindowMs ?? SIDECAR_CRASH_WINDOW_MS;
+      const windowMs = this.crashWindowMs;
       const retryAt = crashes[crashes.length - limit] + windowMs;
       const retryAfterSeconds = Math.max(1, Math.ceil((retryAt - this.now()) / 1000));
       return this.refuse(
@@ -486,7 +496,8 @@ export class SidecarManager {
       this.recordCrash(s, `exited with code ${result.exitCode ?? "null"}`);
     });
 
-    const deadline = Date.now() + (this.opts.startTimeoutMs ?? SIDECAR_START_TIMEOUT_MS);
+    const startTimeoutMs = this.opts.startTimeoutMs ?? SIDECAR_START_TIMEOUT_MS;
+    const deadline = Date.now() + startTimeoutMs;
     const url = `http://${LOOPBACK}:${port}${plan.health}`;
     const gone = (when: string): EnsureResult => {
       const how = exitCode === undefined ? "was stopped" : `exited with code ${exitCode ?? "null"}`;
@@ -507,7 +518,7 @@ export class SidecarManager {
       await sleep(this.opts.healthPollMs ?? 200);
     }
 
-    const seconds = Math.round((this.opts.startTimeoutMs ?? SIDECAR_START_TIMEOUT_MS) / 1000);
+    const seconds = Math.round(startTimeoutMs / 1000);
     await this.stopSidecar(s);
     this.recordCrash(s, `did not answer ${plan.health} within ${seconds}s`);
     return this.refuse(s, 503, `The ${s.name} sidecar did not answer ${plan.health} within ${seconds}s.`);

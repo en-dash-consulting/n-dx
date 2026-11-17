@@ -25,9 +25,10 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
-import { openWebSocket } from "../session.js";
+import { openReconnectingSocket } from "../live-feed-socket.js";
 import { createWSPipeline } from "./use-gateway.js";
-import { useSidecarSessions } from "./use-sidecar-sessions.js";
+import { getJson, sendJson } from "../utils/json-requests.js";
+import { useSidecarSessions, waitingCards } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
 import { GENERAL_LENS, useSidecarAttachment } from "./use-sidecar-attachment.js";
 import type { SidecarAttachment, SidecarPageSelection } from "./use-sidecar-attachment.js";
@@ -403,46 +404,13 @@ export function pickOpenSession(entries: readonly SidecarSessionEntry[]): Sideca
   return best;
 }
 
-/** Cards still waiting on the operator. */
-export function waitingCards(cards: readonly SidecarCard[]): number {
-  return cards.filter((c) => c.status === "pending").length;
-}
-
 /** Cards oldest first, the order the agent waits on them. */
 export function orderCards(cards: readonly SidecarCard[]): SidecarCard[] {
   return [...cards].sort((a, b) => (a.raisedAt < b.raisedAt ? -1 : a.raisedAt > b.raisedAt ? 1 : 0));
 }
 
-async function getJson<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url);
-    return res.ok ? (await res.json()) as T : null;
-  } catch {
-    return null;
-  }
-}
-
 const postJson = <T>(url: string, body: unknown) => sendJson<T>("POST", url, body);
 const patchJson = <T>(url: string, body: unknown) => sendJson<T>("PATCH", url, body);
-
-/** Send a JSON body; the parsed answer, or the server's error text. */
-async function sendJson<T>(
-  method: "POST" | "PATCH",
-  url: string,
-  body: unknown,
-): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({})) as T & { error?: string };
-    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Request failed (${res.status})` };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
 
 /** The picker's catalog from GET /api/llm/catalog; null when the route does not answer. */
 async function loadCatalog(refresh = false): Promise<SidecarCatalog | null> {
@@ -593,10 +561,6 @@ interface Tail {
   again: boolean;
 }
 
-/** The socket's reconnect delay doubles from the first to the cap, and resets once it opens (as use-live.ts). */
-const RECONNECT_FIRST_MS = 1_000;
-const RECONNECT_MAX_MS = 30_000;
-
 const newTail = (sessionId: string | null): Tail => ({ sessionId, cursor: 0, inFlight: false, again: false });
 
 export function useSidecar(
@@ -716,7 +680,6 @@ export function useSidecar(
     if (!enabled) return () => { mountedRef.current = false; };
     void fetchWaiting();
 
-    let ws: WebSocket | null = null;
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
       onFlush: (batch) => {
@@ -743,60 +706,23 @@ export function useSidecar(
       throttledTypes: [],
       coalescerWindowMs: 100,
     });
-    let stopped = false;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let reconnectDelay = RECONNECT_FIRST_MS;
-
-    const connect = (isReconnect: boolean): void => {
-      if (typeof WebSocket === "undefined") return; // no socket: the drawer still reads when it opens
-      try {
-        ws = openWebSocket(endpointRef.current.socketUrl());
-      } catch {
-        scheduleReconnect();
-        return;
-      }
-      ws.onopen = () => {
-        reconnectDelay = RECONNECT_FIRST_MS;
+    // With no socket at all, the drawer still reads when it opens. A
+    // malformed frame is dropped: the next announcement carries the cursor again.
+    const stopSocket = openReconnectingSocket({
+      url: () => endpointRef.current.socketUrl(),
+      onFrame: (frame) => pipeline.push(frame),
+      onOpen: (isReconnect) => {
         // Announcements sent while the socket was down are gone: catch up now.
         if (isReconnect && mountedRef.current) {
           void fetchWaiting();
           void fetchFrames();
         }
-      };
-      ws.onclose = () => {
-        ws = null;
-        if (!stopped) scheduleReconnect();
-      };
-      ws.onmessage = (event) => {
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // A malformed frame: the next announcement carries the cursor again.
-        }
-      };
-    };
-
-    const scheduleReconnect = (): void => {
-      if (stopped || reconnectTimer !== null) return;
-      const delay = reconnectDelay;
-      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        connect(true);
-      }, delay);
-    };
-
-    connect(false);
+      },
+    });
     return () => {
-      stopped = true;
       mountedRef.current = false;
       pipeline.dispose();
-      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
-      if (ws) {
-        ws.onclose = null;
-        ws.close();
-        ws = null;
-      }
+      stopSocket();
     };
   }, [enabled, fetchWaiting, fetchFrames]);
 

@@ -8,7 +8,8 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import {join, relative, resolve, sep} from "node:path";import type {
+import { join, relative, resolve, sep } from "node:path";
+import type {
   Manifest,
   Inventory,
   Imports,

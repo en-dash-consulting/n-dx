@@ -11,7 +11,6 @@ export {
   clearOnChange,
   loadModules,
   loadFromFiles,
-  detectMode,
   probeServer,
   classifyProbeStatus,
   SERVER_PROBE_DELAYS_MS,

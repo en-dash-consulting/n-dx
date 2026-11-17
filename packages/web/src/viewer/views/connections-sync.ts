@@ -8,7 +8,8 @@
 
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
-import { errorText, readError, send, type ReportNotice } from "./connections-api.js";
+import { readError, send, type ReportNotice } from "./connections-api.js";
+import { errorMessage } from "../utils/format.js";
 
 export const RULE_MODES = ["off", "dry-run", "on"] as const;
 export type RuleMode = (typeof RULE_MODES)[number];
@@ -55,7 +56,7 @@ export function SyncRulesSection({ connectionIds, onNotice }: SyncRulesProps) {
       setSettings((await res.json()) as SyncSettings);
       setLoadError(null);
     } catch (err) {
-      setLoadError(errorText(err));
+      setLoadError(errorMessage(err));
     }
   }, []);
 
@@ -75,7 +76,7 @@ export function SyncRulesSection({ connectionIds, onNotice }: SyncRulesProps) {
       }
       setSettings((await res.json()) as SyncSettings);
     } catch (err) {
-      onNotice({ kind: "error", text: `Could not save the sync rules: ${errorText(err)}` });
+      onNotice({ kind: "error", text: `Could not save the sync rules: ${errorMessage(err)}` });
     } finally {
       setBusy(false);
     }

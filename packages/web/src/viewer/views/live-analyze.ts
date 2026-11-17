@@ -27,12 +27,13 @@
  */
 
 import { h } from "preact";
-import type { ComponentChildren } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
 import { useLiveAnalyze, useTick, useCliName, type LiveAnalyzeSnapshot } from "../hooks/index.js";
 import { fmtDuration, formatSince } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
+import { errorOf } from "../utils/response-error.js";
+import { SideSection, copyPageLink, useFollowScroll } from "./live-shared.js";
 import {
   analyzeTitle,
   barSegments,
@@ -63,11 +64,6 @@ export interface LiveAnalyzeViewProps {
   navigateTo: NavigateTo;
 }
 
-async function errorOf(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: string } | null;
-  return body?.error ?? `${fallback} (HTTP ${res.status})`;
-}
-
 function Elapsed({ startedAt }: { startedAt: string }) {
   return h("span", null, useTick(startedAt, (s) => fmtDuration(s, new Date().toISOString())));
 }
@@ -88,12 +84,7 @@ function Header({ snapshot, navigateTo, refresh }: HeaderProps) {
   const running = state === "running";
 
   const copyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(location.href);
-      setNotice("Link copied");
-    } catch {
-      setNotice("Could not copy the link");
-    }
+    setNotice(await copyPageLink());
   }, []);
 
   const stop = useCallback(async () => {
@@ -206,23 +197,8 @@ function PhaseList({ rows, passes, cache }: { rows: PhaseRow[]; passes: PassRow[
 
 function OutputTail({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
   const preRef = useRef<HTMLPreElement>(null);
-  const [following, setFollowing] = useState(true);
-  const programmatic = useRef(false);
   const lines = snapshot.output.lines;
-
-  useEffect(() => {
-    const el = preRef.current;
-    if (!el || !following) return;
-    programmatic.current = true;
-    el.scrollTop = el.scrollHeight;
-  }, [lines.length, lines.at(-1), following]);
-
-  const onScroll = useCallback(() => {
-    const el = preRef.current;
-    if (!el) return;
-    if (programmatic.current) { programmatic.current = false; return; }
-    setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 8);
-  }, []);
+  const { following, follow, onScroll } = useFollowScroll(preRef, [lines.length, lines.at(-1)]);
 
   if (!snapshot.output.available) {
     return h("p", { class: "live-muted" },
@@ -234,7 +210,7 @@ function OutputTail({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
     lines.length === 0
       ? h("p", { class: "live-muted", role: "status" }, "Waiting for the first line of output…")
       : h("pre", { class: "live-log-lines live-analyze-output", ref: preRef, onScroll, "aria-label": "Output", tabIndex: 0 }, lines.join("\n")),
-    following ? null : h("button", { type: "button", class: "cmd-btn cmd-btn-secondary live-follow", onClick: () => setFollowing(true) }, "Follow"),
+    following ? null : h("button", { type: "button", class: "cmd-btn cmd-btn-secondary live-follow", onClick: follow }, "Follow"),
   );
 }
 
@@ -303,18 +279,11 @@ function ChangeSummary({ snapshot, navigateTo }: { snapshot: LiveAnalyzeSnapshot
 
 // ── Side column ──────────────────────────────────────────────────────
 
-function Section({ id, title, children }: { id: string; title: string; children?: ComponentChildren }) {
-  return h("section", { class: "live-side-section", "aria-labelledby": id },
-    h("h3", { id, class: "live-side-title" }, title),
-    children,
-  );
-}
-
 function CallsSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
   const progress = snapshot.progress;
   const classes = classRows(progress);
   const cache = cacheReuse(progress);
-  return h(Section, { id: "la-calls-h", title: "Model calls" },
+  return h(SideSection, { id: "la-calls-h", title: "Model calls" },
     progress?.mode === "fast"
       ? h("p", { class: "live-muted" }, "A fast analysis makes no model calls.")
       : classes.length === 0
@@ -332,7 +301,7 @@ function CallsSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
 const FILE_WORD = { written: "written this run", previous: "previous run's", error: "error", pending: "not written" } as const;
 
 function FilesSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
-  return h(Section, { id: "la-files-h", title: "Files in .sourcevision/" },
+  return h(SideSection, { id: "la-files-h", title: "Files in .sourcevision/" },
     h("ul", { class: "live-recent" }, fileRows(snapshot).map((f) =>
       h("li", { key: f.file, class: "live-analyze-file" },
         h("span", { class: "live-mono" }, f.file),
@@ -348,12 +317,12 @@ function NotesSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
   // where the operator is already reading the outcome.
   const notes = running ? [...runningNotes(snapshot, cliName), ...(narration ? [narration] : [])] : [];
   if (notes.length === 0) return null;
-  return h(Section, { id: "la-notes-h", title: "Notes" },
+  return h(SideSection, { id: "la-notes-h", title: "Notes" },
     h("ul", { class: "live-analyze-notes" }, notes.map((note, i) => h("li", { key: i }, note))));
 }
 
 function RecentSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
-  return h(Section, { id: "la-recent-h", title: "Recent analyses" },
+  return h(SideSection, { id: "la-recent-h", title: "Recent analyses" },
     snapshot.recent.length === 0
       ? h("p", { class: "live-muted" }, "No analyses recorded yet.")
       : h("ul", { class: "live-recent" }, snapshot.recent.map((run) =>

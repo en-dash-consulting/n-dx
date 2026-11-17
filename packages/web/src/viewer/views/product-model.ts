@@ -105,6 +105,11 @@ export function isAppliedStage(stage: ChangeStage): boolean {
 /** Heading for changes with no `plannedRelease`. */
 export const UNSCHEDULED_RELEASE_LABEL = "Unscheduled";
 
+/** A change's id as change lists show it: its display id, else the first eight characters of its id. */
+export function shortChangeId(change: { id: string; displayId?: string }): string {
+  return change.displayId ?? change.id.slice(0, 8);
+}
+
 // ── Product layer ────────────────────────────────────────────────────
 
 /** How a change moves a capability's spec. */

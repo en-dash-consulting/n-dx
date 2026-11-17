@@ -17,6 +17,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveModelPricing, priceTokens } from "../../prd/llm-gateway.js";
+import { RUNS_DIRNAME } from "../../store/paths.js";
 import { listRunsByIds } from "../../store/runs.js";
 import type { RunRecord, TokenUsage, TurnTokenUsage } from "../../schema/index.js";
 
@@ -92,7 +93,7 @@ export async function ledgerSpendTodayUsd(
   now: Date,
   excludeRunId?: string,
 ): Promise<number> {
-  const runsDir = join(henchDir, "runs");
+  const runsDir = join(henchDir, RUNS_DIRNAME);
   const since = startOfLocalDay(now).getTime();
   let files: string[];
   try {

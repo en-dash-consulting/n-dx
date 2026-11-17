@@ -44,6 +44,7 @@ import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index
 import { formatSince } from "../utils/format.js";
 import { useFeatureToggle } from "../hooks/index.js";
 import { BRANCH_HEALTH_FEATURE, BranchHealthStrip } from "./workspace-branch-health.js";
+import { StatCard } from "./stat-card.js";
 import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
@@ -392,35 +393,28 @@ async function loadSlice(doFetch: Fetcher, ws: WorkspaceSummary, into: Workspace
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatTile({ value, label, title }: { value: string; label: string; title?: string }) {
-  return h("div", { class: "stat-card", title },
-    h("div", { class: "value" }, value),
-    h("div", { class: "label" }, label),
-  );
-}
-
 function MachineStrip({ stats }: { stats: MachineStats }) {
   const memory = stats.memory;
   // An unreadable machine gets a dash and says so, rather than a percentage
   // computed from numbers that do not exist.
   const known = memory !== null && memory.usedPercent !== null;
   return h("div", { class: "stat-grid workspaces-machine-strip", role: "group", "aria-label": "Machine totals" },
-    h(StatTile, {
+    h(StatCard, {
       value: String(stats.agentsRunning),
       label: stats.agentsRunning === 1 ? "agent running" : "agents running",
     }),
-    h(StatTile, {
+    h(StatCard, {
       value: known ? `${Math.round(memory.usedPercent!)}%` : "—",
       label: known
         ? `memory in use · ${formatBytes(memory.availableBytes)} available of ${formatBytes(memory.totalBytes)}`
         : memory ? "memory reading unavailable" : "memory in use",
       title: known ? `${formatBytes(memory.usedBytes)} of ${formatBytes(memory.totalBytes)}` : undefined,
     }),
-    h(StatTile, {
+    h(StatCard, {
       value: String(stats.uncommittedTrees),
       label: stats.uncommittedTrees === 1 ? "uncommitted tree" : "uncommitted trees",
     }),
-    h(StatTile, {
+    h(StatCard, {
       value: String(stats.prdOnlyOnBranches),
       label: "PRD items only on branches",
       title: "Items present in a branch worktree's PRD but not in the anchor's",

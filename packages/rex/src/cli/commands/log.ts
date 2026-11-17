@@ -14,7 +14,6 @@
  * @module rex/cli/commands/log
  */
 
-import { join } from "node:path";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import { appendExecutionLogEntry } from "../../core/execution-log.js";
 import { CLIError, requireRexDir } from "../errors.js";

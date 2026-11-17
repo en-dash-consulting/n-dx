@@ -311,7 +311,8 @@ export function sameTextOnDisk(onDisk: string | null, text: string): boolean {
   return onDisk !== null && (onDisk === text || onDisk.replace(/\r\n/g, "\n") === text);
 }
 
-async function readIfExists(path: string): Promise<string | null> {
+/** The file's text as stored (line endings untouched), or null when it is absent. */
+export async function readIfExists(path: string): Promise<string | null> {
   try {
     return await readFile(path, "utf-8");
   } catch (err) {

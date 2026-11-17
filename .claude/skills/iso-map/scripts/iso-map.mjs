@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // packages/sourcevision/src/export/iso-standalone.ts
 import { writeFileSync, existsSync as existsSync4 } from "node:fs";
-import { resolve as resolve3, join as join4, dirname as dirname2 } from "node:path";
+import { resolve as resolve2, join as join4, dirname as dirname2 } from "node:path";
 
 // packages/sourcevision/src/export/iso-model.ts
 function layoutTiles(children, w, d) {
@@ -2126,7 +2126,7 @@ refresh(false);
 
 // packages/sourcevision/src/export/iso-sources.ts
 import { readFileSync as readFileSync3, existsSync as existsSync3 } from "node:fs";
-import { join as join3, basename as basename2, resolve as resolve2 } from "node:path";
+import { join as join3, basename as basename2, resolve } from "node:path";
 
 // packages/sourcevision/src/util/git-remote.ts
 import { execFileSync } from "node:child_process";
@@ -2178,7 +2178,7 @@ function readOriginUrl(root) {
 
 // packages/sourcevision/src/export/iso-scan.ts
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { join, relative, dirname, extname, basename, resolve, sep } from "node:path";
+import { join, relative, dirname, extname, basename, sep } from "node:path";
 var LANGUAGES = {
   ".ts": "TypeScript",
   ".tsx": "TypeScript",
@@ -3427,7 +3427,7 @@ function loadFromSourcevision(root, options = {}) {
     callEdges: callGraph ? aggregateCallEdges(callGraph, zoneOfFile) : void 0,
     linkBase: options.linkBase ?? deriveLinkBase(info),
     meta: {
-      project: basename2(resolve2(root)),
+      project: basename2(resolve(root)),
       analyzedAt: resolveTimestamp(options, info, manifest?.analyzedAt),
       gitBranch: manifest?.gitBranch ?? info.branch,
       gitSha: manifest?.gitSha ?? info.sha,
@@ -3474,7 +3474,7 @@ function loadFromScan(root, options = {}) {
     findings: [],
     linkBase: options.linkBase ?? deriveLinkBase(info),
     meta: {
-      project: basename2(resolve2(root)),
+      project: basename2(resolve(root)),
       analyzedAt: resolveTimestamp(options, info),
       gitBranch: info.branch,
       gitSha: info.sha,
@@ -3569,7 +3569,7 @@ function runStandalone(argv, io) {
     io.out(HELP);
     return 0;
   }
-  const root = resolve3(opts.dir);
+  const root = resolve2(opts.dir);
   if (!existsSync4(root)) {
     io.err(`iso-map: Directory not found: ${root}
 `);
@@ -3594,7 +3594,7 @@ function runStandalone(argv, io) {
     );
     return 1;
   }
-  const out = resolve3(opts.out ?? join4(root, "iso-map.html"));
+  const out = resolve2(opts.out ?? join4(root, "iso-map.html"));
   if (!existsSync4(dirname2(out))) {
     io.err(`iso-map: Output directory does not exist: ${dirname2(out)}
 `);

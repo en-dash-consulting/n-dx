@@ -44,6 +44,7 @@ import { readTrackerItemState } from "./tracker/item-state.js";
 import { itemLinkRefs, type LinkFields } from "./tracker/link-refs.js";
 import { resolveStore, type PRDItem } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
+import { isRecord } from "../shared/index.js";
 
 export const TRACKER_PREFIX = "/api/tracker";
 const TICK_PATH = `${TRACKER_PREFIX}/sync/tick`;
@@ -136,7 +137,7 @@ export async function handleTrackerRoute(
     if (typeof requestId !== "string" || requestId === "") return refuse(res, 400, "requestId is required");
     let decision: CardDecision;
     if (action === "dismiss") decision = { action };
-    else if (action === "approve" && args && typeof args === "object" && !Array.isArray(args)) decision = { action, args: args as Record<string, unknown> };
+    else if (action === "approve" && isRecord(args)) decision = { action, args };
     else return refuse(res, 400, 'action is "dismiss", or "approve" with args');
     const service = (opts.connectionsFor ?? workspaceConnectionService)(ctx.projectDir);
     const decided = await decideTrackerCard({ projectDir: ctx.projectDir, rexDir: ctx.rexDir, service }, requestId, decision);

@@ -5,7 +5,8 @@
  * Pure functions operating on RunRecord arrays. No I/O or side effects.
  */
 
-import type { RunRecord, RunStatus, HenchConfig } from "../../schema/index.js";
+import { HARD_FAILURE_RUN_STATUSES } from "../../schema/index.js";
+import type { RunRecord, HenchConfig } from "../../schema/index.js";
 import {
   contextWriteFloor,
   contextWriteFloorFromCompletedRun,
@@ -94,8 +95,6 @@ export interface WorkflowStats {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-const FAILURE_STATUSES: Set<RunStatus> = new Set(["failed", "timeout", "budget_exceeded"]);
-
 function runDurationMs(run: RunRecord): number {
   if (!run.finishedAt) return 0;
   return new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
@@ -157,7 +156,7 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
   // Failures by status
   const failuresByStatus: Record<string, number> = {};
   for (const run of runs) {
-    if (FAILURE_STATUSES.has(run.status)) {
+    if (HARD_FAILURE_RUN_STATUSES.has(run.status)) {
       failuresByStatus[run.status] = (failuresByStatus[run.status] ?? 0) + 1;
     }
   }
@@ -165,7 +164,7 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
   // Tasks with the most failures
   const taskFailures = new Map<string, number>();
   for (const run of runs) {
-    if (FAILURE_STATUSES.has(run.status)) {
+    if (HARD_FAILURE_RUN_STATUSES.has(run.status)) {
       taskFailures.set(run.taskId, (taskFailures.get(run.taskId) ?? 0) + 1);
     }
   }
@@ -310,7 +309,7 @@ function suggestFailurePrevention(
   // Tasks with concentrated failures
   for (const taskId of stats.troubleTaskIds.slice(0, 3)) {
     const taskRuns = runs.filter((r) => r.taskId === taskId);
-    const taskFailures = taskRuns.filter((r) => FAILURE_STATUSES.has(r.status));
+    const taskFailures = taskRuns.filter((r) => HARD_FAILURE_RUN_STATUSES.has(r.status));
     const taskErrors = taskRuns
       .filter((r) => r.error)
       .map((r) => r.error!)
@@ -394,7 +393,6 @@ function suggestConfigTuning(
 
   // Check retry config against transient error frequency
   const transientErrors = runs.filter((r) => r.status === "error_transient");
-  const retriedRuns = runs.filter((r) => (r.retryAttempts ?? 0) > 0);
   const maxRetries = config?.retry?.maxRetries ?? 3;
 
   if (transientErrors.length >= 3 && maxRetries < 5) {
@@ -426,7 +424,7 @@ function suggestConfigTuning(
       const sorted = [...taskRunList].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
       let failures = 0;
       for (const r of sorted) {
-        if (FAILURE_STATUSES.has(r.status)) failures++;
+        if (HARD_FAILURE_RUN_STATUSES.has(r.status)) failures++;
         else break;
       }
       return failures >= stuckThreshold;

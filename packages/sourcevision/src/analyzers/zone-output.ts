@@ -10,10 +10,7 @@ import type {
   Imports,
   Zones,
   Zone,
-  ZoneCrossing,
-  Finding,
   ZoneSummary,
-  ZoneRiskMetrics,
 } from "../schema/index.js";
 import { toCanonicalJSON } from "../util/sort.js";
 

@@ -13,15 +13,8 @@
  * the Preact hook (`usePolling`) is provided separately.
  */
 
-import {
-  onVisibilityChange,
-  isTabVisible,
-  type TabVisibilitySnapshot,
-} from "./tab-visibility.js";
-import {
-  registerPollingSource,
-  unregisterPollingSource,
-} from "./engine/index.js";
+import { onDebouncedVisibilityChange, isTabVisible } from "./tab-visibility.js";
+import { registerPollingSource } from "./engine/index.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -44,15 +37,6 @@ export interface PollerInfo {
   readonly active: boolean;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-/**
- * Debounce delay for visibility-triggered resume (ms).
- * Prevents thrashing when the user rapidly switches between tabs.
- * Suspension is immediate (no debounce) to stop work quickly.
- */
-const RESUME_DEBOUNCE_MS = 100;
-
 // ─── Constants (polling-state integration) ───────────────────────────────────
 
 const POLLING_STATE_KEY = "polling-manager";
@@ -60,27 +44,23 @@ const POLLING_STATE_KEY = "polling-manager";
 // ─── Module state ────────────────────────────────────────────────────────────
 
 const pollers = new Map<string, PollerEntry>();
+/** Stops the debounced visibility subscription (and its pending resume). */
 let visibilityUnsub: (() => void) | null = null;
 let stateUnsub: (() => void) | null = null;
 let started = false;
 let suspended = false;
-let resumeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 /**
- * Clean up the polling manager's own resources (visibility subscription,
- * debounce timer, poller intervals). Does NOT touch polling-state
- * registration — callers are responsible for that coordination.
+ * Clean up the polling manager's own resources (visibility subscription and
+ * its debounce timer). Does NOT touch polling-state registration — callers
+ * are responsible for that coordination.
  */
 function cleanupOwnResources(): void {
   if (visibilityUnsub) {
     visibilityUnsub();
     visibilityUnsub = null;
-  }
-  if (resumeDebounceTimer !== null) {
-    clearTimeout(resumeDebounceTimer);
-    resumeDebounceTimer = null;
   }
 }
 
@@ -97,28 +77,6 @@ function deactivatePoller(entry: PollerEntry): void {
   entry.timerId = null;
 }
 
-/** Handle visibility change events from the tab-visibility module. */
-function handleVisibilityChange(snapshot: TabVisibilitySnapshot): void {
-  if (snapshot.isVisible) {
-    // Tab became visible — resume with debounce to handle rapid toggling.
-    if (resumeDebounceTimer !== null) {
-      clearTimeout(resumeDebounceTimer);
-    }
-    resumeDebounceTimer = setTimeout(() => {
-      resumeDebounceTimer = null;
-      resumeAll();
-    }, RESUME_DEBOUNCE_MS);
-  } else {
-    // Tab became hidden — suspend immediately.
-    // Cancel any pending resume first.
-    if (resumeDebounceTimer !== null) {
-      clearTimeout(resumeDebounceTimer);
-      resumeDebounceTimer = null;
-    }
-    suspendAll();
-  }
-}
-
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -133,8 +91,12 @@ export function startPollingManager(): void {
   started = true;
   suspended = false;
 
-  // Subscribe to tab visibility changes.
-  visibilityUnsub = onVisibilityChange(handleVisibilityChange);
+  // Subscribe to tab visibility changes: suspend at once when hidden,
+  // resume after the debounce when visible again.
+  visibilityUnsub = onDebouncedVisibilityChange({
+    onHidden: () => suspendAll(),
+    onVisible: () => resumeAll(),
+  });
 
   // If the tab is currently hidden, start in suspended state.
   if (!isTabVisible()) {

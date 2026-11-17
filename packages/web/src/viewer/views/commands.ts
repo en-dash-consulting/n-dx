@@ -19,6 +19,8 @@ import { useCliName, findOperation } from "../hooks/index.js";
 import type { ActiveOperation, JobTray } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { CommandReferenceView } from "./command-reference.js";
+import { assertJobStarted } from "../utils/response-error.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -223,7 +225,7 @@ function ExportPanel() {
       setPdfOutput(body.output ?? "PDF written.");
       setPdfState("done");
     } catch (err) {
-      setPdfOutput(err instanceof Error ? err.message : String(err));
+      setPdfOutput(errorMessage(err));
       setPdfState("error");
     }
   }, []);
@@ -452,10 +454,7 @@ export function SelfHealPanel({ jobs }: { jobs: JobTray }) {
 
       // 409 means it is already running — which is the state the caller
       // wanted, so the tray simply picks it up like any other run.
-      if (!res.ok && res.status !== 409) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
+      await assertJobStarted(res);
     } catch (err) {
       setError(String(err));
     }
@@ -644,10 +643,7 @@ export function RefreshPanel({ jobs }: { jobs: JobTray }) {
       });
 
       // 409 means one is already running — the tray reports that one.
-      if (!res.ok && res.status !== 409) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
+      await assertJobStarted(res);
     } catch (err) {
       setError(String(err));
     }

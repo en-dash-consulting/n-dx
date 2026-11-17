@@ -74,6 +74,7 @@ import {
   type PlaceStepDraft,
   type ProposeStepDraft,
 } from "./placement-draft.js";
+import { errorMessage } from "../../utils/format.js";
 
 // ── Title focus after Place & next ───────────────────────────────────
 
@@ -251,7 +252,7 @@ async function post<T>(url: string, body: unknown): Promise<Answer<T>> {
     const kind = typeof json?.kind === "string" ? json.kind as PlacementRefusalKind : undefined;
     return { ok: false, refusal: { message, ...(kind ? { kind } : {}) } };
   } catch (err) {
-    return { ok: false, refusal: { message: err instanceof Error ? err.message : String(err) } };
+    return { ok: false, refusal: { message: errorMessage(err) } };
   }
 }
 

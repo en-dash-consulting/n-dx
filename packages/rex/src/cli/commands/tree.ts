@@ -8,7 +8,6 @@
  * - Respects NO_COLOR and non-TTY detection via ANSI helpers
  */
 
-import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { computeStats } from "../../core/stats.js";
@@ -21,7 +20,6 @@ import {
   magenta,
   yellow,
   red,
-  dim,
 } from "@n-dx/llm-client";
 import {
   STATUS_ICONS,
@@ -43,7 +41,7 @@ import {
  * - pending → no color
  * - failing → red
  * - blocked → yellow
- * - deferred/deleted → dim
+ * - deferred/deleted → no color
  */
 function renderTreeWithColorScheme(
   items: PRDItem[],

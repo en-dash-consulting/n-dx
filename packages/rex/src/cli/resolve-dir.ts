@@ -28,3 +28,16 @@ export function resolveDir(positional: string[]): string {
   }
   return process.cwd();
 }
+
+/**
+ * Resolve the project directory for a command whose first `operands`
+ * positionals are its own arguments (an item id, a level): the last
+ * positional when there is one beyond them, else `process.cwd()`.
+ *
+ * Unlike {@link resolveDir}, a flag-shaped last argument is not skipped.
+ */
+export function resolveDirAfter(positional: string[], operands: number): string {
+  return positional.length > operands
+    ? resolve(positional[positional.length - 1])
+    : process.cwd();
+}

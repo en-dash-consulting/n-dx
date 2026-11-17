@@ -10,6 +10,7 @@
 import { h } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { errorMessage } from "../utils/format.js";
 
 interface CommandTriggerWire {
   endpoint: string;
@@ -111,7 +112,7 @@ export function RunCell({ command }: { command: ManifestCommandWire }) {
         finish(true);
       }
     } catch (err) {
-      finish(false, err instanceof Error ? err.message : String(err));
+      finish(false, errorMessage(err));
     }
   }, [trigger, finish]);
 
@@ -149,7 +150,7 @@ export function CommandReferenceView() {
         const body = await res.json() as ManifestWire;
         if (!cancelled) setManifest(body);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) setError(errorMessage(err));
       }
     })();
     return () => { cancelled = true; };

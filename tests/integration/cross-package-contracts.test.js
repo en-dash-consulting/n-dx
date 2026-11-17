@@ -745,6 +745,38 @@ describe("hench ↔ web agent-model contract", () => {
 });
 
 // ---------------------------------------------------------------------------
+// graview ↔ web hub endpoint contract
+// ---------------------------------------------------------------------------
+
+/**
+ * `packages/graview/src/hub.ts` names the hub's rex MCP endpoint for the
+ * product face: it reads the hub registry, the running hub's pid file and the
+ * per-user config's `hub.port` from the ndx home, and falls back to the
+ * hub's default port. Graview does not depend on web and has no gateway to
+ * it, so it keeps its own copies of the port and the file names that
+ * `packages/web/src/hub/registry.ts` owns. A drift would point the face's
+ * write-back at a port or a file the hub never uses, and sync would be off
+ * with nothing to say why.
+ */
+describe("graview ↔ web hub endpoint contract", () => {
+  it("graview's default hub port is the hub's own config default", async () => {
+    const graviewHub = await import("../../packages/graview/dist/hub.js");
+    const webRegistry = await import("../../packages/web/dist/hub/registry.js");
+    expect(graviewHub.DEFAULT_HUB_PORT).toBe(webRegistry.HUB_CONFIG_DEFAULTS.port);
+  });
+
+  it("graview reads the same per-user files the hub writes", async () => {
+    const graviewHub = await import("../../packages/graview/dist/hub.js");
+    const webRegistry = await import("../../packages/web/dist/hub/registry.js");
+    const llmClient = await import("../../packages/llm-client/dist/public.js");
+    expect(graviewHub.HUB_REGISTRY_FILENAME).toBe(webRegistry.HUB_REGISTRY_FILE);
+    expect(graviewHub.HUB_PID_FILENAME).toBe(webRegistry.HUB_PID_FILE);
+    expect(graviewHub.HUB_CONFIG_FILENAME).toBe(webRegistry.HUB_CONFIG_FILE);
+    expect(graviewHub.AUTH_TOKEN_FILENAME).toBe(llmClient.AUTH_TOKEN_FILENAME);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Gateway export auto-detection (finding: cross-package import coverage)
 // ---------------------------------------------------------------------------
 

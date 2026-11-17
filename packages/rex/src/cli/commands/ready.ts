@@ -5,7 +5,6 @@
  * @module rex/cli/commands/ready
  */
 
-import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { evaluateReady, applyReadyMarking } from "../../core/ready.js";
 import type { ReadyEvaluation, ReadyMarkOutcome } from "../../core/ready.js";

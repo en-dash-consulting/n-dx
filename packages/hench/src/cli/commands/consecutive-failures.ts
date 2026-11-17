@@ -12,28 +12,15 @@
  * - Any success breaks the streak (resets count), even mid-sequence
  */
 
-/**
- * Run statuses that count as a failure for the consecutive-failure counter.
- *
- * Aligned with `FAILURE_STATUSES` in `agent/lifecycle/shared.ts` (the rollback
- * gate). Both predicates answer "did this run end in failure?" — they must
- * agree, otherwise a status can be rolled back but still reset the counter
- * (or vice versa).
- *
- * `error_transient` and `cancelled` belong here even though `shouldContinueLoop`
- * keeps iterating on them: the loop continues so a different task can be tried,
- * but the failure still counts toward the 3-strike threshold.
- */
-const FAILURE_STATUSES: ReadonlySet<string> = new Set([
-  "failed",
-  "timeout",
-  "budget_exceeded",
-  "error_transient",
-  "cancelled",
-]);
+import { FAILED_RUN_STATUSES } from "../../schema/index.js";
 
 /**
- * Return true if a run status indicates the run ended in failure.
+ * Return true if a run status indicates the run ended in failure: one of
+ * {@link FAILED_RUN_STATUSES}, the set the rollback gate reads too.
+ *
+ * `error_transient` and `cancelled` belong there even though `shouldContinueLoop`
+ * keeps iterating on them: the loop continues so a different task can be tried,
+ * but the failure still counts toward the 3-strike threshold.
  *
  * Distinct from `!shouldContinueLoop(status)`: that predicate decides whether
  * the loop should keep iterating, which is true for `error_transient` and
@@ -42,7 +29,7 @@ const FAILURE_STATUSES: ReadonlySet<string> = new Set([
  * those statuses.
  */
 export function isFailureStatus(status: string): boolean {
-  return FAILURE_STATUSES.has(status);
+  return FAILED_RUN_STATUSES.has(status);
 }
 
 export class ConsecutiveFailureCounter {

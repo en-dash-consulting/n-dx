@@ -12,7 +12,7 @@
 
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { LEVEL_HIERARCHY } from "../schema/index.js";
-import {findItem, removeFromTree, insertChild} from "./tree.js";
+import { findItem, removeFromTree, insertChild } from "./tree.js";
 import { changeLayerType } from "./layer-projection.js";
 export interface MoveResult {
   item: PRDItem;
@@ -169,6 +169,14 @@ export const changeLayerParentRule: ParentRule = (item, parent) => {
   };
 };
 
+/** Append `child` under `parentId` without a level check; false when the parent is missing. */
+function appendChild(items: PRDItem[], parentId: string, child: PRDItem): boolean {
+  const parent = findItem(items, parentId)?.item;
+  if (!parent) return false;
+  (parent.children ??= []).push(child);
+  return true;
+}
+
 /**
  * Move an item to a new parent in the tree.
  *
@@ -184,14 +192,6 @@ export const changeLayerParentRule: ParentRule = (item, parent) => {
  * @param rule - Which parents the item may take (default: the level hierarchy)
  * @returns The move result, or throws on validation failure
  */
-/** Append `child` under `parentId` without a level check; false when the parent is missing. */
-function appendChild(items: PRDItem[], parentId: string, child: PRDItem): boolean {
-  const parent = findItem(items, parentId)?.item;
-  if (!parent) return false;
-  (parent.children ??= []).push(child);
-  return true;
-}
-
 export function moveItem(
   items: PRDItem[],
   itemId: string,

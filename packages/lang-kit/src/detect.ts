@@ -316,6 +316,48 @@ async function markerlessTerraform(search: ProjectFileSearch): Promise<"none" | 
   return (await search([], { count: true })).fallbackSource > 0 ? "beside" : "alone";
 }
 
+/** Which language markers the project root holds. */
+interface RootMarkers {
+  readonly goMod: boolean;
+  readonly packageJson: boolean;
+  readonly swift: boolean;
+  readonly python: boolean;
+  readonly csharp: boolean;
+}
+
+async function readRootMarkers(rootDir: string): Promise<RootMarkers> {
+  const [goMod, packageJson, swift, python, csharp] = await Promise.all([
+    fileExists(join(rootDir, "go.mod")),
+    fileExists(join(rootDir, "package.json")),
+    hasSwiftMarker(rootDir),
+    hasPythonMarker(rootDir),
+    hasCSharpMarker(rootDir),
+  ]);
+  return { goMod, packageJson, swift, python, csharp };
+}
+
+/**
+ * The languages whose markers are present, ordered by descending source-file
+ * count with ties broken by {@link tiebreakRank} (a stable sort). Empty, and
+ * nothing counted, when no marker is present. countSourceFiles is cheap
+ * (shallow scan).
+ */
+async function rankMarkedLanguages(rootDir: string, found: RootMarkers): Promise<LanguageConfig[]> {
+  if (!(found.goMod || found.packageJson || found.swift || found.python || found.csharp)) return [];
+  const counts = await countSourceFiles(rootDir);
+  const present: Array<{ config: LanguageConfig; count: number }> = [];
+  if (found.goMod) present.push({ config: goConfig, count: counts.go });
+  if (found.swift) present.push({ config: swiftConfig, count: counts.swift });
+  if (found.python) present.push({ config: pythonConfig, count: counts.py });
+  if (found.csharp) present.push({ config: csharpConfig, count: counts.cs });
+  if (found.packageJson) present.push({ config: typescriptConfig, count: counts.ts });
+  present.sort((a, b) => {
+    if (a.count !== b.count) return b.count - a.count;
+    return tiebreakRank(a.config) - tiebreakRank(b.config);
+  });
+  return present.map((p) => p.config);
+}
+
 // ── Detection ───────────────────────────────────────────────────────────────
 
 /**
@@ -339,38 +381,21 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   }
 
   // Step 2 & 3: Check for language markers
-  const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp] = await Promise.all([
-    fileExists(join(rootDir, "go.mod")),
-    fileExists(join(rootDir, "package.json")),
-    hasSwiftMarker(rootDir),
-    hasPythonMarker(rootDir),
-    hasCSharpMarker(rootDir),
-  ]);
+  const found = await readRootMarkers(rootDir);
 
   // Single-marker fast path.
-  const markers = [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp].filter(Boolean).length;
+  const markers = [found.goMod, found.packageJson, found.swift, found.python, found.csharp].filter(Boolean).length;
   if (markers === 1) {
-    if (hasGoMod) return goConfig;
-    if (hasSwift) return swiftConfig;
-    if (hasPython) return pythonConfig;
-    if (hasCSharp) return csharpConfig;
+    if (found.goMod) return goConfig;
+    if (found.swift) return swiftConfig;
+    if (found.python) return pythonConfig;
+    if (found.csharp) return csharpConfig;
     return typescriptConfig;
   }
 
   // Step 4: Multiple markers present — file-count tiebreak picks primary.
   if (markers > 1) {
-    const counts = await countSourceFiles(rootDir);
-    const candidates: Array<[number, LanguageConfig]> = [];
-    if (hasGoMod) candidates.push([counts.go, goConfig]);
-    if (hasSwift) candidates.push([counts.swift, swiftConfig]);
-    if (hasPython) candidates.push([counts.py, pythonConfig]);
-    if (hasCSharp) candidates.push([counts.cs, csharpConfig]);
-    if (hasPackageJson) candidates.push([counts.ts, typescriptConfig]);
-    candidates.sort((a, b) => {
-      if (a[0] !== b[0]) return b[0] - a[0];
-      return tiebreakRank(a[1]) - tiebreakRank(b[1]);
-    });
-    return candidates[0][1] ?? typescriptConfig;
+    return (await rankMarkedLanguages(rootDir, found))[0] ?? typescriptConfig;
   }
 
   // Step 5: No other markers — a Maven/Gradle root is Java. Checked last so
@@ -400,33 +425,18 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
 export async function detectLanguages(rootDir: string, options: DetectLanguagesOptions): Promise<LanguageConfig[]> {
   // Check for language markers (Swift adds Package.swift / .xcodeproj /
   // .xcworkspace; only one needs to be present).
-  const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp] = await Promise.all([
-    fileExists(join(rootDir, "go.mod")),
-    fileExists(join(rootDir, "package.json")),
-    hasSwiftMarker(rootDir),
-    hasPythonMarker(rootDir),
-    hasCSharpMarker(rootDir),
-  ]);
+  const found = await readRootMarkers(rootDir);
 
   const hasJava = await hasJavaMarker(rootDir);
-  const present: Array<{ config: LanguageConfig; count: number }> = [];
-
-  // When any markers are present, count source files so we can order by
-  // primary. countSourceFiles is cheap (shallow scan).
-  if (hasGoMod || hasPackageJson || hasSwift || hasPython || hasCSharp) {
-    const counts = await countSourceFiles(rootDir);
-    if (hasGoMod) present.push({ config: goConfig, count: counts.go });
-    if (hasSwift) present.push({ config: swiftConfig, count: counts.swift });
-    if (hasPython) present.push({ config: pythonConfig, count: counts.py });
-    if (hasCSharp) present.push({ config: csharpConfig, count: counts.cs });
-    if (hasPackageJson) present.push({ config: typescriptConfig, count: counts.ts });
-  }
+  // Ordered by primary: most source files first, ties broken by the same
+  // TS > Swift > Go preference detectLanguage uses.
+  const configs = await rankMarkedLanguages(rootDir, found);
 
   // No markers → fallback to TypeScript/JS for backward compatibility, with
   // Terraform beside it; Terraform alone only when there is no fallback
   // source at all (never beside Java). Searched with the skip set of the
   // result (see markerlessTerraform).
-  if (present.length === 0) {
+  if (configs.length === 0) {
     if (hasJava) {
       const { terraform } = await options.searchProjectFiles([javaConfig], { count: false });
       return terraform > 0 ? [javaConfig, terraformConfig] : [javaConfig];
@@ -436,13 +446,6 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
     return terraform === "beside" ? [typescriptConfig, terraformConfig] : [terraformConfig];
   }
 
-  // Stable ordering by descending file count, ties broken by the same
-  // TS > Swift > Go preference detectLanguage uses.
-  present.sort((a, b) => {
-    if (a.count !== b.count) return b.count - a.count;
-    return tiebreakRank(a.config) - tiebreakRank(b.config);
-  });
-  const configs = present.map((p) => p.config);
   // Appended last so Java never displaces the primary language. The
   // secondary variant keeps Java from skipping or flagging the primary
   // language's `out/` and `generated/` files.

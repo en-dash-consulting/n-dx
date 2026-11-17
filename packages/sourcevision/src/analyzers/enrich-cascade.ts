@@ -37,9 +37,8 @@ import type { EnrichResult } from "./enrich-parsing.js";
 import { isStructuralZone, applyStructuralTemplate } from "./enrich.js";
 import { narrateZones } from "./enrich-multiplex.js";
 import { assessZoneFragility, fragilityFindings } from "./enrich-judge.js";
-import { nameZonesBySelection, describeZoneFromFacts, algorithmicZoneName } from "./zone-naming.js";
-import { emptyAnalyzeTokenUsage } from "./token-usage.js";
-import type { AnalyzeTokenUsage } from "../schema/index.js";
+import { nameZonesBySelection, describeZoneFromFacts } from "./zone-naming.js";
+import { addCallUsage, emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { routeLayoutFor } from "./route-convention.js";
 import { dedupeZoneNames, isAlgorithmicName, zoneIdsOf } from "./zone-identity.js";
 import { markPass } from "./analyze-progress.js";
@@ -151,12 +150,6 @@ function previousMatch(zone: Zone, previous: Zone[] | undefined): { zone: Zone; 
 // Name dedupe lives with the other identity rules; re-exported for callers.
 export { dedupeZoneNames } from "./zone-identity.js";
 
-function addUsage(total: AnalyzeTokenUsage, calls: number, usage?: { input: number; output: number }): void {
-  total.calls += calls;
-  total.inputTokens += usage?.input ?? 0;
-  total.outputTokens += usage?.output ?? 0;
-}
-
 /**
  * Run the cascade over the algorithmic zones.
  *
@@ -221,7 +214,7 @@ export async function cascadeEnrichment(
     routeLayout: routeLayoutFor(inventory.files.map((f) => f.path)),
   });
   const deferredNameZoneIds = new Set(options.deferNarration ? naming.fallbackZoneIds : []);
-  addUsage(tokenUsage, naming.calls, naming.tokenUsage);
+  addCallUsage(tokenUsage, naming.calls, naming.tokenUsage);
   prejudgedFindings.push(...naming.findings);
   if (inherited.size > 0) {
     console.log(`  [cascade] ${inherited.size} zone(s) keep the name chosen in a previous run`);
@@ -254,7 +247,7 @@ export async function cascadeEnrichment(
     imports,
     projectDir: projectProfile?.projectDir,
   });
-  addUsage(tokenUsage, assessment.calls, assessment.tokenUsage);
+  addCallUsage(tokenUsage, assessment.calls, assessment.tokenUsage);
   const fragility = fragilityFindings(named, assessment, CASCADE_PASS);
   prejudgedFindings.push(...fragility);
   const inBand = named
@@ -287,7 +280,7 @@ export async function cascadeEnrichment(
   const rerun = deltas.length > 0
     ? await judgeRerun(deltas, judgedPreviousFindings(previousZones?.findings), projectDir)
     : emptyRerunOutcome();
-  addUsage(tokenUsage, rerun.calls, rerun.tokenUsage);
+  addCallUsage(tokenUsage, rerun.calls, rerun.tokenUsage);
 
   // A zone judged to need refreshing is escalated whether or not fragility put
   // it in the band, and ranked ahead of the band: "this changed materially" is
@@ -363,7 +356,7 @@ export async function cascadeEnrichment(
       projectProfile,
       ...(confirmFindings.size > 0 ? { confirmFindings } : {}),
     });
-    addUsage(tokenUsage, narrated.tokenUsage.calls, narrated.tokenUsage);
+    addCallUsage(tokenUsage, narrated.tokenUsage.calls, narrated.tokenUsage);
     newFindings.push(...narrated.newFindings);
     for (const [id, insights] of narrated.newZoneInsights) newZoneInsights.set(id, insights);
     const narratedById = new Map(narrated.zones.map((z) => [z.id, z]));

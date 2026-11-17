@@ -15,3 +15,16 @@ export function guardWatcher(w: FSWatcher, label: string, onError?: () => void):
   });
   return w;
 }
+
+/**
+ * Create a debounced version of a callback. Multiple calls within `delayMs`
+ * are collapsed into a single trailing invocation; watchers use it to batch
+ * the burst of events one save or build fires.
+ */
+export function debounce<T extends (...args: unknown[]) => void>(fn: T, delayMs: number): T {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return ((...args: unknown[]) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; fn(...args); }, delayMs);
+  }) as T;
+}

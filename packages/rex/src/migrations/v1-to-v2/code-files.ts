@@ -163,14 +163,6 @@ function rank(files: Iterable<string>, keywords: string[], maxFiles: number): st
     .sort();
 }
 
-/**
- * Code files per v1 item id, for every item the analysis has evidence for.
- *
- * Returns an empty map when there is no analysis directory, so a project that
- * has never been analysed plans exactly as it did before — the drafter treats
- * a missing entry as no code evidence and says so in the capability's notes.
- * Items are keyed by v1 id; the drafter reads only the capability ones.
- */
 /** When the analysis this evidence comes from was taken, and of what commit. */
 export interface CodeEvidenceProvenance {
   /** ISO timestamp the analysis recorded for itself. */
@@ -278,7 +270,15 @@ export async function readCodeEvidence(
   return { files: out, analysisPresent: true };
 }
 
-/** {@link readCodeEvidence}'s evidence alone, for callers that do not need the flag. */
+/**
+ * Code files per v1 item id, for every item the analysis has evidence for:
+ * {@link readCodeEvidence}'s evidence alone, for callers that do not need the flag.
+ *
+ * Returns an empty map when there is no analysis directory, so a project that
+ * has never been analysed plans exactly as it did before — the drafter treats
+ * a missing entry as no code evidence and says so in the capability's notes.
+ * Items are keyed by v1 id; the drafter reads only the capability ones.
+ */
 export async function readCapabilityCodeFiles(
   dir: string,
   items: readonly PRDItem[],

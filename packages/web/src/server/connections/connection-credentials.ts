@@ -15,6 +15,7 @@ import {
   unsetCredential,
   type CredentialStoreOptions,
 } from "@n-dx/llm-client";
+import { isRecord } from "../../shared/index.js";
 
 /**
  * Metadata revision for auth verdict invalidation, without reading entries or
@@ -56,7 +57,7 @@ export function connectionCredentialRecord(id: string, options: CredentialStoreO
   if (!value?.startsWith("{")) return undefined;
   try {
     const parsed = JSON.parse(value) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
+    return isRecord(parsed) ? parsed : undefined;
   } catch {
     return undefined;
   }

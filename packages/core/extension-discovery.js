@@ -45,7 +45,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { resolveNdxHome } from "./layout.js";
-import { validateExtensionManifest } from "./extension-manifest.js";
+import { isPidAlive } from "./child-lifecycle.js";
+import { isObject, validateExtensionManifest } from "./extension-manifest.js";
 
 /** Sources in precedence order, highest first. */
 export const EXTENSION_SOURCES = Object.freeze(["project", "user", "global", "dev"]);
@@ -697,17 +698,6 @@ function sweepStaleTempFiles(fs, path, isAlive) {
   }
 }
 
-/** @param {number} pid */
-function isPidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    // EPERM: the process exists but belongs to someone else.
-    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
-  }
-}
-
 /**
  * Block for `ms`. The writers are synchronous, so a retry cannot yield.
  *
@@ -735,14 +725,6 @@ function boundProjectEntries(sources, recomputed) {
   const projects = Object.keys(sources).filter((key) => key.startsWith("project:"));
   for (const key of projects.slice(0, Math.max(0, projects.length - MAX_PROJECT_ENTRIES))) delete sources[key];
   return sources;
-}
-
-/**
- * @param {unknown} value
- * @returns {value is Record<string, any>}
- */
-function isObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

@@ -10,6 +10,7 @@
 import { h } from "preact";
 import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { errorMessage } from "../utils/format.js";
 
 interface LogEntry {
   timestamp: string;
@@ -35,7 +36,7 @@ export function ActivityView() {
       setEntries(body.entries ?? []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     }
   }, []);
 

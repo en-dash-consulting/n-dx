@@ -22,12 +22,14 @@ import {
   sortZonesData,
   toCanonicalJSON,
 } from "../util/sort.js";
+import { computeInventorySummary } from "../util/merge.js";
 import {
   promoteZones,
   promoteCrossings,
   buildSubAnalysisRefs,
   detectSubAnalyses,
   loadMemberArtifacts,
+  readMemberFile,
 } from "./workspace.js";
 import type { SubAnalysis } from "./workspace.js";
 import {
@@ -44,7 +46,6 @@ import type {
   Manifest,
   Inventory,
   FileEntry,
-  InventorySummary,
   Imports,
   ImportEdge,
   ExternalImport,
@@ -202,22 +203,6 @@ export function aggregateInventory(members: SubAnalysis[]): Inventory {
 
   const summary = computeInventorySummary(allFiles);
   return sortInventory({ files: allFiles, summary });
-}
-
-function computeInventorySummary(files: FileEntry[]): InventorySummary {
-  const byLanguage: Record<string, number> = {};
-  const byRole: Partial<Record<string, number>> = {};
-  const byCategory: Record<string, number> = {};
-  let totalLines = 0;
-
-  for (const f of files) {
-    byLanguage[f.language] = (byLanguage[f.language] ?? 0) + 1;
-    byRole[f.role] = ((byRole[f.role] as number) ?? 0) + 1;
-    byCategory[f.category] = (byCategory[f.category] ?? 0) + 1;
-    totalLines += f.lineCount;
-  }
-
-  return { totalFiles: files.length, totalLines, byLanguage, byRole, byCategory };
 }
 
 /**
@@ -445,6 +430,16 @@ export function getWorkspaceEdgeCounts(
   }
 }
 
+/** One member's line in `sourcevision workspace --status`. */
+export interface WorkspaceMemberStatus {
+  name: string;
+  path: string;
+  analyzed: boolean;
+  analyzedAt?: string;
+  zoneCount?: number;
+  fileCount?: number;
+}
+
 /**
  * Get the status of workspace members.
  * For each member, reports whether it has been analyzed and when.
@@ -452,27 +447,13 @@ export function getWorkspaceEdgeCounts(
 export function getWorkspaceStatus(
   rootDir: string,
   config: WorkspaceConfig,
-): Array<{
-  name: string;
-  path: string;
-  analyzed: boolean;
-  analyzedAt?: string;
-  zoneCount?: number;
-  fileCount?: number;
-}> {
+): WorkspaceMemberStatus[] {
   const absRoot = resolve(rootDir);
-  const results: Array<{
-    name: string;
-    path: string;
-    analyzed: boolean;
-    analyzedAt?: string;
-    zoneCount?: number;
-    fileCount?: number;
-  }> = [];
+  const results: WorkspaceMemberStatus[] = [];
 
   for (const member of config.members) {
-    const memberDir = resolve(absRoot, member.path);
-    const manifestPath = join(resolveSourcevisionPaths(memberDir).svDir, DATA_FILES.manifest);
+    const svDir = resolveSourcevisionPaths(resolve(absRoot, member.path)).svDir;
+    const manifestPath = join(svDir, DATA_FILES.manifest);
     const name = member.name ?? basename(member.path);
 
     if (!existsSync(manifestPath)) {
@@ -482,24 +463,9 @@ export function getWorkspaceStatus(
 
     try {
       const manifest: Manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-      const zonesPath = join(resolveSourcevisionPaths(memberDir).svDir, DATA_FILES.zones);
-      let zoneCount: number | undefined;
-      let fileCount: number | undefined;
-
-      if (existsSync(zonesPath)) {
-        try {
-          const zones = JSON.parse(readFileSync(zonesPath, "utf-8"));
-          zoneCount = zones.zones?.length;
-        } catch { /* zones unavailable */ }
-      }
-
-      const invPath = join(resolveSourcevisionPaths(memberDir).svDir, DATA_FILES.inventory);
-      if (existsSync(invPath)) {
-        try {
-          const inv = JSON.parse(readFileSync(invPath, "utf-8"));
-          fileCount = inv.files?.length;
-        } catch { /* inventory unavailable */ }
-      }
+      // Counts are optional: a missing or unreadable file leaves its count out.
+      const zoneCount = readMemberFile<{ zones?: unknown[] }>(svDir, DATA_FILES.zones)?.zones?.length;
+      const fileCount = readMemberFile<{ files?: unknown[] }>(svDir, DATA_FILES.inventory)?.files?.length;
 
       results.push({
         name,

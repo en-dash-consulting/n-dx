@@ -23,6 +23,10 @@
  * @module rex/store/title-to-filename
  */
 
+const MARKDOWN_EXTENSION = ".md";
+const MAX_FILENAME_LENGTH = 40;
+const MAX_FILENAME_BODY_LENGTH = MAX_FILENAME_LENGTH - MARKDOWN_EXTENSION.length;
+
 /**
  * Convert a PRD item title to a filesystem-safe markdown filename.
  *
@@ -37,11 +41,6 @@
  * titleToFilename("!!!???")                  // "unnamed.md" (empty after normalization)
  * titleToFilename("Héros & Légendes")       // "heros_legendes.md"
  */
-
-const MARKDOWN_EXTENSION = ".md";
-const MAX_FILENAME_LENGTH = 40;
-const MAX_FILENAME_BODY_LENGTH = MAX_FILENAME_LENGTH - MARKDOWN_EXTENSION.length;
-
 export function titleToFilename(title: string): string {
   // Step 1: Remove .md extension if present (round-trip safety)
   const withoutExtension = stripMarkdownExtension(title);

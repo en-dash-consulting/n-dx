@@ -48,7 +48,9 @@ import { basename, join } from "node:path";
 import type { AnalysisOutcome, AnalysisRun, LLMClassUsage } from "../schema/index.js";
 import { execFileSyncCli } from "../util/exec-cli.js";
 import { describePass } from "./enrich-config.js";
-import { setRunLedgerListener, snapshotRunLedger } from "./run-ledger.js";
+import { ANALYSIS_HISTORY_FILE, setRunLedgerListener, snapshotRunLedger } from "./run-ledger.js";
+import { SV_CACHE_DIRNAME } from "../paths.js";
+import { pidAlive } from "../util/pid.js";
 
 /** File name under `<svDir>/.cache/`. */
 export const ANALYZE_PROGRESS_FILE = "analyze-progress.json";
@@ -148,7 +150,7 @@ export interface AnalyzeProgressReport extends AnalyzeProgress {
 }
 
 export function analyzeProgressPath(svDir: string): string {
-  return join(svDir, ".cache", ANALYZE_PROGRESS_FILE);
+  return join(svDir, SV_CACHE_DIRNAME, ANALYZE_PROGRESS_FILE);
 }
 
 // ── Writer ───────────────────────────────────────────────────────────────
@@ -506,15 +508,9 @@ export function readAnalyzeProgress(svDir: string, options: ReadAnalyzeProgressO
   };
 }
 
-/** `kill(pid, 0)`; EPERM means the process exists but is not ours to signal. */
+/** {@link pidAlive}, for a pid the progress file may have recorded malformed. */
 function defaultIsPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === "EPERM";
-  }
+  return Number.isInteger(pid) && pid > 0 && pidAlive(pid);
 }
 
 /**
@@ -539,7 +535,7 @@ function previousRun(svDir: string, mode: AnalysisRun["mode"], startedAt: string
   if (!family) return null;
   let lines: string[];
   try {
-    lines = readFileSync(join(svDir, ".cache", "analyses.jsonl"), "utf-8").split("\n");
+    lines = readFileSync(join(svDir, SV_CACHE_DIRNAME, ANALYSIS_HISTORY_FILE), "utf-8").split("\n");
   } catch {
     return null;
   }

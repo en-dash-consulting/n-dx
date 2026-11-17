@@ -1,7 +1,6 @@
 /**
  * Polls GET /api/rex/claims — the live cross-worktree task claims — for the
- * PRD tree's "claimed · <worktree>" chips and the Sessions tray's per-worktree
- * claimed-task line.
+ * PRD tree's "claimed · <worktree>" chips.
  *
  * Repository-wide like `useWorktrees`: the claims store lives in the git
  * common dir, so every workspace gets the same answer. Read-only — nothing
@@ -15,7 +14,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 import { useHenchRunsLiveRefresh } from "./use-hench-runs-live-refresh.js";
 
 /** Mirrors ClaimWire in server/routes-rex/reads.ts. */
@@ -45,12 +44,6 @@ export function indexClaims(claims: readonly ClaimEntry[]): Record<string, Claim
   const byId: Record<string, ClaimEntry> = {};
   for (const c of claims) byId[c.taskId] = c;
   return byId;
-}
-
-/** Claims held from one worktree, for the Sessions row of that worktree. */
-export function claimsForWorktree(claims: readonly ClaimEntry[] | null, worktreeRoot: string): ClaimEntry[] {
-  if (!claims) return [];
-  return claims.filter((c) => c.worktreeRoot === worktreeRoot);
 }
 
 export function useClaims(): {

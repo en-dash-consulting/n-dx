@@ -52,6 +52,24 @@ export interface BundleProvenance {
   commit?: string;
 }
 
+/** The `exportedFrom` an export stamps: the branch and commit it was given, or undefined for neither. */
+export function exportProvenance(options: { branch?: string; commit?: string }): BundleProvenance | undefined {
+  const provenance: BundleProvenance = {};
+  if (options.branch) provenance.branch = options.branch;
+  if (options.commit) provenance.commit = options.commit;
+  return Object.keys(provenance).length > 0 ? provenance : undefined;
+}
+
+/** A bundle's `exportedFrom` as read: its string `branch` and `commit`, or undefined when it carries neither. */
+export function readProvenance(from: unknown): BundleProvenance | undefined {
+  if (typeof from !== "object" || from === null) return undefined;
+  const { branch, commit } = from as Record<string, unknown>;
+  const provenance: BundleProvenance = {};
+  if (typeof branch === "string") provenance.branch = branch;
+  if (typeof commit === "string") provenance.commit = commit;
+  return Object.keys(provenance).length > 0 ? provenance : undefined;
+}
+
 export interface PRDBundle {
   bundle: typeof BUNDLE_KIND;
   bundleVersion: number;
@@ -120,9 +138,7 @@ function stripSyncBookkeeping(items: PRDItem[]): void {
  * {@link BUNDLE_STRIPPED_FIELDS}.
  */
 export function buildBundle(doc: PRDDocument, options: BuildBundleOptions = {}): PRDBundle {
-  const provenance: BundleProvenance = {};
-  if (options.branch) provenance.branch = options.branch;
-  if (options.commit) provenance.commit = options.commit;
+  const exportedFrom = exportProvenance(options);
 
   const items = structuredClone(doc.items);
   stripSyncBookkeeping(items);
@@ -141,7 +157,7 @@ export function buildBundle(doc: PRDDocument, options: BuildBundleOptions = {}):
     schema: doc.schema ?? SCHEMA_VERSION,
     title: doc.title,
     exportedAt: options.exportedAt ?? new Date().toISOString(),
-    ...(Object.keys(provenance).length > 0 ? { exportedFrom: provenance } : {}),
+    ...(exportedFrom ? { exportedFrom } : {}),
     items,
   };
 }
@@ -443,14 +459,8 @@ export function parseBundle(raw: unknown): PRDBundle {
     items: candidate.items as PRDItem[],
   };
 
-  const from = candidate.exportedFrom;
-  if (typeof from === "object" && from !== null) {
-    const { branch, commit } = from as Record<string, unknown>;
-    const provenance: BundleProvenance = {};
-    if (typeof branch === "string") provenance.branch = branch;
-    if (typeof commit === "string") provenance.commit = commit;
-    if (Object.keys(provenance).length > 0) parsed.exportedFrom = provenance;
-  }
+  const exportedFrom = readProvenance(candidate.exportedFrom);
+  if (exportedFrom) parsed.exportedFrom = exportedFrom;
 
   return parsed;
 }
@@ -511,12 +521,14 @@ export function countItems(items: PRDItem[]): number {
  * the operator was pointed at a destructive command over deltas that were not
  * content. Sharing the list with `sync.ts` is what keeps the two notions of
  * "same item" from drifting apart again.
+ *
+ * The v2 bundle compares its nodes by the same rule, so it takes any record.
  */
-function sameContent(a: PRDItem, b: PRDItem): boolean {
+export function sameContent(a: object, b: object): boolean {
   return stableKey(a) === stableKey(b);
 }
 
-function stableKey(item: PRDItem): string {
+function stableKey(item: object): string {
   const entries = Object.entries(item)
     .filter(([key]) => key !== "children" && !ITEM_BOOKKEEPING_FIELDS.has(key))
     .sort(([left], [right]) => left.localeCompare(right));

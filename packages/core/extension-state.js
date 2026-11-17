@@ -28,7 +28,7 @@ import { createHash } from "node:crypto";
 import * as nodeFs from "node:fs";
 import { join, resolve } from "node:path";
 import { EXTENSIONS_CACHE_FILE, readExtensionsText, replaceExtensionsFile } from "./extension-discovery.js";
-import { escapeControlCharacters, satisfiesSemverRange } from "./extension-manifest.js";
+import { escapeControlCharacters, isObject, satisfiesSemverRange } from "./extension-manifest.js";
 
 /**
  * Every state an installed extension can be in. Only `enabled` runs.
@@ -307,12 +307,4 @@ function canonicalJson(value) {
  */
 function own(table, key) {
   return isObject(table) && Object.hasOwn(table, key) ? table[key] : undefined;
-}
-
-/**
- * @param {unknown} value
- * @returns {value is Record<string, any>}
- */
-function isObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

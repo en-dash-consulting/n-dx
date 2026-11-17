@@ -10,7 +10,8 @@
 import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import { BodyPortal } from "./body-portal.js";
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useCallback } from "preact/hooks";
+import { useEscapeKey } from "./use-escape-key.js";
 import type { ViewId } from "../api.js";
 import { viewLabelFor, useStatusLayout } from "../api.js";
 
@@ -189,15 +190,8 @@ export function Guide({ view }: GuideProps) {
   const content = guideContent(key, layout);
   const title = viewLabelFor(key, useStatusLayout());
 
-  // Close on Escape key
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useEscapeKey(open, close);
 
   return h(Fragment, null,
     h("button", {

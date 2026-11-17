@@ -12,6 +12,11 @@
  * @see ../components/prd-tree/progressive-loader.ts — progressive load integration
  */
 
+import {
+  registerPollingSource,
+} from "../polling/index.js";
+import type { PerformanceWithMemory } from "./memory-monitor.js";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** DOM node count snapshot at a point in time. */
@@ -95,22 +100,6 @@ export interface DOMPerformanceConfig {
 /** Callback invoked when a new DOM snapshot is taken. */
 export type DOMSnapshotHandler = (snapshot: DOMNodeSnapshot) => void;
 
-import {
-  registerPollingSource,
-} from "../polling/index.js";
-
-// ─── Chrome-specific type augmentation ───────────────────────────────────────
-
-interface PerformanceMemory {
-  usedJSHeapSize: number;
-  totalJSHeapSize: number;
-  jsHeapSizeLimit: number;
-}
-
-interface PerformanceWithMemory extends Performance {
-  memory?: PerformanceMemory;
-}
-
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEFAULT_INTERVAL_MS = 2000;
@@ -121,14 +110,19 @@ const DEFAULT_MAX_COMPARISONS = 100;
 /** Key used to register with the centralized polling state manager. */
 const POLLING_STATE_KEY = "dom-performance-monitor";
 
+/** The configuration in force before any start, and after a reset. */
+function defaultConfig(): DOMPerformanceConfig {
+  return {
+    intervalMs: DEFAULT_INTERVAL_MS,
+    maxSnapshots: DEFAULT_MAX_SNAPSHOTS,
+    maxTimings: DEFAULT_MAX_TIMINGS,
+    maxComparisons: DEFAULT_MAX_COMPARISONS,
+  };
+}
+
 // ─── Module state ────────────────────────────────────────────────────────────
 
-let config: DOMPerformanceConfig = {
-  intervalMs: DEFAULT_INTERVAL_MS,
-  maxSnapshots: DEFAULT_MAX_SNAPSHOTS,
-  maxTimings: DEFAULT_MAX_TIMINGS,
-  maxComparisons: DEFAULT_MAX_COMPARISONS,
-};
+let config: DOMPerformanceConfig = defaultConfig();
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let stateUnsub: (() => void) | null = null;
@@ -506,10 +500,5 @@ export function resetDOMPerformanceMonitor(): void {
   renderTimings = [];
   updateComparisons = [];
   snapshotListeners = [];
-  config = {
-    intervalMs: DEFAULT_INTERVAL_MS,
-    maxSnapshots: DEFAULT_MAX_SNAPSHOTS,
-    maxTimings: DEFAULT_MAX_TIMINGS,
-    maxComparisons: DEFAULT_MAX_COMPARISONS,
-  };
+  config = defaultConfig();
 }

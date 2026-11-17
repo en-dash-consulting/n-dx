@@ -1,6 +1,6 @@
-import { createInterface } from "node:readline";
 import type { Proposal } from "./chunked-review-types.js";
 import { info } from "../output.js";
+import { promptLine } from "../prompt.js";
 
 // Re-export all pure logic and types from the state module.
 // This preserves the existing public API — all consumers can continue
@@ -52,18 +52,6 @@ import type {
   ModificationHandler,
   BatchAcceptanceRecord,
 } from "./chunked-review-state.js";
-
-// ─── Interactive I/O (thin wrapper) ──────────────────────────────────
-
-function promptLine(question: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
 
 /**
  * Run the interactive chunked review loop.

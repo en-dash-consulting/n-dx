@@ -35,7 +35,7 @@
  */
 
 import type { LLMVendor } from "./provider-interface.js";
-import type { TokenUsage, ErrorReason } from "./types.js";
+import type { TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
 // Type-only, and therefore erased: `token-usage.ts` imports
 // `TokenDiagnosticStatus` from this module, so a value import here would be a

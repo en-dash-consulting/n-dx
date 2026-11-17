@@ -21,7 +21,7 @@
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWorkspaceKey } from "../base-path.js";
 import { createWSPipeline } from "./use-gateway.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-live-task.ts and hench's store/run-events.ts
@@ -303,7 +303,6 @@ export function useLiveTask(taskId: string, pick: (snapshot: LiveTaskSnapshot) =
     mountedRef.current = true;
     void fetchSnapshot();
 
-    let ws: WebSocket | null = null;
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
       onFlush: (batch) => {
@@ -321,25 +320,16 @@ export function useLiveTask(taskId: string, pick: (snapshot: LiveTaskSnapshot) =
       // window is the only delay between an append and its fetch.
       coalescerWindowMs: 100,
     });
-    try {
-      ws = openWebSocket();
-      ws.onopen = () => { if (mountedRef.current) setSocketOpen(true); };
-      ws.onclose = () => { if (mountedRef.current) setSocketOpen(false); };
-      ws.onmessage = (event) => {
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // Malformed frame — the poll still catches up.
-        }
-      };
-    } catch {
-      // No WebSocket — polling still works.
-    }
+    // No WebSocket — polling still works.
+    const closeSocket = openFrameSocket((frame) => pipeline.push(frame), {
+      onOpen: () => { if (mountedRef.current) setSocketOpen(true); },
+      onClose: () => { if (mountedRef.current) setSocketOpen(false); },
+    });
 
     return () => {
       mountedRef.current = false;
       pipeline.dispose();
-      ws?.close();
+      closeSocket();
     };
   }, [fetchSnapshot, fetchEvents]);
 

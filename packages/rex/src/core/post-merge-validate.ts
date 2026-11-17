@@ -46,6 +46,7 @@
 
 import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import { stripQuotes } from "./merge-driver.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -415,13 +416,6 @@ function detectChildrenTableDrift(entries: ScannedEntry[]): PostMergeIssue[] {
 }
 
 /**
- * The child links the serializer would write for the item owning `dir`:
- * `<name>/index.md` for each subdirectory that is itself an item, and
- * `<name>.md` for each sibling leaf file. Ordered the way the parser builds
- * `children` — subdirectories alphabetically, then leaf files alphabetically —
- * so a repaired table matches what the next save produces.
- */
-/**
  * The directory a file owns as its item's folder, or `null` when the file is
  * not an `index.md`. Matches the basename exactly — `my-index.md` is a leaf
  * child, not a folder item's own file.
@@ -432,6 +426,13 @@ function owningDirOfIndex(relPath: string): string | null {
   return relPath.slice(0, -"/index.md".length);
 }
 
+/**
+ * The child links the serializer would write for the item owning `dir`:
+ * `<name>/index.md` for each subdirectory that is itself an item, and
+ * `<name>.md` for each sibling leaf file. Ordered the way the parser builds
+ * `children` — subdirectories alphabetically, then leaf files alphabetically —
+ * so a repaired table matches what the next save produces.
+ */
 function childLinksOnDisk(dir: string, entries: ScannedEntry[]): string[] {
   const prefix = dir === "" ? "" : `${dir}/`;
   const branches: string[] = [];
@@ -648,15 +649,4 @@ export function matchList(text: string, key: string): string[] {
 function frontmatterOnly(text: string): string {
   const m = /^---\r?\n([\s\S]*?)\r?\n---/m.exec(text);
   return m ? m[1] : "";
-}
-
-function stripQuotes(value: string): string {
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    try {
-      return JSON.parse(value) as string;
-    } catch {
-      return value.slice(1, -1);
-    }
-  }
-  return value;
 }

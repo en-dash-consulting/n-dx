@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { ensureSidecarDir } from "../sidecar/sidecar-dir.js";
 import { worktreeSidecarDir } from "../sidecar/session-registry.js";
 import type { TrackerEvent } from "./server-profiles.js";
+import { isRecord } from "../../shared/index.js";
 
 /** One source that could not be read at the last tick. */
 export interface SourceProblem {
@@ -23,8 +24,6 @@ export interface SourceProblem {
 }
 
 const PROBLEMS_FILE = "tracker-source-problems.json";
-
-const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 
 /** The problems recorded for `projectDir`, in event order of the file; an unreadable file reads as none. */
 export function readSourceProblems(projectDir: string): SourceProblem[] {

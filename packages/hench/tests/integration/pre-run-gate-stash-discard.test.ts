@@ -12,7 +12,7 @@
  *    leave a `git stash create` snapshot behind so the answer is recoverable.
  *  - discard must leave ignored files alone (`git clean -fd`, never `-fdx`).
  *
- * @see packages/hench/src/agent/lifecycle/shared.ts — performPreRunCommitGateIfNeeded
+ * @see packages/hench/src/agent/lifecycle/pre-run-commit-gate.ts — performPreRunCommitGateIfNeeded
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -26,7 +26,7 @@ import {
   performPreRunCommitGateIfNeeded,
   type PreRunCommitChoice,
   type PreRunCommitGateOptions,
-} from "../../src/agent/lifecycle/shared.js";
+} from "../../src/agent/lifecycle/pre-run-commit-gate.js";
 import { commitGitFixtureBaseline, RM_RETRY } from "../helpers/index.js";
 
 const execFile = promisify(execFileCb);

@@ -15,6 +15,8 @@
  * The same keys are what `ndx config` already writes to the local file only.
  */
 
+import { asRecord } from "./json.js";
+
 const VENDOR_BLOCKS = ["claude", "codex", "google", "local"] as const;
 
 /** Keys dropped from every `llm.<vendor>` block and the legacy `claude` block. */
@@ -28,10 +30,6 @@ export interface TrackedConfigClamp {
   root: Record<string, unknown>;
   /** The dotted keys that were present and dropped, in document order. */
   stripped: string[];
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 }
 
 function dropKeys(block: Record<string, unknown>, keys: readonly string[], prefix: string, stripped: string[]): Record<string, unknown> {

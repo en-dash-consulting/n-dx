@@ -51,7 +51,6 @@
 
 import { readFileSync, readdirSync, writeFileSync, existsSync, realpathSync, watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
-import { writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { henchDirIn } from "./paths.js";
 import { execFileSync } from "node:child_process";
@@ -64,32 +63,53 @@ import {
   killWithFallback,
   listWorktrees,
   getWorktreeRoot,
-  guardBaselineForLanguage,
   resolveLayout,
-  getAvailableMemory,
-  readAvailableMemory,
   HENCH_LOCAL_ONLY_SETTINGS,
   isHenchLocalOnlySetting,
   writeHenchLocalSetting,
   type ManagedChild,
-  type AvailableMemoryReading,
-  type MemoryPressure,
 } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { refuseWhileRestricted } from "./trust-gate.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, readJsonBody, errorMessage, pageParams } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
   fieldDefaultForProject,
   validateFieldValue,
-  validateConfigKeyValue,
   validateConfigConstraints,
   validateProviderForVendor,
   completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
+  henchConfigPath,
+  loadHenchConfig,
 } from "./hench-config-fields.js";
+import {
+  handleTemplateList,
+  handleTemplateGet,
+  handleTemplateCreate,
+  handleTemplateApply,
+  handleTemplateDelete,
+} from "./hench-templates.js";
+// tests/e2e/hench-config-gate-contract.test.js reads this list from this
+// module's dist path to pin it against hench's own.
+export { STRICT_BLOCKED_PATHS } from "./hench-templates.js";
+import {
+  readSystemMemory,
+  warmSystemMemory,
+  type MemoryStatus,
+  type ProcessMemoryEntry,
+} from "./memory-status.js";
+// The memory readers the Live routes and the memory tests import from here.
+export {
+  readSystemMemory,
+  systemMemoryFrom,
+  setAvailableMemoryReaderForTests,
+  warmSystemMemory,
+  type MemoryHealthLevel,
+  type MemoryStatus,
+} from "./memory-status.js";
 import { resolveActiveVendor } from "./routes-llm.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
@@ -314,21 +334,6 @@ function getImpact(path: string, value: unknown): string {
       return `Agent can execute: ${(value as string[]).join(", ")}`;
     default:
       return "";
-  }
-}
-
-/** The workspace's hench config file, on whichever layout the project uses (.ndx/hench or .hench). */
-function henchConfigPath(projectDir: string): string {
-  return join(resolveLayout(projectDir).henchDir, "config.json");
-}
-
-/** Read the hench config.json directly from disk. */
-export function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
-  try {
-    const raw = readFileSync(henchConfigPath(projectDir), "utf-8");
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
   }
 }
 
@@ -890,11 +895,8 @@ function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
     let repoScope = false;
     if (rc.qIdx !== -1) {
       const params = new URLSearchParams(rc.fullPath.slice(rc.qIdx));
-      const limitStr = params.get("limit");
-      const offsetStr = params.get("offset");
+      ({ offset, limit } = pageParams(params));
       const taskIdStr = params.get("taskId");
-      if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
-      if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
       if (taskIdStr) filterTaskId = taskIdStr;
       repoScope = params.get("scope") === "repo";
     }
@@ -1139,14 +1141,8 @@ async function handleConfigUpdate(
   }
 
   // Parse request body
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const changes = body.changes as Record<string, unknown> | undefined;
   if (!changes || typeof changes !== "object") {
@@ -1244,377 +1240,6 @@ async function handleConfigUpdate(
   await commitSettingsChange(ctx.projectDir, configPath, "hench");
 
   jsonResponse(res, 200, { applied, config: { ...current, ...localBefore, ...localChanges } });
-  return true;
-}
-
-// ── Workflow template types (duplicated from hench to avoid runtime coupling) ──
-
-interface WorkflowTemplateData {
-  id: string;
-  name: string;
-  description: string;
-  useCases: string[];
-  tags: string[];
-  config: Record<string, unknown>;
-  builtIn: boolean;
-  createdAt?: string;
-}
-
-/**
- * What the strict-safety template blocks.
- *
- * Both copies of the template — this one and hench's `schema/templates.ts` —
- * now build the list from `guardBaselineForLanguage`, which is in
- * `@n-dx/llm-client` and so is reachable from both. That is the one part of
- * the duplication below that no longer has to be kept in step by hand, and it
- * is the part that most needed not to be: as two hand-written lists they had
- * already drifted from the baseline in two ways, dropping half its credential
- * patterns and naming `.rex`/`.hench` in a spelling a `.ndx/` project does not
- * use. Keep the two derivations identical.
- */
-export const STRICT_BLOCKED_PATHS: string[] = [
-  ...guardBaselineForLanguage().blockedPaths,
-  "**/secrets/**",
-  "**/credentials/**",
-];
-
-/**
- * Built-in templates — a hand-kept copy of hench/src/schema/templates.ts.
- *
- * Web does not depend on `@n-dx/hench`, so there is no gateway to import these
- * through and no test that can pin the two lists together. Any edit to the
- * hench list must be mirrored here in the same change, `tokenBudget` above all:
- * these values are derived from measured runs and their basis is documented at
- * the top of the hench file.
- */
-const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
-  {
-    id: "quick-iteration",
-    name: "Quick Iteration",
-    description: "Short, fast runs for rapid prototyping and small fixes",
-    useCases: ["Bug fixes and small patches", "Quick refactors with clear scope", "Exploratory changes with fast feedback"],
-    tags: ["fast", "lightweight", "prototyping"],
-    config: { maxTurns: 15, tokenBudget: 600000, loopPauseMs: 500, retry: { maxRetries: 2, baseDelayMs: 1000, maxDelayMs: 10000 } },
-    builtIn: true,
-  },
-  {
-    id: "thorough-execution",
-    name: "Thorough Execution",
-    description: "Extended runs with generous limits for complex multi-file tasks",
-    useCases: ["New feature implementation across multiple files", "Large refactoring efforts", "Tasks requiring extensive test writing"],
-    tags: ["thorough", "complex", "multi-file"],
-    config: { maxTurns: 80, maxTokens: 16384, tokenBudget: 1500000, loopPauseMs: 2000, retry: { maxRetries: 5, baseDelayMs: 2000, maxDelayMs: 60000 } },
-    builtIn: true,
-  },
-  {
-    id: "budget-conscious",
-    name: "Budget Conscious",
-    description: "Optimized for minimal token usage while maintaining quality",
-    useCases: ["Cost-sensitive environments", "High-volume task processing", "Routine maintenance tasks"],
-    tags: ["budget", "cost-effective", "efficient"],
-    config: { maxTurns: 20, maxTokens: 4096, tokenBudget: 600000, loopPauseMs: 3000, retry: { maxRetries: 2, baseDelayMs: 3000, maxDelayMs: 15000 } },
-    builtIn: true,
-  },
-  {
-    id: "strict-safety",
-    name: "Strict Safety",
-    description: "Maximum guard rails for sensitive codebases and production-adjacent work",
-    useCases: ["Production infrastructure changes", "Security-sensitive code modifications", "Regulated environments requiring audit trails"],
-    tags: ["safety", "security", "production"],
-    config: { maxTurns: 30, maxFailedAttempts: 2, guard: { blockedPaths: STRICT_BLOCKED_PATHS, allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"], commandTimeout: 15000, maxFileSize: 524288 } },
-    builtIn: true,
-  },
-  {
-    id: "api-direct",
-    name: "API Direct",
-    description: "Use Anthropic API directly instead of Claude Code CLI for headless environments",
-    useCases: ["CI/CD pipeline integration", "Headless server environments", "Custom API key management"],
-    tags: ["api", "headless", "ci-cd"],
-    config: { provider: "api", maxTurns: 40, tokenBudget: 850000, retry: { maxRetries: 4, baseDelayMs: 3000, maxDelayMs: 30000 } },
-    builtIn: true,
-  },
-];
-
-const TEMPLATES_FILE = "templates.json";
-
-/** Load user-defined templates from .hench/templates.json. */
-function loadUserTemplates(projectDir: string): WorkflowTemplateData[] {
-  const filePath = join(henchDirIn(projectDir), TEMPLATES_FILE);
-  try {
-    if (!existsSync(filePath)) return [];
-    const raw = readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as WorkflowTemplateData[];
-  } catch {
-    return [];
-  }
-}
-
-/** Get all templates (built-in + user). */
-function getAllTemplates(projectDir: string): WorkflowTemplateData[] {
-  const builtInIds = new Set(BUILT_IN_TEMPLATES.map((t) => t.id));
-  const userTemplates = loadUserTemplates(projectDir).filter((t) => !builtInIds.has(t.id));
-  return [...BUILT_IN_TEMPLATES, ...userTemplates];
-}
-
-/** Find a template by ID (built-in first, then user). */
-function findTemplate(projectDir: string, id: string): WorkflowTemplateData | null {
-  const builtIn = BUILT_IN_TEMPLATES.find((t) => t.id === id);
-  if (builtIn) return builtIn;
-  const user = loadUserTemplates(projectDir);
-  return user.find((t) => t.id === id) ?? null;
-}
-
-/**
- * Every writable key/value pair a template overlay would set, flattened to the
- * dotted paths the config gate speaks (`retry.maxRetries`, `guard.blockedPaths`).
- *
- * `guard` and `retry` are merged a level down by {@link mergeTemplateConfig},
- * so their members are validated individually; everything else is a top-level
- * assignment.
- */
-function flattenTemplateOverlay(overlay: Record<string, unknown>): Array<[string, unknown]> {
-  const pairs: Array<[string, unknown]> = [];
-  for (const [key, value] of Object.entries(overlay)) {
-    if ((key === "guard" || key === "retry") && value && typeof value === "object" && !Array.isArray(value)) {
-      for (const [inner, innerValue] of Object.entries(value as Record<string, unknown>)) {
-        pairs.push([`${key}.${inner}`, innerValue]);
-      }
-      continue;
-    }
-    pairs.push([key, value]);
-  }
-  return pairs;
-}
-
-/**
- * Refuse a template overlay that would write a config field the dashboard may
- * not write. Returns the first problem, or null.
- *
- * Templates are the fourth path into `.hench/config.json`, after the config
- * editor, the adaptive routes and the workflow apply — and the only one that
- * used to skip the gate those three share. `POST /api/hench/templates` takes
- * `config` verbatim from the request body and `…/apply` merges it into the
- * file, so an unvalidated overlay could invent `permissionMode`, reshape
- * `guard.allowedCommands`, or walk `__proto__` — precisely the three threats
- * `hench-config-fields.ts` names — and the next autonomous run inherited it.
- */
-export function validateTemplateOverlay(overlay: Record<string, unknown>): string | null {
-  for (const [key, value] of flattenTemplateOverlay(overlay)) {
-    const problem = validateConfigKeyValue(key, value);
-    if (problem) return problem;
-  }
-  return null;
-}
-
-/** Apply a template config overlay to a config object. */
-function mergeTemplateConfig(
-  config: Record<string, unknown>,
-  overlay: Record<string, unknown>,
-): Record<string, unknown> {
-  const result = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
-  for (const [key, value] of Object.entries(overlay)) {
-    if (key === "guard" || key === "retry") {
-      // Deep merge nested objects
-      const existing = (result[key] ?? {}) as Record<string, unknown>;
-      result[key] = { ...existing, ...(value as Record<string, unknown>) };
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-// ── Template route handlers ──────────────────────────────────────────
-
-/** GET /api/hench/templates */
-function handleTemplateList(
-  res: ServerResponse,
-  ctx: ServerContext,
-): boolean {
-  const templates = getAllTemplates(ctx.projectDir);
-  jsonResponse(res, 200, { templates });
-  return true;
-}
-
-/** GET /api/hench/templates/:id */
-function handleTemplateGet(
-  id: string,
-  res: ServerResponse,
-  ctx: ServerContext,
-): boolean {
-  const template = findTemplate(ctx.projectDir, id);
-  if (!template) {
-    errorResponse(res, 404, `Template "${id}" not found`);
-    return true;
-  }
-  jsonResponse(res, 200, template);
-  return true;
-}
-
-/** POST /api/hench/templates — create/update user template. */
-async function handleTemplateCreate(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: ServerContext,
-): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
-
-  const id = body.id as string | undefined;
-  if (!id || typeof id !== "string" || !/^[a-z][a-z0-9-]{1,49}$/.test(id)) {
-    errorResponse(res, 400, "Template ID is required and must be lowercase with hyphens (2-50 chars)");
-    return true;
-  }
-
-  // Reject overwriting built-in templates
-  if (BUILT_IN_TEMPLATES.some((t) => t.id === id)) {
-    errorResponse(res, 400, `Cannot overwrite built-in template "${id}"`);
-    return true;
-  }
-
-  const rawOverlay = (body.config as Record<string, unknown>) || {};
-  if (!rawOverlay || typeof rawOverlay !== "object" || Array.isArray(rawOverlay)) {
-    errorResponse(res, 400, "Template config must be an object");
-    return true;
-  }
-  // The settings page saves the GET config as the overlay, and that carries
-  // the user's `HENCH_LOCAL_ONLY_SETTINGS` from .n-dx.local.json. Applying the
-  // template would write them into .hench/config.json, where the trust review
-  // reads them as the repository's and the checkout turns untrusted.
-  const overlay = Object.fromEntries(
-    Object.entries(rawOverlay).filter(([key]) => !isHenchLocalOnlySetting(key)),
-  );
-  const overlayProblem = validateTemplateOverlay(overlay);
-  if (overlayProblem) {
-    errorResponse(res, 400, overlayProblem);
-    return true;
-  }
-
-  const template: WorkflowTemplateData = {
-    id,
-    name: (body.name as string) || id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-    description: (body.description as string) || "User-defined workflow template",
-    useCases: Array.isArray(body.useCases) ? body.useCases as string[] : [],
-    tags: Array.isArray(body.tags) ? body.tags as string[] : [],
-    config: overlay,
-    builtIn: false,
-    createdAt: new Date().toISOString(),
-  };
-
-  // Load, update, and write back
-  const filePath = join(henchDirIn(ctx.projectDir), TEMPLATES_FILE);
-  const existing = loadUserTemplates(ctx.projectDir);
-  const idx = existing.findIndex((t) => t.id === id);
-  if (idx >= 0) {
-    existing[idx] = template;
-  } else {
-    existing.push(template);
-  }
-
-  try {
-    await writeFile(filePath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
-  } catch (err) {
-    errorResponse(res, 500, `Failed to save template: ${errorMessage(err)}`);
-    return true;
-  }
-
-  jsonResponse(res, 201, template);
-  return true;
-}
-
-/** POST /api/hench/templates/:id/apply — apply template to current config. */
-async function handleTemplateApply(
-  id: string,
-  res: ServerResponse,
-  ctx: ServerContext,
-): Promise<boolean> {
-  const template = findTemplate(ctx.projectDir, id);
-  if (!template) {
-    errorResponse(res, 404, `Template "${id}" not found`);
-    return true;
-  }
-
-  // Re-validated on the way out, not just on the way in: `.hench/templates.json`
-  // is a file, and one written before this gate existed (or by hand) must not
-  // become a config write just because it is already stored.
-  const overlayProblem = validateTemplateOverlay(template.config);
-  if (overlayProblem) {
-    errorResponse(res, 400, `Template "${id}" cannot be applied: ${overlayProblem}`);
-    return true;
-  }
-
-  const config = loadHenchConfig(ctx.projectDir);
-  if (!config) {
-    errorResponse(res, 404, "Hench configuration not found. Run 'hench init' first.");
-    return true;
-  }
-
-  const updated = mergeTemplateConfig(config, template.config);
-  // A template overlay carrying part of a nested group (or merging into a
-  // config that never had it) must not leave a partial group on disk.
-  completeConfigGroups(updated);
-
-  const constraintProblem = validateConfigConstraints(updated);
-  if (constraintProblem) {
-    errorResponse(res, 400, `Template "${id}" cannot be applied: ${constraintProblem}`);
-    return true;
-  }
-  const configPath = henchConfigPath(ctx.projectDir);
-
-  try {
-    writeFileSync(configPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
-  } catch (err) {
-    errorResponse(res, 500, `Failed to write config: ${errorMessage(err)}`);
-    return true;
-  }
-
-  // Fail-forward commits the change; a no-op when the mode is off.
-  await commitSettingsChange(ctx.projectDir, configPath, "hench");
-
-  jsonResponse(res, 200, {
-    applied: template.id,
-    templateName: template.name,
-    config: updated,
-  });
-  return true;
-}
-
-/** DELETE /api/hench/templates/:id — delete user template. */
-async function handleTemplateDelete(
-  id: string,
-  res: ServerResponse,
-  ctx: ServerContext,
-): Promise<boolean> {
-  if (BUILT_IN_TEMPLATES.some((t) => t.id === id)) {
-    errorResponse(res, 400, `Cannot delete built-in template "${id}"`);
-    return true;
-  }
-
-  const filePath = join(henchDirIn(ctx.projectDir), TEMPLATES_FILE);
-  const existing = loadUserTemplates(ctx.projectDir);
-  const filtered = existing.filter((t) => t.id !== id);
-
-  if (filtered.length === existing.length) {
-    errorResponse(res, 404, `Template "${id}" not found`);
-    return true;
-  }
-
-  try {
-    await writeFile(filePath, JSON.stringify(filtered, null, 2) + "\n", "utf-8");
-  } catch (err) {
-    errorResponse(res, 500, `Failed to delete template: ${errorMessage(err)}`);
-    return true;
-  }
-
-  jsonResponse(res, 200, { deleted: id });
   return true;
 }
 
@@ -2300,17 +1925,6 @@ async function judgeExecuteRequest(
   };
 }
 
-/** Parse an execute-shaped body, answering 400 itself when it is not JSON. */
-async function readExecuteBody(req: IncomingMessage, res: ServerResponse): Promise<Record<string, unknown> | null> {
-  try {
-    const raw = await readBody(req, res);
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return null;
-  }
-}
-
 /**
  * POST /api/hench/execute/check — would this execute request start?
  *
@@ -2325,7 +1939,7 @@ async function readExecuteBody(req: IncomingMessage, res: ServerResponse): Promi
  * verdict" and queues as before — never as a start).
  */
 async function handleExecuteCheck(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
-  const body = await readExecuteBody(req, res);
+  const body = await readJsonBody(req, res);
   if (!body) return true;
   const verdict = await judgeExecuteRequest(ctx, body);
   if (verdict.kind === "refused") {
@@ -2343,7 +1957,7 @@ async function handleExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const body = await readExecuteBody(req, res);
+  const body = await readJsonBody(req, res);
   if (!body) return true;
   const outcome = await reserveAndStart(ctx, body, broadcast);
   if (outcome.kind === "migrate") return await runTreeMigration(res, ctx);
@@ -3272,28 +2886,8 @@ export function startConcurrencyMonitor(
       // locks dir doesn't exist yet
     }
 
-    // Dashboard active
-    const dashboardRunning = Array.from(activeExecutions.values()).filter(
-      (e) => e.state.status === "running" || e.state.status === "starting",
-    ).length;
-
-    // Disk running
-    const dashboardTaskIds = new Set(activeExecutions.keys());
-    let diskRunning = 0;
-    try {
-      const runFiles = readdirSync(runsDir);
-      for (const file of runFiles) {
-        if (!file.endsWith(".json")) continue;
-        const id = file.replace(/\.json$/, "");
-        const run = loadRunFile(runsDir, id);
-        if (run && run.status === "running" && !dashboardTaskIds.has(run.taskId as string)) {
-          diskRunning++;
-        }
-      }
-    } catch {
-      // runs dir may not exist
-    }
-
+    const dashboardRunning = countDashboardRunning(activeExecutions);
+    const diskRunning = countDiskOnlyRunning(runsDir, activeExecutions);
     const totalRunning = dashboardRunning + diskRunning;
     const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
     const level = concurrencyLevelOf(processCount, maxConcurrent);
@@ -3318,73 +2912,6 @@ export function startConcurrencyMonitor(
 }
 
 // ── Memory / resource monitoring ──────────────────────────────────────
-
-/**
- * Memory health level for UI indicators.
- *
- * `"unknown"` is not a degree of pressure — it means the machine could not be
- * read at all (macOS with `vm_stat` and `sysctl` both unavailable). Nothing may
- * warn, throttle or hold a run on it.
- */
-export type MemoryHealthLevel = "healthy" | "warning" | "critical" | "unknown";
-
-/** Per-process memory snapshot. */
-interface ProcessMemoryEntry {
-  taskId: string;
-  taskTitle: string;
-  pid: number;
-  rssBytes: number;
-  source: "dashboard" | "disk";
-}
-
-/** Full memory status response shape. */
-export interface MemoryStatus {
-  system: {
-    totalBytes: number;
-    /**
-     * The shared reading's `availableBytes`, under the name the API has always
-     * used. Not `os.freemem()` on macOS — see `llm-client/system-memory.ts`.
-     * `null` when the machine could not be read.
-     */
-    freeBytes: number | null;
-    /** The same number as {@link freeBytes}, under the name the reading uses. */
-    availableBytes: number | null;
-    usedBytes: number | null;
-    usedPercent: number | null;
-    /** Kernel memory pressure, or `"unknown"` when nothing could be read. */
-    pressure: MemoryPressure;
-    /** Where the reading came from, e.g. `"darwin:vm_stat+sysctl"`, `"os.freemem"`. */
-    source: string;
-  };
-  server: {
-    pid: number;
-    rssBytes: number;
-    heapUsedBytes: number;
-    heapTotalBytes: number;
-    externalBytes: number;
-  };
-  processes: ProcessMemoryEntry[];
-  health: MemoryHealthLevel;
-  loadAvg: [number, number, number];
-  cpuCount: number;
-  timestamp: string;
-}
-
-/**
- * Memory health from the shared reading's pressure.
- *
- * The thresholds themselves live in `llm-client/system-memory.ts` (75% / 90%
- * used, or macOS's `kern.memorystatus_vm_pressure_level` where it can be read),
- * so the dashboard, the hub gate and hench's throttle all flag at the same point.
- */
-function healthFromPressure(pressure: MemoryPressure): MemoryHealthLevel {
-  switch (pressure) {
-    case "normal": return "healthy";
-    case "warn": return "warning";
-    case "critical": return "critical";
-    case "unknown": return "unknown";
-  }
-}
 
 /**
  * Attempt to read RSS (resident set size) for a given PID.
@@ -3420,75 +2947,10 @@ function getProcessRss(pid: number): number | null {
   }
 }
 
-/** Collect full memory status snapshot. */
 /** Which workspace's tracker each sampled dashboard process belongs to (taskId → runsDir). */
 const processOwners = new Map<string, string>();
 
-/**
- * Where {@link readSystemMemory} gets its reading. Synchronous and cached —
- * a request must never wait on a `vm_stat` spawn.
- */
-let readAvailable: () => AvailableMemoryReading = getAvailableMemory;
-
-/**
- * Point the memory routes at a fixed reading, so a test can exercise a darwin
- * machine (or an unreadable one) on any platform. `null` restores the shared
- * reading. Nothing in production calls this.
- */
-export function setAvailableMemoryReaderForTests(read: (() => AvailableMemoryReading) | null): void {
-  readAvailable = read ?? getAvailableMemory;
-}
-
-/**
- * Derive the API's `system` block from an available-memory reading.
- *
- * `freeBytes` carries `availableBytes` — on macOS `os.freemem()` counts only
- * free pages and reads ~115 MB on a machine with ~3.9 GB it can hand out, which
- * is what used to make a healthy Mac read "critical" at 99% used.
- *
- * An unreadable machine is not a full one: `freeBytes`, `usedBytes` and
- * `usedPercent` are all `null` rather than 0, so no consumer can compute a
- * usage figure out of a reading that does not exist.
- */
-export function systemMemoryFrom(
-  reading: AvailableMemoryReading,
-): MemoryStatus["system"] & { health: MemoryHealthLevel } {
-  const { availableBytes, totalBytes, pressure, source } = reading;
-  const known = availableBytes !== null;
-  const usedBytes = known ? totalBytes - availableBytes : null;
-  return {
-    totalBytes,
-    freeBytes: availableBytes,
-    availableBytes,
-    usedBytes,
-    usedPercent: usedBytes !== null && totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : null,
-    pressure,
-    source,
-    health: healthFromPressure(pressure),
-  };
-}
-
-/**
- * The machine's memory and its health level — the `system` and `health`
- * parts of `GET /api/hench/memory`, without the per-process `ps` probes,
- * for readers that must answer quickly (the Live overview).
- */
-export function readSystemMemory(): MemoryStatus["system"] & { health: MemoryHealthLevel } {
-  return systemMemoryFrom(readAvailable());
-}
-
-/**
- * Take one reading so the cache is warm before the first request.
- *
- * `getAvailableMemory()` never spawns synchronously: until a darwin reading has
- * completed it answers `"pending"` with no bytes, which every consumer treats as
- * unknown. Warming at start-up means the first dashboard paint shows the machine
- * rather than a dash.
- */
-export function warmSystemMemory(): void {
-  void readAvailableMemory().catch(() => {});
-}
-
+/** Collect full memory status snapshot. */
 function collectMemoryStatus(): MemoryStatus {
   processOwners.clear();
   const { health, ...system } = readSystemMemory();
@@ -3737,8 +3199,12 @@ export function getEffectiveMaxConcurrent(projectDir: string): number {
   if (throttleState.concurrencyOverride !== null) {
     return throttleState.concurrencyOverride;
   }
-  const config = loadHenchConfig(projectDir);
-  const guard = config?.guard as Record<string, unknown> | undefined;
+  return configuredMaxConcurrent(projectDir);
+}
+
+/** `guard.maxConcurrentProcesses` from the hench config, or the default when it is unset or not a number. */
+function configuredMaxConcurrent(projectDir: string): number {
+  const guard = loadHenchConfig(projectDir)?.guard as Record<string, unknown> | undefined;
   return typeof guard?.maxConcurrentProcesses === "number"
     ? guard.maxConcurrentProcesses
     : DEFAULT_MAX_CONCURRENT_PROCESSES;
@@ -3867,6 +3333,32 @@ export function concurrencyLevelOf(inUse: number, max: number): ConcurrencyLevel
   return "low";
 }
 
+/** Dashboard-spawned executions that are starting or running. */
+function countDashboardRunning(activeExecutions: ReadonlyMap<string, ActiveExecution>): number {
+  return Array.from(activeExecutions.values()).filter(
+    (e) => e.state.status === "running" || e.state.status === "starting",
+  ).length;
+}
+
+/**
+ * Run records on disk still marked running for a task this server is not
+ * executing: runs started from a terminal. None when the runs directory does
+ * not exist yet.
+ */
+function countDiskOnlyRunning(runsDir: string, activeExecutions: ReadonlyMap<string, ActiveExecution>): number {
+  let count = 0;
+  try {
+    for (const file of readdirSync(runsDir)) {
+      if (!file.endsWith(".json")) continue;
+      const run = loadRunFile(runsDir, file.replace(/\.json$/, ""));
+      if (run && run.status === "running" && !activeExecutions.has(run.taskId as string)) count++;
+    }
+  } catch {
+    // runs dir may not exist
+  }
+  return count;
+}
+
 /** The concurrency status of one workspace, as `GET /api/hench/concurrency` answers it. */
 export function collectConcurrencyStatus(ctx: ServerContext): ConcurrencyStatus {
   const { activeExecutions } = stateForCtx(ctx);
@@ -3875,26 +3367,10 @@ export function collectConcurrencyStatus(ctx: ServerContext): ConcurrencyStatus 
 
   // Count dashboard-triggered executions
   const dashboardActive = activeExecutions.size;
-  const dashboardRunning = Array.from(activeExecutions.values()).filter(
-    (e) => e.state.status === "running" || e.state.status === "starting",
-  ).length;
+  const dashboardRunning = countDashboardRunning(activeExecutions);
 
   // 4. Count disk-based running runs (excludes dashboard-tracked ones)
-  const dashboardTaskIds = new Set(activeExecutions.keys());
-  let diskRunningCount = 0;
-  try {
-    const runFiles = readdirSync(runsDir);
-    for (const file of runFiles) {
-      if (!file.endsWith(".json")) continue;
-      const id = file.replace(/\.json$/, "");
-      const run = loadRunFile(runsDir, id);
-      if (run && run.status === "running" && !dashboardTaskIds.has(run.taskId as string)) {
-        diskRunningCount++;
-      }
-    }
-  } catch {
-    // runs dir may not exist
-  }
+  const diskRunningCount = countDiskOnlyRunning(runsDir, activeExecutions);
 
   // 5. Count pending PRD tasks
   let pendingTaskCount = 0;
@@ -4280,11 +3756,7 @@ export async function shutdownActiveExecutions(
  */
 function handleThrottleGet(res: ServerResponse, ctx: ServerContext): boolean {
   const { activeExecutions } = stateForCtx(ctx);
-  const config = loadHenchConfig(ctx.projectDir);
-  const guard = config?.guard as Record<string, unknown> | undefined;
-  const configMax = typeof guard?.maxConcurrentProcesses === "number"
-    ? guard.maxConcurrentProcesses
-    : DEFAULT_MAX_CONCURRENT_PROCESSES;
+  const configMax = configuredMaxConcurrent(ctx.projectDir);
 
   const effective = throttleState.concurrencyOverride ?? configMax;
 
@@ -4314,14 +3786,8 @@ async function handleThrottleUpdate(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const value = body.maxConcurrent;
   if (value === null || value === undefined) {
@@ -4414,14 +3880,8 @@ async function handleEmergencyStop(
   ctx?: ServerContext,
   onStatusInvalidate?: () => void,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   if (body.confirm !== true) {
     errorResponse(res, 400, "Emergency stop requires { confirm: true } in request body");
@@ -4506,11 +3966,7 @@ function broadcastThrottleState(
   ctx: ServerContext,
 ): void {
   const { activeExecutions } = stateForCtx(ctx);
-  const config = loadHenchConfig(ctx.projectDir);
-  const guard = config?.guard as Record<string, unknown> | undefined;
-  const configMax = typeof guard?.maxConcurrentProcesses === "number"
-    ? guard.maxConcurrentProcesses
-    : DEFAULT_MAX_CONCURRENT_PROCESSES;
+  const configMax = configuredMaxConcurrent(ctx.projectDir);
 
   broadcast({
     type: "hench:throttle-state",

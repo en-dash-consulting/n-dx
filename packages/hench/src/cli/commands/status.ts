@@ -2,6 +2,7 @@ import { listRuns } from "../../store/runs.js";
 import { safeParseInt } from "./constants.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { info, result } from "../output.js";
+import { formatDuration } from "../../types/output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
 import { batchLookupTasksInRex, formatTaskLine } from "./task-lookup.js";
 
@@ -67,12 +68,4 @@ function statusIcon(status: string): string {
     default:
       return "[??]";
   }
-}
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}m ${remaining}s`;
 }

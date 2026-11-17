@@ -7,7 +7,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
-import { isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, routeTab, viewPathname } from "../route-state.js";
+import { defaultView, isTaskRouteView, normalizeLiveView, parseLegacyHashRoute, resolveLocationRoute, routeTab, viewPathname } from "../route-state.js";
+import type { ParsedRoute } from "../route-state.js";
 import { appUrl, getBasePath } from "../base-path.js";
 import { resolveViewAliasRoute } from "../external.js";
 import { guardedLeave } from "./use-leave-guard.js";
@@ -76,35 +77,44 @@ function locationArea(view: ViewId): string | null {
   return routeArea(view, new URLSearchParams(location.search).get("area"));
 }
 
+/** The route the current address names (path, or a legacy hash), or null. */
+function locationRoute(validViews: Set<ViewId>): ParsedRoute | null {
+  return resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
+}
+
 /**
- * The page a bare URL opens on: the landing page whenever it exists (it is a
- * cross-cutting view, so it does in every scope), else the first valid view.
+ * The history entry a parsed route opens: its sub-id is a run id on Runs, a
+ * task id on a task route, and otherwise the tab the view keeps in its path.
  */
-function defaultView(validViews: Set<ViewId>): ViewId {
-  if (validViews.has("home")) return "home";
-  return validViews.values().next().value as ViewId;
+function entryOfRoute(parsed: ParsedRoute): HistoryEntry {
+  return {
+    view: parsed.view,
+    file: null,
+    zone: null,
+    runId: parsed.view === "hench-runs" ? parsed.subId : null,
+    taskId: isTaskRouteView(parsed.view) ? parsed.subId : null,
+    tab: routeTab(parsed.view, parsed.subId),
+    askSeed: null,
+  };
 }
 
 function getInitialView(validViews: Set<ViewId>): ViewId {
-  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
-  return parsed?.view ?? defaultView(validViews);
+  return locationRoute(validViews)?.view ?? defaultView(validViews);
 }
 
 function getInitialRunId(validViews: Set<ViewId>): string | null {
-  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
-  if (!parsed || parsed.view !== "hench-runs") return null;
-  return parsed.subId;
+  const parsed = locationRoute(validViews);
+  return parsed ? entryOfRoute(parsed).runId : null;
 }
 
 function getInitialTaskId(validViews: Set<ViewId>): string | null {
-  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
-  if (!parsed || !isTaskRouteView(parsed.view)) return null;
-  return parsed.subId;
+  const parsed = locationRoute(validViews);
+  return parsed ? entryOfRoute(parsed).taskId : null;
 }
 
 function getInitialTab(validViews: Set<ViewId>): string | null {
-  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
-  return parsed ? routeTab(parsed.view, parsed.subId) : null;
+  const parsed = locationRoute(validViews);
+  return parsed ? entryOfRoute(parsed).tab : null;
 }
 
 export function useRouteState(validViews: Set<ViewId>): RouteState {
@@ -175,26 +185,8 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     // Backward compat: migrate old hash URLs to path URLs
     const hashRoute = parseLegacyHashRoute(location.hash, validViews);
     if (hashRoute) {
-      const isRunView = hashRoute.view === "hench-runs";
-      const isTaskView = isTaskRouteView(hashRoute.view);
-      const entry: HistoryEntry = {
-        view: hashRoute.view,
-        file: null,
-        zone: null,
-        runId: isRunView ? hashRoute.subId : null,
-        taskId: isTaskView ? hashRoute.subId : null,
-        tab: routeTab(hashRoute.view, hashRoute.subId),
-        askSeed: null,
-      };
-      setSelectedFile(entry.file);
-      setSelectedZone(entry.zone);
-      setSelectedRunId(entry.runId);
-      setSelectedTaskId(entry.taskId);
-      setSelectedTab(entry.tab);
-      setSelectedArea(null);
-      setAskSeed(entry.askSeed);
-      setView(entry.view);
-      currentRef.current = entry;
+      const entry = entryOfRoute(hashRoute);
+      applyEntry(entry, false);
       history.replaceState(entry, "", appUrl(entryUrl(entry)));
     } else {
       // Seed the initial history entry — preserve deep-link path if present
@@ -237,34 +229,14 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
           }
         }
 
-        const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath())
-          ?? { view: defaultView(validViews), subId: null };
-        const isRunView = parsed.view === "hench-runs";
-        const isTaskView = isTaskRouteView(parsed.view);
-        return {
-          view: parsed.view,
-          file: null,
-          zone: null,
-          runId: isRunView ? parsed.subId : null,
-          taskId: isTaskView ? parsed.subId : null,
-          tab: routeTab(parsed.view, parsed.subId),
-          askSeed: null,
-          area: locationArea(parsed.view),
-        };
+        const parsed = locationRoute(validViews) ?? { view: defaultView(validViews), subId: null };
+        return { ...entryOfRoute(parsed), area: locationArea(parsed.view) };
       };
       const picked = entryFor();
       const target = { ...picked, view: normalizeLiveView(picked.view, picked.taskId) };
 
       const applied = guardedLeave(() => {
-        setSelectedFile(target.file);
-        setSelectedZone(target.zone);
-        setSelectedRunId(target.runId);
-        setSelectedTaskId(target.taskId);
-        setSelectedTab(target.tab);
-        setSelectedArea(routeArea(target.view, target.area));
-        setAskSeed(target.askSeed);
-        setView(target.view);
-        currentRef.current = target;
+        applyEntry(target, false);
         // Fixes up the address bar for the deferred (Discard) case, where our
         // own re-push below already moved it; a no-op when applied immediately,
         // since the browser already placed `location` at this entry.

@@ -55,12 +55,12 @@ import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js
 import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { LocalConfig } from "./llm-types.js";
-import { parseOpenAiTokenUsage } from "./openai-api-provider.js";
+import { parseOpenAiTokenUsage, readChatCompletion, readChatDeltaText } from "./openai-api-provider.js";
 import { CLASSIFY_WINDOW } from "./llm-error-classifier.js";
 import { DEFAULT_LOCAL_HOST, DEFAULT_LOCAL_PORT, describeLocalEndpointProblem } from "./local-endpoint.js";
 import { assembleLocalChatStream, readSseData } from "./local-chat-stream.js";
+import { RETRY_STATUS_CODES, throwHttpStatusError } from "./http-retry.js";
 
-const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 /**
  * Retry defaults for the local server. A dropped connection to LM Studio is
  * usually a model reload or a short server restart, which outlasts seconds:
@@ -669,20 +669,6 @@ function toLocalClientError(err: unknown, timeoutMs: number): ClaudeClientError 
   return new ClaudeClientError((err as Error)?.message ?? "Unknown error", "unknown", false);
 }
 
-/** Classify an HTTP status code into an ErrorReason and throw. */
-function classifyAndThrow(status: number, message: string): never {
-  if (status === 401 || status === 403) {
-    throw new ClaudeClientError(message, "auth", false);
-  }
-  if (status === 408) {
-    throw new ClaudeClientError(message, "timeout", true);
-  }
-  if (RETRY_STATUS_CODES.has(status)) {
-    throw new ClaudeClientError(message, "rate-limit", true);
-  }
-  throw new ClaudeClientError(message, "unknown", false);
-}
-
 // ── Factory ───────────────────────────────────────────────────────────────
 
 /**
@@ -767,20 +753,11 @@ export function createLocalApiProvider(
           const rawBody = await response.text();
           const message = parseLmStudioError(response.status, rawBody);
 
-          if (response.status === 401 || response.status === 403) {
-            throw new ClaudeClientError(message, "auth", false);
-          }
-          if (response.status === 408) {
-            throw new ClaudeClientError(message, "timeout", true);
-          }
           if (RETRY_STATUS_CODES.has(response.status) && attempt < maxRetries) {
             await sleep(retryDelayMs(policy, attempt));
             continue;
           }
-          if (RETRY_STATUS_CODES.has(response.status)) {
-            throw new ClaudeClientError(message, "rate-limit", true);
-          }
-          throw new ClaudeClientError(message, "unknown", false);
+          throwHttpStatusError(response.status, message);
         }
 
         let data: Record<string, unknown>;
@@ -795,21 +772,7 @@ export function createLocalApiProvider(
           }
           throw toLocalClientError(err, timeoutMs);
         }
-        const choices = data.choices as Array<Record<string, unknown>> | undefined;
-        let text = "";
-
-        if (choices && choices.length > 0) {
-          const msg = choices[0].message as Record<string, unknown> | undefined;
-          if (msg && typeof msg.content === "string") {
-            text = msg.content;
-          }
-        }
-
-        const tokenUsage = data.usage
-          ? parseOpenAiTokenUsage(data.usage as Record<string, unknown>)
-          : undefined;
-
-        return { text, tokenUsage };
+        return readChatCompletion(data);
       }
     },
 
@@ -849,7 +812,7 @@ export function createLocalApiProvider(
 
       if (!response.ok) {
         const rawBody = await response.text();
-        classifyAndThrow(response.status, parseLmStudioError(response.status, rawBody));
+        throwHttpStatusError(response.status, parseLmStudioError(response.status, rawBody));
       }
 
       if (!response.body) {
@@ -870,13 +833,9 @@ export function createLocalApiProvider(
         }
         try {
           const data = JSON.parse(line) as Record<string, unknown>;
-          const choices = data.choices as Array<Record<string, unknown>> | undefined;
-
-          if (choices && choices.length > 0) {
-            const delta = choices[0].delta as Record<string, unknown> | undefined;
-            if (delta && typeof delta.content === "string") {
-              yield { text: delta.content };
-            }
+          const text = readChatDeltaText(data);
+          if (text !== undefined) {
+            yield { text };
           }
 
           if (data.usage) {

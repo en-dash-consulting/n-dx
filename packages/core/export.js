@@ -515,20 +515,47 @@ export async function runExport(args) {
   const rexPublic = await import(
     pathToFileURL(resolvePackagePath("packages/rex", "@n-dx/rex", "dist/public.js")).href
   );
-  const {
-    computeStats,
-    computeEpicStats,
-    computePriorityDistribution,
-    computeRequirementsSummary,
-    findNextTask,
-    collectCompletedIds,
-    computeHealthScore,
-  } = rexPublic;
 
   // Clean output directory
   ensureDir(outDir);
 
   // ── Step 1: Copy sourcevision data files ───────────────────────────────
+  copySourcevisionData(svDir, outDir);
+
+  // ── Step 2: Pre-render PRD data ────────────────────────────────────────
+  const prdDoc = prerenderPrdData(dir, rexDir, outDir, rexPublic);
+
+  // ── Step 3: Pre-render hench data ──────────────────────────────────────
+  prerenderHenchData(henchDir, outDir, includeTranscripts);
+
+  // ── Step 4: Pre-render meta endpoints ──────────────────────────────────
+  prerenderMetaEndpoints(dir, outDir, prdDoc);
+
+  // ── Step 5: Copy viewer assets ─────────────────────────────────────────
+  if (!(await writeViewer(outDir, basePath))) return 1;
+
+  // ── Step 6: Write markers ──────────────────────────────────────────────
+  writeFileSync(join(outDir, ".nojekyll"), "");
+  writeJSON(join(outDir, "deployed.json"), {
+    exportedAt: new Date().toISOString(),
+    basePath,
+  });
+
+  console.log(`[export] done — ${outDir}`);
+
+  // ── Optional: deploy to GitHub Pages ────────────────────────────────────
+  if (deploy === "github") {
+    return deployToGitHubPages(outDir, dir, cname);
+  }
+
+  return 0;
+}
+
+/**
+ * Step 1 of {@link runExport}: sourcevision's analysis files, plus the
+ * listing the viewer detects its mode from.
+ */
+function copySourcevisionData(svDir, outDir) {
   console.log("[export] copying sourcevision data...");
   const svDataFiles = [
     "manifest.json", "inventory.json", "imports.json", "zones.json", "components.json", "callgraph.json",
@@ -544,8 +571,14 @@ export async function runExport(args) {
 
   // Write data/index.json (file listing for mode detection)
   writeJSON(join(outDir, "data", "index.json"), { files: copiedFiles });
+}
 
-  // ── Step 2: Pre-render PRD data ────────────────────────────────────────
+/**
+ * Step 2 of {@link runExport}: the PRD as the static dashboard's rex API
+ * responses. `rex` is rex's public module. Exits the process when the PRD
+ * cannot be loaded; returns the PRD document otherwise.
+ */
+function prerenderPrdData(dir, rexDir, outDir, rex) {
   console.log("[export] pre-rendering PRD data...");
   let prdDoc;
   try {
@@ -564,6 +597,15 @@ export async function runExport(args) {
     process.exit(1);
   }
   const items = prdDoc.items || [];
+  const {
+    computeStats,
+    computeEpicStats,
+    computePriorityDistribution,
+    computeRequirementsSummary,
+    findNextTask,
+    collectCompletedIds,
+    computeHealthScore,
+  } = rex;
 
   // Raw PRD copy — exported as JSON for the static dashboard frontend.
   writeJSON(join(outDir, "data", "prd.json"), prdDoc);
@@ -571,12 +613,13 @@ export async function runExport(args) {
 
   // Stats
   const stats = computeStats(items);
+  const percentComplete = stats.total > 0
+    ? Math.round((stats.completed / stats.total) * 100)
+    : 0;
   writeJSON(join(outDir, "api", "rex", "stats.json"), {
     title: prdDoc.title,
     stats,
-    percentComplete: stats.total > 0
-      ? Math.round((stats.completed / stats.total) * 100)
-      : 0,
+    percentComplete,
   });
 
   // Dashboard aggregate
@@ -588,9 +631,7 @@ export async function runExport(args) {
   writeJSON(join(outDir, "api", "rex", "dashboard.json"), {
     title: prdDoc.title,
     stats,
-    percentComplete: stats.total > 0
-      ? Math.round((stats.completed / stats.total) * 100)
-      : 0,
+    percentComplete,
     epics,
     nextTask,
     priorities,
@@ -620,8 +661,11 @@ export async function runExport(args) {
     } catch { /* ignore */ }
   }
   writeJSON(join(outDir, "api", "rex", "log.json"), { entries: logEntries });
+  return prdDoc;
+}
 
-  // ── Step 3: Pre-render hench data ──────────────────────────────────────
+/** Step 3 of {@link runExport}: run records, the run index and token usage totals. */
+function prerenderHenchData(henchDir, outDir, includeTranscripts) {
   console.log("[export] pre-rendering hench data...");
   const runsDir = join(henchDir, "runs");
   let runs = [];
@@ -676,8 +720,10 @@ export async function runExport(args) {
     budget: null,
     usage: { input: totalInput, output: totalOutput, total: totalInput + totalOutput },
   });
+}
 
-  // ── Step 4: Pre-render meta endpoints ──────────────────────────────────
+/** Step 4 of {@link runExport}: the config, features and project endpoints. */
+function prerenderMetaEndpoints(dir, outDir, prdDoc) {
   console.log("[export] pre-rendering meta endpoints...");
 
   writeJSON(join(outDir, "api", "config.json"), { scope: "all", initialized: true });
@@ -696,8 +742,13 @@ export async function runExport(args) {
     git: gitInfo,
     nameSource: "prd",
   });
+}
 
-  // ── Step 5: Copy viewer assets ─────────────────────────────────────────
+/**
+ * Step 5 of {@link runExport}: the viewer page, rewritten for `basePath`, and
+ * its assets. Returns false (after printing why) when there is no viewer build.
+ */
+async function writeViewer(outDir, basePath) {
   console.log("[export] copying viewer assets...");
   const viewerDir = resolvePackagePath("packages/web", "@n-dx/web", "dist/viewer");
 
@@ -707,7 +758,7 @@ export async function runExport(args) {
     const built = await ensureSourceBuild(join(viewerDir, "index.html"));
     if (!built.ok) {
       console.error(`Error: The dashboard viewer is not built. ${built.message}`);
-      return 1;
+      return false;
     }
   }
 
@@ -740,22 +791,7 @@ export async function runExport(args) {
 
   // Copy JS bundles from viewer dist
   copyViewerAssets(viewerDir, outDir);
-
-  // ── Step 6: Write markers ──────────────────────────────────────────────
-  writeFileSync(join(outDir, ".nojekyll"), "");
-  writeJSON(join(outDir, "deployed.json"), {
-    exportedAt: new Date().toISOString(),
-    basePath,
-  });
-
-  console.log(`[export] done — ${outDir}`);
-
-  // ── Optional: deploy to GitHub Pages ────────────────────────────────────
-  if (deploy === "github") {
-    return deployToGitHubPages(outDir, dir, cname);
-  }
-
-  return 0;
+  return true;
 }
 
 /**

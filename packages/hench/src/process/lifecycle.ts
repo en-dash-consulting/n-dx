@@ -20,13 +20,12 @@
 
 import { readdir, writeFile, unlink, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { LOCKS_DIRNAME, RUNS_DIRNAME } from "../store/paths.js";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const LOCKS_DIR = "locks";
-const RUNS_DIR = "runs";
 const LIFECYCLE_DIR = "lifecycle";
 
 /** Default stale run threshold: 2 minutes without activity. */
@@ -333,7 +332,7 @@ export class ProcessLifecycleValidator {
 
     // Clean orphaned lock files
     for (const lock of orphanedLocks) {
-      const lockPath = join(this._henchDir, LOCKS_DIR, `${lock.pid}.lock`);
+      const lockPath = join(this._henchDir, LOCKS_DIRNAME, `${lock.pid}.lock`);
       try {
         await unlink(lockPath);
         cleanedUp++;
@@ -353,7 +352,7 @@ export class ProcessLifecycleValidator {
     // Mark stale runs as failed
     for (const staleRun of staleRuns) {
       try {
-        const runPath = join(this._henchDir, RUNS_DIR, `${staleRun.id}.json`);
+        const runPath = join(this._henchDir, RUNS_DIRNAME, `${staleRun.id}.json`);
         const raw = await readFile(runPath, "utf-8");
         const record = JSON.parse(raw);
 
@@ -448,7 +447,7 @@ export class ProcessLifecycleValidator {
 
   private async _lockFileExists(pid: number): Promise<boolean> {
     try {
-      await readFile(join(this._henchDir, LOCKS_DIR, `${pid}.lock`), "utf-8");
+      await readFile(join(this._henchDir, LOCKS_DIRNAME, `${pid}.lock`), "utf-8");
       return true;
     } catch {
       return false;
@@ -456,7 +455,7 @@ export class ProcessLifecycleValidator {
   }
 
   private async _findOrphanedLocks(): Promise<OrphanReport["orphanedLocks"]> {
-    const dir = join(this._henchDir, LOCKS_DIR);
+    const dir = join(this._henchDir, LOCKS_DIRNAME);
     let entries: string[];
     try {
       entries = await readdir(dir);
@@ -495,7 +494,7 @@ export class ProcessLifecycleValidator {
   }
 
   private async _findStaleRuns(): Promise<OrphanReport["staleRuns"]> {
-    const dir = join(this._henchDir, RUNS_DIR);
+    const dir = join(this._henchDir, RUNS_DIRNAME);
     let entries: string[];
     try {
       entries = await readdir(dir);

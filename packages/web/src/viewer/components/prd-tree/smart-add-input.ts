@@ -21,13 +21,15 @@
 import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
-import { ProposalEditor } from "./proposal-editor.js";
+import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { TargetRow, TargetSearch, requestPlacement, type PlacementTarget } from "./change-placement.js";
 import { PlanWithSidecarButton } from "../plan-with-sidecar.js";
 import { useProductRead } from "../../hooks/index.js";
 import type { AreaDetail, PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
+import { errorMessage } from "../../utils/format.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -240,8 +242,7 @@ async function postJson<T>(url: string, body: unknown, fallback: string): Promis
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({ error: fallback }));
-    throw new Error(errBody.error || `HTTP ${res.status}`);
+    throw new Error(await errorOrHttpStatus(res, fallback));
   }
   return await res.json() as T;
 }
@@ -379,8 +380,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       if (reqId !== requestIdRef.current) return;
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Preview failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Preview failed"));
       }
 
       const data = await res.json();
@@ -477,8 +477,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       // Reset state
@@ -520,7 +519,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
             }, "Add failed")];
           } catch (err) {
             if (!created.length) throw err;
-            const message = err instanceof Error ? err.message : String(err);
+            const message = errorMessage(err);
             throw new Error(`${message} (${created.length} of ${changes.length} changes were added before it failed)`);
           }
         }
@@ -569,6 +568,14 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     onPrdChanged();
   }, [onPrdChanged, refreshScopes]);
 
+  // Scope label for display. Read before the editor's early return, so the
+  // hooks run in the same order on every render.
+  const scopeLabel = useMemo(() => {
+    if (!selectedScope) return null;
+    const opt = scopeOptions.find((o) => o.id === selectedScope);
+    return opt ? `${opt.itemType}: ${opt.title}` : null;
+  }, [selectedScope, scopeOptions]);
+
   // ── Render: Proposal editor mode ─────────────────────────────────
 
   if (editing && proposals.length > 0) {
@@ -585,18 +592,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
 
   // ── Render: Input + preview ──────────────────────────────────────
 
-  const taskCount = proposals.reduce(
-    (sum, p) => sum + p.features.reduce((fs, f) => fs + f.tasks.length, 0),
-    0,
-  );
-  const featureCount = proposals.reduce((sum, p) => sum + p.features.length, 0);
-
-  // Scope label for display
-  const scopeLabel = useMemo(() => {
-    if (!selectedScope) return null;
-    const opt = scopeOptions.find((o) => o.id === selectedScope);
-    return opt ? `${opt.itemType}: ${opt.title}` : null;
-  }, [selectedScope, scopeOptions]);
+  const { features: featureCount, tasks: taskCount } = proposalCounts(proposals);
 
   const panelClass = bar ? "smart-add-panel smart-add-panel-bar" : "smart-add-panel";
 
@@ -781,22 +777,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
             : null,
 
           // Summary stats
-          h("div", { class: "smart-add-stats" },
-            h("span", { class: "smart-add-stat" },
-              h("span", { class: "smart-add-stat-count" }, String(proposals.length)),
-              ` epic${proposals.length !== 1 ? "s" : ""}`,
-            ),
-            h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-            h("span", { class: "smart-add-stat" },
-              h("span", { class: "smart-add-stat-count" }, String(featureCount)),
-              ` feature${featureCount !== 1 ? "s" : ""}`,
-            ),
-            h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-            h("span", { class: "smart-add-stat" },
-              h("span", { class: "smart-add-stat-count" }, String(taskCount)),
-              ` task${taskCount !== 1 ? "s" : ""}`,
-            ),
-          ),
+          h(ProposalStats, { epics: proposals.length, features: featureCount, tasks: taskCount }),
 
           // Proposal hierarchy preview
           h("div", { class: "smart-add-preview" },

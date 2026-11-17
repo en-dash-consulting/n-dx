@@ -54,24 +54,6 @@ export interface RepoTrustApplied {
 }
 
 /**
- * The `hench` section of the user's own `.n-dx.local.json`, which is
- * git-ignored and therefore theirs: a `claudePath` or `apiKeyEnv` set there
- * survives the clamp. Read directly rather than through the async override
- * loader because the clamp is applied synchronously per task.
- */
-function localHenchOverrides(projectDir: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(resolveLayout(projectDir).localConfigFile, "utf-8"));
-    const hench = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>).hench
-      : undefined;
-    return hench && typeof hench === "object" && !Array.isArray(hench) ? (hench as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-/**
  * Evaluate trust for `projectDir` and return the config and permission mode
  * a run should actually use. Pure apart from reading the repository and the
  * user's trust store; never throws on a missing or unreadable file.
@@ -177,7 +159,11 @@ interface LocalHenchSection {
   guard?: { env?: { allow?: unknown } };
 }
 
-/** The `hench` section of the machine-local config file, which the repository does not ship. */
+/**
+ * The `hench` section of the machine-local config file, which the repository
+ * does not ship. Read directly rather than through the async override loader
+ * because the clamp is applied synchronously per task.
+ */
 function localHenchSection(projectDir: string): LocalHenchSection | undefined {
   let parsed: unknown;
   try {

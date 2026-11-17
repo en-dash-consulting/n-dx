@@ -14,8 +14,10 @@
 import { h, Fragment } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useRef } from "preact/hooks";
-import { ProposalEditor } from "./proposal-editor.js";
+import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
+import { formatByteSize } from "../../utils/format.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -57,13 +59,6 @@ function inferFormat(fileName: string): "text" | "markdown" | "json" {
   if (lower.endsWith(".json")) return "json";
   if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "markdown";
   return "text";
-}
-
-/** Format byte size to human-readable string. */
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** Count lines in a string. */
@@ -203,8 +198,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
       setProcessingStage("analyzing");
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Import failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Import failed"));
       }
 
       setProcessingStage("generating");
@@ -255,8 +249,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       // Reset
@@ -300,11 +293,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
   // ── Render: Results ──────────────────────────────────────────────
 
   if (state === "done" && proposals.length > 0) {
-    const taskCount = proposals.reduce(
-      (sum, p) => sum + p.features.reduce((fs, f) => fs + f.tasks.length, 0),
-      0,
-    );
-    const featureCount = proposals.reduce((sum, p) => sum + p.features.length, 0);
+    const { features: featureCount, tasks: taskCount } = proposalCounts(proposals);
 
     return h(
       "div",
@@ -319,22 +308,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
       ),
 
       // Summary stats
-      h("div", { class: "smart-add-stats" },
-        h("span", { class: "smart-add-stat" },
-          h("span", { class: "smart-add-stat-count" }, String(proposals.length)),
-          ` epic${proposals.length !== 1 ? "s" : ""}`,
-        ),
-        h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-        h("span", { class: "smart-add-stat" },
-          h("span", { class: "smart-add-stat-count" }, String(featureCount)),
-          ` feature${featureCount !== 1 ? "s" : ""}`,
-        ),
-        h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-        h("span", { class: "smart-add-stat" },
-          h("span", { class: "smart-add-stat-count" }, String(taskCount)),
-          ` task${taskCount !== 1 ? "s" : ""}`,
-        ),
-      ),
+      h(ProposalStats, { epics: proposals.length, features: featureCount, tasks: taskCount }),
 
       // Confidence indicator
       confidence > 0
@@ -568,7 +542,7 @@ export function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
       h("span", { class: "batch-import-item-source" }, item.source),
       !isTextEntry
         ? h("span", { class: "batch-import-item-meta" },
-            h("span", { class: "batch-import-item-size" }, formatSize(size)),
+            h("span", { class: "batch-import-item-size" }, formatByteSize(size)),
             h("span", { class: "batch-import-item-meta-sep" }, "\u00B7"),
             h("span", null, `${lines} line${lines !== 1 ? "s" : ""}`),
             h("span", { class: "batch-import-item-meta-sep" }, "\u00B7"),

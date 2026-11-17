@@ -1,8 +1,10 @@
 import { join } from "node:path";
-import {readFile, writeFile, readdir, mkdir} from "node:fs/promises";import { gunzip } from "node:zlib";
+import { readFile, writeFile, readdir, mkdir } from "node:fs/promises";
+import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { normalizeRunTokens, validateRunRecord } from "../schema/index.js";
 import { redactDeep, toCanonicalJSON } from "../prd/llm-gateway.js";
+import { RUNS_DIRNAME } from "./paths.js";
 import type { RunRecord } from "../schema/index.js";
 
 const gunzipAsync = promisify(gunzip);
@@ -26,7 +28,7 @@ export async function saveRun(
   henchDir: string,
   run: RunRecord,
 ): Promise<void> {
-  const runsDir = join(henchDir, "runs");
+  const runsDir = join(henchDir, RUNS_DIRNAME);
   await mkdir(runsDir, { recursive: true, mode: 0o700 });
   // Always stamp the normalized token tuple so that failed/aborted runs
   // are still joinable back to their PRD item at rollup time. Mutate the
@@ -45,7 +47,7 @@ export async function loadRun(
   henchDir: string,
   id: string,
 ): Promise<RunRecord> {
-  const runsDir = join(henchDir, "runs");
+  const runsDir = join(henchDir, RUNS_DIRNAME);
   const jsonPath = join(runsDir, `${id}.json`);
   const gzPath = join(runsDir, `${id}.json.gz`);
 
@@ -69,7 +71,7 @@ export async function listRuns(
   henchDir: string,
   limit?: number,
 ): Promise<RunRecord[]> {
-  const runsDir = join(henchDir, "runs");
+  const runsDir = join(henchDir, RUNS_DIRNAME);
   let files: string[];
   try {
     files = await readdir(runsDir);

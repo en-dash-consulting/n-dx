@@ -17,43 +17,10 @@
  * @module n-dx/help
  */
 
+// Color detection is cli-brand.js's, so help output and the rest of ndx agree.
+import { bold, cyan, dim, yellow } from "./cli-brand.js";
+
 // ── ANSI color support ──────────────────────────────────────────────────
-
-/**
- * Detect whether the terminal supports color output.
- * Mirrors the logic in @n-dx/llm-client/help-format.
- */
-function supportsColor() {
-  if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
-    return true;
-  }
-  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
-    return false;
-  }
-  if (process.stdout && typeof process.stdout.isTTY === "boolean") {
-    return process.stdout.isTTY;
-  }
-  return false;
-}
-
-let _colorEnabled = null;
-
-function isColorEnabled() {
-  if (_colorEnabled === null) {
-    _colorEnabled = supportsColor();
-  }
-  return _colorEnabled;
-}
-
-function ansi(code, text, reset) {
-  if (!isColorEnabled()) return text;
-  return `\x1b[${code}m${text}\x1b[${reset}m`;
-}
-
-function bold(text) { return ansi("1", text, "22"); }
-function dim(text) { return ansi("2", text, "22"); }
-function cyan(text) { return ansi("36", text, "39"); }
-function yellow(text) { return ansi("33", text, "39"); }
 
 /** Format a command name (cyan). */
 function cmd(text) { return cyan(text); }

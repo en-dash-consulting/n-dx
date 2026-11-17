@@ -32,19 +32,8 @@ import { dominantRouteFeature, routePathOf } from "./route-convention.js";
 import { markBatch } from "./analyze-progress.js";
 import { collectZoneSymbols, dominantSymbolNoun } from "./zone-symbols.js";
 import type { RouteLayout } from "./route-convention.js";
-
-/**
- * kebab-or-snake segment → Title Case. Mirrors zones.ts `deriveZoneName`
- * without importing it (zones → cascade → naming → zones would be a cycle).
- * Exported so the cascade can tell an algorithmic default from a chosen name.
- */
-export function algorithmicZoneName(id: string): string {
-  return id
-    .split("-")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
+import { deriveZoneName } from "./zone-id-derivation.js";
+import { addCallTokens } from "./token-usage.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -109,7 +98,7 @@ const ARCHETYPE_MAJORITY = 0.4;
 const GENERIC_SEGMENTS = new Set(["src", "lib", "app", "packages", "internal", "pkg", "source"]);
 
 function titleCase(segment: string): string {
-  return algorithmicZoneName(segment.toLowerCase().replace(/_/g, "-"));
+  return deriveZoneName(segment.toLowerCase().replace(/_/g, "-"));
 }
 
 /** Directory counts at a given depth, generic prefixes skipped. */
@@ -343,7 +332,7 @@ export function buildNameCandidates(zone: Zone, ctx: NamingContext): NameCandida
     }
     const majority = top(counts);
     if (majority && classified > 0 && majority[1] / classified >= ARCHETYPE_MAJORITY) {
-      const noun = ARCHETYPE_NOUNS[majority[0]] ?? algorithmicZoneName(majority[0]);
+      const noun = ARCHETYPE_NOUNS[majority[0]] ?? deriveZoneName(majority[0]);
       const prefix = dir1 ? titleCase(dir1[0].split("/")[0]) : "";
       const name = prefix && !noun.toLowerCase().startsWith(prefix.toLowerCase()) ? `${prefix} ${noun}` : noun;
       add({ name, source: "archetype", why: `${majority[1]} of ${classified} classified files are ${majority[0]} files.` });
@@ -363,7 +352,7 @@ export function describeZoneFromFacts(zone: Zone, ctx: NamingContext, zonesById:
       if (a) counts.set(a, (counts.get(a) ?? 0) + 1);
     }
     const nouns = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2)
-      .map(([a]) => (ARCHETYPE_NOUNS[a] ?? algorithmicZoneName(a)).toLowerCase());
+      .map(([a]) => (ARCHETYPE_NOUNS[a] ?? deriveZoneName(a)).toLowerCase());
     if (nouns.length > 0) parts[0] += `, mostly ${nouns.join(" and ")}`;
   }
   if (zone.entryPoints.length > 0) {
@@ -507,11 +496,6 @@ export async function proposeZoneNamesFor(zones: Zone[]): Promise<Map<string, st
   return out;
 }
 
-/** Single-zone form, kept for callers that have one zone in hand. */
-export async function proposeZoneNames(zone: Zone): Promise<string[]> {
-  return (await proposeZoneNamesFor([zone])).get(zone.id) ?? [];
-}
-
 // ── Orchestration ────────────────────────────────────────────────────────────
 
 export interface ZoneNamingResult {
@@ -528,12 +512,6 @@ export interface ZoneNamingResult {
   skippedFallback: number;
   /** Zones whose Choice came back none/unsure and that were not skipped — the fallback's input. */
   fallbackZoneIds: string[];
-}
-
-function addUsage(total: TokenUsage, more?: TokenUsage): void {
-  if (!more) return;
-  total.input += more.input;
-  total.output += more.output;
 }
 
 /**
@@ -569,7 +547,7 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
       throw err;
     }
     result.calls++;
-    addUsage(usage, response.tokenUsage);
+    addCallTokens(usage, response.tokenUsage);
 
     for (const [qid, { zone, candidates }] of req.naming) {
       const a = response.answers[qid];
@@ -653,7 +631,7 @@ export async function nameZonesBySelection(zones: Zone[], ctx: NamingContext): P
       throw err;
     }
     result.calls++;
-    addUsage(usage, response.tokenUsage);
+    addCallTokens(usage, response.tokenUsage);
     withNames.forEach((zone, i) => {
       const id = `z${i}`;
       const names = proposed.get(zone.id)!;

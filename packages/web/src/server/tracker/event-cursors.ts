@@ -14,6 +14,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ensureSidecarDir } from "../sidecar/sidecar-dir.js";
 import { worktreeSidecarDir } from "../sidecar/session-registry.js";
+import { isRecord } from "../../shared/index.js";
 
 /**
  * A high-water mark: the newest time read (ms since the epoch) and the keys
@@ -44,7 +45,6 @@ export function trackerCursorsPath(projectDir: string): string {
   return join(worktreeSidecarDir(projectDir), CURSORS_FILE);
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === "string");
 
 function parseCursor(value: unknown): EventCursor | null {
