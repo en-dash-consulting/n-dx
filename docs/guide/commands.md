@@ -125,7 +125,7 @@ ndx init --no-git .              # never create one
 ndx init --no-llm .              # static-only: no model, vendor CLI or network call
 ```
 
-`--no-llm` is for batch initialization: init spawns no vendor CLI (no auth check, no `claude` lookup for MCP registration), skips the update check and never prompts. The vendor is recorded only from `--provider` or existing config, unchecked; the summary says model features were not checked.
+`--no-llm` is for batch initialization: init spawns no vendor CLI (no auth check, no `claude` lookup for MCP registration), skips the update check and never prompts for a provider or model (pass `--git` or `--no-git` too, so a run on a TTY is not asked about git). The vendor is recorded only from `--provider` or existing config, unchecked; the summary says model features were not checked.
 
 Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`, holding an empty v2 PRD; an existing v1 PRD keeps its layout until `ndx migrate`), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
 

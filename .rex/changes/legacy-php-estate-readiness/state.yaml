@@ -8,10 +8,14 @@ items:
     lastModified: "2026-11-17T00:13:25.377Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4e33c0c3-8233-4480-92eb-d1d74a089ed8":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-17T00:25:14.370Z"
-    activeIntervals: [{"start":"2026-11-17T00:25:14.370Z"}]
-    lastModified: "2026-11-17T00:25:15.651Z"
+    completedAt: "2026-11-17T00:39:08.167Z"
+    endedAt: "2026-11-17T00:39:08.167Z"
+    activeIntervals: [{"end":"2026-11-17T00:39:08.167Z","start":"2026-11-17T00:25:14.370Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx init --no-llm: no auth preflight (config --no-preflight), no claude lookup in MCP registration (noVendorCli), no update check, no prompts, static path only; vendor optional; summary line + one skip notice; help, docs, command-effects, changeset; e2e tests with fake vendors and a fetch recorder."
+    lastModified: "2026-11-17T00:39:08.167Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7bb107a8-6831-44c8-9dc8-4a1cc51ffa70":
     status: "completed"
