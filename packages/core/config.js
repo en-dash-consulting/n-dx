@@ -3478,8 +3478,9 @@ async function handleSetProjectSection(
 
   // Vendor auth preflight for llm.vendor. `--soft-preflight` (used by `ndx init`)
   // downgrades a failed preflight from a fatal abort to a warning so the chosen
-  // vendor is still persisted.
-  if (isVendorWrite) {
+  // vendor is still persisted. `--no-preflight` (used by `ndx init --no-llm`)
+  // skips it: the preflight spawns the vendor CLI or calls the vendor's API.
+  if (isVendorWrite && flags["no-preflight"] !== "true") {
     await runLLMVendorPreflight(dir, coerced, configs, flags["soft-preflight"] === "true");
   }
 

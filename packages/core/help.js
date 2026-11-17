@@ -861,6 +861,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--codex-only", description: "Provision only Codex surfaces (equivalent to --no-claude)" },
       { flag: "--assistants=<list>", description: "Comma-separated list of assistants to provision (e.g. --assistants=claude,codex)" },
       { flag: "--mcp-scope=local", description: "Register Claude MCP servers via 'claude mcp add --scope local' instead of the tracked .mcp.json default" },
+      { flag: "--no-llm", description: "Static-only, for batch runs: spawn no vendor CLI and make no model or network call (no auth check, no claude MCP lookup, no update check, no prompts); the vendor is recorded only from --provider or existing config" },
     ],
     examples: [
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
@@ -877,6 +878,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx init --no-codex .", description: "Initialize without Codex integration" },
       { command: "ndx init --assistants=claude .", description: "Initialize with only Claude surfaces" },
       { command: "ndx init --mcp-scope=local .", description: "Register Claude MCP servers via local scope instead of tracked .mcp.json" },
+      { command: "ndx init --no-llm --no-commit .", description: "Initialize with no model, vendor CLI or network call (batch scans)" },
     ],
     related: ["plan", "status", "config"],
   },
