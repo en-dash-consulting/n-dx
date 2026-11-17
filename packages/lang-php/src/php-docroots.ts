@@ -37,14 +37,24 @@ export function primaryDocroot(files: ReadonlySet<string>): string {
 }
 
 /**
- * Every document root, sorted: each directory named as one of
- * {@link PHP_DOCROOT_DIRECTORIES} that holds an `index.php`, at any depth
+ * Whether a directory name is a document root's: one of
+ * {@link PHP_DOCROOT_DIRECTORIES}, Plesk's `httpdocs`, or a prefixed
+ * `htdocs` (`default_htdocs`, `public-htdocs`), as hosting layouts with
+ * several sites name theirs.
+ */
+export function isDocrootName(name: string): boolean {
+  return PHP_DOCROOT_DIRECTORIES.includes(name) || name === "httpdocs" || /^[A-Za-z0-9]+[_-]htdocs$/.test(name);
+}
+
+/**
+ * Every document root, sorted: each directory named as a docroot
+ * ({@link isDocrootName}) that holds an `index.php`, at any depth
  * (one per application directory) and not inside another; else the
  * repository root (`""`) when it holds `index.php`; else none.
  */
 export function phpDocroots(files: Iterable<string>): string[] {
   const named = [...entryDirectories(files)]
-    .filter((dir) => dir !== "" && PHP_DOCROOT_DIRECTORIES.includes(baseOf(dir)))
+    .filter((dir) => dir !== "" && isDocrootName(baseOf(dir)))
     .sort();
   const roots = named.filter((dir) => !named.some((outer) => outer !== dir && isWithin(dir, outer)));
   if (roots.length > 0) return roots;

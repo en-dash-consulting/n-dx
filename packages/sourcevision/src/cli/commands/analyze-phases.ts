@@ -684,9 +684,32 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
     writeFileSync(outPath, toCanonicalJSON(components));
     updateManifestModule(ctx.absDir, "components", "complete");
     info(`  ${bold(String(components.summary.totalComponents))} components, ${bold(String(components.summary.totalRouteModules))} route modules, ${bold(String(components.summary.totalUsageEdges))} usage edges → ${dim(outPath)}`);
+    const docrootLine = describeDocrootRoutes(components.serverRoutes);
+    if (docrootLine) info(docrootLine);
   } catch (err) {
     failPhase(ctx, 5, "components", err);
   }
+}
+
+/**
+ * One line counting the files a pack serves from each document root, from the
+ * routes' `source` (`docroot public`), e.g. `  routes by docroot: public 41,
+ * admin/htdocs 7`; undefined when no route came from a docroot.
+ */
+export function describeDocrootRoutes(groups: readonly { file: string; routes: readonly { source?: string }[] }[]): string | undefined {
+  const files = new Map<string, Set<string>>();
+  for (const group of groups) {
+    for (const route of group.routes) {
+      if (!route.source?.startsWith("docroot ")) continue;
+      const docroot = route.source.slice("docroot ".length);
+      let set = files.get(docroot);
+      if (set === undefined) files.set(docroot, (set = new Set()));
+      set.add(group.file);
+    }
+  }
+  if (files.size === 0) return undefined;
+  const parts = [...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([docroot, set]) => `${docroot} ${set.size}`);
+  return `  routes by docroot (files served): ${parts.join(", ")}`;
 }
 
 // ── Phase 6: Call Graph ──────────────────────────────────────────────

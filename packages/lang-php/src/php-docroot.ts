@@ -132,7 +132,13 @@ export function readDocrootRoutes(files: readonly PackSourceFile[], htaccessText
     routes.set(path, list);
   };
 
-  for (const docroot of phpDocroots(paths)) {
+  const docroots = phpDocroots(paths);
+  if (docroots.length === 0 && files.some((f) => isPage(f.path))) {
+    notices.push(
+      "no document root found (no index.php at the repository root or in a public, web, htdocs, *_htdocs, httpdocs, www or public_html directory); no docroot routes recorded.",
+    );
+  }
+  for (const docroot of docroots) {
     const byDir = new Map<string, Htaccess>();
     for (const [file, text] of [...htaccessText].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
       if (!isWithin(dirOf(file), docroot)) continue;
