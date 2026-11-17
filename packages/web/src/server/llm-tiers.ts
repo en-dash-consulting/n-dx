@@ -40,6 +40,7 @@ export interface TierRow {
  */
 export const TASK_CLASS_LABELS: Record<string, string> = {
   "agent.execute": "ndx work",
+  "agent.review": "agent review",
   "git.commit-message": "commit messages",
   "context.summarize": "summaries",
   "context.distill": "context distillation",
