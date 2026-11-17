@@ -48,8 +48,16 @@ const HEREDOC = /<<<[ \t]*(["']?)([A-Za-z_\x80-￿][\w\x80-￿]*)\1\r?\n/y;
 export function rewriteLegacySyntax(source: string): LegacySyntaxResult | undefined {
   const out = source.split("");
   const rewrites: LegacySyntaxRewrite[] = [];
-  /** Open `{` in code: the index of a brace offset's `{`, or -1 for any other brace. */
+  /**
+   * Open `{` in code: a brace offset's index, or {@link BLOCK}, {@link INTERP}
+   * (a string's `{$…}`) or {@link ACCESS} (`${…}`, `->{…}`, whose result can
+   * itself be offset: `$a->{$b}{0}`).
+   */
   const stack: number[] = [];
+  /** Where each `}` that closed an offset or a dynamic access is: an offset may follow it directly. */
+  const indexable = new Set<number>();
+  /** Strings being read, innermost last; code is read when this is empty or the top is `interp`. */
+  const ctx: Context[] = [];
   const n = source.length;
   let i = 0;
   let line = 1;
@@ -66,6 +74,30 @@ export function rewriteLegacySyntax(source: string): LegacySyntaxResult | undefi
   };
 
   while (i < n) {
+    const top = ctx.at(-1);
+    if (top !== undefined && top.type !== "interp") {
+      // A string or heredoc body: only its `{$…}` segments are code.
+      const c = source[i];
+      if (top.type === "heredoc" && (i === top.bodyStart || source[i - 1] === "\n")) {
+        const close = new RegExp(`[ \\t]*${top.id}(?![\\w\\x80-\\uffff])`, "y");
+        close.lastIndex = i;
+        if (close.test(source)) {
+          ctx.pop();
+          advanceTo(close.lastIndex);
+          continue;
+        }
+      }
+      if (c === "\\") advanceTo(i + 2);
+      else if (top.type === "quoted" && c === top.quote) {
+        ctx.pop();
+        advanceTo(i + 1);
+      } else if (c === "{" && source[i + 1] === "$") {
+        stack.push(INTERP);
+        ctx.push({ type: "interp" });
+        advanceTo(i + 1);
+      } else advanceTo(i + 1);
+      continue;
+    }
     if (!inPhp) {
       const open = source.indexOf("<?", i);
       if (open === -1) break;
@@ -80,7 +112,7 @@ export function rewriteLegacySyntax(source: string): LegacySyntaxResult | undefi
     }
     const c = source[i];
     const next = source[i + 1];
-    if (c === "?" && next === ">") {
+    if (c === "?" && next === ">" && top === undefined) {
       inPhp = false;
       advanceTo(i + 2);
     } else if (c === "#" || (c === "/" && next === "/")) {
@@ -91,10 +123,13 @@ export function rewriteLegacySyntax(source: string): LegacySyntaxResult | undefi
     } else if (c === "/" && next === "*") {
       const end = source.indexOf("*/", i + 2);
       advanceTo(end === -1 ? n : end + 2);
-    } else if (c === "'" || c === '"' || c === "`") {
+    } else if (c === "'") {
       let end = i + 1;
       while (end < n && source[end] !== c) end += source[end] === "\\" ? 2 : 1;
       advanceTo(end + 1);
+    } else if (c === '"' || c === "`") {
+      ctx.push({ type: "quoted", quote: c });
+      advanceTo(i + 1);
     } else if (c === "<" && source.startsWith("<<<", i)) {
       HEREDOC.lastIndex = i;
       const m = HEREDOC.exec(source);
@@ -102,24 +137,33 @@ export function rewriteLegacySyntax(source: string): LegacySyntaxResult | undefi
         advanceTo(i + 3);
         continue;
       }
-      // The closing identifier starts a line (indented from PHP 7.3) and is not followed by a name character.
-      const close = new RegExp(`^[ \\t]*${m[2]}(?![\\w\\x80-\\uffff])`, "m");
-      const rest = source.slice(i + m[0].length);
-      const found = close.exec(rest);
-      advanceTo(found === null ? n : i + m[0].length + found.index + found[0].length);
+      if (m[1] === "'") {
+        // A nowdoc is text throughout.
+        const close = new RegExp(`^[ \\t]*${m[2]}(?![\\w\\x80-\\uffff])`, "m");
+        const rest = source.slice(i + m[0].length);
+        const found = close.exec(rest);
+        advanceTo(found === null ? n : i + m[0].length + found.index + found[0].length);
+      } else {
+        advanceTo(i + m[0].length);
+        ctx.push({ type: "heredoc", id: m[2]!, bodyStart: i });
+      }
     } else if (c === "{") {
       const before = source.slice(Math.max(0, i - 256), i);
-      if (OFFSET_BASE_END.test(before) && !before.endsWith("$")) {
+      const prev = source[i - 1];
+      if (prev === "$" || before.endsWith("->") || before.endsWith("::")) stack.push(ACCESS);
+      else if ((prev === "}" && indexable.has(i - 1)) || isOffsetBase(before)) {
         stack.push(i);
         rewrites.push({ construct: "brace-offset", position: { line, column: i - lineStart } });
-      } else stack.push(-1);
+      } else stack.push(BLOCK);
       advanceTo(i + 1);
     } else if (c === "}") {
       const open = stack.pop();
       if (open !== undefined && open >= 0) {
         out[open] = "[";
         out[i] = "]";
-      }
+        indexable.add(i);
+      } else if (open === ACCESS) indexable.add(i);
+      else if (open === INTERP && top?.type === "interp") ctx.pop();
       advanceTo(i + 1);
     } else if (c === "$" || /[A-Za-z_]/.test(c)) {
       IDENT.lastIndex = c === "$" ? i + 1 : i;
@@ -132,6 +176,24 @@ export function rewriteLegacySyntax(source: string): LegacySyntaxResult | undefi
   const closed = rewrites.filter((r) => out[lineOffset(source, r.position)] === "[");
   if (closed.length === 0) return undefined;
   return { source: out.join(""), rewrites: closed };
+}
+
+/** A string being read: quoted (`"`, `` ` ``), a heredoc body, or a `{$…}` segment of one, which is code. */
+type Context = { type: "quoted"; quote: string } | { type: "heredoc"; id: string; bodyStart: number } | { type: "interp" };
+
+const BLOCK = -1;
+const INTERP = -2;
+const ACCESS = -3;
+
+/** A property declaration ending in its name (`public $name {`, a PHP 8.4 hook), never an offset. */
+const PROPERTY_DECLARATION = /\b(?:public|protected|private|var|readonly|static)\b[^;{}()=]*\$[\w\x80-\uffff]+\s*$/;
+
+/** Whether the code before a `{` ends in what an offset applies to: a variable, `]` or a property, with or without spaces between. */
+function isOffsetBase(before: string): boolean {
+  if (OFFSET_BASE_END.test(before)) return !before.endsWith("$");
+  const trimmed = before.trimEnd();
+  if (trimmed.length === before.length || !/[ \t]$/.test(before)) return false;
+  return OFFSET_BASE_END.test(trimmed) && !PROPERTY_DECLARATION.test(before);
 }
 
 /** The index of a position in `source`. */
