@@ -2881,6 +2881,7 @@ function findIaCFiles(root, limit = 400) {
         walk(full, depth + 1);
         continue;
       }
+      if (!entry.isFile()) continue;
       const ext = extname2(entry.name);
       const path = relative2(root, full).split(sep2).join("/");
       if (ext === ".tf" && terraform.length < limit) terraform.push(path);
