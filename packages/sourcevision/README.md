@@ -49,7 +49,7 @@ sourcevision mcp [dir]         Start MCP server for AI tool integration
 | `--port=N` | Server port for serve (default: 3117) |
 | `--phase=N` | Run only phase N (1=inventory, 2=imports, 3=zones, 4=components) |
 | `--only=MODULE` | Run only named module (inventory, imports, zones, components) |
-| `--fast` | Skip AI zone-name enrichment (use algorithmic names) |
+| `--fast` | Static only: no model or network calls (algorithmic names, no judgment) |
 
 ## Output Files
 

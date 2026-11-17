@@ -111,7 +111,7 @@ Control enrichment with CLI flags:
 
 ```sh
 ndx analyze .              # default: 1-2 enrichment passes
-ndx analyze --fast .       # skip AI enrichment entirely (algorithmic only)
+ndx analyze --fast .       # static only: no model or network calls (algorithmic only)
 ndx analyze --full .       # run all 4 enrichment passes
 ndx analyze --per-zone .   # per-zone enrichment (smaller context per call)
 ```

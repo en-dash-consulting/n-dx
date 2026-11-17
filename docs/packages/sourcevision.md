@@ -17,7 +17,7 @@ SourceVision runs a 4-phase analysis pipeline:
 
 ```sh
 sourcevision analyze .                    # full analysis
-sourcevision analyze --fast .             # skip AI enrichment
+sourcevision analyze --fast .             # static only: no model or network calls
 sourcevision analyze --phase zones .      # run specific phase
 sourcevision serve .                      # interactive browser viewer
 sourcevision validate .                   # validate analysis output

@@ -20,6 +20,7 @@ import {
   detectSubAnalyses,
   setLLMConfig,
   setProjectDir,
+  setStaticOnly,
   getAuthMode,
   getLLMVendor,
 } from "../sourcevision-core.js";
@@ -435,17 +436,22 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     );
   }
 
+  const fastMode = extraArgs.includes("--fast");
+  // --fast is static-only: no judgment route and no model call in any phase,
+  // whatever keys or config exist. One switch in the LLM bridge, not a check
+  // at each call site, so a phase added later cannot forget it.
+  setStaticOnly(fastMode);
   const { svDir, llmConfig } = await initAndLoadLLMConfig(absDir);
   const filter = parsePhaseFilter(extraArgs);
 
   startRunLedger(
-    extraArgs.includes("--fast") ? "fast" : extraArgs.includes("--narrate") ? "narrate" : "generative",
+    fastMode ? "fast" : extraArgs.includes("--narrate") ? "narrate" : "generative",
   );
   const ctx: AnalyzeContext = {
     absDir,
     svDir,
     fullMode: extraArgs.includes("--full"),
-    fastMode: extraArgs.includes("--fast"),
+    fastMode,
     narrate: extraArgs.includes("--narrate"),
     wait: extraArgs.includes("--wait"),
     targetPass: parseTargetPass(extraArgs),

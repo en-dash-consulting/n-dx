@@ -55,7 +55,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     options: [
       { flag: "--phase=<N>", description: "Run only phase N (1–4)" },
       { flag: "--only=<module>", description: "Run only a named module: inventory, imports, zones, components" },
-      { flag: "--fast", description: "Skip AI zone-name enrichment (algorithmic names only)" },
+      { flag: "--fast", description: "Static only: no model or network calls (algorithmic names, no judgment)" },
       { flag: "--narrate", description: "Generative prompts over every zone, even when a TypeSafe key selects the judgment cascade" },
       { flag: "--wait", description: "Narrate escalated zones before returning instead of in a background child (cascade mode)" },
       { flag: "--full", description: "Run all 4 enrichment passes in sequence" },
@@ -66,7 +66,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     examples: [
       { command: "sourcevision analyze", description: "Full analysis of current directory" },
-      { command: "sourcevision analyze --fast .", description: "Skip AI enrichment for speed" },
+      { command: "sourcevision analyze --fast .", description: "Static analysis only: no model or network calls" },
       { command: "sourcevision analyze --phase=1", description: "Run only the inventory phase" },
       { command: "sv analyze --only=zones .", description: "Re-run zone detection only" },
     ],

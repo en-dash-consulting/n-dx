@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-17T00:13:32.994Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7bb107a8-6831-44c8-9dc8-4a1cc51ffa70":
-    lastModified: "2026-11-17T00:12:35.157Z"
+    status: "completed"
+    startedAt: "2026-11-17T00:14:28.098Z"
+    completedAt: "2026-11-17T00:23:58.070Z"
+    endedAt: "2026-11-17T00:23:58.070Z"
+    activeIntervals: [{"end":"2026-11-17T00:23:58.070Z","start":"2026-11-17T00:14:28.098Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Static-only switch in sourcevision's LLM bridge set from --fast (no judgment route, callClaude refused); rex/ps spawns pass logInvocation: false so no claude_commands.log; help/docs updated."
+    lastModified: "2026-11-17T00:23:58.070Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7ffab98a-95f7-4d90-86df-e3aad31a3a3c":
     lastModified: "2026-11-17T00:13:28.030Z"
