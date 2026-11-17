@@ -169,6 +169,10 @@ const SUPERGLOBAL = /^\$_(ENV|SERVER)\s*\[\s*(?:'([^'\\]*)'|"([^"\\$]*)"|([A-Za-
 const SUPERGLOBAL_ANY = /^\$_(ENV|SERVER)\s*\[/;
 const GETENV = /^\\?getenv\s*\(\s*(?:'([^'\\]*)'|"([^"\\$]*)")\s*(?:,[^)]*)?\)$/i;
 const VARIABLE = /^\$([A-Za-z_]\w*)$/;
+/** A constant as written: `API_URL`, `\\API_URL`, a class constant `Gateway::WSDL` or `self::WSDL`. */
+const CONSTANT_NAME = /^\\?(?:[A-Za-z_][\w\\]*::)?[A-Za-z_][A-Za-z0-9_]*$/;
+/** Bare names that are values, not constants. */
+const NOT_CONSTANTS: ReadonlySet<string> = new Set(["true", "false", "null"]);
 /** A leading literal that is only a scheme (`ssl://`, `https://`) names no target. */
 const SCHEME_ONLY = /^[A-Za-z][\w+.-]*:\/\/$/;
 
@@ -347,6 +351,7 @@ class TargetReader {
   constructor(
     private readonly file: PackSourceFile,
     private readonly constant: ConstantLookup,
+    private readonly config: ConfigLookup = () => undefined,
   ) {
     this.assignments = readAssignments(file).map((a) => ({ ...a, scope: scopeAt(file, a.start) }));
   }
@@ -360,7 +365,14 @@ class TargetReader {
     const key = envKey(t);
     if (key !== undefined) return key === "" ? UNKNOWN : { target: key, targetSource: "env" };
     const config = configSubscript(t);
-    if (config && CONFIG_NAMES.has(config.array)) return { target: config.key, targetSource: "config" };
+    if (config && CONFIG_NAMES.has(config.array)) {
+      // A key the repository assigns one computable value resolves to it; otherwise it is named.
+      const value = this.config(config.key);
+      return value !== undefined ? literal(value) : { target: config.key, targetSource: "config" };
+    }
+    // A constant no single literal definition computes (defined twice, from a
+    // value read at run time, or outside the repository): named as written.
+    if (CONSTANT_NAME.test(t) && !NOT_CONSTANTS.has(t.toLowerCase())) return { target: t.replace(/^\\/, ""), targetSource: "config" };
     const variable = VARIABLE.exec(t);
     if (variable) {
       const assigned = this.lastAssignment(variable[1]!, at);
@@ -653,10 +665,10 @@ export const PHP_OUTBOUND_METHODS: readonly string[] = [
 // ── One file ────────────────────────────────────────────────────────────────
 
 /** One file's outbound calls, in document order. */
-export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup): OutboundCallFact[] {
+export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup, config: ConfigLookup = () => undefined): OutboundCallFact[] {
   const captures = file.captures[OUTBOUND_QUERY] ?? [];
   if (captures.length === 0) return [];
-  const targets = new TargetReader(file, constant);
+  const targets = new TargetReader(file, constant, config);
   const facts: OutboundCallFact[] = [];
   const add = (kind: OutboundCallFact["kind"], client: string, target: Target, position: SourcePosition): void => {
     facts.push({ kind, ...target, client, confidence: "certain", position });
@@ -833,12 +845,57 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup)
     .sort((a, b) => (before(a.position, b.position) ? -1 : before(b.position, a.position) ? 1 : 0));
 }
 
+/** Looks a configuration key (`api.url`) up; undefined when no single computable value is assigned. */
+export type ConfigLookup = (key: string) => string | undefined;
+
+/**
+ * Configuration values across the repository: each `$config['a']['b'] =
+ * value` (an array named in {@link CONFIG_NAMES}) whose value is computable
+ * as an include path is, by key (`a.b`). A key assigned two different values
+ * anywhere is not computable, as a constant defined twice is not: which one
+ * a call sees depends on which file ran.
+ */
+export function repositoryConfigValues(files: readonly PackSourceFile[], constant: ConstantLookup): ConfigLookup {
+  const values = new Map<string, Set<string | undefined>>();
+  for (const file of [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))) {
+    const captures = file.captures[OUTBOUND_QUERY] ?? [];
+    const parts = captures.filter((c) => c.name === "out.config_key" || c.name === "out.config_value");
+    const byAssign = new Map<string, { key?: Capture; value?: Capture }>();
+    innermostEach(
+      captures.filter((c) => c.name === "out.config_assign"),
+      parts,
+    ).forEach((owner, i) => {
+      if (!owner) return;
+      const k = `${owner.start.line}:${owner.start.column}`;
+      const entry = byAssign.get(k) ?? {};
+      entry[parts[i]!.name === "out.config_key" ? "key" : "value"] ??= parts[i]!;
+      byAssign.set(k, entry);
+    });
+    for (const { key, value } of byAssign.values()) {
+      if (!key || !value) continue;
+      const config = configSubscript(key.text);
+      if (!config || !CONFIG_NAMES.has(config.array)) continue;
+      const computed = evaluatePath(value.text, file.path, constant);
+      let set = values.get(config.key);
+      if (set === undefined) values.set(config.key, (set = new Set()));
+      set.add(computed !== undefined && isPlainValue(computed) ? computed : undefined);
+    }
+  }
+  return (key) => {
+    const set = values.get(key);
+    if (set === undefined || set.size !== 1) return undefined;
+    const [only] = set;
+    return only === "" ? undefined : only;
+  };
+}
+
 /** Every outbound call of a project, by file. */
 export function readOutbound(files: readonly PackSourceFile[]): FrameworkFacts {
   const constant = repositoryConstants(files);
+  const config = repositoryConfigValues(files, constant);
   const facts = new Map<string, Omit<FileFacts, "path">>();
   for (const file of files) {
-    const calls = readFileOutbound(file, constant);
+    const calls = readFileOutbound(file, constant, config);
     if (calls.length > 0) facts.set(file.path, { outboundCalls: calls });
   }
   return { facts, notices: [] };

@@ -73,3 +73,11 @@
 (augmented_assignment_expression left: (subscript_expression) @out.written)
 (reference_assignment_expression left: (subscript_expression) @out.written)
 (unset_statement (subscript_expression) @out.written)
+
+; Configuration values a target can resolve through: `$config['a']['b'] =
+; value` (@out.config_key the subscript, @out.config_value the value);
+; src/php-outbound.ts keeps those whose array is a configuration name and
+; whose value is computable.
+(assignment_expression
+  left: (subscript_expression) @out.config_key
+  right: (_) @out.config_value) @out.config_assign
