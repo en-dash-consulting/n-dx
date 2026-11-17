@@ -335,6 +335,12 @@ Globs use `**`, `*` and `?`; a trailing `/` means the whole directory, and a nam
 
 A third-party file stays in the inventory, and imports to it still resolve. It is left out of zones (so never a zone entry point), classification and the model escalation pass, primary-language detection, readiness evidence and the call graph (`--include-third-party` maps it). Pack totals in `sdlc-profile.json` `ecosystem.<language>` count it apart, under `thirdParty`. An `outbound.json` call in it is kept, since a copied-in SDK's calls are still the repository's integrations, and marked `thirdParty`.
 
+## Mirrored folders
+
+A folder that is a near-copy of another (a legacy `edit/` kept beside `app/`) would double every count. Inventory finds such pairs from content hashes: identical files with the same name give candidate root pairs, and a pair counts when at least 10 files of one root, and at least half of its files, are identical to the file at the same relative path in the other. That root is the copy (for an exact copy, the smaller, then the later in path order). Each identical file of the copy gets `mirrorOf`, its counterpart's path, and `summary.mirrored` counts them; analyze prints one `[mirror]` line per pair. Files where the copy diverged stay first-party.
+
+A mirror copy is left out of the same phases as third-party code, and its pack totals and outbound calls are dropped, since its source's are already counted. `sourcevision.mirrors` sets a pair (`{ "edit/": "app/" }`) or denies one (`{ "edit/": false }`).
+
 ## Zone Detection
 
 Zones are detected using Louvain community detection on the import graph, then refined through multiple post-processing passes (small zone absorption, satellite merging, large zone splitting). AI enrichment optionally names zones, writes descriptions, and generates per-zone context files.

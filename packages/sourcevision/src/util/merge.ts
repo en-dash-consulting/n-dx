@@ -15,6 +15,7 @@ import type {
   FileRole,
 } from "../schema/index.js";
 import { sortInventory, sortImports } from "./sort.js";
+import { mirrorLabel } from "./paths.js";
 
 /** Merge multiple inventory chunks into one */
 export function mergeInventories(chunks: Inventory[]): Inventory {
@@ -48,7 +49,7 @@ export function computeInventorySummary(files: FileEntry[]): InventorySummary {
   }
 
   const thirdParty = countByReason(files.map((f) => f.thirdParty));
-  const mirrored = countByReason(files.map((f) => (f.mirrorOf === undefined ? undefined : `mirror of ${f.mirrorOf}`)));
+  const mirrored = countByReason(files.map((f) => (f.mirrorOf === undefined ? undefined : mirrorLabel(f.path, f.mirrorOf))));
   return {
     totalFiles: files.length,
     totalLines,

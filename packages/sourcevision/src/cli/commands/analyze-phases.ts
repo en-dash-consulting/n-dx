@@ -218,6 +218,10 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
     );
     const excludedLine = describeExcluded(ctx.inventoryResult.summary);
     if (excludedLine) info(excludedLine);
+    for (const pair of ctx.inventoryResult.mirrors ?? []) {
+      const share = pair.files === 0 ? 0 : Math.round((pair.matched / pair.files) * 100);
+      info(`  [mirror] ${pair.mirror}/ mirrors ${pair.source}/: ${pair.matched} of ${pair.files} files identical (${share}%)${pair.configured ? ", set in sourcevision.mirrors" : ""}; counted once`);
+    }
 
     // Serialize only { files, summary } (strip stats/changedFiles)
     const outPath = join(ctx.svDir, DATA_FILES.inventory);

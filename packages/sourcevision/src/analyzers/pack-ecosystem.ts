@@ -40,7 +40,8 @@ type Fact = PackFrameworkFacts[number];
 
 /**
  * Facts for files the inventory lists, grouped by language: the application's
- * own, and apart from them those of third-party and mirror-copy files.
+ * own, and apart from them those of third-party files. A mirror copy's facts
+ * are its source file's, already counted, so they are dropped.
  */
 function byLanguage(facts: PackFrameworkFacts | undefined, inventory: Inventory): Map<string, { own: Fact[]; outside: Fact[] }> {
   const files = new Map(inventory.files.map((f) => [f.path, f]));
@@ -51,6 +52,7 @@ function byLanguage(facts: PackFrameworkFacts | undefined, inventory: Inventory)
     const language = file.language.toLowerCase();
     let lists = grouped.get(language);
     if (lists === undefined) grouped.set(language, (lists = { own: [], outside: [] }));
+    if (file.mirrorOf !== undefined) continue;
     (isOutsideStructure(file) ? lists.outside : lists.own).push(fact);
   }
   return grouped;

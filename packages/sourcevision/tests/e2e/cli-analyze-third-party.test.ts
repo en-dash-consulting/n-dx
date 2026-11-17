@@ -87,3 +87,38 @@ describe("sv analyze --fast leaves copied-in third-party code out of the map", {
     expect(JSON.stringify(json("sdlc-profile.json"))).not.toContain("js/build/tests");
   });
 });
+
+describe("sv analyze --fast counts a mirrored folder once", { timeout: 120_000 }, () => {
+  let dir: string;
+  let output: string;
+  const json = (file: string) => JSON.parse(readFileSync(join(dir, ".sourcevision", file), "utf-8"));
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "sv-mirror-"));
+    const write = (path: string, content: string) => {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), content);
+    };
+    // app/ is a small JS app; edit/ is its copy with two modules edited.
+    for (let i = 0; i < 12; i++) {
+      const body = `import { m${(i + 1) % 12} } from './m${(i + 1) % 12}.js';\nexport function m${i}() { return ${i}; }\n`;
+      write(`app/src/m${i}.js`, body);
+      write(`edit/src/m${i}.js`, i < 2 ? body.replace(`return ${i}`, `return ${i} + 100`) : body);
+    }
+    const run = spawnSync(process.execPath, [CLI_PATH, "analyze", dir, "--fast"], { encoding: "utf-8", timeout: 90_000 });
+    output = `${run.stdout}${run.stderr}`;
+    expect(run.status, output).toBe(0);
+  });
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("marks the identical copies, logs the pair and keeps them out of zones and classifications", () => {
+    const inventory = json("inventory.json");
+    expect(inventory.summary.mirrored).toEqual({ files: 10, byReason: { "edit/ mirrors app/": 10 } });
+    expect(output).toContain("[mirror] edit/ mirrors app/: 10 of 12 files identical (83%); counted once");
+    const zoned = json("zones.json").zones.flatMap((z: { files: string[] }) => z.files);
+    expect(zoned.filter((p: string) => p.startsWith("edit/")).sort()).toEqual(["edit/src/m0.js", "edit/src/m1.js"]);
+    const classified = json("classifications.json").files.map((f: { path: string }) => f.path);
+    expect(classified.filter((p: string) => p.startsWith("edit/")).sort()).toEqual(["edit/src/m0.js", "edit/src/m1.js"]);
+  });
+});

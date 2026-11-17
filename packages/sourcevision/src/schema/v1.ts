@@ -296,10 +296,11 @@ export interface FileEntry {
    */
   thirdParty?: string;
   /**
-   * The directory this file's directory mirrors: a near-identical copy of
-   * another folder in the same repository, whose identical files are counted
-   * once, in the source. Set only on files whose content matches their
-   * counterpart; the files that differ stay first-party. Absent otherwise.
+   * The identical file this one copies, when its folder is a near-identical
+   * copy of another folder in the same repository (`edit/x.php` →
+   * `app/x.php`): counted once, in the source, and left out of the same
+   * phases as third-party code. Set only on files identical to their
+   * counterpart; the files where the copy diverged stay first-party.
    */
   mirrorOf?: string;
 }
@@ -308,7 +309,7 @@ export interface FileEntry {
 export interface InventoryExcludedSummary {
   /** Files marked third-party. */
   files: number;
-  /** Files per reason, as in {@link FileEntry.thirdParty} or `mirror <dir> of <dir>`. */
+  /** Files per reason: {@link FileEntry.thirdParty}, or `<copy>/ mirrors <source>/`. */
   byReason: Record<string, number>;
 }
 
@@ -1677,9 +1678,10 @@ export interface SdlcLanguageEcosystem {
   legacyConstructs?: SdlcLegacyConstructs;
   dynamicCode?: SdlcDynamicCode;
   /**
-   * The same counts over third-party and mirror-copy files (inventory
-   * `thirdParty`, `mirrorOf`), kept apart so the sections above describe the
-   * application alone. Absent when those files have none.
+   * The same counts over third-party files (inventory `thirdParty`), kept
+   * apart so the sections above describe the application alone. Mirror copies
+   * (`mirrorOf`) are counted once, in their source. Absent when third-party
+   * files have none.
    */
   thirdParty?: { legacyConstructs?: SdlcLegacyConstructs; dynamicCode?: SdlcDynamicCode };
 }

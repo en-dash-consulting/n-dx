@@ -22,6 +22,7 @@ import {
   MINIFIED_RULES,
 } from "./minified.js";
 import { markThirdParty } from "./third-party.js";
+import { markMirrors, type MirrorPair } from "./mirrors.js";
 import {
   csharpConfig,
   javaConfig,
@@ -493,6 +494,8 @@ export interface InventoryResult extends Inventory {
   changedFiles?: Set<string>;
   /** Paths whose role `generated` came from the minified-content rule alone, in inventory order; set only when there are some. */
   minifiedByContent?: string[];
+  /** Mirrored folder pairs found this run (mirrors.ts), for the analyze log; never written. */
+  mirrors?: MirrorPair[];
 }
 
 /**
@@ -663,13 +666,16 @@ export async function analyzeInventory(
       ...(options?.thirdPartyGlobs ?? []).map((glob) => ({ glob, source: "cli" as const })),
     ],
   });
-  for (let i = 0; i < marked.length; i++) {
-    const before = prevMap.get(marked[i].path);
-    if (before && before.thirdParty !== marked[i].thirdParty && !changedFiles.has(marked[i].path)) {
-      changedFiles.add(marked[i].path);
+  // Mirror copies (mirrors.ts) are found from the hashes, over every file.
+  const mirrored = markMirrors(marked, inventoryConfig.mirrors);
+  for (let i = 0; i < mirrored.files.length; i++) {
+    const now = mirrored.files[i];
+    const before = prevMap.get(now.path);
+    if (before && (before.thirdParty !== now.thirdParty || before.mirrorOf !== now.mirrorOf) && !changedFiles.has(now.path)) {
+      changedFiles.add(now.path);
       changed++;
     }
-    files[i] = marked[i];
+    files[i] = now;
   }
 
   // Detect deleted files
@@ -715,6 +721,7 @@ export async function analyzeInventory(
     result.changedFiles = changedFiles;
   }
   if (byContent.length > 0) result.minifiedByContent = byContent.sort();
+  if (mirrored.pairs.length > 0) result.mirrors = mirrored.pairs;
 
   return result;
 }

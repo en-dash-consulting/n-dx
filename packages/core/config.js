@@ -2731,6 +2731,8 @@ Sourcevision settings (.n-dx.json):
   sourcevision.thirdParty  array     Globs of copied-in third-party code, left out of zones,
                                      classification, the call graph and migration totals
                                      ("!glob" denies; edit the file, ndx config cannot set it)
+  sourcevision.mirrors     object    Mirrored folders: {"edit/": "app/"} sets a pair, {"edit/": false}
+                                     denies one (edit the file, ndx config cannot set it)
   sourcevision.zones.pins  object    Override zone assignments: {"file/path.ts": "zone-id"}
   sourcevision.zones.mergeThreshold
                            number    Min zone size for small-zone merge (default: 3)
