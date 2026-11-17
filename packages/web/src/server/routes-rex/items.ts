@@ -1,10 +1,10 @@
 /**
- * Item CRUD routes: add, get, patch, delete, bulk update, merge.
+ * Item CRUD routes: add, get, patch, delete, bulk update, merge, image attachments.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, readJsonObject, errorMessage } from "../response-utils.js";
@@ -16,7 +16,7 @@ import {
   appendLog, API_SETTABLE_STATUSES, loadPRDOr404, broadcastPrdChanged,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
-import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -93,6 +93,11 @@ export function routeItems(
     // POST / DELETE /api/rex/items/:id/links { ref } — link the item to a tracker work item, or unlink it
     if (path === `items/${itemId}/links` && (method === "POST" || method === "DELETE")) {
       return handleItemLink(req, res, ctx, itemId, method === "POST" ? "link" : "unlink", broadcast);
+    }
+
+    // POST /api/rex/items/:id/attachments { images: [{ name, mediaType, data }] } — store images in a change's folder
+    if (path === `items/${itemId}/attachments` && method === "POST") {
+      return handleItemAttach(req, res, ctx, itemId);
     }
 
     // Requirements sub-routes: /api/rex/items/:id/requirements[/:reqId]
@@ -333,6 +338,53 @@ async function handleItemLink(
     broadcast?.({ type: "rex:item-updated", itemId, updates: { links: result.refs }, timestamp: new Date().toISOString() });
   }
   jsonResponse(res, 200, { ok: true, changed: result.changed, refs: result.refs });
+  return true;
+}
+
+/**
+ * Handle POST /api/rex/items/:id/attachments — store images in the folder of
+ * change `itemId` (v2 only). `data` is the image's bytes in base64. Rex checks
+ * each image's type, signature and size and refuses the whole call, writing
+ * nothing, when one fails; that refusal is a 400. The tree is unchanged, so
+ * nothing is broadcast.
+ */
+async function handleItemAttach(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  itemId: string,
+): Promise<boolean> {
+  const body = await readJsonObject(req, res);
+  if (typeof body === "string") {
+    errorResponse(res, 400, body);
+    return true;
+  }
+  const raw = (body as { images?: unknown }).images;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    errorResponse(res, 400, "images must be a non-empty array of { name, mediaType, data }");
+    return true;
+  }
+  const images = [];
+  for (const entry of raw) {
+    const { name, mediaType, data } = (entry ?? {}) as { name?: unknown; mediaType?: unknown; data?: unknown };
+    if (typeof mediaType !== "string" || typeof data !== "string") {
+      errorResponse(res, 400, "Each image needs a mediaType and base64 data");
+      return true;
+    }
+    images.push({ name: typeof name === "string" ? name : "", mediaType, data: Buffer.from(data, "base64") });
+  }
+  try {
+    const written = await attachImages(ctx.rexDir, itemId, images);
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "item_edited",
+      itemId,
+      detail: `Attached ${written.length} image${written.length === 1 ? "" : "s"} (via web)`,
+    });
+    jsonResponse(res, 200, { ok: true, files: written.map((path) => basename(path)) });
+  } catch (err) {
+    errorResponse(res, err instanceof AttachmentError ? 400 : 500, errorMessage(err));
+  }
   return true;
 }
 

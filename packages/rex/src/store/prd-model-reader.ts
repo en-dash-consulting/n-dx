@@ -127,6 +127,11 @@ export interface LoadPrdModelOptions {
    * are not listed.
    */
   folderState?: FolderStateKeys;
+  /**
+   * v2 only: filled with the folder each folder node (every change, and any
+   * other node with children) is stored in, by id. Leaf `.md` nodes have none.
+   */
+  folders?: Map<string, string>;
 }
 
 /**
@@ -242,7 +247,7 @@ export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions 
   }
 
   const warnings: ParseWarning[] = [...header.warnings];
-  const ctx: ReadContext = { warnings, ignoreStamp: readOnly !== undefined, stateRows: options.stateRows, folderState: options.folderState };
+  const ctx: ReadContext = { warnings, ignoreStamp: readOnly !== undefined, stateRows: options.stateRows, folderState: options.folderState, folders: options.folders };
   const tree = v2
     ? {
         product: await readLayer(productDir, "product", ctx),
@@ -319,6 +324,7 @@ interface ReadContext {
   ignoreStamp: boolean;
   stateRows?: Map<string, ItemState>;
   folderState?: FolderStateKeys;
+  folders?: Map<string, string>;
 }
 
 async function readLayer(layerDir: string, layer: Layer, ctx: ReadContext): Promise<RuleNode[]> {
@@ -384,6 +390,7 @@ async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode |
   const node = await readNode(indexPath, basename(dir), folder.state, ctx);
   if (!node) return null;
   folder.claimed.add(node.id);
+  ctx.folders?.set(node.id, dir);
   warnOrphanRows(dir, folder, ctx.warnings);
   const extra = extraTopLevelKeys(folder.state);
   if (extra) ctx.folderState?.nodes.set(node.id, extra);

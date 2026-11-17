@@ -9,6 +9,8 @@ import {
   buildChangeBrief,
   resolveWorkById,
   indexTree,
+  isChangeLayerStore,
+  listAttachments,
 } from "../../prd/rex-gateway.js";
 import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 import {
@@ -21,6 +23,7 @@ import {
   resolveV2Entry,
   V2_HAS_NO_EPICS,
 } from "./work-selection.js";
+import { isAbsolute, relative, sep } from "node:path";
 import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
   TaskBrief,
@@ -431,6 +434,28 @@ function changeBriefSections(
   return sections.map(({ name, text }) => ({ name, text }));
 }
 
+/**
+ * The images attached to the unit `unitId` and to its change, relative to
+ * `projectDir` when one is given and the image sits inside it. Rex lists
+ * them; a store that is not v2 has none.
+ */
+async function unitAttachments(
+  store: PRDStore,
+  tree: V2Tree,
+  unitId: string,
+  projectDir: string | undefined,
+): Promise<string[]> {
+  if (!isChangeLayerStore(store)) return [];
+  const unit = resolveWorkById(tree, unitId);
+  if (!unit) return [];
+  const found = await listAttachments(store.rexDir, [unit.change.id, unitId]);
+  return found.flatMap(({ files }) => files).map((file) => {
+    if (!projectDir) return file;
+    const rel = relative(projectDir, file);
+    return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel.split(sep).join("/") : file;
+  });
+}
+
 /** What the run is for on a v2 tree: a task inside a change, or a task-less change that runs as one task. */
 function workUnitOf(tree: V2Tree, unitId: string): TaskBriefWorkUnit {
   const unit = resolveWorkById(tree, unitId);
@@ -494,6 +519,8 @@ export async function assembleTaskBrief(
     source: tr.sourceItemTitle,
   }));
 
+  const attachments = tree ? await unitAttachments(store, tree, entry.item.id, options?.projectDir) : [];
+
   const brief: TaskBrief = {
     ...(tree
       ? {
@@ -501,6 +528,7 @@ export async function assembleTaskBrief(
           workUnit: workUnitOf(tree, entry.item.id),
         }
       : {}),
+    ...(attachments.length ? { attachments } : {}),
     task: itemToTaskBrief(entry.item),
     parentChain: entry.parents.map(itemToParent),
     siblings: getSiblings(entry, doc),
@@ -616,6 +644,16 @@ function commitTrailersBlock(brief: TaskBrief): string | undefined {
   ].join("\n");
 }
 
+/** The images attached to the change, which no text section can carry. */
+function attachmentsBlock(brief: TaskBrief): string | undefined {
+  if (!brief.attachments?.length) return undefined;
+  return [
+    "## Attached Images",
+    "Images were attached to this change when it was written. Open each one (your file-reading tool shows images) before you start; they are part of what is asked.",
+    ...brief.attachments.map((path) => `- ${path}`),
+  ].join("\n");
+}
+
 /** Session filters (e.g. self-heal tag constraint, --mine assignee constraint). */
 function sessionFiltersBlock(brief: TaskBrief): string | undefined {
   const { tags, assignee } = brief.sessionFilters ?? {};
@@ -641,13 +679,13 @@ function workflowBlock(brief: TaskBrief): string | undefined {
 
 /**
  * The v2 brief: rex's change brief, with hench's own blocks inserted — the
- * commit trailers and session filters right after the task section (rex
+ * attached images, commit trailers and session filters right after the task section (rex
  * never drops it), and workflow.md before the log and the trimmed note.
  * Rex bounded and budgeted every section of its own; workflow is outside that
  * budget, as on v1, because the project's execution rules must always arrive.
  */
 function formatChangeBrief(brief: TaskBrief, changeBrief: readonly TaskBriefChangeSection[]): string {
-  const own = [commitTrailersBlock(brief), sessionFiltersBlock(brief)].filter((b): b is string => b !== undefined);
+  const own = [attachmentsBlock(brief), commitTrailersBlock(brief), sessionFiltersBlock(brief)].filter((b): b is string => b !== undefined);
   const blocks = changeBrief.flatMap((section) => (section.name === "task" ? [section.text, ...own] : [section.text]));
   const workflow = workflowBlock(brief);
   if (workflow) {
