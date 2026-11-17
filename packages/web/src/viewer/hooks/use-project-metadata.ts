@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from "preact/hooks";
+import { getJson } from "../utils/json-requests.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,32 +39,17 @@ export const DEFAULT_CLI_NAME = "n-dx";
 let cachedMeta: ProjectMetadata | null = null;
 let fetchPromise: Promise<ProjectMetadata | null> | null = null;
 
-async function fetchProjectMetadata(): Promise<ProjectMetadata | null> {
-  try {
-    const res = await fetch("/api/project");
-    if (!res.ok) return null;
-    return (await res.json()) as ProjectMetadata;
-  } catch {
-    return null;
-  }
-}
-
 /** Fetch with dedup — concurrent calls share one in-flight request. */
 export function getProjectMetadata(): Promise<ProjectMetadata | null> {
   if (cachedMeta) return Promise.resolve(cachedMeta);
   if (!fetchPromise) {
-    fetchPromise = fetchProjectMetadata().then((m) => {
+    fetchPromise = getJson<ProjectMetadata>("/api/project").then((m) => {
       cachedMeta = m;
       fetchPromise = null;
       return m;
     });
   }
   return fetchPromise;
-}
-
-/** Return the cached value synchronously (may be null if not yet fetched). */
-export function getCachedProjectMetadata(): ProjectMetadata | null {
-  return cachedMeta;
 }
 
 /** Clear the metadata cache (exposed for testing). */

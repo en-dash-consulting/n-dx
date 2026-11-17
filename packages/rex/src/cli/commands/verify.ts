@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { verify } from "../../core/verify.js";
 import { gateRepoTestCommand } from "../../core/test-command-trust.js";

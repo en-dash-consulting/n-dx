@@ -6,7 +6,8 @@
  */
 
 import { readFile } from "node:fs/promises";
-import {join, dirname, extname, resolve} from "node:path";import ts from "typescript";
+import { join, dirname, extname } from "node:path";
+import ts from "typescript";
 import type {
   ImportEdge,
   ImportType,
@@ -26,6 +27,7 @@ import { readManifest } from "./manifest.js";
 import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
 import { type FileFacts, type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
 import { isTerraformSource } from "./terraform-infrastructure.js";
+import { parseJsTsSource } from "./ts-source.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -46,15 +48,7 @@ export interface RawImport {
 }
 
 export function extractImports(sourceText: string, filePath: string): RawImport[] {
-  const ext = extname(filePath);
-  const scriptKind =
-    ext === ".tsx" || ext === ".jsx"
-      ? ts.ScriptKind.TSX
-      : ext === ".ts"
-        ? ts.ScriptKind.TS
-        : ts.ScriptKind.JS;
-
-  const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, false, scriptKind);
+  const sf = parseJsTsSource(filePath, sourceText, false);
   const imports: RawImport[] = [];
 
   function visit(node: ts.Node) {
@@ -230,7 +224,6 @@ interface Resolver {
 
 function createResolver(
   fileSet: Set<string>,
-  targetDir: string,
   tsconfigPaths: Record<string, string[]> | null
 ): Resolver {
   return {
@@ -284,19 +277,8 @@ function probeFile(candidate: string, fileSet: Set<string>): string | null {
     if (fileSet.has(stripped + "/index" + ext)) return stripped + "/index" + ext;
   }
 
-  // Also try extensions on the original (for extensionless specifiers)
-  if (stripped !== candidate) {
-    // Already tried above with stripped
-  } else {
-    // No extension was stripped — try appending extensions directly
-    for (const ext of PROBE_EXTENSIONS) {
-      if (fileSet.has(candidate + ext)) return candidate + ext;
-    }
-    for (const ext of PROBE_EXTENSIONS) {
-      if (fileSet.has(candidate + "/index" + ext)) return candidate + "/index" + ext;
-    }
-  }
-
+  // An extensionless specifier needs no probe of its own: with no `.js`/`.jsx`
+  // stripped, `stripped` is `candidate`, so the loops above already tried it.
   return null;
 }
 
@@ -406,15 +388,6 @@ interface IncrementalState {
 }
 
 /**
- * Build starting edge/external maps from a previous run, carrying forward only
- * the entries for unchanged files. Files in changedFiles are excluded so they
- * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
- * file pruned from the inventory in an earlier run is absent from it without
- * showing up as deleted (#744). An edge target must still exist: an inventoried
- * file, or a directory holding one, since Go edges point at the imported
- * package's directory.
- */
-/**
  * Whether an edge target names something in the inventory: a file, or a
  * directory holding an inventoried Go file, since Go edges, and only Go
  * edges, point at the imported package's directory ("" is the project root:
@@ -432,6 +405,15 @@ function inventoriedTarget(fileSet: ReadonlySet<string>): (to: string) => boolea
   return (to) => fileSet.has(to) || goDirs.has(to);
 }
 
+/**
+ * Build starting edge/external maps from a previous run, carrying forward only
+ * the entries for unchanged files. Files in changedFiles are excluded so they
+ * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
+ * file pruned from the inventory in an earlier run is absent from it without
+ * showing up as deleted (#744). An edge target must still exist: an inventoried
+ * file, or a directory holding one, since Go edges point at the imported
+ * package's directory.
+ */
 function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
@@ -501,7 +483,6 @@ async function reExtractUnchangedExternals(
   }
 }
 
-/** Parse JS/TS files and append edges and external imports to the provided maps. */
 /**
  * Tokenize a JS/TS source file and count occurrences of each identifier-like
  * token. Used to weight import edges by *actual usage* rather than just the
@@ -547,6 +528,7 @@ function importWeight(symbols: readonly string[], counts: Map<string, number>): 
   return Math.max(1, total);
 }
 
+/** Parse JS/TS files and append edges and external imports to the provided maps. */
 async function processJsTsFiles(
   files: Inventory["files"],
   targetDir: string,
@@ -593,17 +575,11 @@ async function processJsTsFiles(
         }
       } else if (!raw.specifier.startsWith(".")) {
         // External package
-        const pkg = extractPackageName(raw.specifier);
-        const existing = externalMap.get(pkg);
-        if (existing) {
-          externalMap.set(pkg, {
-            package: pkg,
-            importedBy: Array.from(new Set([...existing.importedBy, file.path])),
-            symbols: Array.from(new Set([...existing.symbols, ...raw.symbols])),
-          });
-        } else {
-          externalMap.set(pkg, { package: pkg, importedBy: [file.path], symbols: [...raw.symbols] });
-        }
+        mergeExternal(externalMap, {
+          package: extractPackageName(raw.specifier),
+          importedBy: [file.path],
+          symbols: [...raw.symbols],
+        });
       }
       // Unresolved relative imports are silently skipped
     }
@@ -650,17 +626,20 @@ function mergeGraph(
     }
   }
 
-  for (const ext of graph.external) {
-    const existing = externalMap.get(ext.package);
-    if (existing) {
-      externalMap.set(ext.package, {
-        package: ext.package,
-        importedBy: Array.from(new Set([...existing.importedBy, ...ext.importedBy])),
-        symbols: Array.from(new Set([...existing.symbols, ...ext.symbols])),
-      });
-    } else {
-      externalMap.set(ext.package, { ...ext });
-    }
+  for (const ext of graph.external) mergeExternal(externalMap, ext);
+}
+
+/** Add an external package to the map, unioning importers and symbols with an entry already there. */
+function mergeExternal(externalMap: Map<string, ExternalImport>, ext: ExternalImport): void {
+  const existing = externalMap.get(ext.package);
+  if (existing) {
+    externalMap.set(ext.package, {
+      package: ext.package,
+      importedBy: Array.from(new Set([...existing.importedBy, ...ext.importedBy])),
+      symbols: Array.from(new Set([...existing.symbols, ...ext.symbols])),
+    });
+  } else {
+    externalMap.set(ext.package, { ...ext });
   }
 }
 
@@ -741,7 +720,7 @@ export async function analyzeImports(
   const fileSet = new Set(inventory.files.map((f) => f.path));
   const targetExists = inventoriedTarget(fileSet);
   const tsconfigPaths = await readTsconfigPaths(targetDir);
-  const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
+  const resolver = createResolver(fileSet, tsconfigPaths);
 
   const parseableExts = await parseableExtensionsFor(targetDir, options);
 

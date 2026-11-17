@@ -21,14 +21,15 @@
 
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, mkdirSync } from "node:fs";
+import { basename, isAbsolute, join } from "node:path";
+import { isPackageNamed, WEB_PACKAGE_ROOT } from "./build-identity.js";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
-import { AdmissionGate, countProjectExecutions, redactQueueEntry } from "./admission.js";
+import { AdmissionGate, countProjectExecutions, redactQueueEntry, replayedRunFields } from "./admission.js";
 import type { AdmissionLimits, ExecuteRefusal, PublicQueueSnapshot, QueueEntry, StartOutcome } from "./admission.js";
 import {
+  HUB_CONFIG_DEFAULTS,
   hubConfigPath,
   hubPidPath,
   readHubConfig,
@@ -41,10 +42,10 @@ import {
 } from "./registry.js";
 import type { HealedRecord, HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
-import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits, setFrameResponseHeaders } from "./proxy.js";
+import { bareResponse, handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits, setFrameResponseHeaders } from "./proxy.js";
 import { frameKeyUpgradeRefusal, guardFrameKeyRequest, guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
 import { answerOAuthCallback, type CallbackProjects } from "./oauth-callback.js";
-import { CredentialStore } from "../shared/index.js";
+import { CredentialStore, isRecord } from "../shared/index.js";
 import { FrameKeys, parseKeyedPath } from "./frame-keys.js";
 import type { FrameKeyOptions } from "./frame-keys.js";
 import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
@@ -56,8 +57,10 @@ import { proxiedTickPost, TrackerSyncClock } from "./tracker-sync.js";
 import type { TrackerSyncClockOptions } from "./tracker-sync.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
 import { sha256Hex, takeSessionHandover, writeSessionHandover } from "./session-handover.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
-export const DEFAULT_HUB_PORT = 3117;
+/** The port `hub.port` in the per-user config defaults to. */
+export const DEFAULT_HUB_PORT = HUB_CONFIG_DEFAULTS.port;
 const LOOPBACK_HOST = "127.0.0.1";
 
 export interface HubOptions {
@@ -196,25 +199,21 @@ function postExecute(
   timeoutMs: number,
   token: string | null,
 ): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}${path}`, {
+  return fetch(loopbackUrl(port, path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { "X-Ndx-Token": token } : {}),
+      ...tokenHeaders(token),
       ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
     },
     body: JSON.stringify({
       taskId: entry.taskId,
-      ...(entry.options ? { options: entry.options } : {}),
-      ...(entry.mode ? { mode: entry.mode } : {}),
-      ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
-      ...(entry.saveRun ? { saveRun: entry.saveRun } : {}),
+      ...replayedRunFields(entry),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
 }
 
-/** A response's JSON body when it is an object; null for anything else. */
 /** The registered projects, as the OAuth callback page reads them. */
 function callbackProjects(hub: Hub): CallbackProjects {
   return {
@@ -226,19 +225,16 @@ function callbackProjects(hub: Hub): CallbackProjects {
   };
 }
 
+/** A response's JSON body when it is an object; null for anything else. */
 async function readJsonObject(res: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await res.json();
-    return body !== null && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null;
+    return isRecord(body) ? body : null;
   } catch {
     return null; // not JSON: the caller falls back to the status alone
   }
 }
 
-/**
- * Hub state and operations, independent of HTTP so the routes stay thin and
- * the lifecycle is testable without a socket.
- */
 /**
  * The binary every project server is spawned from.
  *
@@ -262,19 +258,6 @@ export function resolveSelfBin(explicit: string | undefined): string {
   return "";
 }
 
-/** `@n-dx/web`'s own root: this module sits at `<pkg>/src/hub/` or `<pkg>/dist/hub/`. */
-const WEB_PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-
-/** Whether `dir` is the `@n-dx/core` package, by its own package.json. */
-function isNdxCorePackage(dir: string): boolean {
-  try {
-    const pkg: unknown = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
-    return !!pkg && typeof pkg === "object" && (pkg as { name?: unknown }).name === "@n-dx/core";
-  } catch {
-    return false;
-  }
-}
-
 /**
  * The n-dx CLI the hub asks about extensions: the one it was given, or else
  * `@n-dx/core`'s `cli.js` found beside this `@n-dx/web` — its sibling in a
@@ -288,11 +271,15 @@ export function resolveNdxCli(explicit: string | null | undefined, webRoot: stri
   if (explicit) return explicit;
   for (const coreDir of [join(webRoot, "..", "core"), join(webRoot, "..", "..", "..")]) {
     const cli = join(coreDir, "cli.js");
-    if (existsSync(cli) && isNdxCorePackage(coreDir)) return cli;
+    if (existsSync(cli) && isPackageNamed(coreDir, "@n-dx/core")) return cli;
   }
   return "";
 }
 
+/**
+ * Hub state and operations, independent of HTTP so the routes stay thin and
+ * the lifecycle is testable without a socket.
+ */
 export class Hub {
   readonly hubHome: string;
   readonly registryPath: string;
@@ -595,15 +582,19 @@ export class Hub {
     this.persist();
   }
 
+  /** A supervisor's record joined with its live status, as every project-returning method answers it. */
+  private view(sup: ProjectSupervisor): ProjectView {
+    return { ...sup.record, ndxBin: this.selfBin, status: sup.status() };
+  }
+
   listProjects(): ProjectView[] {
-    return Array.from(this.supervisors.values())
-      .map((sup) => ({ ...sup.record, ndxBin: this.selfBin, status: sup.status() }))
+    return Array.from(this.supervisors.values(), (sup) => this.view(sup))
       .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   }
 
   getProject(id: string): ProjectView | null {
     const sup = this.supervisors.get(id);
-    return sup ? { ...sup.record, ndxBin: this.selfBin, status: sup.status() } : null;
+    return sup ? this.view(sup) : null;
   }
 
   /**
@@ -640,7 +631,7 @@ export class Hub {
       await sup.start();
       this.persist();
     }
-    return { created, project: { ...sup.record, ndxBin: this.selfBin, status: sup.status() } };
+    return { created, project: this.view(sup) };
   }
 
   /** How many projects are registered. */
@@ -679,7 +670,7 @@ export class Hub {
       worktreeKnown,
       projectRemoved: false,
       remaining,
-      project: { ...sup.record, ndxBin: this.selfBin, status: sup.status() },
+      project: this.view(sup),
       hubExiting: false,
     };
   }
@@ -725,6 +716,18 @@ export class Hub {
   }
 }
 
+/**
+ * Answer a request whose handler threw. A throw left to propagate is an
+ * unhandled rejection, which ends the hub and every project server it
+ * supervises, so it is logged and answered 500 instead — as far as the
+ * response is not already under way.
+ */
+function answerInternalError(res: ServerResponse, err: unknown): void {
+  console.error("[hub] request failed:", err);
+  if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
+}
+
 /** Start the hub: adopt registered servers, listen, health-check. */
 export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   const requestedPort = options.port ?? DEFAULT_HUB_PORT;
@@ -766,11 +769,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       // No credential: only what is public — the home page shell and proxied
       // requests the project server answers with its own public shell or a 401.
       if (isPublicOnlyHubRequest(req)) {
-        void handlePublicHubRequest(req, res, hub).catch((err: unknown) => {
-          console.error("[hub] request failed:", err);
-          if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-          if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
-        });
+        void handlePublicHubRequest(req, res, hub).catch((err: unknown) => answerInternalError(res, err));
         return;
       }
     }
@@ -780,15 +779,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
         // /p/<id>/… explicitly, or the root alias when one project is registered.
         if (!handled) void handleProxyRequest(req, res, hub);
       })
-      .catch((err: unknown) => {
-        // A throw here is an unhandled rejection, which ends the hub and every
-        // project server it supervises. Answer 500 instead.
-        console.error("[hub] request failed:", err);
-        if (!res.headersSent) {
-          res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-        }
-        if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
-      });
+      .catch((err: unknown) => answerInternalError(res, err));
   });
   server.on("upgrade", (req, socket, head) => {
     // Each refusal keeps its own status line, as on the HTTP path and on the
@@ -799,7 +790,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       ? frameKeyUpgradeRefusal(req, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))
       : upgradeRefusal(req, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url));
     if (refusal !== null) {
-      socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+      socket.write(bareResponse(refusal));
       socket.destroy();
       return;
     }

@@ -18,6 +18,7 @@ import { closeSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, rmS
 import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import { CLIError } from "../errors.js";
+import { pidAlive } from "../../util/pid.js";
 
 /** What a lock file records. */
 export interface PackLockHolder {
@@ -36,16 +37,6 @@ const codeOf = (error: unknown): string | undefined => (error as NodeJS.ErrnoExc
 
 /** `<pack dir>.lock`. */
 export const packLockPath = (packDir: string): string => `${packDir}.lock`;
-
-/** `kill(pid, 0)`; EPERM means the process exists but is not ours to signal. */
-export function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return codeOf(error) === "EPERM";
-  }
-}
 
 function decode(content: string): PackLockHolder | null {
   let parsed: Partial<PackLockHolder>;

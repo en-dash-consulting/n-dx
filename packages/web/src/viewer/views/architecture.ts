@@ -7,6 +7,7 @@ import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { effectiveEnrichmentPass } from "../enrichment-pass.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { StatCard } from "./stat-card.js";
 
 interface ArchitectureProps {
   data: LoadedData;
@@ -89,23 +90,14 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
 
     // Summary stats
     h("div", { class: "stat-grid" },
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(patterns.length)),
-        h("div", { class: "label" }, "Patterns")
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(relationships.length)),
-        h("div", { class: "label" }, "Relationships")
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(crossingCount)),
-        h("div", { class: "label" }, "Cross-Zone Imports")
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: `value${biDirectional > 0 ? " text-orange" : ""}` },
-          String(biDirectional)),
-        h("div", { class: "label" }, "Bidirectional Couplings")
-      ),
+      h(StatCard, { value: String(patterns.length), label: "Patterns" }),
+      h(StatCard, { value: String(relationships.length), label: "Relationships" }),
+      h(StatCard, { value: String(crossingCount), label: "Cross-Zone Imports" }),
+      h(StatCard, {
+        value: String(biDirectional),
+        label: "Bidirectional Couplings",
+        valueClass: biDirectional > 0 ? "text-orange" : undefined,
+      }),
     ),
 
     // Zone health bar chart

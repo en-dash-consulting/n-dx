@@ -9,7 +9,8 @@
 import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useMemo, useRef, useEffect } from "preact/hooks";
-import type { PRDItemData, Priority } from "./types.js";
+import type { PRDItemData } from "./types.js";
+import { OPTIONAL_PRIORITY_OPTIONS } from "./status-display.js";
 import { type ItemType, childTypeOf, isRootType, isValidParentType, itemTypeLabel, itemTypeOf, parentTypesOf } from "../../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -43,14 +44,6 @@ export interface AddItemInput {
  */
 const TYPE_OPTIONS: Array<{ value: ItemType; label: string }> =
   (["epic", "feature", "task", "subtask"] as const).map((value) => ({ value, label: itemTypeLabel(value) }));
-
-const PRIORITY_OPTIONS: Array<{ value: Priority | ""; label: string }> = [
-  { value: "", label: "None" },
-  { value: "critical", label: "Critical" },
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-];
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -305,7 +298,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         value: priority,
         onChange: (e: Event) => setPriority((e.target as HTMLSelectElement).value),
       },
-        PRIORITY_OPTIONS.map((opt) =>
+        OPTIONAL_PRIORITY_OPTIONS.map((opt) =>
           h("option", { key: opt.value, value: opt.value }, opt.label),
         ),
       ),

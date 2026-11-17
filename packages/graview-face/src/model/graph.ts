@@ -129,24 +129,26 @@ export function byChoice<N>(order: readonly string[], of: (n: N) => string | und
   };
 }
 
+/** Status values n-dx says in other words; any other is said with its underscores and hyphens as spaces. */
+const STATUS_WORDS: Readonly<Record<string, string>> = {
+  in_progress: "in progress",
+  budget_exceeded: "over budget",
+  error_transient: "transient error",
+  pending: "pending",
+  completed: "done",
+  met: "met",
+  proposed: "proposed",
+  changing: "changing",
+  revised: "revised",
+  retired: "retired",
+  defective: "defective",
+  ok: "ok",
+};
+
 /** A status word in n-dx's voice. */
 export function said(status: unknown): string {
-  const words: Record<string, string> = {
-    in_progress: "in progress",
-    budget_exceeded: "over budget",
-    error_transient: "transient error",
-    pending: "pending",
-    completed: "done",
-    met: "met",
-    proposed: "proposed",
-    changing: "changing",
-    revised: "revised",
-    retired: "retired",
-    defective: "defective",
-    ok: "ok",
-  };
   const key = String(status ?? "");
-  return words[key] ?? key.replace(/[_-]+/g, " ");
+  return STATUS_WORDS[key] ?? key.replace(/[_-]+/g, " ");
 }
 
 export type Tone = "good" | "warn" | "bad" | "accent" | "neutral";

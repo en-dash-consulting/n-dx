@@ -28,6 +28,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import ts from "typescript";
 import type { Imports, Zone } from "../schema/index.js";
+import { parseJsTsSource } from "./ts-source.js";
 
 /** Exported symbol names carried per zone; enough to see a vocabulary. */
 export const MAX_EXPORTED_SYMBOLS = 30;
@@ -102,13 +103,7 @@ export function extractTopLevelDeclarations(sourceText: string, filePath: string
   const ext = extname(filePath);
   if (!JS_TS_EXTENSIONS.has(ext)) return extractDeclarationsByPattern(sourceText);
 
-  const scriptKind =
-    ext === ".tsx" || ext === ".jsx"
-      ? ts.ScriptKind.TSX
-      : ext === ".ts"
-        ? ts.ScriptKind.TS
-        : ts.ScriptKind.JS;
-  const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, scriptKind);
+  const sf = parseJsTsSource(filePath, sourceText);
   const out: Declaration[] = [];
 
   const lineOf = (node: ts.Node): number => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;

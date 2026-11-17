@@ -7,8 +7,9 @@
  * @module cli/commands/reshape-detect-duplicates
  */
 
-import { similarity } from "../../analyze/dedupe.js";
-import {walkTree} from "../../core/tree.js";import { comparePRDFileAge } from "./smart-add-duplicates.js";
+import { clusterTransitively, similarity } from "../../analyze/dedupe.js";
+import { walkTree } from "../../core/tree.js";
+import { comparePRDFileAge } from "./smart-add-duplicates.js";
 import type { ReshapeProposal, MergeAction } from "../../core/reshape.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
 import type { ItemFileMap } from "./smart-add-duplicates.js";
@@ -56,45 +57,14 @@ function findDuplicatePairsInCohort(
 ): Array<{ survivor: PRDItem; loser: PRDItem }> {
   const pairs: Array<{ survivor: PRDItem; loser: PRDItem }> = [];
 
-  // Build union-find structure to detect transitive duplicates
-  const n = items.length;
-  const parent = Array.from({ length: n }, (_, i) => i);
-
-  function find(i: number): number {
-    while (parent[i] !== i) {
-      parent[i] = parent[parent[i]]; // path compression
-      i = parent[i];
-    }
-    return i;
-  }
-
-  function union(i: number, j: number): void {
-    const ri = find(i);
-    const rj = find(j);
-    if (ri !== rj) parent[ri] = rj;
-  }
-
-  // Compare all pairs within this cohort
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const score = scorePairForDuplication(items[i], items[j]);
-      if (score >= DUPLICATE_THRESHOLD) {
-        union(i, j);
-      }
-    }
-  }
-
-  // Collect clusters
-  const clusters = new Map<number, PRDItem[]>();
-  for (let i = 0; i < n; i++) {
-    const root = find(i);
-    const cluster = clusters.get(root) ?? [];
-    cluster.push(items[i]);
-    clusters.set(root, cluster);
-  }
+  // Compare all pairs within this cohort; clustering catches transitive duplicates
+  const clusters = clusterTransitively(
+    items,
+    (a, b) => scorePairForDuplication(a, b) >= DUPLICATE_THRESHOLD,
+  );
 
   // For each cluster > 1 item, pick newest file's item as survivor
-  for (const [, cluster] of clusters) {
+  for (const cluster of clusters) {
     if (cluster.length < 2) continue;
 
     // Sort by file age (oldest first, so newest is last)

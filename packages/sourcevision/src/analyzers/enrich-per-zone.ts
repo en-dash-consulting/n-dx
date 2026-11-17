@@ -21,14 +21,13 @@ import type {
 import {
   MAX_CONCURRENT_ZONES,
   PER_ZONE_MAX_FILES,
-  PER_ZONE_MAX_CROSSINGS,
   getPassConfig,
   computePerZoneAttemptConfigs,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
-import { emptyAnalyzeTokenUsage } from "./token-usage.js";
+import { addCallTokens, addCallUsage, emptyAnalyzeTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import { markPass, markBatch } from "./analyze-progress.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
@@ -63,11 +62,6 @@ interface SingleZoneResult {
   success: boolean;
 }
 
-/**
- * Enrich a single zone with the active LLM vendor.
- * Sends only this zone's files + entry points + boundary crossings.
- * Includes 1-line summaries of other zones for context.
- */
 /** Everything the two per-zone prompts read, already rendered. */
 interface SingleZonePromptContext {
   zone: Zone;
@@ -182,11 +176,15 @@ export function buildSingleZoneLaterPassEnvelope(
   ]);
 }
 
+/**
+ * Enrich a single zone with the active LLM vendor.
+ * Sends only this zone's files + entry points + boundary crossings.
+ * Includes 1-line summaries of other zones for context.
+ */
 async function enrichSingleZone(
   zone: Zone,
   allZones: Zone[],
   crossings: ZoneCrossing[],
-  inventory: Inventory,
   passNumber: number,
   passConfig: PassConfig,
   previousZone?: Zone,
@@ -272,10 +270,7 @@ async function enrichSingleZone(
         ? await callClaude(prompt, undefined, { taskClass: "zone.enrich-scan" })
         : await callClaude(prompt, undefined, { taskClass: "zone.enrich-deep" });
       zoneTokenUsage.calls++;
-      if (callResult.tokenUsage) {
-        zoneTokenUsage.input += callResult.tokenUsage.input;
-        zoneTokenUsage.output += callResult.tokenUsage.output;
-      }
+      addCallTokens(zoneTokenUsage, callResult.tokenUsage);
       callText = callResult.text;
     } catch (err) {
       if (err instanceof ClaudeClientError) {
@@ -357,7 +352,6 @@ export async function enrichZonesPerZone(
 ): Promise<PerZoneEnrichResult> {
   const prevEnrichPass = previousZones?.enrichmentPass ?? 0;
   const passNumber = prevEnrichPass + 1;
-  const isFirstPass = passNumber === 1;
   const passConfig = getPassConfig(passNumber, (previousZones?.findings ?? []).length);
 
   const empty: PerZoneEnrichResult = {
@@ -431,7 +425,7 @@ export async function enrichZonesPerZone(
       batchResults = await Promise.all(
         batch.map((zone) => {
           const prevZone = findPrevZone(previousZones?.zones, zone);
-          return enrichSingleZone(zone, zones, crossings, inventory, passNumber, passConfig, prevZone, fileArchetypes, hints);
+          return enrichSingleZone(zone, zones, crossings, passNumber, passConfig, prevZone, fileArchetypes, hints);
         })
       );
     } finally {
@@ -456,10 +450,7 @@ export async function enrichZonesPerZone(
     newZoneInsights.set(result.zone.id, result.newInsights);
     allNewFindings.push(...result.newFindings);
 
-    // Accumulate token usage
-    totalTokenUsage.calls += result.tokenUsage.calls;
-    totalTokenUsage.inputTokens += result.tokenUsage.input;
-    totalTokenUsage.outputTokens += result.tokenUsage.output;
+    addCallUsage(totalTokenUsage, result.tokenUsage.calls, result.tokenUsage);
   }
 
   // Combine enriched + unchanged zones

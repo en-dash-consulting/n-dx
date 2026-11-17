@@ -36,8 +36,6 @@
 import { isDebug, debug } from "@n-dx/llm-client";
 import { startStopwatch, stopStopwatch } from "./debug-stopwatch.js";
 
-export { isDebug };
-
 /** Gaps at or above this are almost certainly a real stall, not scheduling noise. */
 const GAP_WARN_THRESHOLD_MS = 250;
 

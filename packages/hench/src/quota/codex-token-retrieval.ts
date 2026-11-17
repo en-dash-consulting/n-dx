@@ -15,6 +15,7 @@
  */
 
 import type { TokenUsage } from "../schema/index.js";
+import { MISSING_CODEX_KEY_MESSAGE, OPENAI_DEFAULT_ENDPOINT, toISODate } from "./openai-billing.js";
 
 // ── Error types ──────────────────────────────────────────────────────────────
 
@@ -115,7 +116,6 @@ interface UsageListResponse {
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-const DEFAULT_ENDPOINT = "https://api.openai.com";
 const DEFAULT_TIMEOUT_MS = 5000;
 
 function classifyStatus(status: number): TokenRetrievalErrorKind {
@@ -267,12 +267,12 @@ export async function fetchCodexTokenUsage(
       ok: false,
       error: {
         kind: "auth",
-        message: "No Codex API key available: export OPENAI_API_KEY or store one with 'ndx config credentials.codex' (storing it does not switch modes; 'ndx config llm.codex.auth api' does)",
+        message: MISSING_CODEX_KEY_MESSAGE,
       },
     };
   }
 
-  const base = (options.apiEndpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
+  const base = (options.apiEndpoint ?? OPENAI_DEFAULT_ENDPOINT).replace(/\/+$/, "");
   const fetchFn = options.fetchFn ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
@@ -351,12 +351,4 @@ export async function fetchCodexTokenUsage(
       output: completionTokens,
     },
   };
-}
-
-/** Return an ISO date string (YYYY-MM-DD) for the given Date object. */
-function toISODate(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }

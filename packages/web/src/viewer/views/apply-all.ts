@@ -20,6 +20,7 @@ import { useState } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
 import type { AppliedAmendment } from "./product-model.js";
 import { displayTitle } from "../components/index.js";
+import { errorMessage, plural } from "../utils/format.js";
 
 interface WaitingRef { id: string; displayId?: string; title: string; summary?: string }
 
@@ -52,11 +53,9 @@ async function post<T>(path: string, body?: unknown): Promise<{ ok: true; data: 
     if (res.ok) return { ok: true, data: json as T };
     return { ok: false, message: typeof json?.error === "string" ? json.error : `HTTP ${res.status}` };
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    return { ok: false, message: errorMessage(err) };
   }
 }
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Why a change refused as moved was skipped. Results come back in apply order,

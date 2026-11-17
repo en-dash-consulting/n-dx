@@ -186,9 +186,6 @@ export interface ReshapeReasonResult {
   tokenUsage: AnalyzeTokenUsage;
 }
 
-/**
- * Use LLM to analyze the PRD and propose reshape actions.
- */
 /** Which of the three reshape briefs a call is asking for. */
 export type ReshapeMode = "reshape" | "prune" | "consolidate";
 
@@ -240,6 +237,9 @@ export function buildReshapePrompt(
   });
 }
 
+/**
+ * Use LLM to analyze the PRD and propose reshape actions.
+ */
 export async function reasonForReshape(
   items: PRDItem[],
   options: ReshapeReasonOptions = {},
@@ -442,13 +442,6 @@ export function validateMergedDescription(text: string): string {
 }
 
 /**
- * Use LLM to generate a merged description for a group of hash-suffix duplicate items.
- * Returns a generic description that covers the combined scope of all items.
- *
- * Mechanical single-shot call: when no explicit model is given, routes to the
- * vendor's light-tier model (e.g. haiku) instead of the standard tier.
- */
-/**
  * Prompt merging several duplicate items' descriptions into one.
  *
  * Extracted from {@link reasonForBodyMerge}. Like the reshape prompt above,
@@ -482,12 +475,17 @@ export function buildBodyMergePrompt(group: PRDItem[]): string {
   return rexPrompt(buildBodyMergeEnvelope(group), { separator: "\n" });
 }
 
+/**
+ * Use LLM to generate a merged description for a group of hash-suffix duplicate items.
+ * Returns a generic description that covers the combined scope of all items.
+ *
+ * Mechanical single-shot call: when no explicit model is given, routes to the
+ * vendor's light-tier model (e.g. haiku) instead of the standard tier.
+ */
 export async function reasonForBodyMerge(
   group: PRDItem[],
   model?: string,
 ): Promise<BodyMergeResult> {
-  const tokenUsage = emptyAnalyzeTokenUsage();
-
   const envelope = buildBodyMergeEnvelope(group);
   logRexPromptSections("reasonForBodyMerge", envelope);
 

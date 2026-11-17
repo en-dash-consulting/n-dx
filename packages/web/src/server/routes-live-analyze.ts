@@ -45,6 +45,7 @@ import { svAnalyzeRunOf, type SvAnalyzeRunSnapshot } from "./routes-commands.js"
 import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { estimateCostFromTotals } from "./rex-gateway.js";
 import type { LiveSources, LiveWorktree } from "./routes-live.js";
+import { isRecord } from "../shared/index.js";
 
 /** Lines of stdout the page shows. */
 export const LIVE_ANALYZE_OUTPUT_LINES = 200;
@@ -136,7 +137,7 @@ function readJsonObject(path: string): Record<string, unknown> | null {
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+    return isRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -151,7 +152,7 @@ function num(value: unknown): number {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return isRecord(value) ? value : {};
 }
 
 function modulesOf(manifest: Record<string, unknown> | null): LiveAnalyzeModule[] {

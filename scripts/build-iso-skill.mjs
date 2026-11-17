@@ -16,10 +16,11 @@
  * that depends on it directly.
  */
 
-import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { invokedDirectly } from "./lib/invoked-directly.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ENTRY = join(ROOT, "packages/sourcevision/src/export/iso-standalone.ts");
@@ -122,30 +123,7 @@ async function main() {
   process.stdout.write(`iso-skill: wrote ${OUT} (${generated.length} bytes)\n`);
 }
 
-/**
- * Was this file executed directly, rather than imported?
- *
- * Compares resolved real paths rather than URL strings. The obvious form,
- * `import.meta.url === \`file://${process.argv[1]}\``, is wrong three ways:
- * on Windows `import.meta.url` is `file:///C:/...` while the concatenation
- * yields `file://C:\\...`; on POSIX a space or non-ASCII character is
- * percent-encoded on one side only; and Node resolves symlinks for
- * `import.meta.url` but not for `argv[1]`, so any symlinked path mismatches.
- *
- * Each failure is silent — the script exits 0 having done nothing, while
- * CLAUDE.md, the generated banner and the drift test's failure message all
- * tell you to run it.
- */
-function invokedDirectly() {
-  if (!process.argv[1]) return false;
-  try {
-    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
-  } catch {
-    return false; // argv[1] is not a resolvable path (e.g. an eval context)
-  }
-}
-
-if (invokedDirectly()) {
+if (invokedDirectly(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`iso-skill: ${err.message}\n`);
     process.exit(1);

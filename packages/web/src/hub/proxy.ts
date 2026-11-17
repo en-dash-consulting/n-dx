@@ -82,19 +82,21 @@ import {
   authRequiredPage,
   wantsHtml,
   injectSessionScript,
-  AUTH_HINT,
+  authRequiredBody,
+  BEARER_CHALLENGE,
   TICKET_QUERY_PARAM,
   removeTokenParam,
   tokensEqual,
+  isRecord,
 } from "../shared/index.js";
 import type { RunMode, RunOptions, CredentialStore } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
+import { replayedRunFields } from "./admission.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
-import { homedir } from "node:os";
 import { HOME_EXTENSIONS_WAIT_MS, renderHomePage } from "./home.js";
 import { buildExtensionsAnswer } from "./extensions.js";
 import type { ExtensionView } from "./extensions.js";
-import { defaultParentDir } from "./new-project.js";
+import { suggestedParentDir } from "./new-project.js";
 import { hubRoutePath } from "./request-guard.js";
 import { SidecarManager } from "./sidecars.js";
 import { HUB_SESSION_FEATURE, probeHubLens } from "./session-host.js";
@@ -132,6 +134,15 @@ export const SIDECAR_BASE_PATH_HEADER = "x-ndx-base-path";
 export const FRAME_CSP = "sandbox allow-scripts allow-forms allow-popups allow-downloads";
 /** Headers a frame-keyed response carries; the key in the URL must not leave in a Referer. */
 const FRAME_RESPONSE_HEADERS = { "Content-Security-Policy": FRAME_CSP, "Referrer-Policy": "no-referrer" } as const;
+
+/**
+ * A whole HTTP response with no body, written straight to a socket — how an
+ * upgrade is refused, since there is no `ServerResponse` to answer it with.
+ * `statusLine` is the code and reason, `"403 Forbidden"`.
+ */
+export function bareResponse(statusLine: string): string {
+  return `HTTP/1.1 ${statusLine}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`;
+}
 
 /** Put {@link FRAME_RESPONSE_HEADERS} on a keyed response before anything answers it, refusals included. */
 export function setFrameResponseHeaders(res: ServerResponse): void {
@@ -215,9 +226,7 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
     if (!project) {
       return { kind: "json", status: 404, body: { error: `No project registered as "${id}"`, projects: projectIds(hub) } };
     }
-    if (project.port === null) {
-      return { kind: "json", status: 503, body: { error: `Project "${id}" has no running server`, status: project.status } };
-    }
+    if (project.port === null) return { kind: "json", status: 503, body: noRunningServer(project) };
     return { kind: "proxy", project, path: stripBasePath(prefix, pathname) + query, prefix };
   }
 
@@ -244,9 +253,7 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
   const projects = hub.listProjects();
   if (projects.length === 1) {
     const project = projects[0];
-    if (project.port === null) {
-      return { kind: "json", status: 503, body: { error: `Project "${project.id}" has no running server`, status: project.status } };
-    }
+    if (project.port === null) return { kind: "json", status: 503, body: noRunningServer(project) };
     return { kind: "proxy", project, path: url, prefix: "" };
   }
 
@@ -281,6 +288,11 @@ function withoutTokenParam(query: string): string {
 
 function projectIds(hub: Hub): string[] {
   return hub.listProjects().map((p) => p.id);
+}
+
+/** The 503 body for a registered project whose server is not running. */
+function noRunningServer(project: ProjectView): { error: string; status: ProjectView["status"] } {
+  return { error: `Project "${project.id}" has no running server`, status: project.status };
 }
 
 /**
@@ -394,7 +406,7 @@ async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub
     return true;
   }
   if (project.port === null) {
-    writeJson(res, 503, { error: `Project "${project.id}" has no running server`, status: project.status });
+    writeJson(res, 503, noRunningServer(project));
     return true;
   }
   proxyHttp(req, res, project.port, RELOAD_PATH, "", body, upstreamAuth(hub));
@@ -503,14 +515,13 @@ export function proxyHttp(
   // Only the hub states its admission state; a client's copy never reaches the child.
   delete headers[HUB_ADMISSION_HEADER];
   if (!sidecar) {
-  // The hub judged the client's credential already. A browser session is the
-  // hub's, and means nothing to the child, so it never travels; an
-  // authenticated request goes on with the per-user token instead (passed in
-  // `extraHeaders` by the caller, see upstreamAuth), a public one with none.
-  delete headers.authorization;
-  delete headers["x-ndx-token"];
-  }
-  if (sidecar) {
+    // The hub judged the client's credential already. A browser session is the
+    // hub's, and means nothing to the child, so it never travels; an
+    // authenticated request goes on with the per-user token instead (passed in
+    // `extraHeaders` by the caller, see upstreamAuth), a public one with none.
+    delete headers.authorization;
+    delete headers["x-ndx-token"];
+  } else {
     for (const [name, value] of Object.entries(headers)) {
       if (typeof value !== "string") continue;
       const kept = sidecarHeaderValue(name, value, sidecar);
@@ -561,9 +572,7 @@ export function proxyHttp(
   upstream.on("error", (err) => {
     onUpstreamError?.();
     if (!res.headersSent) {
-      const body = JSON.stringify({ error: `Project server unreachable: ${err.message}` });
-      res.writeHead(502, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) });
-      res.end(body);
+      writeJson(res, 502, { error: `Project server unreachable: ${err.message}` });
     } else {
       res.destroy();
     }
@@ -602,7 +611,7 @@ export function proxyUpgrade(
   const fail = (): void => {
     onUpstreamError?.();
     if (socket.writable) {
-      socket.write("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+      socket.write(bareResponse("502 Bad Gateway"));
     }
     socket.destroy();
     upstream.destroy();
@@ -773,9 +782,9 @@ function refusePublic(req: IncomingMessage, res: ServerResponse): void {
   res.writeHead(401, {
     "Content-Type": html ? "text/html; charset=utf-8" : "application/json",
     "Cache-Control": "no-store",
-    "WWW-Authenticate": 'Bearer realm="n-dx"',
+    "WWW-Authenticate": BEARER_CHALLENGE,
   });
-  res.end(html ? authRequiredPage() : JSON.stringify({ error: "Authentication required", hint: AUTH_HINT }));
+  res.end(html ? authRequiredPage() : JSON.stringify(authRequiredBody()));
 }
 
 /**
@@ -824,9 +833,7 @@ export async function handlePublicHubRequest(req: IncomingMessage, res: ServerRe
     return;
   }
   if (decision.kind === "home") {
-    const html = renderHomePage({ projects: [], generatedAt: new Date().toISOString() }, "", [], { deferred: true });
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-    res.end(html);
+    writeHtml(res, 200, renderHomePage({ projects: [], generatedAt: new Date().toISOString() }, "", [], { deferred: true }));
     return;
   }
   refusePublic(req, res);
@@ -836,6 +843,12 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(text) });
   res.end(text);
+}
+
+/** A page the hub renders itself; revalidated on every load, since its cards are live. */
+function writeHtml(res: ServerResponse, status: number, html: string): void {
+  res.writeHead(status, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+  res.end(html);
 }
 
 type SessionHost = NonNullable<ReturnType<Hub["sessionHosts"]["pick"]>>;
@@ -919,9 +932,9 @@ async function upgradeHubSession(req: IncomingMessage, socket: Duplex, head: Buf
     host = hub.sessionHosts.pick(hub.listProjects());
   }
   if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
-    socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    socket.end(bareResponse("403 Forbidden"));
   } else {
-    socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    socket.end(bareResponse("503 Service Unavailable"));
   }
 }
 
@@ -966,8 +979,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, undefined, { ...upstreamAuth(hub), ...(await admissionHeadersFor(req, hub, decision)) });
       return;
     case "html":
-      res.writeHead(decision.status, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-      res.end(decision.html);
+      writeHtml(res, decision.status, decision.html);
       return;
     case "json":
       writeJson(res, decision.status, decision.body);
@@ -986,12 +998,11 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       ]);
       // Where the "New project" form offers to create: wherever most of the
       // registered projects already live, else the user's home.
-      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions, {
+      const html = renderHomePage(overview, suggestedParentDir(projects), extensions, {
         hubSession,
         hubSpend: readHubUsageTotals(hub.hubHome),
       });
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-      res.end(html);
+      writeHtml(res, 200, html);
       return;
     }
   }
@@ -1041,20 +1052,73 @@ async function admissionHeadersFor(
       running: snapshot.running,
       maxSessions: snapshot.limits.maxSessions,
       queued: snapshot.entries.length,
-      queue: snapshot.entries
-        .filter((entry) => entry.projectId === projectId)
-        .map((entry) => ({
-          taskId: entry.taskId,
-          workspace: entry.workspace,
-          enqueuedAt: entry.enqueuedAt,
-          ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
-          ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
-        })),
+      // The header keeps only each entry's identifying fields (formatHubAdmissionHeader),
+      // so the run options a queued entry replays never ride along.
+      queue: snapshot.entries.filter((entry) => entry.projectId === projectId),
       availableBytes: snapshot.availableBytes,
       pressure: snapshot.pressure,
       memoryPaused: snapshot.memoryPaused,
     }),
   };
+}
+
+/** What the gate reads off an execute body. */
+interface ExecuteRequest {
+  taskId: string | null;
+  /** Absent when the request carried none. */
+  options?: RunOptions;
+  /** Absent for `single`. */
+  mode?: RunMode;
+  iterations?: number;
+  saveRun?: Record<string, unknown>;
+  /** False when an option, the run mode or `saveRun` is one the project server would refuse. */
+  valid: boolean;
+}
+
+/** Read an execute body's task, run options, mode and settings to save. A body that is not JSON names no task. */
+function parseExecuteBody(body: Buffer): ExecuteRequest {
+  const request: ExecuteRequest = { taskId: null, valid: true };
+  try {
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
+      taskId?: unknown;
+      options?: unknown;
+      mode?: unknown;
+      iterations?: unknown;
+      saveRun?: unknown;
+    };
+    if (typeof parsed.taskId === "string" && parsed.taskId) request.taskId = parsed.taskId;
+    const checked = checkRunOptions(parsed.options);
+    if (checked.ok) {
+      if (Object.keys(checked.options).length > 0) request.options = checked.options;
+    } else {
+      request.valid = false;
+    }
+    // The same validator the execute route and `execute/check` use, so a mode
+    // this forwards is a mode they accept. Judging it here by hand is what let
+    // `{ mode: "looop" }` be queued as a single-task run on a busy machine and
+    // 400'd on an idle one.
+    const checkedMode = checkRunMode(parsed);
+    if (checkedMode.ok) {
+      if (checkedMode.mode !== "single") request.mode = checkedMode.mode;
+      request.iterations = checkedMode.iterations;
+    } else {
+      // Forwarded, not queued — see handleExecuteAdmission.
+      request.valid = false;
+    }
+    // Settings to save when the run starts. Only the shape is judged here; the
+    // project server checks the block (and its version) in `execute/check`
+    // before this queues it, and saves it only when the replay starts the run.
+    if (parsed.saveRun !== undefined) {
+      if (isRecord(parsed.saveRun)) {
+        request.saveRun = parsed.saveRun;
+      } else {
+        request.valid = false;
+      }
+    }
+  } catch {
+    // not JSON — forward and let the server say so
+  }
+  return request;
 }
 
 /**
@@ -1088,56 +1152,11 @@ async function handleExecuteAdmission(
     return false; // let the project server answer for its own request
   }
 
-  let taskId: string | null = null;
-  let options: RunOptions | undefined;
-  let optionsValid = true;
-  let mode: RunMode | undefined;
-  let iterations: number | undefined;
-  let saveRun: Record<string, unknown> | undefined;
-  try {
-    const parsed = JSON.parse(body.toString("utf-8") || "{}") as {
-      taskId?: unknown;
-      options?: unknown;
-      mode?: unknown;
-      iterations?: unknown;
-      saveRun?: unknown;
-    };
-    if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
-    const checked = checkRunOptions(parsed.options);
-    if (checked.ok) {
-      if (Object.keys(checked.options).length > 0) options = checked.options;
-    } else {
-      optionsValid = false;
-    }
-    // The same validator the execute route and `execute/check` use, so a mode
-    // this forwards is a mode they accept. Judging it here by hand is what let
-    // `{ mode: "looop" }` be queued as a single-task run on a busy machine and
-    // 400'd on an idle one.
-    const checkedMode = checkRunMode(parsed);
-    if (checkedMode.ok) {
-      if (checkedMode.mode !== "single") mode = checkedMode.mode;
-      iterations = checkedMode.iterations;
-    } else {
-      // Forwarded, not queued — see the comment below the catch.
-      optionsValid = false;
-    }
-    // Settings to save when the run starts. Only the shape is judged here; the
-    // project server checks the block (and its version) in `execute/check`
-    // before this queues it, and saves it only when the replay starts the run.
-    if (parsed.saveRun !== undefined) {
-      if (parsed.saveRun !== null && typeof parsed.saveRun === "object" && !Array.isArray(parsed.saveRun)) {
-        saveRun = parsed.saveRun as Record<string, unknown>;
-      } else {
-        optionsValid = false;
-      }
-    }
-  } catch {
-    // not JSON — forward and let the server say so
-  }
+  const { taskId, options, mode, iterations, saveRun, valid } = parseExecuteBody(body);
   // A rejected option or run mode is forwarded too: queuing it would turn the
   // server's 400 into a run silently dropped minutes later, when its turn came
   // — or, worse for a mode, into a run that starts and does less than it said.
-  if (!taskId || !optionsValid) {
+  if (!taskId || !valid) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body, upstreamAuth(hub));
     return true;
   }
@@ -1150,10 +1169,7 @@ async function handleExecuteAdmission(
     projectId: decision.project.id,
     workspace,
     taskId,
-    ...(options ? { options } : {}),
-    ...(mode && mode !== "single" ? { mode } : {}),
-    ...(iterations !== undefined ? { iterations } : {}),
-    ...(saveRun ? { saveRun } : {}),
+    ...replayedRunFields({ options, mode, iterations, saveRun }),
   });
   if (result.admitted) {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body, upstreamAuth(hub));
@@ -1174,7 +1190,7 @@ async function handleExecuteAdmission(
     projectId: decision.project.id,
     workspace,
     ...(options ? { options } : {}),
-    ...(mode && mode !== "single" ? { mode } : {}),
+    ...(mode ? { mode } : {}),
     ...(iterations !== undefined ? { iterations } : {}),
     queueLength: snapshot.entries.length,
     running: snapshot.running,
@@ -1244,11 +1260,11 @@ async function upgradeSidecar(
   if (!started.ok) {
     revokeOnRefusal(hub, decision.name, started);
     const reason = started.status === 404 ? "Not Found" : "Service Unavailable";
-    socket.end(`HTTP/1.1 ${started.status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    socket.end(bareResponse(`${started.status} ${reason}`));
     return;
   }
   if (decision.frameKey !== undefined && !hub.frameKeys.isLive(decision.name, decision.frameKey)) {
-    socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    socket.end(bareResponse("401 Unauthorized"));
     return;
   }
   socket.once("close", hub.sidecars.openSocket(decision.name));
@@ -1274,5 +1290,5 @@ export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: B
   }
   const status = decision.kind === "json" ? decision.status : 404;
   const reason = status === 409 ? "Conflict" : status === 503 ? "Service Unavailable" : "Not Found";
-  socket.end(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  socket.end(bareResponse(`${status} ${reason}`));
 }

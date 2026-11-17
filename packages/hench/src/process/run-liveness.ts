@@ -32,6 +32,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
+import { LOCKS_DIRNAME } from "../store/paths.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -176,7 +177,7 @@ export function collectLiveLocks(
 
 /** `<henchDir>/locks` — the directory {@link ./limiter} writes to. */
 export function locksDirOf(henchDir: string): string {
-  return join(henchDir, "locks");
+  return join(henchDir, LOCKS_DIRNAME);
 }
 
 // ---------------------------------------------------------------------------

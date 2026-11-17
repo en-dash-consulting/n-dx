@@ -32,6 +32,7 @@
 import { totalmem } from "node:os";
 import { derivePressure, getAvailableMemory, readAvailableMemory, type MemoryPressure } from "@n-dx/llm-client";
 import type { RunMode, RunOptions } from "../shared/index.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 /** Bounds the machine will not exceed, whatever any single project would allow. */
 export interface AdmissionLimits {
@@ -90,6 +91,19 @@ export interface QueueEntry {
    */
   saveRun?: Record<string, unknown>;
   enqueuedAt: string;
+}
+
+/** What a queued request replays besides its task. */
+export type ReplayedRunFields = Pick<QueueEntry, "options" | "mode" | "iterations" | "saveRun">;
+
+/** The {@link ReplayedRunFields} a request carried, each only when it did, in the order the execute body lists them. */
+export function replayedRunFields(fields: ReplayedRunFields): ReplayedRunFields {
+  return {
+    ...(fields.options ? { options: fields.options } : {}),
+    ...(fields.mode ? { mode: fields.mode } : {}),
+    ...(fields.iterations !== undefined ? { iterations: fields.iterations } : {}),
+    ...(fields.saveRun ? { saveRun: fields.saveRun } : {}),
+  };
 }
 
 /** A refusal from the project server, as its execute route answered it. */
@@ -243,9 +257,10 @@ export class AdmissionQueue {
    * double-clicked button is the common case. The re-ask's options and run mode
    * replace the queued ones: the operator changed how the run starts, not when.
    *
-   * Every field the replacement carries must be listed below. It is built from
-   * scratch rather than spread over the old entry, so a field added to
-   * {@link QueueEntry} and not added here is silently dropped on the second
+   * Every field the replacement carries must be listed below or in
+   * {@link replayedRunFields}. It is built from scratch rather than spread over
+   * the old entry, so a field added to {@link QueueEntry} and not added there
+   * is silently dropped on the second
    * ask — which is how a re-ask with `mode: "loop"` came back as one task
    * while its 202 said otherwise.
    *
@@ -259,10 +274,7 @@ export class AdmissionQueue {
         projectId: queued.projectId,
         workspace: queued.workspace,
         taskId: queued.taskId,
-        ...(entry.options ? { options: entry.options } : {}),
-        ...(entry.mode ? { mode: entry.mode } : {}),
-        ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
-        ...(entry.saveRun ? { saveRun: entry.saveRun } : {}),
+        ...replayedRunFields(entry),
         enqueuedAt: queued.enqueuedAt,
       };
       return { position: existing + 1, added: false };
@@ -533,8 +545,8 @@ export class AdmissionGate {
  */
 export async function countProjectExecutions(port: number, token: string | null = null, timeoutMs = 2_000): Promise<number> {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`, {
-      headers: token ? { "X-Ndx-Token": token } : {},
+    const res = await fetch(loopbackUrl(port, "/api/hench/execute/status"), {
+      headers: tokenHeaders(token),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return 0;

@@ -36,7 +36,7 @@ import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import { removeItemById } from "../components/prd-tree/tree-utils.js";
 import { createWSPipeline } from "../messaging/index.js";
 import { createUpdateBatcher, createDomUpdateGate, createResponseBufferGate } from "../performance/index.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 export interface PRDWebSocketDeps {
   /** Setter for PRD document state (supports functional updates). */
@@ -56,8 +56,6 @@ export interface PRDWebSocketDeps {
  */
 export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWebSocketDeps): void {
   useEffect(() => {
-    let ws: WebSocket | null = null;
-
     // RAF-based update batcher: ensures at most one setData call per
     // animation frame during rapid WebSocket message bursts.
     const batcher = createUpdateBatcher();
@@ -108,14 +106,12 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
           fetchTaskUsage();
         }
       },
-      defaultDelayMs: 250,
       delays: {
         "rex:prd-changed": 300,     // heavier — full tree reconciliation
         "rex:item-updated": 200,    // lighter — targeted node patch
         "rex:item-deleted": 200,    // lighter — targeted node removal
       },
       throttledTypes: ["rex:prd-changed", "rex:item-updated", "rex:item-deleted"],
-      maxPendingPerType: 20,
     });
 
     // Response buffer gate: drops messages while tab is hidden,
@@ -131,29 +127,18 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
       },
     });
 
-    try {
-      ws = openWebSocket();
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (!bufferGate.accept()) return; // Tab hidden — drop message
-          pipeline.push(msg);
-        } catch {
-          // Ignore malformed messages
-        }
-      };
-    } catch {
-      // WebSocket not available — polling still works as fallback
-    }
+    // WebSocket not available — polling still works as fallback
+    const closeSocket = openFrameSocket((frame) => {
+      if (!bufferGate.accept()) return; // Tab hidden — drop message
+      pipeline.push(frame);
+    });
 
     return () => {
       bufferGate.dispose();
       pipeline.dispose();
       updateGate.dispose();
       batcher.dispose();
-      if (ws) {
-        try { ws.close(); } catch { /* ignore */ }
-      }
+      closeSocket();
     };
   }, [setData, fetchPRDData, fetchTaskUsage]);
 }

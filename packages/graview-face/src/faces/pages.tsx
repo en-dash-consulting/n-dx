@@ -8,6 +8,7 @@ import { BASE } from "../base.js";
 import { pages } from "../ui/pages.js";
 import { views } from "../ui/views.js";
 import { SchemeContext } from "../ui/scheme.js";
+import { DOOR_SYNC_INFO_PATH } from "../sync/door.js";
 import { startSync } from "../sync/engine.js";
 import { setSync } from "../ui/sync-status.js";
 
@@ -25,7 +26,7 @@ export interface Mount {
  */
 async function connect(store: Mount["store"]): Promise<void> {
   try {
-    const info = (await (await fetch(`${BASE}/ndx/sync-info`)).json()) as { rex?: boolean };
+    const info = (await (await fetch(`${BASE}${DOOR_SYNC_INFO_PATH}`)).json()) as { rex?: boolean };
     if (!info.rex) return;
     const who = rememberedPrincipal();
     setSync(startSync({ store, principal: who.name ?? who.id ?? "reader" }));

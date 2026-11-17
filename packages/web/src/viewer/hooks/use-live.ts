@@ -18,7 +18,7 @@ import { useState, useEffect } from "preact/hooks";
 import { getWorkspaceKey } from "../base-path.js";
 import { registerPoller } from "../polling/index.js";
 import { createWSPipeline } from "./use-gateway.js";
-import { openWebSocket } from "../session.js";
+import { openReconnectingSocket } from "../live-feed-socket.js";
 
 // ---------------------------------------------------------------------------
 // Shape — the slice of server/routes-live.ts's LiveSnapshot the tab reads
@@ -332,10 +332,6 @@ export interface LiveFeed {
 // so the first to unmount stopped the poll for the rest.
 // ---------------------------------------------------------------------------
 
-/** The socket's reconnect delay doubles from the first to the cap, and resets once it opens. */
-const RECONNECT_FIRST_MS = 1_000;
-const RECONNECT_MAX_MS = 30_000;
-
 interface FeedState {
   live: LiveSummary | null;
   reachable: boolean;
@@ -380,9 +376,6 @@ async function fetchLive(): Promise<void> {
 /** Open the socket, the pipeline and the poll; returns what closes them. */
 function startFeed(): () => void {
   let stopped = false;
-  let ws: WebSocket | null = null;
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  let reconnectDelay = RECONNECT_FIRST_MS;
 
   const pipeline = createWSPipeline({
     workspace: getWorkspaceKey(),
@@ -391,61 +384,25 @@ function startFeed(): () => void {
       if (Date.now() - lastFetchAt < MIN_REFETCH_INTERVAL_MS) return;
       void fetchLive();
     },
-    defaultDelayMs: 250,
   });
 
-  const connect = (isReconnect: boolean): void => {
-    if (typeof WebSocket === "undefined") return; // no socket at all: the poll carries it
-    try {
-      ws = openWebSocket();
-    } catch {
-      scheduleReconnect();
-      return;
-    }
-    ws.onopen = () => {
-      reconnectDelay = RECONNECT_FIRST_MS;
+  // With no socket at all, the poll carries the feed.
+  const stopSocket = openReconnectingSocket({
+    onFrame: (frame) => pipeline.push(frame),
+    onOpen: (isReconnect) => {
       setFeed({ socketOpen: true });
       // Frames sent while the socket was down are gone: catch up now.
       if (isReconnect) void fetchLive();
-    };
-    ws.onclose = () => {
-      ws = null;
-      if (stopped) return;
-      setFeed({ socketOpen: false });
-      scheduleReconnect();
-    };
-    ws.onmessage = (event) => {
-      try {
-        pipeline.push(JSON.parse(event.data));
-      } catch {
-        // Malformed frame — the poll still catches up.
-      }
-    };
-  };
-
-  const scheduleReconnect = (): void => {
-    if (stopped || reconnectTimer !== null) return;
-    const delay = reconnectDelay;
-    reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      connect(true);
-    }, delay);
-  };
-
-  connect(false);
+    },
+    onClose: () => setFeed({ socketOpen: false }),
+  });
   const unregisterPoll = registerPoller("live", () => { void fetchLive(); }, POLL_INTERVAL_MS);
 
   return () => {
     stopped = true;
     unregisterPoll();
     pipeline.dispose();
-    if (reconnectTimer !== null) clearTimeout(reconnectTimer);
-    if (ws) {
-      ws.onclose = null;
-      ws.close();
-      ws = null;
-    }
+    stopSocket();
   };
 }
 

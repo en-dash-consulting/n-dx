@@ -27,9 +27,9 @@ import type { DetailItem, NavigateTo } from "../types.js";
 import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
-import { itemTypeOf } from "../external.js";
-import { useItemSelection } from "./use-item-selection.js";
+import { prdDetailOf, useItemSelection } from "./use-item-selection.js";
 import { useDeleteActions } from "./use-delete-actions.js";
+import { errorOrHttpStatus } from "../utils/response-error.js";
 
 /**
  * Toast text for a `POST /api/rex/items` answer. A v1 project answers the
@@ -37,6 +37,24 @@ import { useDeleteActions } from "./use-delete-actions.js";
  */
 export function createdItemToast(result: { type?: string; level?: string; title: string }): string {
   return `Created ${result.type ?? result.level}: ${result.title}`;
+}
+
+/**
+ * `POST /api/rex/items`. Throws the server's `error` (or the status) when the
+ * add is refused, so each form can show why.
+ */
+async function postNewItem(input: object): Promise<{ type?: string; level?: string; title: string }> {
+  const res = await fetch("/api/rex/items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!res.ok) {
+    throw new Error(await errorOrHttpStatus(res, "Failed to add item"));
+  }
+
+  return res.json();
 }
 
 /** Active tab in the command bar. */
@@ -223,19 +241,7 @@ export function usePRDActions({
 
   const handleAddChild = useCallback(
     async (input: { title: string; parentId: string; type: string; description?: string; acceptanceCriteria?: string[]; priority?: string }) => {
-      const res = await fetch("/api/rex/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Failed to add item" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-
-      const result = await res.json();
-      showToast(createdItemToast(result));
+      showToast(createdItemToast(await postNewItem(input)));
       await fetchPRDData();
       await fetchTaskUsage();
     },
@@ -246,19 +252,7 @@ export function usePRDActions({
 
   const handleAddItem = useCallback(
     async (input: AddItemInput) => {
-      const res = await fetch("/api/rex/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Failed to add item" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-
-      const result = await res.json();
-      showToast(createdItemToast(result));
+      showToast(createdItemToast(await postNewItem(input)));
       setActiveTab(null);
       setAddParentId(null);
       await fetchPRDData();
@@ -271,19 +265,7 @@ export function usePRDActions({
 
   const handleInlineAddItem = useCallback(
     async (input: InlineAddInput) => {
-      const res = await fetch("/api/rex/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Failed to add item" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-
-      const result = await res.json();
-      showToast(createdItemToast(result));
+      showToast(createdItemToast(await postNewItem(input)));
       await fetchPRDData();
       await fetchTaskUsage();
     },
@@ -329,20 +311,7 @@ export function usePRDActions({
 
     // Keep the detail header in sync with the current item title
     if (onSelectItem) {
-      onSelectItem({
-        type: "prd",
-        title: item.title,
-        id: item.id,
-        itemType: itemTypeOf(item),
-        status: item.status,
-        description: item.description,
-        acceptanceCriteria: item.acceptanceCriteria,
-        priority: item.priority,
-        tags: item.tags,
-        blockedBy: item.blockedBy,
-        startedAt: item.startedAt,
-        completedAt: item.completedAt,
-      });
+      onSelectItem(prdDetailOf(item));
     }
 
     onDetailContent(

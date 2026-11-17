@@ -9,17 +9,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { SidecarExternalCall } from "../hooks/sidecar.js";
 import { ExternalCallBody, type ExternalCallEdit } from "./sidecar-external-call.js";
-
-/** The server's error message for a failed response, or `fallback` and the status. */
-export async function errorOf(res: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error) return body.error;
-  } catch {
-    // Not JSON: the fallback says enough.
-  }
-  return `${fallback} (${res.status})`;
-}
+import { stringErrorOf } from "../utils/response-error.js";
 
 interface DecidedEntry {
   result?: string;
@@ -68,7 +58,7 @@ export function TrackerCardForm({ entry, onDone, onSettled, onCancel }: TrackerC
     fetch(`/api/tracker/cards/form?requestId=${encodeURIComponent(entry.requestId)}`)
       .then(async (res) => {
         if (cancelled) return;
-        if (!res.ok) { setError(await errorOf(res, "Could not read the call's form")); return; }
+        if (!res.ok) { setError(await stringErrorOf(res, "Could not read the call's form")); return; }
         setCall(((await res.json()) as { externalCall: SidecarExternalCall }).externalCall);
       })
       .catch((err: unknown) => { if (!cancelled) setError(err instanceof Error ? err.message : "Could not read the call's form"); });
@@ -85,7 +75,7 @@ export function TrackerCardForm({ entry, onDone, onSettled, onCancel }: TrackerC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: entry.requestId, action: "approve", args: edit }),
       });
-      if (!res.ok) { setError(await errorOf(res, "Could not run the call")); return; }
+      if (!res.ok) { setError(await stringErrorOf(res, "Could not run the call")); return; }
       const { entry: decided } = (await res.json()) as { entry?: DecidedEntry };
       const problem = problemOf(decided);
       if (!problem) { onDone(); return; }

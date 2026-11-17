@@ -11,6 +11,7 @@ export type { ViewId } from "./view-id.js";
 export type { FeatureToggle, FeaturesResponse } from "./features.js";
 export { PROJECT_LANGUAGES, isProjectLanguage } from "./project-languages.js";
 export type { ProjectLanguage } from "./project-languages.js";
+export { isRecord } from "./is-record.js";
 export type { ViewerScope, SourcevisionScopeViewId } from "./view-routing.js";
 export {
   HUB_PATH,
@@ -80,6 +81,7 @@ export {
   SESSION_STORAGE_KEY,
   AUTH_ROUTES,
   AUTH_HINT,
+  BEARER_CHALLENGE,
   NONCE_TTL_MS,
   TICKET_TTL_MS,
   SESSION_IDLE_TTL_MS,
@@ -96,6 +98,7 @@ export {
   authRouteOf,
   answerAuthRoute,
   authRequiredPage,
+  authRequiredBody,
   wantsHtml,
   splitTokenQuery,
   removeTokenParam,

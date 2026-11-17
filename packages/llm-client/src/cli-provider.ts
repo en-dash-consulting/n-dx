@@ -37,31 +37,15 @@ import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
-import { classifyAuthError } from "./llm-error-classifier.js";
+import { classifyAuthError, extractJsonErrorMessage } from "./llm-error-classifier.js";
 import { resolveClaudeCliEffort } from "./claude-effort.js";
-import { printRetryLine } from "./progress-reporter.js";
-import { formatRetryCountdown } from "./rate-limit.js";
+import { printRateLimitRetryLine } from "./progress-reporter.js";
+import { CLI_RATE_LIMIT_PATTERN, CLI_TRANSIENT_PATTERNS } from "./rate-limit.js";
 import { resolveVendorCliEnv } from "./child-env.js";
+import { isLlmDebugEnabled } from "./output.js";
 
 /** Regex patterns for stderr content indicating an auth error. */
 const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/i;
-
-/** Regex patterns for stderr content indicating a rate-limit error. */
-const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
-
-/** Regex patterns in error messages that indicate a transient failure. */
-const TRANSIENT_PATTERNS = [
-  /\b500\b/,
-  /\b502\b/,
-  /\b503\b/,
-  /\b529\b/,
-  /\b429\b/,
-  /overloaded/i,
-  /ETIMEDOUT/,
-  /ECONNRESET/,
-  /ECONNREFUSED/,
-  /socket hang up/i,
-];
 
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BASE_DELAY_MS = 1000;
@@ -88,7 +72,7 @@ export interface CliProviderOptions extends ClaudeClientOptions {
  * Classify an error message as retryable or not.
  */
 function isTransientError(message: string): boolean {
-  return TRANSIENT_PATTERNS.some((p) => p.test(message));
+  return CLI_TRANSIENT_PATTERNS.some((p) => p.test(message));
 }
 
 /**
@@ -98,20 +82,15 @@ function classifyStderr(stderr: string): { reason: "auth" | "rate-limit" | "unkn
   if (AUTH_PATTERNS.test(stderr)) {
     return { reason: "auth", retryable: false };
   }
-  if (RATE_LIMIT_PATTERNS.test(stderr)) {
+  if (CLI_RATE_LIMIT_PATTERN.test(stderr)) {
     return { reason: "rate-limit", retryable: true };
   }
   return { reason: "unknown", retryable: isTransientError(stderr) };
 }
 
-function isDebugEnabled(): boolean {
-  const v = process.env.NDX_DEBUG_LLM ?? process.env.NDX_DEBUG;
-  return v === "1" || v === "true" || v === "yes";
-}
-
 /** Per-call spawn tracing — opt-in via NDX_DEBUG_LLM / NDX_DEBUG. */
 function debugLog(message: string): void {
-  if (isDebugEnabled()) {
+  if (isLlmDebugEnabled()) {
     process.stderr.write(`[ndx:llm:claude] ${message}\n`);
   }
 }
@@ -261,25 +240,7 @@ function cleanResultMessage(text: string): string {
     } catch { /* not pure JSON — fall through */ }
   }
   // Slow-path: JSON blob embedded mid-string (e.g. "Error: {...}").
-  let depth = 0, start = -1;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "{") {
-      if (!depth) start = i;
-      depth++;
-    } else if (text[i] === "}" && depth > 0) {
-      depth--;
-      if (!depth && start >= 0) {
-        try {
-          const parsed = JSON.parse(text.slice(start, i + 1)) as Record<string, unknown>;
-          const inner = parsed.error as Record<string, unknown> | undefined;
-          if (inner && typeof inner.message === "string") return inner.message;
-          if (typeof parsed.message === "string") return parsed.message;
-        } catch { /* not JSON here */ }
-        start = -1;
-      }
-    }
-  }
-  return "";
+  return extractJsonErrorMessage(text);
 }
 
 /**
@@ -404,17 +365,12 @@ function parseStreamOutput(stdout: string): CompletionResult {
  * Claude CLI authenticates through a browser session that cannot be probed
  * programmatically without making a real completion request.
  */
-function defaultRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
-  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
-  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
-}
-
 export function createCliClient(options: CliProviderOptions): ClaudeClient & LLMProvider {
   const cliBinary = resolveCliPath(options.claudeConfig);
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
-  const onRetry = options.onRetry ?? defaultRateLimitOnRetry;
+  const onRetry = options.onRetry ?? printRateLimitRetryLine;
 
   const info: ProviderInfo = {
     vendor: LLM_VENDOR.CLAUDE,

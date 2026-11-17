@@ -3,6 +3,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isRecord } from "../shared/index.js";
 
 /**
  * Largest request body any dashboard route will buffer, in bytes.
@@ -120,6 +121,27 @@ export function readBody(req: IncomingMessage, res?: ServerResponse): Promise<st
   });
 }
 
+/**
+ * The request body parsed as JSON, or `undefined` once it has answered 400
+ * "Invalid JSON in request body" because the body did not parse.
+ *
+ * The parsed value is not checked: a route reading fields off it gets
+ * whatever JSON the client sent, `null` included. Test the result against
+ * `undefined`, not for falsiness, or a `null` body is dropped unanswered.
+ * {@link readJsonObject} is the variant that insists on an object.
+ */
+export async function readJsonBody(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<Record<string, unknown> | undefined> {
+  try {
+    return JSON.parse(await readBody(req, res)) as Record<string, unknown>;
+  } catch {
+    errorResponse(res, 400, "Invalid JSON in request body");
+    return undefined;
+  }
+}
+
 /** The request body as a JSON object (empty body: `{}`), else the reason it is not one. */
 export async function readJsonObject(
   req: IncomingMessage,
@@ -132,7 +154,17 @@ export async function readJsonObject(
   } catch (err) {
     return `Invalid request body: ${errorMessage(err)}`;
   }
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : "Request body must be a JSON object";
+  return isRecord(parsed) ? parsed : "Request body must be a JSON object";
+}
+
+/**
+ * `?offset=N&limit=N` as non-negative integers; an absent or unparseable value
+ * is 0, which a paginating route reads as "from the start" and "no limit".
+ */
+export function pageParams(params: URLSearchParams): { offset: number; limit: number } {
+  const read = (name: string): number => {
+    const raw = params.get(name);
+    return raw ? Math.max(0, parseInt(raw, 10) || 0) : 0;
+  };
+  return { offset: read("offset"), limit: read("limit") };
 }

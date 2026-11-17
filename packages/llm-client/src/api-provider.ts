@@ -40,22 +40,16 @@ import { resolveClaudeApiEffort } from "./claude-effort.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import {
   extractRetryAfterMs,
-  formatRetryCountdown,
   shouldAutoRetry,
   DEFAULT_AUTO_RETRY_THRESHOLD_MS,
 } from "./rate-limit.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
-import { printRetryLine } from "./progress-reporter.js";
+import { printRateLimitRetryLine } from "./progress-reporter.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
-
-function defaultApiRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
-  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
-  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
-}
 
 /**
  * Build the error message thrown for an Anthropic SDK failure.
@@ -129,7 +123,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
   const autoRetryThresholdMs = options.autoRetryThresholdMs ?? DEFAULT_AUTO_RETRY_THRESHOLD_MS;
-  const onRetry = options.onRetry ?? defaultApiRateLimitOnRetry;
+  const onRetry = options.onRetry ?? printRateLimitRetryLine;
 
   const info: ProviderInfo = {
     vendor: LLM_VENDOR.CLAUDE,

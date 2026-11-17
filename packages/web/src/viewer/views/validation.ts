@@ -13,6 +13,9 @@ import { BrandedHeader } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useCliName } from "../hooks/index.js";
 import { itemTypeLabel } from "../external.js";
+import { errorOrHttpStatus, assertJobStarted } from "../utils/response-error.js";
+import { errorMessage } from "../utils/format.js";
+import { fetchWithJsonBody } from "../utils/json-requests.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -638,14 +641,6 @@ interface AsyncJobWire {
   error: string | null;
 }
 
-async function postJson(url: string, body: unknown): Promise<Response> {
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
 /** Poll an async job's status endpoint until it reports finished. */
 function pollJob(
   statusUrl: string,
@@ -700,14 +695,14 @@ export function ValidationActions({ onChanged, show }: {
     setFixState("running");
     setError(null);
     try {
-      const res = await postJson("/api/commands/fix", { dryRun });
+      const res = await fetchWithJsonBody("POST", "/api/commands/fix", { dryRun });
       const body = await res.json() as { error?: string; report?: unknown; output?: string };
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setFixReport(body.report ?? body.output ?? null);
       setFixState(dryRun ? "previewed" : "done");
       if (!dryRun) onChanged?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
       setFixState("error");
     }
   }, [onChanged]);
@@ -716,11 +711,8 @@ export function ValidationActions({ onChanged, show }: {
     setCiState("running");
     setError(null);
     try {
-      const res = await postJson("/api/commands/ci", {});
-      if (!res.ok && res.status !== 409) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error || `HTTP ${res.status}`);
-      }
+      const res = await fetchWithJsonBody("POST", "/api/commands/ci", {});
+      await assertJobStarted(res);
       cancelPolls.current.push(pollJob("/api/commands/ci/status", (status) => {
         // ndx ci exits 1 when a check fails while still printing its full
         // JSON report, and the server records any non-zero exit as
@@ -742,7 +734,7 @@ export function ValidationActions({ onChanged, show }: {
         setCiState("done");
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
       setCiState("error");
     }
   }, []);
@@ -751,11 +743,8 @@ export function ValidationActions({ onChanged, show }: {
     setReshapeState("running");
     setError(null);
     try {
-      const res = await postJson("/api/commands/reshape", { accept });
-      if (!res.ok && res.status !== 409) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error || `HTTP ${res.status}`);
-      }
+      const res = await fetchWithJsonBody("POST", "/api/commands/reshape", { accept });
+      await assertJobStarted(res);
       cancelPolls.current.push(pollJob("/api/commands/reshape/status", (status) => {
         if (status.error) {
           setError(status.error);
@@ -767,7 +756,7 @@ export function ValidationActions({ onChanged, show }: {
         if (accept) onChanged?.();
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
       setReshapeState("error");
     }
   }, [onChanged]);
@@ -928,8 +917,7 @@ export function ValidationView({ navigateTo }: { navigateTo?: NavigateTo }) {
     try {
       const res = await fetch("/api/rex/validate");
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Validation failed" }));
-        setError(err.error || `HTTP ${res.status}`);
+        setError(await errorOrHttpStatus(res, "Validation failed"));
         return;
       }
       const data = await res.json();

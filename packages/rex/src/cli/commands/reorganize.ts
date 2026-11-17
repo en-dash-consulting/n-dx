@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { isChangeLayerStore, resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { loadProductLayerItems, resolveLayerStore } from "../../store/change-layer-store.js";
@@ -20,8 +19,9 @@ import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
-import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
+import { enforceBudgetPreflight } from "./budget-preflight.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
+import { headerModelSource } from "../model-resolution.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
@@ -47,34 +47,13 @@ async function runLlmAnalysis(
     // Resolve model: explicit flag > vendor config > default
     const resolvedModel = resolveConfiguredModel(flags.model);
     const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-    const modelSource = flags.model
-      ? "cli-override" as const
-      : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
-        ? "configured" as const
-        : "default" as const;
     printVendorModelHeader(vendor, llmConfig, {
       format: flags.format,
       resolvedModel,
-      modelSource,
+      modelSource: headerModelSource(flags.model, llmConfig),
     });
 
-    // Pre-flight budget check
-    const budgetResult = await preflightBudgetCheck(rexDir, dir);
-    if (budgetResult) {
-      const budgetLines = formatBudgetWarnings(budgetResult);
-      if (budgetLines.length > 0) {
-        for (const line of budgetLines) warn(line);
-        warn("");
-      }
-      if (budgetResult.severity === "exceeded") {
-        const { resolveStore } = await import("../../store/index.js");
-        const store = await resolveStore(rexDir);
-        const config = await store.loadConfig();
-        if (config.budget?.abort) {
-          throw new BudgetExceededError(budgetResult.warnings);
-        }
-      }
-    }
+    await enforceBudgetPreflight(rexDir, dir);
 
     const spinner = startSpinner("Running LLM analysis...");
     try {

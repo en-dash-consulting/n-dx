@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { resolveStore, isChangeLayerStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { validateMove, moveItem, levelParentRule, changeLayerParentRule } from "../../core/move.js";
 

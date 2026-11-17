@@ -80,6 +80,7 @@ import { AreaBlock, BlockLegend, areaBlock } from "./product-area-map.js";
 import { SpecMap, liveCapabilities } from "./area-spec-map.js";
 import { Pending } from "./product-pages.js";
 import type { AreaDetail, AreaSection, CapabilityRow, ChangePlacement, PlacementCandidate, ProductMap } from "./product-model.js";
+import { plural } from "../utils/format.js";
 
 // ── Model ────────────────────────────────────────────────────────────
 
@@ -125,8 +126,6 @@ export function placementStart(placement: ChangePlacement, map: ProductMap): Pla
   const area = areaOfTarget(map, top.target);
   return area ? { level: "area", slug: area.slug, target: top.target } : { level: "map" };
 }
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** An area block's note at the area level: how many candidates it holds. */
 export function areaCandidateNote(count: number): string {

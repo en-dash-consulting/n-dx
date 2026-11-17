@@ -20,7 +20,7 @@
 import * as nodeFs from "node:fs";
 import { join } from "node:path";
 import { discoverExtensions } from "./extension-discovery.js";
-import { RESERVED_EXTENSION_NAMES } from "./extension-manifest.js";
+import { isObject, RESERVED_EXTENSION_NAMES } from "./extension-manifest.js";
 
 /** Keywords that describe a value without constraining it. */
 const ANNOTATIONS = new Set([
@@ -127,13 +127,13 @@ function brokenChecker(message) {
 
 /** Declared types along properties, map values, array items and combinators. */
 function schemaTypeAt(schema, parts) {
-  if (!isPlainObject(schema)) return undefined;
+  if (!isObject(schema)) return undefined;
   const types = new Set();
   const add = (value) => { for (const type of Array.isArray(value) ? value : value ? [value] : []) types.add(type); };
   if (parts.length === 0) add(schema.type);
   else {
     const [part, ...rest] = parts;
-    const properties = isPlainObject(schema.properties) ? schema.properties : {};
+    const properties = isObject(schema.properties) ? schema.properties : {};
     if (Object.hasOwn(properties, part)) add(schemaTypeAt(properties[part], rest));
     else if (/^(0|[1-9][0-9]*)$/.test(part) && schema.items) add(schemaTypeAt(schema.items, rest));
     else add(schemaTypeAt(schema.additionalProperties, rest));
@@ -163,7 +163,7 @@ export function compileConfigSchema(schema) {
 
 function assertSchema(node, at) {
   if (typeof node === "boolean") return;
-  if (!isPlainObject(node)) throw new Error(`${at} is not a schema`);
+  if (!isObject(node)) throw new Error(`${at} is not a schema`);
   for (const [key, value] of Object.entries(node)) {
     const here = `${at}/${key}`;
     if (ANNOTATIONS.has(key)) continue;
@@ -181,7 +181,7 @@ function assertSchema(node, at) {
     } else if (key === "enum") {
       if (!Array.isArray(value)) throw new Error(`${here} must be an array`);
     } else if (key === "properties") {
-      if (!isPlainObject(value)) throw new Error(`${here} must be an object`);
+      if (!isObject(value)) throw new Error(`${here} must be an object`);
       for (const [name, sub] of Object.entries(value)) assertSchema(sub, `${here}/${name}`);
     } else if (key === "required") {
       if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) throw new Error(`${here} must be an array of names`);
@@ -251,7 +251,7 @@ function check(schema, value, path, out) {
     if (s.items !== undefined) value.forEach((item, i) => check(s.items, item, [...path, String(i)], out));
   }
 
-  if (isPlainObject(value)) {
+  if (isObject(value)) {
     for (const name of s.required ?? []) {
       if (!Object.hasOwn(value, name)) fail("required", `must have the property "${name}"`);
     }
@@ -276,7 +276,7 @@ function check(schema, value, path, out) {
 
 function isType(value, type) {
   switch (type) {
-    case "object": return isPlainObject(value);
+    case "object": return isObject(value);
     case "array": return Array.isArray(value);
     case "string": return typeof value === "string";
     case "number": return typeof value === "number" && Number.isFinite(value);
@@ -293,17 +293,13 @@ function isWholeMultiple(value, divisor) {
   return Math.abs(quotient - Math.round(quotient)) < 1e-9;
 }
 
-function isPlainObject(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 /** JSON equality: same type, same items, same keys with equal values. */
 function equal(a, b) {
   if (a === b) return true;
   if (Array.isArray(a) || Array.isArray(b)) {
     return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => equal(v, b[i]));
   }
-  if (isPlainObject(a) && isPlainObject(b)) {
+  if (isObject(a) && isObject(b)) {
     const keys = Object.keys(a);
     return keys.length === Object.keys(b).length && keys.every((k) => Object.hasOwn(b, k) && equal(a[k], b[k]));
   }

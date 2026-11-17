@@ -29,14 +29,14 @@ export function choiceAnswerOf(draft: ChoiceDraft): SidecarChoiceAnswer | null {
 }
 
 /** A draft with `label` toggled; a single-answer question holds one pick, Other included. */
-export function toggleChoice(draft: ChoiceDraft, label: string, multiSelect: boolean): ChoiceDraft {
+function toggleChoice(draft: ChoiceDraft, label: string, multiSelect: boolean): ChoiceDraft {
   const on = draft.selected.includes(label);
   if (!multiSelect) return { selected: [label], otherOn: false, other: draft.other };
   return { ...draft, selected: on ? draft.selected.filter((s) => s !== label) : [...draft.selected, label] };
 }
 
 /** A draft with the Other row toggled. */
-export function toggleOther(draft: ChoiceDraft, multiSelect: boolean): ChoiceDraft {
+function toggleOther(draft: ChoiceDraft, multiSelect: boolean): ChoiceDraft {
   if (!multiSelect) return { selected: [], otherOn: true, other: draft.other };
   return { ...draft, otherOn: !draft.otherOn };
 }

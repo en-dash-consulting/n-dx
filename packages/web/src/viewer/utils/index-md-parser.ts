@@ -62,40 +62,35 @@ export function parseIndexMd(markdown: string): IndexMdSections {
   const sections: IndexMdSections = {};
 
   try {
-    // Extract Summary section
-    const summaryMatch = markdown.match(/## Summary\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
-    if (summaryMatch) {
-      sections.summary = summaryMatch[1].trim();
+    const summary = sectionBody(markdown, "Summary");
+    if (summary !== null) {
+      sections.summary = summary.trim();
     }
 
-    // Extract Progress table
-    const progressMatch = markdown.match(/## Progress\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
-    if (progressMatch) {
-      sections.progress = parseProgressTable(progressMatch[1]);
+    const progress = sectionBody(markdown, "Progress");
+    if (progress !== null) {
+      sections.progress = parseProgressTable(progress);
     }
 
-    // Extract Commits section
-    const commitsMatch = markdown.match(/## Commits\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
-    if (commitsMatch) {
-      const parsed = parseCommitsList(commitsMatch[1]);
+    const commits = sectionBody(markdown, "Commits");
+    if (commits !== null) {
+      const parsed = parseCommitsList(commits);
       if (parsed.length > 0) {
         sections.commits = parsed;
       }
     }
 
-    // Extract Changes section
-    const changesMatch = markdown.match(/## Changes\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
-    if (changesMatch) {
-      const parsed = parseChangesList(changesMatch[1]);
+    const changes = sectionBody(markdown, "Changes");
+    if (changes !== null) {
+      const parsed = parseChangesList(changes);
       if (parsed.length > 0) {
         sections.changes = parsed;
       }
     }
 
-    // Extract Info section
-    const infoMatch = markdown.match(/## Info\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
-    if (infoMatch) {
-      const parsed = parseInfoSection(infoMatch[1]);
+    const info = sectionBody(markdown, "Info");
+    if (info !== null) {
+      const parsed = parseInfoSection(info);
       if (parsed.length > 0) {
         sections.info = parsed;
       }
@@ -105,8 +100,7 @@ export function parseIndexMd(markdown: string): IndexMdSections {
     const subtasksMatches = markdown.matchAll(/## Subtask: (.+?)\n([\s\S]*?)(?=\n## Subtask:|$)/g);
     const subtasks: SubtaskEntry[] = [];
     for (const match of subtasksMatches) {
-      const parsed = parseSubtaskBlock(match[1], match[2]);
-      if (parsed) subtasks.push(parsed);
+      subtasks.push(parseSubtaskBlock(match[1], match[2]));
     }
     if (subtasks.length > 0) {
       sections.subtasks = subtasks;
@@ -126,6 +120,21 @@ export function parseIndexMd(markdown: string): IndexMdSections {
 }
 
 /**
+ * The body under `## <heading>`, up to the next `##` or `#` heading or the
+ * end; null when there is no such section. `heading` is a fixed word
+ * (no regex metacharacters).
+ */
+function sectionBody(markdown: string, heading: string): string | null {
+  const re = new RegExp(`## ${heading}\\s*\\n([\\s\\S]*?)(?=\\n## |\\n# |\\s*$)`);
+  return re.exec(markdown)?.[1] ?? null;
+}
+
+/** Index of a table's `|---|` separator row, or -1 when there is none. */
+function tableSeparatorIndex(lines: string[]): number {
+  return lines.findIndex((line) => line.includes("---") && line.includes("|"));
+}
+
+/**
  * Parse the Progress table from markdown.
  * Expected format: Markdown table with columns: Child, Level, Status, Last Updated
  */
@@ -133,14 +142,9 @@ function parseProgressTable(content: string): ProgressRow[] {
   const rows: ProgressRow[] = [];
   const lines = content.split("\n");
 
-  // Skip header rows (markdown table header and separator)
-  let dataStart = 0;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes("---") && lines[i].includes("|")) {
-      dataStart = i + 1;
-      break;
-    }
-  }
+  // Skip header rows (markdown table header and separator); with no
+  // separator, every line is read as data.
+  const dataStart = tableSeparatorIndex(lines) + 1;
 
   // Parse data rows
   for (let i = dataStart; i < lines.length; i++) {
@@ -200,13 +204,7 @@ function parseCommitsList(content: string): CommitRef[] {
   const lines = content.split("\n");
 
   // Try to parse as table first (new format)
-  let dataStart = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes("---") && lines[i].includes("|")) {
-      dataStart = i + 1;
-      break;
-    }
-  }
+  const dataStart = tableSeparatorIndex(lines) + 1;
 
   if (dataStart > 0) {
     // Parse table format
@@ -221,10 +219,10 @@ function parseCommitsList(content: string): CommitRef[] {
 
       if (cells.length >= 4) {
         // Cells: [author, hash, message, timestamp]
-        let hash = cells[1].replace(/`/g, "").trim();
+        const hash = cells[1].replace(/`/g, "").trim();
 
         commits.push({
-          hash: hash,
+          hash,
           author: cells[0] || "",
           authorEmail: "", // Not available in table format, would need separate field
           timestamp: cells[3] || "",
@@ -313,7 +311,7 @@ function parseInfoSection(content: string): InfoField[] {
 /**
  * Parse a single Subtask block.
  */
-function parseSubtaskBlock(title: string, content: string): SubtaskEntry | null {
+function parseSubtaskBlock(title: string, content: string): SubtaskEntry {
   const lines = content.split("\n");
   const entry: SubtaskEntry = {
     id: "",

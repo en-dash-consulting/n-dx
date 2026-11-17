@@ -7,11 +7,10 @@
  */
 
 import type { SidecarChoice, SidecarChoiceAnswer } from "../../shared/index.js";
+import { isRecord } from "../../shared/index.js";
 
 const MAX_OPTIONS = 12;
 const MAX_ANSWER_CHARS = 2000;
-
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** An `ask_choice` call read for its card, or why no card can be raised. */
 export function readChoiceCall(input: Record<string, unknown>): SidecarChoice | string {
@@ -21,10 +20,10 @@ export function readChoiceCall(input: Record<string, unknown>): SidecarChoice | 
   if (input.options.length > MAX_OPTIONS) return `a choice has at most ${MAX_OPTIONS} options`;
   const options: SidecarChoice["options"] = [];
   for (const raw of input.options) {
-    const label = isObject(raw) && typeof raw.label === "string" ? raw.label.trim() : "";
+    const label = isRecord(raw) && typeof raw.label === "string" ? raw.label.trim() : "";
     if (!label) return "every option needs a label";
     if (options.some((o) => o.label === label)) return `option "${label}" is listed twice`;
-    const description = isObject(raw) && typeof raw.description === "string" ? raw.description.trim() : "";
+    const description = isRecord(raw) && typeof raw.description === "string" ? raw.description.trim() : "";
     options.push({ label, ...(description && { description }) });
   }
   return { question, options, multiSelect: input.multiSelect === true };
@@ -32,7 +31,7 @@ export function readChoiceCall(input: Record<string, unknown>): SidecarChoice | 
 
 /** An approval's answer read against the card, or why it cannot be accepted. */
 export function readChoiceAnswer(choice: SidecarChoice, raw: unknown): SidecarChoiceAnswer | string {
-  if (!isObject(raw)) return `"answer" must be an object`;
+  if (!isRecord(raw)) return `"answer" must be an object`;
   const selected = raw.selected ?? [];
   if (!Array.isArray(selected) || !selected.every((s) => typeof s === "string")) return `"answer.selected" must be a list of option labels`;
   if (raw.other !== undefined && typeof raw.other !== "string") return `"answer.other" must be a string`;

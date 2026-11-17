@@ -26,7 +26,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, readFileSync, truncateSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { addTokenUsage, isLLMVendor, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
 import type {
@@ -48,7 +48,7 @@ import {
   type Exchange,
   type SidecarScope,
 } from "./context-refresh.js";
-import { renderLedger, type LedgerEntry } from "./ledger.js";
+import { dropPartialTail, renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
@@ -811,25 +811,12 @@ export class SidecarSessionRegistry {
    */
   private reconcileCursor(record: SidecarSessionRecord): void {
     if (this.reconciled.has(record.id)) return;
-    this.dropPartialTail(record.id);
+    // A crash mid-append leaves a fragment the next frame would glue onto:
+    // it moves to `<id>.jsonl.corrupt`.
+    dropPartialTail(this.transcriptPath(record.id));
     const last = this.readFrames(record.id, record.cursor).at(-1);
     if (last) record.cursor = last.seq;
     this.reconciled.add(record.id);
-  }
-
-  /**
-   * A server killed mid-append leaves a last line without its newline; the next
-   * append would glue a frame onto it. Move the fragment to `<id>.jsonl.corrupt`
-   * and cut it from the transcript.
-   */
-  private dropPartialTail(id: string): void {
-    const path = this.transcriptPath(id);
-    if (!existsSync(path)) return;
-    const bytes = readFileSync(path);
-    if (bytes.length === 0 || bytes[bytes.length - 1] === 0x0a) return;
-    const keep = bytes.lastIndexOf(0x0a) + 1;
-    appendFileSync(`${path}.corrupt`, Buffer.concat([bytes.subarray(keep), Buffer.from("\n")]));
-    truncateSync(path, keep);
   }
 
   private appendFrame(record: SidecarSessionRecord, frame: SidecarFrame): void {

@@ -33,9 +33,10 @@
  * @see tests/unit/check-lockfile-integrity.test.js
  */
 
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { invokedDirectly } from "./lib/invoked-directly.mjs";
 
 /** Lockfile major versions these textual patterns were written against. */
 export const SUPPORTED_LOCKFILE_VERSIONS = ["9"];
@@ -228,16 +229,7 @@ export function findSupplyChainIssues(rootDir) {
   return findings;
 }
 
-const invokedDirectly = (() => {
-  if (!process.argv[1]) return false;
-  try {
-    return fileURLToPath(import.meta.url) === realpathSync(process.argv[1]);
-  } catch {
-    return false;
-  }
-})();
-
-if (invokedDirectly) {
+if (invokedDirectly(import.meta.url)) {
   const rootDir = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..");
   const findings = findSupplyChainIssues(rootDir);
   if (findings.length === 0) {

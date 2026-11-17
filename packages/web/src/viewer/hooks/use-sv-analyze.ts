@@ -17,6 +17,8 @@
  */
 
 import { useState, useCallback, useEffect } from "preact/hooks";
+import { errorMessage } from "../utils/format.js";
+import { errorOrHttpStatus } from "../utils/response-error.js";
 
 /** Status payload from `/api/commands/sv-analyze/status`. */
 interface SvAnalyzeStatusData {
@@ -92,12 +94,11 @@ export function useSvAnalyze(pollIntervalMs = 3000): SvAnalyzeController {
         return;
       }
       if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: "Analysis failed to start" })) as { error?: string };
-        throw new Error(d.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Analysis failed to start"));
       }
       // 202 accepted — the polling loop handles the rest.
     } catch (err) {
-      setError(String(err instanceof Error ? err.message : err));
+      setError(errorMessage(err));
       setState("error");
     }
   }, []);

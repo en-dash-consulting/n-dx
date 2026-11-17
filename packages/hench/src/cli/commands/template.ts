@@ -10,7 +10,6 @@
  *   hench template delete <id> [dir]         — delete a user-defined template
  */
 
-import { join } from "node:path";
 import { loadConfig, saveConfig } from "../../store/config.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { validateConfig, revertInvalidFields, formatFieldIssues } from "../../schema/index.js";

@@ -3,11 +3,8 @@ import { describe, it, expect, vi } from "vitest";
 import { h, render } from "preact";
 import type { Zone, ZoneCrossing } from "../../../src/schema/v1.js";
 import type { ZoneData, FlowEdge, ZoneBreadcrumb } from "../../../src/viewer/views/zone-types.js";
-import {
-  convertSubZones,
-  convertCrossings,
-  ZoneBreadcrumbNav,
-} from "../../../src/viewer/views/zones.js";
+import { convertSubZones, convertCrossings } from "../../../src/viewer/views/zones-model.js";
+import { ZoneBreadcrumbNav } from "../../../src/viewer/views/zones.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

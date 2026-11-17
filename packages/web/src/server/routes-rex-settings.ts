@@ -20,7 +20,6 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import {
   APPLY_ON,
@@ -34,7 +33,9 @@ import {
 } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
+import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { isRecord } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,40 +82,26 @@ interface RexSettingsPutBody {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Read the project config, returning an empty object when absent or unparseable. */
-function readNdxConfig(projectDir: string): Record<string, unknown> {
-  const configPath = resolveLayout(projectDir).configFile;
-  if (!existsSync(configPath)) return {};
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(configPath, "utf-8"));
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-/** Write the project config, preserving every key this route does not own. */
-function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = resolveLayout(projectDir).configFile;
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+/** The project config, or an empty object when it is absent, unparseable or not an object. */
+function readConfigObject(projectDir: string): Record<string, unknown> {
+  const parsed: unknown = readNdxConfig(projectDir);
+  return isRecord(parsed) ? parsed : {};
 }
 
 /** The `rex` section of the config, or an empty one. */
 function rexSectionOf(config: Record<string, unknown>): Record<string, unknown> {
   const raw = config["rex"];
-  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return isRecord(raw) ? raw : {};
 }
 
 /** The `rex.placement` sub-section, or an empty one. */
 function placementSectionOf(rex: Record<string, unknown>): Record<string, unknown> {
   const raw = rex["placement"];
-  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return isRecord(raw) ? raw : {};
 }
 
 export function extractRexSettings(projectDir: string): RexSettingsResponse {
-  const config = readNdxConfig(projectDir);
+  const config = readConfigObject(projectDir);
   const rex = rexSectionOf(config);
 
   const { applyOn, warnings: applyWarnings } = parseApplyOn(rex);
@@ -195,7 +182,7 @@ export async function handleRexSettingsRoute(
       return true;
     }
 
-    const config = readNdxConfig(ctx.projectDir);
+    const config = readConfigObject(ctx.projectDir);
     const rex = rexSectionOf(config);
     config["rex"] = rex;
 

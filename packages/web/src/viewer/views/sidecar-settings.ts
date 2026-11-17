@@ -16,6 +16,7 @@
 import { h, type ComponentChildren } from "preact";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { resolveCliLabel, useCliName } from "../hooks/index.js";
+import { responseError } from "../utils/response-error.js";
 
 interface SettingsResponse {
   mode: "ask";
@@ -85,11 +86,6 @@ export interface SidecarSettingsForm {
 
 const sameRule = (a: Rule, b: Rule) => a.tool === b.tool && a.key === b.key;
 
-async function failure(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => ({})) as { error?: string };
-  return body.error ?? fallback;
-}
-
 const argvOf = (command: string) => command.trim().split(/\s+/);
 
 /** The server's verdict on allow-listing `command`, written nowhere: null when allowed, else its refusal. */
@@ -99,7 +95,7 @@ async function checkCommand(command: string): Promise<string | null> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tool: "run_command", argv: argvOf(command) }),
   });
-  return res.ok ? null : failure(res, "Not allowed");
+  return res.ok ? null : responseError(res, "Not allowed");
 }
 
 /**
@@ -128,8 +124,8 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
   const load = useCallback(async (keepEdits = false) => {
     try {
       const [settingsRes, rulesRes] = await Promise.all([fetch("/api/sidecar/settings"), fetch("/api/sidecar/allow-list")]);
-      if (!settingsRes.ok) throw new Error(await failure(settingsRes, "Failed to load Sidecar settings"));
-      if (!rulesRes.ok) throw new Error(await failure(rulesRes, "Failed to load the allow-list"));
+      if (!settingsRes.ok) throw new Error(await responseError(settingsRes, "Failed to load Sidecar settings"));
+      if (!rulesRes.ok) throw new Error(await responseError(rulesRes, "Failed to load the allow-list"));
       setSettings(await settingsRes.json() as SettingsResponse);
       const onDisk = (await rulesRes.json() as { rules: Rule[] }).rules;
       setRules(onDisk);
@@ -190,7 +186,7 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tool: "run_command", argv: argvOf(command) }),
         });
-        if (!res.ok) return await fail(`Not allow-listed (${command}): ${await failure(res, "Save failed")}`);
+        if (!res.ok) return await fail(`Not allow-listed (${command}): ${await responseError(res, "Save failed")}`);
       }
       for (const rule of removed) {
         const res = await fetch("/api/sidecar/allow-list", {
@@ -198,7 +194,7 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(rule),
         });
-        if (!res.ok) return await fail(await failure(res, "Save failed"));
+        if (!res.ok) return await fail(await responseError(res, "Save failed"));
       }
       const patch: Record<string, unknown> = {};
       const ceiling: Record<string, number> = {};
@@ -216,7 +212,7 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
-        if (!res.ok) return await fail(await failure(res, "Save failed"));
+        if (!res.ok) return await fail(await responseError(res, "Save failed"));
       }
     } catch (err) {
       return await fail(err instanceof Error ? err.message : "Save failed");

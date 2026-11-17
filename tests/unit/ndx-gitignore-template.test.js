@@ -21,7 +21,7 @@
  * — the one hench's own code reads — so it is checked against both files
  * rather than left to drift alongside them.
  *
- * @see packages/hench/src/agent/lifecycle/shared.ts — the `git add -A` gate
+ * @see packages/hench/src/agent/lifecycle/pre-run-commit-gate.ts — the `git add -A` gate
  * @see packages/hench/src/store/artifacts.ts — the list hench itself uses
  */
 

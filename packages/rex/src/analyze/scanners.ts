@@ -141,14 +141,6 @@ function inferEpicName(filePath: string, baseDir: string): string {
   return "General";
 }
 
-function featureNameFromFile(filePath: string): string {
-  const base = basename(filePath);
-  const name = base
-    .replace(/\.(test|spec)\.(ts|tsx|js|jsx)$/, "")
-    .replace(/\.(ts|tsx|js|jsx)$/, "");
-  return toTitleCase(name);
-}
-
 /**
  * Scan test files for coverage context.
  *

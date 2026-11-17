@@ -20,6 +20,7 @@ import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import {jsonResponse} from "./response-utils.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
+import { isRecord } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,11 +94,8 @@ function mergeConfigLayers(
   const out: Record<string, unknown> = { ...shared };
   for (const [key, value] of Object.entries(local)) {
     const existing = out[key];
-    if (
-      value && typeof value === "object" && !Array.isArray(value)
-      && existing && typeof existing === "object" && !Array.isArray(existing)
-    ) {
-      out[key] = mergeConfigLayers(existing as Record<string, unknown>, value as Record<string, unknown>);
+    if (isRecord(value) && isRecord(existing)) {
+      out[key] = mergeConfigLayers(existing, value);
     } else {
       out[key] = value;
     }

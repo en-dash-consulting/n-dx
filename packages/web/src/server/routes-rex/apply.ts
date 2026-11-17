@@ -40,7 +40,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "../response-utils.js";
 import { refreshPRDCache } from "../prd-io.js";
-import { appendLog } from "./rex-route-helpers.js";
+import { appendLog, broadcastPrdChanged } from "./rex-route-helpers.js";
 import { applyChange, loadPrdModel, prdLayout, resolveStore } from "../rex-gateway.js";
 import { awaitingApplyChanges, type AwaitingApplyRef } from "./product.js";
 
@@ -241,7 +241,7 @@ async function handleApplyAll(preview: boolean, req: IncomingMessage, res: Serve
       } catch {
         // The changes are written; the cache rebuilds on the next read, and the broadcast still goes.
       }
-      broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      broadcastPrdChanged(broadcast);
     }
     jsonResponse(res, 200, { layout: "v2", results });
   } catch (err) {

@@ -16,20 +16,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { relativeToRoot, resolveLayout } from "./layout.js";
+import { isPidAlive } from "./child-lifecycle.js";
 
 /**
  * @typedef {{ status: "pending"|"done"|"failed", zones: string[], names?: string[], startedAt: string, finishedAt?: string, pid?: number, log?: string, reason?: string }} NarrationState
  */
-
-/** @param {number} pid */
-function pidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
-  }
-}
 
 /** @param {number} ms */
 function formatAge(ms) {
@@ -76,7 +67,7 @@ export function readNarrationState(dir) {
 export function formatNarrationStatus(narration, opts = {}) {
   if (!narration || narration.status === "done") return null;
   const now = opts.now ?? Date.now();
-  const isAlive = opts.isAlive ?? pidAlive;
+  const isAlive = opts.isAlive ?? isPidAlive;
   const count = new Set([...(narration.zones ?? []), ...(narration.names ?? [])]).size;
   const what = `${count} zone${count === 1 ? "" : "s"}`;
   // No invented fallback: `readNarrationState` fills `log` from the resolver

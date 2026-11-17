@@ -30,7 +30,8 @@ import {
   resolveGitBranch,
   slugifyTitle,
   resolveSiblingSlugs,
- resolveRexPaths } from "../../store/index.js";
+  resolveRexPaths,
+} from "../../store/index.js";
 import { atomicWrite, atomicWriteJSON } from "../../store/atomic-write.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { buildBundle, countItems, scopeItems } from "../../core/prd-bundle.js";

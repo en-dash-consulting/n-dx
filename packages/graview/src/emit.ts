@@ -12,6 +12,7 @@ import { resolveLayout, type Layout } from "./llm-gateway.js";
 import { documentFor } from "./document.js";
 import { buildSnapshot, graviewDirOf, type BuildSnapshotOptions } from "./snapshot.js";
 import { canonicalJson } from "./canonical.js";
+import { errorMessage } from "./error-message.js";
 import { writeSnapshotFile } from "./snapshot-file.js";
 import { fitSnapshot, type Misfit } from "./fit.js";
 import { buildIsoModel, loadFromSourcevision, renderIsoMap } from "./sourcevision-gateway.js";
@@ -73,7 +74,7 @@ function writeIsoMap(root: string, graviewDir: string, title: string, warn: Warn
   } catch (error) {
     // The map on disk is of an earlier analysis, if any: take it away rather than frame it as this one.
     rmSync(path, { force: true });
-    warn?.(`The code map was not written: ${error instanceof Error ? error.message : String(error)}`);
+    warn?.(`The code map was not written: ${errorMessage(error)}`);
     return undefined;
   }
 }

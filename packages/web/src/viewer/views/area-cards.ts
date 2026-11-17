@@ -23,7 +23,7 @@ import type {
   AreaInboxGuess,
   OpenChangeOverlay,
 } from "./product-model.js";
-import { CHANGE_STAGE_LABELS } from "./product-model.js";
+import { CHANGE_STAGE_LABELS, shortChangeId } from "./product-model.js";
 
 /**
  * What the code card's action says. Neither the dashboard nor rex has a
@@ -36,10 +36,6 @@ export const LINK_CODE_HELP =
 
 /** The empty state's text for the code card. */
 export const NO_CODE_MESSAGE = "No capability here lists its code files yet.";
-
-function shortId(change: { id: string; displayId?: string }): string {
-  return change.displayId ?? change.id.slice(0, 8);
-}
 
 function Card({ id, title, count, children }: { id: string; title: string; count?: number; children?: ComponentChildren }) {
   return h("section", { class: "area-card", "aria-labelledby": `area-card-${id}`, "data-card": id },
@@ -81,7 +77,7 @@ function MovingNow({ changes, onOpenChange, onOpenAll }: {
         h("ul", { class: "area-card-list" },
           rows.map((c) =>
             h("li", { key: c.id, class: "area-card-row", "data-change-id": c.id },
-              h("span", { class: "ch-display-id" }, shortId(c)),
+              h("span", { class: "ch-display-id" }, shortChangeId(c)),
               onOpenChange
                 ? h("button", { type: "button", class: "ch-change-link", onClick: () => onOpenChange(c.id) }, c.title)
                 : h("span", null, c.title),
@@ -96,7 +92,7 @@ function WaitingInInbox({ guesses, onPlace }: { guesses: readonly AreaInboxGuess
       : h("ul", { class: "area-card-list" },
           guesses.map((g) =>
             h("li", { key: g.id, class: "area-card-row", "data-change-id": g.id },
-              h("span", { class: "ch-display-id" }, shortId(g)),
+              h("span", { class: "ch-display-id" }, shortChangeId(g)),
               h("span", { class: "area-card-title-text" }, g.title),
               h("span", { class: "inbox-guess" },
                 h("span", { class: "inbox-guess-label" }, "Best guess"),
@@ -121,7 +117,7 @@ function RecentlyApplied({ changes }: { changes: readonly AreaAppliedChange[] })
       : h("ul", { class: "area-card-list" },
           changes.map((c) =>
             h("li", { key: c.id, class: "area-card-row", "data-change-id": c.id },
-              h("span", { class: "ch-display-id" }, shortId(c)),
+              h("span", { class: "ch-display-id" }, shortChangeId(c)),
               h("span", { class: "area-card-title-text" }, c.title),
               c.appliedAt ? h("span", { class: "tag" }, `applied ${day(c.appliedAt)}`) : null,
               c.shippedIn ? h("span", { class: "tag" }, `shipped in ${c.shippedIn}`) : null))));

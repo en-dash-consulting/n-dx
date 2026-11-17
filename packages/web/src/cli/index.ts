@@ -14,7 +14,7 @@ import { suppressKnownDeprecations, setVerbose, setDebug } from "@n-dx/llm-clien
 import { startServer } from "../server/start.js";
 import { startHub, DEFAULT_HUB_PORT } from "../hub/index.js";
 import { startPreviewServer, DEFAULT_PREVIEW_PORT } from "../server/preview.js";
-import type { ViewerScope } from "../shared/view-routing.js";
+import type { ViewerScope } from "../shared/index.js";
 
 suppressKnownDeprecations();
 

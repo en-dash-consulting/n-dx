@@ -60,7 +60,7 @@ afterEach(() => {
 
 describe("Git mutation failures in the Hench lifecycle", () => {
   it("stops before work starts when a pre-run commit is rejected", async () => {
-    const { performPreRunCommitGateIfNeeded } = await import("../../src/agent/lifecycle/shared.js");
+    const { performPreRunCommitGateIfNeeded } = await import("../../src/agent/lifecycle/pre-run-commit-gate.js");
 
     const result = await performPreRunCommitGateIfNeeded({
       projectDir: "/project",
@@ -135,8 +135,9 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       await writeFile(prdPath, "status: pending\n", "utf-8");
 
       await failGitMutation("commit", "pre-commit hook rejected this change");
-      const { commitResetDeferredChanges, performPreRunCommitGateIfNeeded } = await import(
-        "../../src/agent/lifecycle/shared.js"
+      const { commitResetDeferredChanges } = await import("../../src/agent/lifecycle/shared.js");
+      const { performPreRunCommitGateIfNeeded } = await import(
+        "../../src/agent/lifecycle/pre-run-commit-gate.js"
       );
 
       const result = await commitResetDeferredChanges(projectDir, 1);

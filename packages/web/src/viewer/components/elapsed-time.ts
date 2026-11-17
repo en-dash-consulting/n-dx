@@ -19,6 +19,12 @@
 
 import { h } from "preact";
 import { useTick } from "../hooks/index.js";
+import { fmtDuration } from "../utils/format.js";
+
+/** Time from `startedAt` until now, written as `fmtDuration` writes a finished span. */
+export function elapsedUntilNow(startedAt: string): string {
+  return fmtDuration(startedAt, new Date().toISOString());
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 

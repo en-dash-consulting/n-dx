@@ -13,6 +13,9 @@
  * Read once, as the module loads: the files describe the build this process
  * loaded, and a rebuild while the hub runs must not make it claim the new one.
  *
+ * Also where the hub asks which package a directory is ({@link isPackageNamed}),
+ * for the binaries it is willing to spawn.
+ *
  * @module web/hub/build-identity
  */
 
@@ -36,8 +39,8 @@ export interface HubBuildIdentity {
 /** File name of the stamp inside dist/ (scripts/lib/stale-dist.mjs, packages/core/build-identity.mjs). */
 const BUILD_STAMP_FILE = ".build-stamp.json";
 
-/** The package root: this module sits at `<pkg>/src/hub/` or `<pkg>/dist/hub/`. */
-const PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+/** `@n-dx/web`'s own root: this module sits at `<pkg>/src/hub/` or `<pkg>/dist/hub/`. */
+export const WEB_PACKAGE_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
 function readJson(path: string): Record<string, unknown> | null {
   try {
@@ -48,8 +51,16 @@ function readJson(path: string): Record<string, unknown> | null {
   }
 }
 
-/** Read the identity of the package rooted at `packageRoot`. Exported for tests. */
-export function readBuildIdentity(packageRoot: string): HubBuildIdentity {
+/**
+ * Whether `dir` is the package called `name`, by its own package.json.
+ * No package.json, an unreadable one, or one that is not JSON is not the package.
+ */
+export function isPackageNamed(dir: string, name: string): boolean {
+  return readJson(join(dir, "package.json"))?.name === name;
+}
+
+/** Read the identity of the package rooted at `packageRoot`. */
+function readBuildIdentity(packageRoot: string): HubBuildIdentity {
   const version = readJson(join(packageRoot, "package.json"))?.version;
   const sourceHash = readJson(join(packageRoot, "dist", BUILD_STAMP_FILE))?.sourceHash;
   return {
@@ -60,7 +71,7 @@ export function readBuildIdentity(packageRoot: string): HubBuildIdentity {
 }
 
 /** Read when the hub's modules load, so a later rebuild cannot change the answer. */
-const OWN_IDENTITY = readBuildIdentity(PACKAGE_ROOT);
+const OWN_IDENTITY = readBuildIdentity(WEB_PACKAGE_ROOT);
 
 /** This hub's own build identity. */
 export function hubBuildIdentity(): HubBuildIdentity {

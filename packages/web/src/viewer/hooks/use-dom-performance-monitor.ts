@@ -8,11 +8,10 @@
  * @see ../performance/dom-performance-monitor.ts — standalone monitoring module
  */
 
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { useState, useEffect, useCallback } from "preact/hooks";
 import type { RefObject } from "preact";
 import type {
   DOMNodeSnapshot,
-  DOMPerformanceConfig,
   RenderTiming,
   UpdateComparison,
   PerformanceSummary,
@@ -29,9 +28,6 @@ import {
   recordUpdate,
   measureOperation,
   computeSummary,
-  resetDOMPerformanceMonitor,
-  countDOMNodes,
-  readHeapUsage,
 } from "../performance/dom-performance-monitor.js";
 
 export interface UseDOMPerformanceMonitorOptions {
@@ -103,7 +99,8 @@ export function useDOMPerformanceMonitor(
   containerRef: RefObject<Element>,
   options: UseDOMPerformanceMonitorOptions = {},
 ): UseDOMPerformanceMonitorResult {
-  const { intervalMs = 2000, maxSnapshots, enabled = true } = options;
+  // An omitted interval falls through to the monitor's own default.
+  const { intervalMs, maxSnapshots, enabled = true } = options;
 
   const [snapshot, setSnapshot] = useState<DOMNodeSnapshot | null>(
     getLatestDOMSnapshot,

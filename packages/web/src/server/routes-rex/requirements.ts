@@ -7,8 +7,8 @@ import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, appendLog } from "./rex-route-helpers.js";
-import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { findItemById, appendLog, loadPRDOr404, broadcastPrdChanged } from "./rex-route-helpers.js";
+import { refreshPRDCache } from "../prd-io.js";
 import { resolveStore } from "../rex-gateway.js";
 import { itemTypeOf } from "../../shared/index.js";
 
@@ -145,11 +145,8 @@ function handleGetRequirements(
   ctx: ServerContext,
   itemId: string,
 ): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   const item = findItemById(doc.items, itemId);
   if (!item) {
@@ -168,6 +165,51 @@ function handleGetRequirements(
     inheritedCount: inherited.length - own.length,
   });
   return true;
+}
+
+type RequirementStore = Awaited<ReturnType<typeof resolveStore>>;
+
+/**
+ * The item and requirement a PATCH or DELETE names, or null once it has
+ * answered 404 for whichever is missing.
+ */
+async function findRequirement(
+  res: ServerResponse,
+  ctx: ServerContext,
+  itemId: string,
+  reqId: string,
+): Promise<{ store: RequirementStore; item: PRDItem; reqs: RequirementRecord[]; reqIdx: number } | null> {
+  // Use the PRDStore so writes go to the correct backend (prd_tree/ or
+  // prd.md) rather than always writing to prd.md via savePRDSync.
+  const store = await resolveStore(ctx.rexDir);
+  const item = await store.getItem(itemId);
+  if (!item) {
+    errorResponse(res, 404, `Item "${itemId}" not found`);
+    return null;
+  }
+
+  const reqs = (item.requirements ?? []) as RequirementRecord[];
+  const reqIdx = reqs.findIndex((r) => r.id === reqId);
+  if (reqIdx === -1) {
+    errorResponse(res, 404, `Requirement "${reqId}" not found on item "${itemId}"`);
+    return null;
+  }
+  return { store, item, reqs, reqIdx };
+}
+
+/** Store an item's requirements, refresh the PRD cache, log the change and tell the open viewers. */
+async function saveRequirements(
+  store: RequirementStore,
+  ctx: ServerContext,
+  itemId: string,
+  requirements: RequirementRecord[] | undefined,
+  log: { event: string; detail: string },
+  broadcast?: WebSocketBroadcaster,
+): Promise<void> {
+  await store.updateItem(itemId, { requirements } as Partial<PRDItem>);
+  refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  appendLog(ctx, { timestamp: new Date().toISOString(), event: log.event, itemId, detail: log.detail });
+  broadcastPrdChanged(broadcast);
 }
 
 /** POST /api/rex/items/:id/requirements */
@@ -232,23 +274,10 @@ async function handleAddRequirement(
       : [];
     const updatedRequirements = [...existingRequirements, requirement];
 
-    await store.updateItem(itemId, { requirements: updatedRequirements } as Partial<PRDItem>);
-    const updatedDoc = await store.loadDocument();
-    refreshPRDCache(ctx.rexDir, updatedDoc);
-
-    appendLog(ctx, {
-      timestamp: new Date().toISOString(),
+    await saveRequirements(store, ctx, itemId, updatedRequirements, {
       event: "requirement_added",
-      itemId,
       detail: `Added ${input.category} requirement "${input.title}" to item "${item.title}" (via web)`,
-    });
-
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    }, broadcast);
 
     jsonResponse(res, 201, { ok: true, id, requirement });
   } catch (err) {
@@ -266,21 +295,9 @@ async function handleUpdateRequirement(
   reqId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  // Use the PRDStore so writes go to the correct backend (prd_tree/ or
-  // prd.md) rather than always writing to prd.md via savePRDSync.
-  const store = await resolveStore(ctx.rexDir);
-  const item = await store.getItem(itemId);
-  if (!item) {
-    errorResponse(res, 404, `Item "${itemId}" not found`);
-    return true;
-  }
-
-  const reqs = (item.requirements ?? []) as RequirementRecord[];
-  const reqIdx = reqs.findIndex((r) => r.id === reqId);
-  if (reqIdx === -1) {
-    errorResponse(res, 404, `Requirement "${reqId}" not found on item "${itemId}"`);
-    return true;
-  }
+  const found = await findRequirement(res, ctx, itemId, reqId);
+  if (!found) return true;
+  const { store, item, reqs, reqIdx } = found;
 
   try {
     const body = await readBody(req, res);
@@ -304,23 +321,10 @@ async function handleUpdateRequirement(
     const existing = { ...reqs[reqIdx], ...updates, id: reqId };
     const updatedRequirements = reqs.map((r, idx) => (idx === reqIdx ? existing : r));
 
-    await store.updateItem(itemId, { requirements: updatedRequirements } as Partial<PRDItem>);
-    const updatedDoc = await store.loadDocument();
-    refreshPRDCache(ctx.rexDir, updatedDoc);
-
-    appendLog(ctx, {
-      timestamp: new Date().toISOString(),
+    await saveRequirements(store, ctx, itemId, updatedRequirements, {
       event: "requirement_updated",
-      itemId,
       detail: `Updated requirement "${existing.title}" on item "${item.title}" (via web)`,
-    });
-
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    }, broadcast);
 
     jsonResponse(res, 200, { ok: true, requirement: existing });
   } catch (err) {
@@ -337,44 +341,17 @@ async function handleDeleteRequirement(
   reqId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  // Use the PRDStore so writes go to the correct backend (prd_tree/ or
-  // prd.md) rather than always writing to prd.md via savePRDSync.
-  const store = await resolveStore(ctx.rexDir);
-  const item = await store.getItem(itemId);
-  if (!item) {
-    errorResponse(res, 404, `Item "${itemId}" not found`);
-    return true;
-  }
-
-  const reqs = (item.requirements ?? []) as RequirementRecord[];
-  const reqIdx = reqs.findIndex((r) => r.id === reqId);
-  if (reqIdx === -1) {
-    errorResponse(res, 404, `Requirement "${reqId}" not found on item "${itemId}"`);
-    return true;
-  }
+  const found = await findRequirement(res, ctx, itemId, reqId);
+  if (!found) return true;
+  const { store, item, reqs, reqIdx } = found;
 
   const removed = reqs[reqIdx];
   const updatedRequirements = reqs.filter((_, idx) => idx !== reqIdx);
 
-  await store.updateItem(itemId, {
-    requirements: updatedRequirements.length > 0 ? updatedRequirements : undefined,
-  } as Partial<PRDItem>);
-  const updatedDoc = await store.loadDocument();
-  refreshPRDCache(ctx.rexDir, updatedDoc);
-
-  appendLog(ctx, {
-    timestamp: new Date().toISOString(),
+  await saveRequirements(store, ctx, itemId, updatedRequirements.length > 0 ? updatedRequirements : undefined, {
     event: "requirement_deleted",
-    itemId,
     detail: `Deleted requirement "${removed.title}" from item "${item.title}" (via web)`,
-  });
-
-  if (broadcast) {
-    broadcast({
-      type: "rex:prd-changed",
-      timestamp: new Date().toISOString(),
-    });
-  }
+  }, broadcast);
 
   jsonResponse(res, 200, { ok: true });
   return true;
@@ -410,11 +387,8 @@ function handleRequirementsCoverage(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   const stats: RequirementsCoverageStats = {
     totalItems: 0,
@@ -483,11 +457,8 @@ function handleRequirementsTraceability(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   // Build traceability: each requirement → which items it applies to
   const matrix: Array<{

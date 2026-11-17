@@ -18,7 +18,6 @@
 import type {
   Finding,
   ProjectProfile,
-  TokenUsage,
   Zone,
   ZoneCrossing,
 } from "../schema/index.js";

@@ -13,6 +13,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { isLocalConfigTracked, resolveLayout } from "@n-dx/llm-client";
+import { isRecord } from "../../shared/index.js";
 
 /** A connection id: also the tool namespace, so it must fit a tool name. */
 export const CONNECTION_ID_PATTERN = /^[a-z][a-z0-9-]{0,30}$/;
@@ -87,7 +88,7 @@ export interface LoadConnectionsOptions {
 type Json = Record<string, unknown>;
 
 function asRecord(value: unknown): Json | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Json) : undefined;
+  return isRecord(value) ? value : undefined;
 }
 
 function readJson(path: string, warn: (message: string) => void): Json | undefined {

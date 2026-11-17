@@ -139,7 +139,7 @@ function formatTextReport(options: ValidateTokensOptions, runs: RunRecord[]) {
   }
 }
 
-function formatJsonReport(options: ValidateTokensOptions, runs: RunRecord[]) {
+function formatJsonReport(runs: RunRecord[]) {
   const summary = validateTokenReportingBatch(runs);
 
   const runsReport = runs.map((run) => {
@@ -209,7 +209,7 @@ export async function cmdValidateTokens(henchDir: string, flags: ValidateTokensO
 
   // Format and output
   if (format === "json") {
-    formatJsonReport(flags, runs);
+    formatJsonReport(runs);
   } else {
     formatTextReport(flags, runs);
   }

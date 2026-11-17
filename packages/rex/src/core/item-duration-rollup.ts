@@ -102,10 +102,6 @@ function selfRunningMs(item: PRDItem, nowMs: number): number {
   return 0;
 }
 
-function emptyDuration(): ItemDurationTotals {
-  return { totalMs: 0, runningMs: 0, isRunning: false };
-}
-
 /**
  * Roll up work durations across every item in the PRD tree.
  *

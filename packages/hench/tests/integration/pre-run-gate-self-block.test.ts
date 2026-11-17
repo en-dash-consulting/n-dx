@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { execFile as execFileCb } from "node:child_process";
-import { performPreRunCommitGateIfNeeded } from "../../src/agent/lifecycle/shared.js";
+import { performPreRunCommitGateIfNeeded } from "../../src/agent/lifecycle/pre-run-commit-gate.js";
 import { measureChangeMagnitude } from "../../src/agent/analysis/change-magnitude.js";
 import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 

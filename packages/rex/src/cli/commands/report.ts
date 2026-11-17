@@ -1,23 +1,15 @@
-import { join } from "node:path";
-import { readFile } from "node:fs/promises";
 import { SCHEMA_VERSION } from "../../schema/index.js";
-import { validateDocument, validateConfig } from "../../schema/validate.js";
-import { validateDAG } from "../../core/dag.js";
+import { validateDocument } from "../../schema/validate.js";
 import { validateStructure } from "../../core/structural.js";
 import { walkTree } from "../../core/tree.js";
 import { computeStats } from "../../core/stats.js";
 import { resolveStore, isChangeLayerStore, resolveRexPaths } from "../../store/index.js";
+import { checkConfigSchema, checkDag, schemaIssueLines, structuralChecks } from "./prd-checks.js";
 
 import { result } from "../output.js";
 import type { PRDDocument, PRDItem, ItemLevel } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
-
-interface CheckResult {
-  name: string;
-  pass: boolean;
-  severity?: "error" | "warn";
-  errors: string[];
-}
+import type { CheckResult } from "./prd-checks.js";
 
 interface LevelBreakdown {
   total: number;
@@ -63,27 +55,7 @@ async function runChecks(dir: string): Promise<{
   // hierarchy and "a container needs a child" do not describe it (as validate.ts).
   let changeLayer = false;
 
-  // Check config.json schema
-  try {
-    const raw = await readFile(join(rexDir, "config.json"), "utf-8");
-    const parsed = JSON.parse(raw);
-    const res = validateConfig(parsed);
-    if (res.ok) {
-      checks.push({ name: "config.json schema", pass: true, errors: [] });
-    } else {
-      checks.push({
-        name: "config.json schema",
-        pass: false,
-        errors: res.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
-      });
-    }
-  } catch (err) {
-    checks.push({
-      name: "config.json schema",
-      pass: false,
-      errors: [(err as Error).message],
-    });
-  }
+  checks.push(await checkConfigSchema(rexDir));
 
   // Check PRD schema (Markdown is authoritative; FileStore performs legacy migration if needed)
   try {
@@ -98,7 +70,7 @@ async function runChecks(dir: string): Promise<{
       checks.push({
         name: "PRD schema",
         pass: false,
-        errors: res.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+        errors: schemaIssueLines(res.errors),
       });
     }
   } catch (err) {
@@ -124,57 +96,13 @@ async function runChecks(dir: string): Promise<{
 
   // DAG validation
   if (doc) {
-    const dagResult = validateDAG(doc.items);
-    if (dagResult.valid) {
-      checks.push({ name: "DAG integrity", pass: true, errors: [] });
-    } else {
-      checks.push({
-        name: "DAG integrity",
-        pass: false,
-        errors: dagResult.errors,
-      });
-    }
+    checks.push(checkDag(doc.items));
   }
 
   // Structural validation: orphans, cycles, stuck tasks
   if (doc) {
     const structural = validateStructure(doc.items);
-
-    if (!changeLayer) {
-      checks.push({
-        name: "hierarchy placement",
-        pass: structural.orphanedItems.length === 0,
-        errors: structural.orphanedItems.map(
-          (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
-        ),
-      });
-    }
-
-    checks.push({
-      name: "blockedBy cycles",
-      pass: structural.cycles.length === 0,
-      errors: structural.cycles.map((c) => c.join(" → ")),
-    });
-
-    checks.push({
-      name: "stuck tasks",
-      pass: structural.stuckItems.length === 0,
-      severity: "warn",
-      errors: structural.stuckItems.map(
-        (s) => `"${s.itemId}": ${s.reason}`,
-      ),
-    });
-
-    if (!changeLayer) {
-      checks.push({
-        name: "empty containers",
-        pass: structural.emptyContainers.length === 0,
-        severity: "warn",
-        errors: structural.emptyContainers.map(
-          (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
-        ),
-      });
-    }
+    checks.push(...structuralChecks(structural, changeLayer));
 
     if (structural.warnings.length > 0) {
       checks.push({

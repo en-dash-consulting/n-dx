@@ -18,11 +18,11 @@
  * All data comes from `useSidecar` in main.ts; this file only draws it.
  */
 
-import { h } from "preact";
+import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/sidecar.js";
-import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/sidecar.js";
+import type { SidecarFrame, SidecarRuntimeEvent, SidecarSetupNeed, SidecarState } from "../hooks/sidecar.js";
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions, NewSessionButton } from "./sidecar-sessions.js";
 import { modelLabel, vendorLabel } from "./sidecar-agent-names.js";
@@ -249,6 +249,53 @@ export function SidecarFrameRow({ frame, result, card, connectionLabels }: {
   }
 }
 
+/**
+ * The transcript list's ref, scrolled to the bottom whenever a frame arrives
+ * so both drawers follow the newest one.
+ */
+export function useFollowNewestFrame(frameCount: number) {
+  const transcriptRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [frameCount]);
+  return transcriptRef;
+}
+
+/**
+ * What stands between the session and its next turn, under the cards: the CLI
+ * setup the agent still needs, how the last turn ended, the session's error
+ * and the paused bar. The hub drawer draws them alike; only the hint for a
+ * missing CLI differs, so the caller supplies it.
+ */
+export function SidecarTurnNotices({ sidecar, setupNeed, installHint }: {
+  sidecar: SidecarState;
+  setupNeed: SidecarSetupNeed | null;
+  installHint: string;
+}) {
+  const paused = sidecar.running && sidecar.sessionWaiting > 0;
+  const turnFailed = sidecar.lastTurn && sidecar.lastTurn.status !== "completed" ? sidecar.lastTurn : null;
+  return h(Fragment, null,
+    setupNeed
+      ? h("div", { class: "sidecar-setup", role: "alert", "data-reason": setupNeed.reason },
+          h("p", { class: "sidecar-setup-title" },
+            `The ${setupNeed.cli} CLI is ${setupNeed.reason === "missing-cli" ? "not installed" : "not signed in"}`),
+          h("p", { class: "sidecar-setup-hint" },
+            setupNeed.reason === "missing-cli" ? installHint : "Sign in, then send your message again:"),
+          h("code", { class: "sidecar-setup-command" }, setupNeed.command))
+      : null,
+    turnFailed && !setupNeed
+      ? h("p", { class: "sidecar-turn-end", role: "status" },
+          `Turn ${turnFailed.status}${turnFailed.error ? `: ${turnFailed.error}` : ""}`)
+      : null,
+    sidecar.error ? h("p", { class: "sidecar-error", role: "alert" }, sidecar.error) : null,
+    paused
+      ? h("div", { class: "sidecar-paused", role: "status" },
+          `Agent paused · waiting on ${sidecar.sessionWaiting === 1 ? "your decision" : `${sidecar.sessionWaiting} decisions`}`)
+      : null,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Attachment and lens chips
 // ---------------------------------------------------------------------------
@@ -332,7 +379,6 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [draft, setDraft] = useState("");
   const [listing, setListing] = useState(false);
   const [lensMenu, setLensMenu] = useState(false);
-  const transcriptRef = useRef<HTMLOListElement>(null);
   const hub = useHubProjects();
   const tabs = useExtensionTabs(hub);
   const [selected, setSelected] = useState(SIDECAR_TAB);
@@ -380,11 +426,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     return () => { root.style.removeProperty("--sidecar-w"); };
   }, [shownWidth]);
 
-  // Follow the newest frame.
-  useEffect(() => {
-    const el = transcriptRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [sidecar.frames.length]);
+  const transcriptRef = useFollowNewestFrame(sidecar.frames.length);
 
   const onResizeStart = (e: PointerEvent) => {
     e.preventDefault();
@@ -444,8 +486,6 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const models = agent ? catalog?.[agent.vendor]?.models ?? [] : [];
   // A session's own model may not be in the live list; keep it selectable.
   const modelOptions = agent?.model && !models.includes(agent.model) ? [agent.model, ...models] : models;
-  const paused = sidecar.running && sidecar.sessionWaiting > 0;
-  const turnFailed = sidecar.lastTurn && sidecar.lastTurn.status !== "completed" ? sidecar.lastTurn : null;
 
   return h("aside", {
     id: "sidecar-drawer",
@@ -527,25 +567,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       rows.length > 0 ? rows : h("li", { class: "sidecar-empty" }, "Ask about this project. Each turn runs your vendor CLI."),
     ),
     h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide, send: cardTurnSender(sidecar) }),
-    setupNeed
-      ? h("div", { class: "sidecar-setup", role: "alert", "data-reason": setupNeed.reason },
-          h("p", { class: "sidecar-setup-title" },
-            setupNeed.reason === "missing-cli"
-              ? `The ${setupNeed.cli} CLI is not installed`
-              : `The ${setupNeed.cli} CLI is not signed in`),
-          h("p", { class: "sidecar-setup-hint" },
-            setupNeed.reason === "missing-cli" ? "Install it, then reopen Sidecar:" : "Sign in, then send your message again:"),
-          h("code", { class: "sidecar-setup-command" }, setupNeed.command))
-      : null,
-    turnFailed && !setupNeed
-      ? h("p", { class: "sidecar-turn-end", role: "status" },
-          `Turn ${turnFailed.status}${turnFailed.error ? `: ${turnFailed.error}` : ""}`)
-      : null,
-    sidecar.error ? h("p", { class: "sidecar-error", role: "alert" }, sidecar.error) : null,
-    paused
-      ? h("div", { class: "sidecar-paused", role: "status" },
-          `Agent paused · waiting on ${sidecar.sessionWaiting === 1 ? "your decision" : `${sidecar.sessionWaiting} decisions`}`)
-      : null,
+    h(SidecarTurnNotices, { sidecar, setupNeed, installHint: "Install it, then reopen Sidecar:" }),
     sidecar.readOnly
       ? h("div", { class: "sidecar-readonly", role: "status" },
           h("span", null, "This session has ended. Its transcript is read-only."),

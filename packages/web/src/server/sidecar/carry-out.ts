@@ -25,7 +25,7 @@
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.3, §12.
  */
 
-import { laneSteps, stepRunOptions } from "../../shared/index.js";
+import { laneSteps, stepRunOptions, isRecord } from "../../shared/index.js";
 import type { QueuePlan, SidecarChangeSet, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import { choiceResultText } from "./choice-card.js";
@@ -451,7 +451,7 @@ export function outputTail(output: string): { text: string; cutLines: number; cu
  */
 export function workOptions(input: Record<string, unknown>): Record<string, unknown> {
   const { options } = input;
-  const given = options && typeof options === "object" && !Array.isArray(options) ? options as Record<string, unknown> : {};
+  const given = isRecord(options) ? options : {};
   const { requireUnblocked, ...rest } = given;
   return requireUnblocked === false ? rest : { ...rest, requireUnblocked: true };
 }

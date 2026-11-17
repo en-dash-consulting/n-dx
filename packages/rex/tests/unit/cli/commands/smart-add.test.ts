@@ -6,12 +6,12 @@ import {
   filterProposalsByIndex,
   parseApprovalInput,
   parseDuplicatePromptInput,
-  parseGranularityInput,
   remapDuplicateMatchesForSelectedProposals,
   formatQualityWarnings,
   classifySmartAddError,
   applySmartPlacement,
 } from "../../../../src/cli/commands/smart-add.js";
+import { parseGranularityInput } from "../../../../src/cli/commands/proposal-selection.js";
 import type { Proposal, QualityIssue } from "../../../../src/analyze/index.js";
 import type { ProposalDuplicateMatch } from "../../../../src/cli/commands/smart-add-duplicates.js";
 import type { PRDItem } from "../../../../src/schema/index.js";

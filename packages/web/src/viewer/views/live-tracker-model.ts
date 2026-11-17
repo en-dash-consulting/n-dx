@@ -4,6 +4,8 @@
  * Plain functions over plain values; `live-tracker.ts` only lays them out.
  */
 
+import { isRecord } from "../utils/is-record.js";
+
 export type TrackerResult = "would" | "ok" | "duplicate" | "refused" | "card" | "dismissed" | "unavailable" | "needs-sign-in";
 
 export interface TrackerProblem {
@@ -35,8 +37,6 @@ export interface TrackerActivity {
   cards: string[];
   connection: TrackerConnectionState;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 
 /** The route's answer as {@link TrackerActivity}; null when no tracker connection is configured or the answer is not one. */
 export function asTrackerActivity(body: unknown): TrackerActivity | null {

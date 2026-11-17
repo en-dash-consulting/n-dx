@@ -18,7 +18,8 @@
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { useCliName, useFeatureToggle } from "../hooks/index.js";
-import { TrackerCardForm, errorOf } from "./tracker-card-form.js";
+import { TrackerCardForm } from "./tracker-card-form.js";
+import { stringErrorOf } from "../utils/response-error.js";
 import { linkHref, linkText } from "./tracker-links.js";
 
 export interface TrackerChipRead {
@@ -98,7 +99,7 @@ function TrackerLiveState({ changeId, workRef, label }: { changeId: string; work
     setLive(null);
     fetch(`/api/tracker/changes/${encodeURIComponent(changeId)}/state`)
       .then(async (res): Promise<LiveState> => {
-        if (!res.ok) return { state: null, problem: await errorOf(res, "Could not read the tracker") };
+        if (!res.ok) return { state: null, problem: await stringErrorOf(res, "Could not read the tracker") };
         const body = (await res.json()) as { state?: unknown; problem?: unknown };
         return typeof body.state === "string" ? { state: body.state } : { state: null, ...(typeof body.problem === "string" && { problem: body.problem }) };
       })
@@ -138,7 +139,7 @@ export function CreateInTrackerButton({ changeId, read, onCreated }: { changeId:
     setError(null);
     try {
       const res = await fetch(`/api/tracker/changes/${encodeURIComponent(changeId)}/create`, { method: "POST" });
-      if (!res.ok) { setError(await errorOf(res, "Could not raise the card")); return; }
+      if (!res.ok) { setError(await stringErrorOf(res, "Could not raise the card")); return; }
       const body = (await res.json()) as { requestId: string; entry: { call: Raised["call"] } };
       setCard({ requestId: body.requestId, call: body.entry.call });
     } catch (err) {

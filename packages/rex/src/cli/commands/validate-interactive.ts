@@ -12,6 +12,7 @@ import {
   removeFeature,
 } from "../../core/remove-feature.js";
 import { info, warn } from "../output.js";
+import { promptAnswer } from "../prompt.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ export async function resolveEpiclessFeatures(
   epiclessFeatures: EpiclessFeature[],
   options?: { prompt?: PromptFn },
 ): Promise<EpiclessResolution[]> {
-  const prompt = options?.prompt ?? defaultPrompt;
+  const prompt = options?.prompt ?? promptAnswer;
   const resolutions: EpiclessResolution[] = [];
 
   // Collect available epics for correlation
@@ -325,20 +326,4 @@ export function applyEpiclessResolutions(
   }
 
   return mutated;
-}
-
-// ── Default readline prompt ──────────────────────────────────────────────────
-
-async function defaultPrompt(question: string): Promise<string> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const answer = await new Promise<string>((resolve) =>
-    rl.question(question, resolve),
-  );
-  rl.close();
-  return answer;
 }

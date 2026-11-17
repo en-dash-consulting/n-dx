@@ -31,8 +31,8 @@ import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } fro
 import type { CodexConfig } from "./llm-types.js";
 import { requireVendorApiKey, resolveVendorKey } from "./vendor-auth.js";
 import { resolveApiEndpoint } from "./config.js";
+import { postJsonWithRetries, throwHttpStatusError } from "./http-retry.js";
 
-const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
@@ -74,6 +74,44 @@ export function parseOpenAiTokenUsage(
   return { input, output };
 }
 
+// ── Response reading ──────────────────────────────────────────────────────
+// The local provider speaks the same Chat Completions format and reads its
+// responses through these too.
+
+/**
+ * Read a Chat Completions response: the first choice's message content
+ * (empty when there is none) and the token usage, when reported.
+ */
+export function readChatCompletion(data: Record<string, unknown>): CompletionResult {
+  const choices = data.choices as Array<Record<string, unknown>> | undefined;
+  let text = "";
+
+  if (choices && choices.length > 0) {
+    const message = choices[0].message as Record<string, unknown> | undefined;
+    if (message && typeof message.content === "string") {
+      text = message.content;
+    }
+  }
+
+  const tokenUsage = data.usage
+    ? parseOpenAiTokenUsage(data.usage as Record<string, unknown>)
+    : undefined;
+
+  return { text, tokenUsage };
+}
+
+/** The first choice's delta content in a streamed Chat Completions chunk, if it carries one. */
+export function readChatDeltaText(data: Record<string, unknown>): string | undefined {
+  const choices = data.choices as Array<Record<string, unknown>> | undefined;
+  if (choices && choices.length > 0) {
+    const delta = choices[0].delta as Record<string, unknown> | undefined;
+    if (delta && typeof delta.content === "string") {
+      return delta.content;
+    }
+  }
+  return undefined;
+}
+
 // ── Auth resolution ───────────────────────────────────────────────────────
 
 /**
@@ -95,20 +133,6 @@ export function resolveOpenAiApiKey(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-
-/** Classify an HTTP status code into an ErrorReason and throw. */
-function classifyAndThrow(status: number, message: string): never {
-  if (status === 401 || status === 403) {
-    throw new ClaudeClientError(message, "auth", false);
-  }
-  if (status === 408) {
-    throw new ClaudeClientError(message, "timeout", true);
-  }
-  if (RETRY_STATUS_CODES.has(status)) {
-    throw new ClaudeClientError(message, "rate-limit", true);
-  }
-  throw new ClaudeClientError(message, "unknown", false);
-}
 
 /** Build the base URL for OpenAI API requests. */
 function resolveBaseUrl(codexConfig?: CodexConfig): string {
@@ -187,87 +211,20 @@ export function createOpenAiApiProvider(
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       const model = request.model || defaultModel;
-      let lastError: Error | undefined;
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          const response = await fetch(`${baseUrl}/chat/completions`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              model,
-              max_tokens: maxTokens,
-              messages: [{ role: "user", content: request.prompt }],
-            }),
-          });
-
-          if (!response.ok) {
-            const body = await response.text();
-            const message = `OpenAI API error ${response.status}: ${body}`;
-
-            // Auth errors are not retryable
-            if (response.status === 401 || response.status === 403) {
-              throw new ClaudeClientError(message, "auth", false);
-            }
-
-            // Timeout-like errors
-            if (response.status === 408) {
-              throw new ClaudeClientError(message, "timeout", true);
-            }
-
-            // Retryable errors
-            if (RETRY_STATUS_CODES.has(response.status) && attempt < maxRetries) {
-              const delay = baseDelayMs * 2 ** attempt;
-              await new Promise((r) => setTimeout(r, delay));
-              continue;
-            }
-
-            // Exhausted retries for retryable errors
-            if (RETRY_STATUS_CODES.has(response.status)) {
-              throw new ClaudeClientError(message, "rate-limit", true);
-            }
-
-            throw new ClaudeClientError(message, "unknown", false);
-          }
-
-          const data = await response.json() as Record<string, unknown>;
-          const choices = data.choices as Array<Record<string, unknown>> | undefined;
-          let text = "";
-
-          if (choices && choices.length > 0) {
-            const message = choices[0].message as Record<string, unknown> | undefined;
-            if (message && typeof message.content === "string") {
-              text = message.content;
-            }
-          }
-
-          const tokenUsage = data.usage
-            ? parseOpenAiTokenUsage(data.usage as Record<string, unknown>)
-            : undefined;
-
-          return { text, tokenUsage };
-        } catch (err) {
-          if (err instanceof ClaudeClientError) {
-            throw err;
-          }
-          lastError = err as Error;
-
-          // Network/fetch errors may be transient
-          if (attempt < maxRetries) {
-            const delay = baseDelayMs * 2 ** attempt;
-            await new Promise((r) => setTimeout(r, delay));
-            continue;
-          }
-
-          throw new ClaudeClientError(
-            (err as Error).message ?? "Unknown error",
-            "unknown",
-            false,
-          );
-        }
-      }
-
-      throw lastError ?? new ClaudeClientError("Exhausted retries", "unknown", false);
+      return postJsonWithRetries({
+        url: () => `${baseUrl}/chat/completions`,
+        body: () => JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          messages: [{ role: "user", content: request.prompt }],
+        }),
+        headers,
+        maxRetries,
+        baseDelayMs,
+        throwForStatus: (status, body) => throwHttpStatusError(status, `OpenAI API error ${status}: ${body}`),
+        read: readChatCompletion,
+      });
     },
 
     async *stream(request: CompletionRequest): AsyncIterable<StreamChunk> {
@@ -286,7 +243,7 @@ export function createOpenAiApiProvider(
 
       if (!response.ok) {
         const body = await response.text();
-        classifyAndThrow(
+        throwHttpStatusError(
           response.status,
           `OpenAI API stream error ${response.status}: ${body}`,
         );
@@ -328,13 +285,9 @@ export function createOpenAiApiProvider(
             if (trimmed.startsWith("data: ")) {
               try {
                 const data = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
-                const choices = data.choices as Array<Record<string, unknown>> | undefined;
-
-                if (choices && choices.length > 0) {
-                  const delta = choices[0].delta as Record<string, unknown> | undefined;
-                  if (delta && typeof delta.content === "string") {
-                    yield { text: delta.content };
-                  }
+                const text = readChatDeltaText(data);
+                if (text !== undefined) {
+                  yield { text };
                 }
 
                 // Some OpenAI-compatible endpoints include usage in stream chunks

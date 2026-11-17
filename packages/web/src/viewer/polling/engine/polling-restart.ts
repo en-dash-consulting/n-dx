@@ -28,13 +28,7 @@
  * this module does not depend on the performance zone directly.
  */
 
-import {
-  suspendAllSources,
-  resumeAllSources,
-  isGlobalSuspended,
-  getGeneration,
-  isGenerationCurrent,
-} from "./polling-state.js";
+import { suspendAllSources, resumeAllSources } from "./polling-state.js";
 
 // ─── Injection types ─────────────────────────────────────────────────────────
 

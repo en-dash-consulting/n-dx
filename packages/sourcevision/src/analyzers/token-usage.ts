@@ -1,31 +1,61 @@
 /**
  * Token usage tracking utilities for sourcevision analyze.
- * Mirrors the pattern from rex's analyze token tracking.
+ *
+ * The empty aggregate and the per-call accumulator are llm-client's, shared
+ * with rex and hench: {@link AnalyzeTokenUsage} is its `AggregateTokenUsage`
+ * plus the vendor and model the manifest records.
  */
 
-import type { TokenUsage, AnalyzeTokenUsage } from "../schema/index.js";
+import { accumulateTokenUsage, emptyAggregateTokenUsage } from "@n-dx/llm-client";
+import type { AnalyzeTokenUsage } from "../schema/index.js";
+
+export { accumulateTokenUsage };
 
 /** Create an empty AnalyzeTokenUsage accumulator. */
 export function emptyAnalyzeTokenUsage(): AnalyzeTokenUsage {
-  return { calls: 0, inputTokens: 0, outputTokens: 0 };
+  return emptyAggregateTokenUsage();
 }
 
-/** Accumulate a single call's token usage into the aggregate. */
-export function accumulateTokenUsage(
+/**
+ * Add a step's call count and input/output tokens to the aggregate — the
+ * shape judgment, naming and narration steps report. Cache token counts are
+ * not added.
+ */
+export function addCallUsage(
   aggregate: AnalyzeTokenUsage,
-  usage?: TokenUsage,
+  calls: number,
+  usage?: { input: number; output: number },
 ): void {
-  aggregate.calls++;
+  aggregate.calls += calls;
+  aggregate.inputTokens += usage?.input ?? 0;
+  aggregate.outputTokens += usage?.output ?? 0;
+}
+
+/**
+ * Add one call's input/output tokens to a step's running total; nothing when
+ * the call reported no usage. Cache token counts are not added.
+ */
+export function addCallTokens(
+  total: { input: number; output: number },
+  usage?: { input: number; output: number },
+): void {
   if (!usage) return;
-  aggregate.inputTokens += usage.input;
-  aggregate.outputTokens += usage.output;
-  if (usage.cacheCreationInput) {
-    aggregate.cacheCreationInputTokens =
-      (aggregate.cacheCreationInputTokens ?? 0) + usage.cacheCreationInput;
+  total.input += usage.input;
+  total.output += usage.output;
+}
+
+/** Merge one aggregate into another, cache token counts included. */
+export function mergeTokenUsage(target: AnalyzeTokenUsage, source: AnalyzeTokenUsage): void {
+  target.calls += source.calls;
+  target.inputTokens += source.inputTokens;
+  target.outputTokens += source.outputTokens;
+  if (source.cacheCreationInputTokens) {
+    target.cacheCreationInputTokens =
+      (target.cacheCreationInputTokens ?? 0) + source.cacheCreationInputTokens;
   }
-  if (usage.cacheReadInput) {
-    aggregate.cacheReadInputTokens =
-      (aggregate.cacheReadInputTokens ?? 0) + usage.cacheReadInput;
+  if (source.cacheReadInputTokens) {
+    target.cacheReadInputTokens =
+      (target.cacheReadInputTokens ?? 0) + source.cacheReadInputTokens;
   }
 }
 

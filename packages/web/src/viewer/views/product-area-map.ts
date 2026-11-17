@@ -9,6 +9,7 @@
 
 import { h } from "preact";
 import type { AreaSection } from "./product-model.js";
+import { plural } from "../utils/format.js";
 
 /** What tints a block. Defective outranks the status of the capabilities. */
 export type BlockStatus = "met" | "changing" | "proposed" | "defective";
@@ -87,8 +88,6 @@ export function areaBlock(area: AreaSection, ghostCounts: GhostCounts = new Map(
     slug: area.slug,
   };
 }
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** The block's accessible name: what it is, how big, its status, and its open changes. */
 export function blockName(block: Pick<AreaBlockModel, "label" | "size" | "unit" | "status" | "openChanges" | "ghosts">): string {

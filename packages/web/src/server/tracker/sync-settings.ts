@@ -9,6 +9,7 @@
 import { updateLocalConfigBlock } from "../local-config-write.js";
 import { TRACKER_EVENTS, type TrackerEvent } from "./server-profiles.js";
 import { loadTrackerSync, rulesOff, TRACKER_RULE_MODES, type TrackerRuleMode } from "./sync-config.js";
+import { isRecord } from "../../shared/index.js";
 
 export interface SyncSettings {
   /** The connection the calls go through; null until sync is configured. */
@@ -54,7 +55,7 @@ export function writeSyncRules(
   updateLocalConfigBlock(projectDir, "trackerSync", (block) => {
     const named = connection ?? (typeof block.connection === "string" ? block.connection : undefined);
     if (!named) throw new SyncSettingsError("name the connection tracker sync goes through");
-    const existing = block.rules && typeof block.rules === "object" && !Array.isArray(block.rules) ? (block.rules as Record<string, unknown>) : {};
+    const existing = isRecord(block.rules) ? block.rules : {};
     return { ...block, connection: named, rules: { ...existing, ...rules } };
   });
   return readSyncSettings(projectDir);

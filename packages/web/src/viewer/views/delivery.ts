@@ -13,6 +13,7 @@ import { h } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { ComponentChild } from "preact";
 import { useCliName } from "../hooks/index.js";
+import { getJson } from "../utils/json-requests.js";
 
 // ── Shapes ─────────────────────────────────────────────────────
 
@@ -154,16 +155,6 @@ export function scoreBand(score: number): "good" | "fair" | "poor" {
 
 // ── Data ───────────────────────────────────────────────────────
 
-async function fetchJson(path: string): Promise<unknown | null> {
-  try {
-    const res = await fetch(path);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
 interface DeliveryData {
   readiness: Readiness | null;
   infrastructure: Infrastructure | null;
@@ -190,7 +181,7 @@ function useDeliveryData(stamp: string): DeliveryData | null {
   const [data, setData] = useState<DeliveryData | null>(null);
   useEffect(() => {
     let live = true;
-    void Promise.all([fetchJson("/data/readiness.json"), fetchJson("/data/infrastructure.json")])
+    void Promise.all([getJson<unknown>("/data/readiness.json"), getJson<unknown>("/data/infrastructure.json")])
       .then(([readiness, infrastructure]) => {
         if (live) setData({ readiness: asReadiness(readiness), infrastructure: asInfrastructure(infrastructure) });
       });

@@ -1,7 +1,8 @@
 import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import { BodyPortal } from "./body-portal.js";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useCallback } from "preact/hooks";
+import { useEscapeKey } from "./use-escape-key.js";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
 interface FAQItem {
@@ -120,34 +121,10 @@ const FAQ_SECTIONS: FAQSection[] = [
   },
 ];
 
-/**
- * Map view IDs to the FAQ section title that is most relevant.
- * Used by HeaderFAQ to auto-expand the contextual section.
- */
-const VIEW_TO_FAQ_SECTION: Record<string, string> = {
-  // SourceVision views
-  overview: "SourceVision",
-  graph: "SourceVision",
-  zones: "SourceVision",
-  files: "SourceVision",
-  routes: "SourceVision",
-  architecture: "SourceVision",
-  problems: "SourceVision",
-  suggestions: "SourceVision",
-  ask: "SourceVision",
-  // Rex views
-  "rex-dashboard": "Rex (PRD Management)",
-  prd: "Rex (PRD Management)",
-  "token-usage": "Dashboard",
-  validation: "Rex (PRD Management)",
-  // Hench views
-  "hench-runs": "Hench (Autonomous Agent)",
-};
-
-/** Shared FAQ modal body — used by both sidebar FAQ and header FAQ */
-function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSection: string | null }) {
+/** The FAQ modal body, opened by the sidebar's FAQ button with every section collapsed. */
+function FAQModal({ onClose }: { onClose: () => void }) {
   const cliName = useCliName();
-  const [expandedSection, setExpandedSection] = useState<string | null>(initialSection);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const toggleSection = useCallback((title: string) => {
     setExpandedSection((prev) => (prev === title ? null : title));
@@ -223,20 +200,13 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
 
 /**
  * Global FAQ button — lives in the sidebar footer toolbar (bottom-left).
- * Opens the full FAQ modal without view-contextual auto-expansion.
+ * Opens the full FAQ modal.
  */
 export function GlobalFAQ() {
   const [open, setOpen] = useState(false);
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useEscapeKey(open, close);
 
   return h(Fragment, null,
     h("button", {
@@ -261,53 +231,6 @@ export function GlobalFAQ() {
         h("circle", { cx: 8, cy: 12, r: 0.5, fill: "currentColor", stroke: "none" }),
       ),
     ),
-    open ? h(FAQModal, { onClose: () => setOpen(false), initialSection: null }) : null,
-  );
-}
-
-/**
- * Header FAQ button — contextual entry point in the content area header.
- * Auto-expands the FAQ section relevant to the current view.
- */
-export function HeaderFAQ({ view }: { view: string }) {
-  const [open, setOpen] = useState(false);
-
-  // Determine which FAQ section to auto-expand based on current view
-  const contextSection = VIEW_TO_FAQ_SECTION[view] ?? FAQ_SECTIONS[0].title;
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
-
-  return h(Fragment, null,
-    h("button", {
-      class: "header-faq-btn",
-      onClick: () => setOpen(true),
-      title: "Help & FAQ",
-      "aria-label": "Open contextual help and FAQ",
-    },
-      h("svg", {
-        width: 14,
-        height: 14,
-        viewBox: "0 0 16 16",
-        fill: "none",
-        stroke: "currentColor",
-        "stroke-width": "1.5",
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round",
-        "aria-hidden": "true",
-      },
-        h("circle", { cx: 8, cy: 8, r: 7 }),
-        h("path", { d: "M5.5 6a2.5 2.5 0 0 1 4.9.5c0 1.5-2.4 2-2.4 3" }),
-        h("circle", { cx: 8, cy: 12, r: 0.5, fill: "currentColor", stroke: "none" }),
-      ),
-    ),
-    open ? h(FAQModal, { onClose: () => setOpen(false), initialSection: contextSection }) : null,
+    open ? h(FAQModal, { onClose: () => setOpen(false) }) : null,
   );
 }

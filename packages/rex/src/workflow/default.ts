@@ -65,6 +65,3 @@ Examples of what to put here:
 
 Delete this comment block and add your rules below. -->
 `;
-
-// Backward compatibility
-export const DEFAULT_WORKFLOW = NDX_WORKFLOW;

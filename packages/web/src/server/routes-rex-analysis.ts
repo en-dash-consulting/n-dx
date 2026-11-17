@@ -14,7 +14,7 @@ import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { appendLog } from "./routes-rex/rex-route-helpers.js";
+import { appendLog, loadPRDOr404, broadcastPrdChanged } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { resolveOwnPackageCli } from "./own-cli.js";
@@ -185,6 +185,18 @@ function resolveParentId(ctx: ServerContext, requested: unknown): string | null 
     if (id === requested) return id;
   }
   return null;
+}
+
+/**
+ * A request's optional `parentId` resolved by {@link resolveParentId}:
+ * undefined when the request sent none, or null once it has answered 400
+ * because the PRD holds no such item.
+ */
+function requestedParentIdOr400(ctx: ServerContext, res: ServerResponse, requested: unknown): string | undefined | null {
+  if (requested === undefined) return undefined;
+  const parentId = resolveParentId(ctx, requested);
+  if (parentId === null) errorResponse(res, 400, "parentId does not name an item in this PRD");
+  return parentId;
 }
 
 // ---------------------------------------------------------------------------
@@ -523,12 +535,7 @@ async function handleCaptureNextSteps(
       detail: `Captured ${created} next step${created === 1 ? "" : "s"} to PRD (${skipped} duplicate${skipped === 1 ? "" : "s"} skipped) via web`,
     });
 
-    if (created > 0 && broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    if (created > 0) broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, created, skipped, epicId: created > 0 ? epicId : undefined });
   } catch (err) {
@@ -666,12 +673,7 @@ async function handleCaptureAsk(
       detail: `Captured an Ask answer as task "${item.title}" under "${ASK_CAPTURE_EPIC_TITLE}" via web`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, {
       ok: true,
@@ -768,12 +770,25 @@ function handleAnalyzeStatus(res: ServerResponse): boolean {
   return true;
 }
 
+/** Where `rex analyze` caches its proposals for a later accept. */
+function pendingProposalsPath(ctx: ServerContext): string {
+  return join(ctx.rexDir, "pending-proposals.json");
+}
+
+/** Empty the cached proposals once an accept has taken them, best-effort. */
+function clearPendingProposals(ctx: ServerContext): void {
+  const pendingPath = pendingProposalsPath(ctx);
+  if (existsSync(pendingPath)) {
+    try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
+  }
+}
+
 /** Handle GET /api/rex/proposals — get pending proposals */
 function handleGetProposals(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const pendingPath = join(ctx.rexDir, "pending-proposals.json");
+  const pendingPath = pendingProposalsPath(ctx);
   if (!existsSync(pendingPath)) {
     jsonResponse(res, 200, { proposals: [] });
     return true;
@@ -876,11 +891,8 @@ async function handleAcceptProposals(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   try {
     const body = await readBody(req, res);
@@ -889,7 +901,7 @@ async function handleAcceptProposals(
       indices?: number[];
     };
 
-    const pendingPath = join(ctx.rexDir, "pending-proposals.json");
+    const pendingPath = pendingProposalsPath(ctx);
     if (!existsSync(pendingPath)) {
       errorResponse(res, 404, "No pending proposals");
       return true;
@@ -1027,12 +1039,7 @@ async function handleAcceptProposals(
         : `Accepted ${toAccept.length} proposals (${addedCount} items) via web`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     // On v2 the counts say why an accept may add nothing: every proposal
     // described code that already exists (skippedCount).
@@ -1059,11 +1066,8 @@ async function handleAcceptEditedProposals(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   try {
     const body = await readBody(req, res);
@@ -1197,11 +1201,7 @@ async function handleAcceptEditedProposals(
     // eventually, but we want immediate visibility for the dashboard).
     refreshPRDCache(ctx.rexDir, await store.loadDocument());
 
-    // Clear pending proposals file
-    const pendingPath = join(ctx.rexDir, "pending-proposals.json");
-    if (existsSync(pendingPath)) {
-      try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
-    }
+    clearPendingProposals(ctx);
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
@@ -1209,12 +1209,7 @@ async function handleAcceptEditedProposals(
       detail: `Accepted ${selectedProposals.length} edited proposals (${addedCount} items) via proposal editor`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, acceptedCount: selectedProposals.length, addedCount });
   } catch (err) {
@@ -1264,16 +1259,13 @@ async function acceptEditedAsChanges(
     return true;
   }
 
-  const pendingPath = join(ctx.rexDir, "pending-proposals.json");
-  if (existsSync(pendingPath)) {
-    try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
-  }
+  clearPendingProposals(ctx);
   appendLog(ctx, {
     timestamp: new Date().toISOString(),
     event: "proposals_edited_accept",
     detail: `Accepted ${selected.length} edited proposals via proposal editor: ${v2AcceptSummary(outcome)}`,
   });
-  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  broadcastPrdChanged(broadcast);
   jsonResponse(res, 200, {
     ok: true,
     acceptedCount: selected.length,
@@ -1314,11 +1306,8 @@ async function handleSmartAddPreview(
     // Use rex CLI add (smart mode) with --format=json (no --accept = preview mode).
     // Pass description via --description flag (not positional) to prevent any
     // stale UI text from being concatenated into the argument list.
-    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
-    if (parentId === null) {
-      errorResponse(res, 400, "parentId does not name an item in this PRD");
-      return true;
-    }
+    const parentId = requestedParentIdOr400(ctx, res, input.parentId);
+    if (parentId === null) return true;
 
     const area = input.area === undefined ? undefined : await resolvePreviewArea(ctx, input.area);
     if (typeof area === "string") {
@@ -1451,11 +1440,8 @@ async function handleSmartAddAccept(
       errorResponse(res, 400, "Text is required");
       return true;
     }
-    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
-    if (parentId === null) {
-      errorResponse(res, 400, "parentId does not name an item in this PRD");
-      return true;
-    }
+    const parentId = requestedParentIdOr400(ctx, res, input.parentId);
+    if (parentId === null) return true;
 
     // The description goes to rex through a file, the way batch import already
     // sends its items, rather than as a `--description` argv token: the text
@@ -1506,9 +1492,7 @@ async function handleSmartAddAccept(
           .join(", ")}`,
       });
 
-      if (broadcast) {
-        broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-      }
+      broadcastPrdChanged(broadcast);
 
       jsonResponse(res, 200, { ok: true, changes });
     } finally {
@@ -1527,11 +1511,8 @@ async function handleBatchImport(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   try {
     const body = await readBody(req, res);
@@ -1560,11 +1541,8 @@ async function handleBatchImport(
       }
     }
 
-    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
-    if (parentId === null) {
-      errorResponse(res, 400, "parentId does not name an item in this PRD");
-      return true;
-    }
+    const parentId = requestedParentIdOr400(ctx, res, input.parentId);
+    if (parentId === null) return true;
 
     // Write items to temp files and build --file args for rex CLI
     const tmpDir = mkdtempSync(join(tmpdir(), "rex-batch-"));
@@ -1637,9 +1615,7 @@ async function handleBatchImport(
             detail: `Batch imported ${input.items.length} items (${changes.length} changes added) from: ${itemSources.join(", ")}`,
           });
 
-          if (broadcast) {
-            broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-          }
+          broadcastPrdChanged(broadcast);
         }
 
         jsonResponse(res, 200, {
@@ -1668,12 +1644,7 @@ async function handleBatchImport(
           detail: `Batch imported ${input.items.length} items (${output.added} PRD items added) from: ${itemSources.join(", ")}`,
         });
 
-        if (broadcast) {
-          broadcast({
-            type: "rex:prd-changed",
-            timestamp: new Date().toISOString(),
-          });
-        }
+        broadcastPrdChanged(broadcast);
       }
 
       jsonResponse(res, 200, {

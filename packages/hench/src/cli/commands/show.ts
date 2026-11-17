@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import type { PersistedRuntimeEvent } from "../../schema/index.js";
 import { loadRun, saveRun } from "../../store/runs.js";
 import { resolveHenchPaths } from "../../store/paths.js";

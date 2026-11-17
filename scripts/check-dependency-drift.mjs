@@ -23,9 +23,9 @@
  */
 
 import { readFile, readdir } from "node:fs/promises";
-import { realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { invokedDirectly } from "./lib/invoked-directly.mjs";
 
 /** Range prefixes that are not version ranges at all — never checked. */
 const SKIP_PREFIXES = ["workspace:", "npm:", "file:", "link:", "portal:", "catalog:", "git", "http"];
@@ -184,16 +184,7 @@ function padXRange(xMatch) {
 
 // ── CLI entry ─────────────────────────────────────────────────────────
 
-const invokedDirectly = (() => {
-  if (!process.argv[1]) return false;
-  try {
-    return fileURLToPath(import.meta.url) === realpathSync(process.argv[1]);
-  } catch {
-    return false;
-  }
-})();
-
-if (invokedDirectly) {
+if (invokedDirectly(import.meta.url)) {
   const rootDir = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..");
   const drift = await findDependencyDrift(rootDir);
   if (drift.length > 0) {

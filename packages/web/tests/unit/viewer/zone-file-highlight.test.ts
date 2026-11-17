@@ -4,7 +4,7 @@ import type { ZoneData, FileInfo, BoxRect, FileConnectionMap, ExpandedSubZones }
 import {
   computeFileRowRect,
   buildFileHighlightEdges,
-} from "../../../src/viewer/views/zones.js";
+} from "../../../src/viewer/views/zones-model.js";
 
 // Layout constants mirrored from zones.ts rendering
 const BOX_H_COLLAPSED = 80;

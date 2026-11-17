@@ -25,6 +25,7 @@ import type { SidecarCallProblem, SidecarExternalCall, SidecarFieldOption } from
 import type { FieldHint, FieldHints } from "../connections/connection-config.js";
 import type { ConnectionService, ConnectionTool } from "../connections/connection-service.js";
 import { profileFieldHints, type ProfileOptions } from "../tracker/server-profiles.js";
+import { isRecord } from "../../shared/index.js";
 
 /** The longest a picker's list is drawn; a longer result is cut. */
 export const MAX_FIELD_OPTIONS = 200;
@@ -38,8 +39,6 @@ const MAX_PROBLEM_LENGTH = 500;
 export const IDEMPOTENCY_KEY_PROPERTIES: readonly string[] = ["requestId", "idempotencyKey"];
 
 type Json = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is Json => !!value && typeof value === "object" && !Array.isArray(value);
 
 /** A result's data: its structured content, else its first text block parsed as JSON. */
 export function resultData(result: CallToolResult): unknown {
@@ -181,15 +180,6 @@ export async function buildExternalCall(
     inputSchema,
     ...(Object.keys(options).length > 0 && { options }),
   };
-}
-
-/** The idempotency key an arguments object carries: the first of the key properties set to a scalar. */
-export function idempotencyKeyOf(args: Json): { name: string; value: string | number | boolean } | undefined {
-  for (const name of IDEMPOTENCY_KEY_PROPERTIES) {
-    const value = args[name];
-    if (isScalar(value)) return { name, value };
-  }
-  return undefined;
 }
 
 /** One problem entry as a line: a string as it is, an object by its path/field and message. */
