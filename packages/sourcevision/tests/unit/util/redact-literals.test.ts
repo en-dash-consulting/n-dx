@@ -36,6 +36,18 @@ describe("redactLiterals", () => {
     );
   });
 
+  it.each([
+    ["mysql:host=h;dbname=x;password=ab#cd", `mysql:host=h;dbname=x;password=${REDACTED}`],
+    ["mysql:host=h;password=ab&cd?e;port=1", `mysql:host=h;password=${REDACTED};port=1`],
+    ["Server=h;Password='s3 cret;x';Database=d", `Server=h;Password='${REDACTED}';Database=d`],
+    ['Server=h;Password="s3cret"', `Server=h;Password="${REDACTED}"`],
+    ["Driver={SQL Server};Server=h;Pwd={s3;cret}", `Driver={SQL Server};Server=h;Pwd={${REDACTED}}`],
+    ["Server=h; Password=my secret;", `Server=h; Password=${REDACTED};`],
+  ])("redacts the whole connection-string password of %s", (input, expected) => {
+    expect(redactLiterals(input)).toBe(expected);
+    expect(redactLiterals(expected)).toBe(expected);
+  });
+
   it("finds literals inside prose and leaves everything else alone", () => {
     expect(redactLiterals("Calls `https://u:pw@api.example.invalid/v1?token=t0k` from src/a.php")).toBe(
       `Calls \`https://api.example.invalid/v1?token=${REDACTED}\` from src/a.php`,

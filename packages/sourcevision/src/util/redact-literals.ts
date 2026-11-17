@@ -20,9 +20,10 @@
  *   `Server=h;Password=…`, `jdbc:…;password=…`): the same, for each
  *   secret-shaped key.
  *
- * Scheme, host, port, path and every other parameter are kept. Strings are
- * scanned in whitespace- and quote-delimited tokens with bounded patterns, so
- * the cost is linear in the text. Redaction is idempotent.
+ * Scheme, host, port, path and every other parameter are kept. Connection
+ * strings are matched across the text (a value may be quoted or hold spaces);
+ * URLs are matched in whitespace- and quote-delimited tokens. Every pattern is
+ * bounded, so the cost is linear in the text. Redaction is idempotent.
  */
 
 /** What a secret value is replaced with. */
@@ -64,8 +65,17 @@ export function isSecretName(name: string): boolean {
 /** A scheme and `://`; the authority runs to the first `/`, `?` or `#`. */
 const URL_AUTHORITY = /([A-Za-z][A-Za-z0-9+.-]{0,31}:\/\/)([^/?#]*)/g;
 
-/** One parameter: a separator (or the token's start), a name without separators, `=`, the value. */
-const PARAMETER = /(^|[?&;:])([^?&;:=/#]{1,64})=([^?&;#]*)/g;
+/** One query parameter: `?` or `&`, a name, `=`, the value up to the next parameter or the fragment. */
+const QUERY_PARAMETER = /([?&])([^?&;:=/#]{1,64})=([^&;#]*)/g;
+
+/**
+ * One connection-string entry: the text's start, `;` or `:` (after a DSN
+ * prefix such as `mysql:`), a name that may hold spaces (`User Id`), `=`, and
+ * the value. A quoted or braced value (`'…'`, `"…"`, `{…}`) runs to its
+ * closing mark; any other runs to the next `;` or line end, so a password
+ * holding `#`, `&`, `?` or a space goes whole.
+ */
+const DSN_ENTRY = /(^|[;:])([ \t]*)([A-Za-z][\w .-]{0,63}?)=('[^'\n]*'|"[^"\n]*"|\{[^}\n]*\}|[^;\n]*)/g;
 
 /** Text with nothing to redact: no `@` and no `=`. */
 const NOTHING_TO_REDACT = /^[^@=]*$/;
@@ -78,15 +88,26 @@ function redactToken(token: string): string {
   const withoutUserinfo = token.replace(URL_AUTHORITY, (_m, scheme: string, authority: string) =>
     scheme + authority.slice(authority.lastIndexOf("@") + 1),
   );
-  return withoutUserinfo.replace(PARAMETER, (match, separator: string, name: string, value: string) =>
+  return withoutUserinfo.replace(QUERY_PARAMETER, (match, separator: string, name: string, value: string) =>
     value.length > 0 && isSecretName(name) ? `${separator}${name}=${REDACTED}` : match,
   );
+}
+
+/** A connection-string value replaced, keeping the quotes or braces around it. */
+function redactedValue(value: string): string {
+  const open = value[0];
+  return open === "'" || open === '"' || open === "{" ? `${open}${REDACTED}${value[value.length - 1]}` : REDACTED;
 }
 
 /** `text` with every URL userinfo and secret-shaped parameter value removed. */
 export function redactLiterals(text: string): string {
   if (NOTHING_TO_REDACT.test(text)) return text;
-  return text.replace(TOKEN, redactToken);
+  const withoutDsnSecrets = text.replace(DSN_ENTRY, (match, separator: string, space: string, name: string, value: string) =>
+    value.trim().length > 0 && isSecretName(name) && redactedValue(value) !== value
+      ? `${separator}${space}${name}=${redactedValue(value)}`
+      : match,
+  );
+  return withoutDsnSecrets.replace(TOKEN, redactToken);
 }
 
 /**
