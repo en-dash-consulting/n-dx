@@ -182,6 +182,18 @@ All output is written to `.sourcevision/`:
 | `CONTEXT.md` | Detailed AI context document |
 | `zones/{zone-id}/` | Per-zone context and summary files |
 
+**No credential from source.** Strings copied out of the code (outbound
+targets, config keys, expressions as written, findings) are redacted before
+any of these files is written, for every language
+(`src/util/redact-literals.ts`):
+
+- **URLs lose their userinfo:** `https://u:pw@host/v1` becomes `https://host/v1`.
+- **Secret values are replaced:** a secret-shaped query parameter or
+  key=value connection-string entry (`password`, `pwd`, `pass`, `secret`,
+  `token`, `api_key`, `access_key`, `auth`, `key`, `sig`, `signature`,
+  `credentials`, in any case, with `_`/`-` variants) keeps its name and gets
+  the value `REDACTED`.
+
 ## Findings
 
 SourceVision produces findings in several categories:
