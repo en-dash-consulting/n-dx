@@ -122,7 +122,7 @@ export interface CompletionResult {
   text: string;
   /** Token usage from the call, if available. */
   tokenUsage?: TokenUsage;
-  /** Coverage of CLI accounting; absent on providers without provenance. */
+  /** Coverage of request accounting; absent on providers without provenance. */
   usageStatus?: "measured" | "unavailable" | "malformed" | "partial";
 }
 

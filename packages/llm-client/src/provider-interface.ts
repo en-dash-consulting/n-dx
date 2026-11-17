@@ -160,6 +160,9 @@ export interface StreamChunk {
    */
   usage?: TokenUsage;
 
+  /** Coverage of the request accounting, including interrupted streams. */
+  usageStatus?: CompletionResult["usageStatus"];
+
   /**
    * True when this is the terminal chunk and no more chunks follow.
    * Consumers should stop iterating after receiving a chunk with `done: true`.
