@@ -148,15 +148,19 @@ Hench's `apiKeyEnv`, the variable the API loop sends as the Anthropic key, follo
 "Always applies" holds while `.n-dx.local.json` is untracked. A repository that commits the file (`git add -f`, or a checkout that never ran `ndx init`) makes it repository config: the trust review lists it (`local-config-tracked`) with the settings it carries, and nothing in it — `guard.env.allow`, `claudePath`, `cli.claudePath`, `cli_path`, `graview.bin`, `graview.app`, `api_endpoint`, `apiKeyEnv` — applies until you trust the checkout. `ndx init` never probes a `cli.claudePath` from a tracked file. Outside a git repository nothing is tracked, so the file applies as before.
 :::
 
-### Effort (API mode)
+### Reasoning effort
 
-`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). Values are `low`, `medium`, `high`, `xhigh` and `max`.
+`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). Values depend on the model and client; common levels are `low`, `medium`, `high`, `xhigh` and `max`. Codex CLI can also advertise `ultra`.
+
+Codex CLI also honors these rules, including `agent.execute` and `agent.review`. It checks the selected binary's `model/list` catalog for the selected model's advertised reasoning efforts before sending `-c model_reasoning_effort=...`. An unsupported value, missing model, older client without effort metadata, or failed catalog probe prints a warning and leaves the client setting unchanged. A catalog entry describes client support, not account entitlement.
+
+OpenAI Chat Completions sends a supported rule as `reasoning_effort` in both blocking and streaming requests. Its model allowlist is separate from CLI support: `ultra` is not an API effort. Unknown models and unsupported values warn and omit the field. With no matching rule, neither Codex path forces a tier/reviewer recommendation: intentional CLI/profile pins and API defaults remain in effect. Set an explicit rule to adopt a recommendation; exact task-class pins outrank wildcard rules.
 
 ```json
 { "llm": { "effort": { "prd.*": "low", "agent.execute": "xhigh" } } }
 ```
 
-With no matching rule, `claude-opus-5-5` gets `high` (Opus 5's API default; Opus 5.5's own is `medium`) and every other model gets the API default. A model that does not accept effort, such as `claude-haiku-4-5`, never receives it, and an unknown value is never sent; both print a warning. CLI mode (Claude Code) does not apply `llm.effort` yet.
+With no matching rule, `claude-opus-5-5` gets `high` (Opus 5's API default; Opus 5.5's own is `medium`) and every other model gets the API default. A model that does not accept effort, such as `claude-haiku-4-5`, never receives it, and an unknown value is never sent; both print a warning. Claude Code CLI sends a validated explicit rule as `--effort`, without applying the API default.
 
 ## API keys and auth modes
 

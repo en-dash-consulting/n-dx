@@ -12,7 +12,7 @@ export interface CodexModelListOptions {
 }
 
 /** No thread or inference request is created; no API key is required. */
-export async function listCodexModels(options: CodexModelListOptions): Promise<VendorModelListing> {
+export async function listCodexModels(options: CodexModelListOptions): Promise<VendorModelListing & { reasoningEfforts?: Record<string, string[]> }> {
   const timeoutMs = options.timeoutMs ?? 5000;
   return new Promise((resolve) => {
     let child: ReturnType<typeof spawnCli>;
@@ -22,9 +22,10 @@ export async function listCodexModels(options: CodexModelListOptions): Promise<V
     let requestId = 1;
     let initialized = false;
     const models = new Set<string>();
+    const reasoningEfforts: Record<string, string[]> = {};
     const cursors = new Set<string>();
     const failure = (reason: string): VendorModelListing => ({ ok: false, reason });
-    const finish = (result: VendorModelListing): void => {
+    const finish = (result: VendorModelListing & { reasoningEfforts?: Record<string, string[]> }): void => {
       if (done) return;
       done = true;
       clearTimeout(timer);
@@ -76,7 +77,14 @@ export async function listCodexModels(options: CodexModelListOptions): Promise<V
           finish(failure("Codex model/list returned an unexpected response; update the CLI and retry.")); return;
         }
         for (const entry of message.result.data) {
-          if (entry && typeof entry.model === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$/.test(entry.model) && entry.hidden !== true) models.add(entry.model);
+          if (entry && typeof entry.model === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$/.test(entry.model) && entry.hidden !== true) {
+            models.add(entry.model);
+            if (Array.isArray(entry.supportedReasoningEfforts)) {
+              reasoningEfforts[entry.model] = entry.supportedReasoningEfforts
+                .map((item: { reasoningEffort?: unknown }) => item?.reasoningEffort)
+                .filter((value: unknown): value is string => typeof value === "string" && /^[a-z]+$/.test(value));
+            }
+          }
         }
         const cursor = message.result.nextCursor;
         if (cursor != null) {
@@ -86,7 +94,7 @@ export async function listCodexModels(options: CodexModelListOptions): Promise<V
           cursors.add(cursor);
           list(cursor);
         } else {
-          finish(models.size ? { ok: true, models: [...models].sort() } : failure("Codex listed no picker models; check CLI login and provider configuration, then refresh."));
+          finish(models.size ? { ok: true, models: [...models].sort(), ...(Object.keys(reasoningEfforts).length ? { reasoningEfforts } : {}) } : failure("Codex listed no picker models; check CLI login and provider configuration, then refresh."));
         }
       }
     });

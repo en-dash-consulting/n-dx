@@ -75,6 +75,25 @@ describe("Codex retry and self-review loop contract", () => {
     { type: "error", message: "ECONNRESET" },
   ] });
 
+  it("carries distinct validated execution/review pins through retries and resumed self-review", async () => {
+    writeFileSync(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex",
+      effort: { "agent.*": "low", "agent.review": "max" },
+    } }));
+    execFileSync("git", ["add", ".n-dx.json"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "fixture effort"], { cwd: projectDir, stdio: "ignore" });
+    const gateway = await import("../../src/prd/llm-gateway.js");
+    const resolve = vi.spyOn(gateway, "resolveCodexCliEffort").mockImplementation(async (_model, effort) => effort);
+    cli.script(() => failed("work"), works("done.ts", "work"), () => failed("work"));
+    await run("task-1", "gpt-6-astra");
+    expect(resolve.mock.calls.map(call => [call[0], call[1], call[3]])).toEqual([
+      ["gpt-6-astra", "low", "agent.execute"], ["gpt-6-astra", "max", "agent.review"],
+    ]);
+    expect(cli.invocations).toHaveLength(3);
+    expect(cli.invocations.map(call => call.args.filter(arg => arg.startsWith("model_reasoning_effort="))))
+      .toEqual([['model_reasoning_effort="low"'], ['model_reasoning_effort="low"'], ['model_reasoning_effort="max"']]);
+    expect(cli.invocations[2].args.slice(0, 3)).toEqual(["exec", "resume", "work"]);
+  });
+
   it("retries the work thread with policy, model and credential hiding reapplied", async () => {
     cli.script(() => failed("work"), works("done.ts", "work"));
     const outcome = await run("task-1");

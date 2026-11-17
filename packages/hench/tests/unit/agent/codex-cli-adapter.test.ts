@@ -1184,3 +1184,14 @@ describe("codexCliAdapter turn cap", () => {
      'sandbox_mode="workspace-write"', 'approval_policy="never"', "-m", "pinned-model", ...SHELL_ENV,
    ]));
  });
+
+
+describe("Codex adapter effort forwarding", () => {
+  it.each([undefined, "session-id"])("forwards validated effort on fresh/resumed execution (%s)", (resumeSessionId) => {
+    const result = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, {
+      model: "gpt-6.1-sol", effort: "max", resumeSessionId,
+    });
+    expect(result.args).toContain('model_reasoning_effort="max"');
+    expect(result.args).not.toContain("--effort");
+  });
+});

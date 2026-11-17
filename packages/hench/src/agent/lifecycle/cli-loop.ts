@@ -117,7 +117,7 @@ import {
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveCodexCliEffort, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { prdLayout } from "../../prd/rex-gateway.js";
 import { reviewDedupeDir, reviewInboxDir } from "./uncommitted-work-gate.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
@@ -1628,6 +1628,7 @@ export interface ReviewPassContext {
   henchDir: string;
   /** Resolved review model. Empty string means "send no model flag" (local vendor). */
   reviewModel: string;
+  effort?: string;
   /** Permission posture for the reviewer. It must be able to apply must-fixes. */
   permissionMode: PermissionMode;
   /** True when no human is attached — the reviewer applies the verdict policy itself. */
@@ -1683,6 +1684,7 @@ export interface PairFixContext {
   mcpConfigPath?: string;
   /** `hench.review.rounds`: fix rounds the executor gets. */
   rounds: number;
+  effort?: string;
 }
 
 /**
@@ -1833,6 +1835,7 @@ async function runExecutorFix(
   ]);
   const spawnConfig = fix.adapter.buildSpawnConfig(envelope, ctx.policy, {
     model: fix.spawnModel,
+    effort: fix.effort,
     // The executor has to edit; `plan` would leave it able to describe a fix only.
     permissionMode: "acceptEdits",
     resumeSessionId: sessionId,
@@ -1969,6 +1972,7 @@ export async function runAdversarialReviewPass(
 
   const spawnConfig = ctx.adapter.buildSpawnConfig(envelope, ctx.policy, {
     model: ctx.reviewModel || undefined,
+    effort: ctx.effort,
     permissionMode: ctx.permissionMode,
     resumeSessionId,
     mcpConfigPath: ctx.mcpConfigPath,
@@ -2083,6 +2087,7 @@ export async function runAdversarialReviewPass(
     const resumed = await spawnReviewer(
       ctx.adapter.buildSpawnConfig(resumeEnvelope, ctx.policy, {
         model: ctx.reviewModel || undefined,
+        effort: ctx.effort,
         permissionMode: ctx.permissionMode,
         resumeSessionId: reviewerSession,
         // Same pin as the first review spawn: a resumed session does not keep
@@ -2753,6 +2758,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     detail(line, { captureWhenQuiet: true });
   });
 
+  const configuredEffort = vendor === LLM_VENDOR.CODEX
+    ? resolveTaskModel("agent.execute", llmConfig).effort
+    : resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig);
+  const executionEffort = vendor === LLM_VENDOR.CODEX
+    ? await resolveCodexCliEffort(opts.spawnModel, configuredEffort, { binary: cliBinary, env: cliEnv, cwd: projectDir }, "agent.execute")
+    : configuredEffort;
+
   // Pin the spawned session's MCP servers to *this* project directory, so the
   // agent's PRD writes land in the worktree the run is executing in. Without
   // this the session inherits Claude Code's registrations for the repository,
@@ -2846,6 +2858,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
                 cliEnv,
                 model: eventModel,
                 spawnModel: opts.spawnModel,
+                effort: executionEffort,
                 mcpConfigPath,
                 rounds: opts.reviewRounds ?? config.review?.rounds ?? DEFAULT_REVIEW_ROUNDS,
               },
@@ -2857,6 +2870,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             reuseIdentity(reviewModel, reviewPolicy, permissionMode)),
         henchDir,
         reviewModel,
+        effort: reviewVendor === LLM_VENDOR.CODEX
+          ? await resolveCodexCliEffort(reviewModel, resolveTaskModel("agent.review", llmConfig).effort, {
+              binary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
+              env: pairVendor ? resolveSessionCliEnv({ ...llmConfig, vendor: pairVendor }, config, "review effort", (line) => detail(line, { captureWhenQuiet: true })) : cliEnv,
+              cwd: projectDir,
+            }, "agent.review")
+          : resolveAgentCliEffort(reviewModel, llmConfig, "agent.review"),
         // The reviewer has to be able to apply must-fixes and run the
         // project's checks. `plan` would leave it able to do neither, so the
         // review pass always runs with edit permission regardless of the
@@ -3338,8 +3358,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           model: opts.spawnModel,
           // A matching llm.effort rule for agent.execute, validated against
           // this model. Undefined leaves the flag off so the vendor applies
-          // its own default; non-Claude adapters ignore it either way.
-          effort: resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig),
+          // its own default.
+          effort: executionEffort,
           permissionMode: currentPermissionMode,
           // Fork the orientation session rather than continuing it, so the
           // parent stays reusable by the next task and this spawn gets its

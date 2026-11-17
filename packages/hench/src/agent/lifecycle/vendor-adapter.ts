@@ -98,8 +98,8 @@ export interface VendorSpawnOptions {
   /**
    * Effort level for the spawned session, already validated for this model.
    *
-   * Currently only honored by the Claude CLI adapter, which forwards it as
-   * `--effort <level>`. Other adapters silently ignore it. Undefined means no
+   * Claude forwards this as `--effort`; Codex as `model_reasoning_effort`,
+   * after the caller validates the selected client catalog. Undefined means no
    * `llm.effort` rule matched, and the vendor picks its own default.
    */
   readonly effort?: string;

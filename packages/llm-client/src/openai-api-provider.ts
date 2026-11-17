@@ -25,6 +25,8 @@
  * @see {@link createCodexCliClient} in `codex-cli-provider.ts` for the CLI alternative
  */
 
+import { resolveOpenAiEffort } from "./codex-effort.js";
+
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
@@ -216,6 +218,7 @@ export function createOpenAiApiProvider(
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       const model = request.model || defaultModel;
+      const effort = resolveOpenAiEffort(model, request.effort, request.taskClass);
       let lastError: Error | undefined;
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -226,6 +229,7 @@ export function createOpenAiApiProvider(
             body: JSON.stringify({
               model,
               max_tokens: maxTokens,
+              ...(effort !== undefined ? { reasoning_effort: effort } : {}),
               messages: [{ role: "user", content: request.prompt }],
             }),
           });
@@ -297,6 +301,7 @@ export function createOpenAiApiProvider(
 
     async *stream(request: CompletionRequest): AsyncIterable<StreamChunk> {
       const model = request.model || defaultModel;
+      const effort = resolveOpenAiEffort(model, request.effort, request.taskClass);
 
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
@@ -304,6 +309,7 @@ export function createOpenAiApiProvider(
         body: JSON.stringify({
           model,
           max_tokens: maxTokens,
+          ...(effort !== undefined ? { reasoning_effort: effort } : {}),
           messages: [{ role: "user", content: request.prompt }],
           stream: true,
           stream_options: { include_usage: true },

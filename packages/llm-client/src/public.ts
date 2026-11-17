@@ -189,6 +189,8 @@ export {
 } from "./config.js";
 export type { TaskModelResolution, ModelSourceKey, JudgmentRoute, ModelCost } from "./config.js";
 
+export { resolveCodexCliEffort } from "./codex-effort.js";
+
 // Claude Messages API effort (output_config.effort)
 export {
   CLAUDE_EFFORT_LEVELS,

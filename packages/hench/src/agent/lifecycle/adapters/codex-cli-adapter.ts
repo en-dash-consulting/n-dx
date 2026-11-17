@@ -95,6 +95,7 @@ export const codexCliAdapter: VendorAdapter = {
       resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId, fork: opts.forkSession } : undefined,
       codex: {
         forkSupported: opts.codexForkSupported,
+        effort: opts.effort,
         // Orientation must not reach write-capable MCP tools outside the sandbox.
         configFlags: opts.codexOrientationFlags,
         policyFlags: compileCodexPolicyFlags(policy),

@@ -20,6 +20,8 @@
  * @see docs/analysis/claude-codex-runtime-identity-discovery.md §7.1
  */
 
+import { codexEffortFlags, resolveCodexCliEffort } from "./codex-effort.js";
+
 import { CodexCliUsage } from "./codex-cli-usage.js";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -325,6 +327,8 @@ async function spawnOnce(
   try {
     const effectivePolicy = policy ?? DEFAULT_EXECUTION_POLICY;
     const policyFlags = compileCodexPolicyFlags(effectivePolicy);
+    const effort = await resolveCodexCliEffort(request.model || resolveCodexModel(codexConfig), request.effort,
+      { binary: cliBinary, env, cwd: process.cwd() }, request.taskClass);
     const args = [
       "exec",
       "--json",
@@ -335,6 +339,7 @@ async function spawnOnce(
       "-o",
       outputPath,
       ...(request.cliFlags ?? []),
+      ...codexEffortFlags(effort),
       "-",
     ];
     debugLog(`spawn start cli="${cliBinary}" model="${request.model || resolveCodexModel(codexConfig)}" promptChars=${request.prompt.length}`);

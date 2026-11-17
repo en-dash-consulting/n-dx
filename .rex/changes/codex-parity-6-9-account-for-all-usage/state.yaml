@@ -29,5 +29,8 @@ items:
     lastModified: "2026-11-17T00:08:50.410Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c73a021f-4560-4bb6-9091-6d1622d860b9":
-    lastModified: "2026-11-17T00:09:48.413Z"
+    startedAt: "2026-11-17T00:10:18.037Z"
+    activeIntervals: [{"end":"2026-11-17T00:36:03.430Z","start":"2026-11-17T00:10:18.037Z"}]
+    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-tests.mjs affected 7eea9263a2ad2895342b4c8075cbb4bf8f83f819]: rex;…\nFailing tests (8):\n- hench llm-gateway source exports match contract test list\n- covers exactly the same class names\n- agrees on every default tier\n- reports no known class as unknown\n- tests/integration/cross-package-contracts.test.js > gateway export auto-detection > hench llm-gateway source exports match contract test list\n  AssertionError: Hench llm-gateway contract test list is out of sync with gateway source.\n- tests/integration/task-class-sync.test.js > core TASK_CLASSES mirrors llm-client DEFAULT_ROUTES > covers exactly the same class names\n  AssertionError: expected [ 'agent.execute', …(24) ] to deeply equal [ 'agent.execute', …(25) ]\n- tests/integration/task-class-sync.test.js > core TASK_CLASSES mirrors llm-client DEFAULT_ROUTES > agrees on every default tier\n  AssertionError: agent.review: expected undefined to be 'standard' // Object.is equality\n- tests/integration/task-class-sync.test.js > core TASK_CLASSES mirrors llm-client DEFAULT_ROUTES > reports no known class as unknown\n  AssertionError: agent.review: expected 'Note: \"agent.review\" is not a task cl…' to be null"
+    lastModified: "2026-11-17T00:36:04.139Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -124,14 +124,11 @@ describe("hench CLI loop effort", () => {
     expect(stderr.mock.calls.flat().join(" ")).toContain("does not accept an effort setting");
   });
 
-  it("resolves to nothing for a non-Claude model id, and says nothing about it", () => {
-    // The silence is the point, and is what the returned undefined alone does
-    // not pin: the allowlist check warns that the model "does not accept an
-    // effort setting", which on a Codex project with llm.effort set fired on
-    // every run. llm.effort is a Claude setting, and a Codex model is not
-    // failing to honour it. The Claude-model case above still warns.
-    expect(resolveAgentCliEffort("gpt-5-codex", { effort: { "*": "high" } })).toBeUndefined();
-    expect(stderr.mock.calls.flat().join(" ")).not.toContain("does not accept an effort setting");
+  it("routes Codex execution and review pins to the adapter for client validation", () => {
+    const config = { effort: { "agent.*": "low", "agent.review": "max" } };
+    expect(resolveAgentCliEffort("gpt-6.1-sol", config)).toBe("low");
+    expect(resolveAgentCliEffort("gpt-6.1-sol", config, "agent.review")).toBe("max");
+    expect(resolveAgentCliEffort("gpt-6.1-sol", {})).toBeUndefined();
   });
 
   it("resolves to nothing when no model was given", () => {
