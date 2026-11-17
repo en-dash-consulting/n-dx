@@ -29,7 +29,7 @@ Consequences for new code:
 - **Every listener gets the gate.** A new `createServer` in this package calls
   `handleRequestSecurity` (or the hub's `guardHubRequest`) before routing, and
   its `upgrade` handler applies `isTrustedHost` + the origin check. The
-  dashboard, the hub and the preview server all do.
+  dashboard and the hub both do.
 - **`GET` must be read-only.** A safe method must not have side effects; a
   `GET` that writes a file or spawns a process is a bug even on loopback.
 - **Internal clients must use a loopback name.** The hub's health probes and
@@ -49,8 +49,8 @@ Consequences for new code:
 Host and Origin tell a web page apart from the dashboard; they cannot tell
 this user from another account on the same machine, since every account can
 reach `127.0.0.1`. With a per-user token configured (`ndx start` always
-configures one unless `--no-auth`), every request to the hub, a project server
-or the preview server must also carry a credential, **in a header**
+configures one unless `--no-auth`), every request to the hub or a project
+server must also carry a credential, **in a header**
 (`X-Ndx-Token` or `Authorization: Bearer`). The shared definitions are in
 `src/shared/auth.ts`; each gate applies them after the Host rule and before the
 Origin rule.
@@ -100,7 +100,7 @@ every same-origin request carries the credential. Behind the hub the nonce and
 the session are the hub's: the hub answers `/api/auth/*` itself, at the root
 and under any `/p/<id>/`, and its proxy replaces whatever credential a client
 sent with the per-user token before forwarding, so a project server never sees
-a hub session. A `--here` server or the preview server mints and keeps its own.
+a hub session. A `--here` server mints and keeps its own.
 
 **WebSockets.** A browser cannot set headers on a handshake, so the page trades
 its session for a ticket (`POST /api/auth/ws-ticket`) and puts it in the socket
@@ -114,11 +114,7 @@ with no credential is passed on *marked* public-only, and gets only the page
 shell: the viewer HTML, the landing page, static images, the hub home page
 without its cards (they load once the page is signed in). Anything else is 401
 — an HTML "sign-in needed" page for a navigation, JSON otherwise. The shell is
-the built bundle, the same for every user. The preview server's document is
-not public: a navigation without a credential gets a sign-in page, which moves
-the tab to `/__preview/s/<capability>/` — a separate, read-only capability for
-the document directory, minted for a signed-in page — because a design
-document's stylesheets and images load without headers.
+the built bundle, the same for every user.
 
 **Reload, new tab, deep link.**
 
@@ -152,8 +148,7 @@ for scripts and styles and is otherwise same-origin (plus `data:`/`blob:`
 images and loopback WebSockets). `/data/*` responses switch to a strict policy
 that allows nothing, because they are data, not documents. The hub session's
 drawer page alone may be framed, by its own origin (`SAMEORIGIN`,
-`frame-ancestors 'self'`): the hub home docks it in an iframe. The preview server
-adds `https:` sources, since a design document may load from a CDN.
+`frame-ancestors 'self'`): the hub home docks it in an iframe.
 
 ## Repository trust
 

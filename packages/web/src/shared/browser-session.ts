@@ -2,7 +2,7 @@
  * The page half of the browser credential (see `auth.ts`).
  *
  * Every HTML document a token-protected server sends — the dashboard shell,
- * the landing page, the hub home page, the preview — gets
+ * the landing page, the hub home page — gets
  * {@link BROWSER_SESSION_SCRIPT} as its first script ({@link injectSessionScript}).
  * One copy of the logic for every page, including the two that are rendered
  * as strings and cannot import a bundle. It:

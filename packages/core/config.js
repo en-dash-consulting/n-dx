@@ -2748,8 +2748,8 @@ Self-heal settings (.n-dx.json):
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
-  web.auth                 boolean   Require the per-user dashboard token on the hub,
-                                    dashboard and preview servers (default: true).
+  web.auth                 boolean   Require the per-user dashboard token on the hub
+                                    and dashboard servers (default: true).
                                     'ndx start' creates <ndx home>/auth.token and prints
                                     a one-time sign-in URL (never the token); false,
                                     or --no-auth, runs the servers without it.

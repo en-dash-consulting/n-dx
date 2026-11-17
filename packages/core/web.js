@@ -9,8 +9,6 @@
  *   - Peer detection on a busy port: another project's dashboard is left alone
  *     and this one relocates near the requested port (falling back to
  *     3117–3200 only if that neighbourhood is full), rather than being killed
- *   - Preview mode (--preview): a static UI layout document on its own port and
- *     its own pid/port files, made to run alongside a real dashboard
  *
  * Used by both `ndx start` (unified: dashboard + MCP) and `ndx web` (alias).
  *
@@ -20,8 +18,6 @@
  *   ndx start --background [dir]     Start detached (daemon mode)
  *   ndx start stop [dir]             Stop a background server
  *   ndx start status [dir]           Check if server is running
- *   ndx start --preview [dir]        Serve the UI layout preview (:3118, live reload)
- *   ndx start --preview stop [dir]   Stop a background preview server
  *   ndx start [dir]                  Register with the per-user hub (0.7.0) and
  *                                    serve at http://127.0.0.1:3117/p/<id>/
  *   ndx start --here [dir]           Force the single-project server above
@@ -42,9 +38,6 @@
  * while another worktree is registered, and the hub exits with its last
  * project unless `hub.keepAlive` is set in the per-user `config.json`. `ndx hub
  * status` and `ndx hub stop` address the hub itself.
- *
- * Preview mode is orthogonal to all of that: it never registers with the hub
- * and owns its own pid/port files, so it runs alongside either server.
  */
 
 import { spawn, execFileSync } from "child_process";
@@ -84,24 +77,12 @@ const NDX_CLI = fileURLToPath(new URL("./cli.js", import.meta.url));
 
 const DEFAULT_PORT = 3117;
 
-// ── Preview mode ─────────────────────────────────────────────────────────────
-// `ndx start --preview` runs a second, stateless server that serves a static UI
-// layout document (packages/web/src/preview/index.html) with live reload. It is
-// meant to run *alongside* a real dashboard, so it keeps its own port and its own
-// pid/port files: sharing the dashboard's pid file would make either server's
-// stop command kill the other one.
-const DEFAULT_PREVIEW_PORT = 3118;
-const PREVIEW_PID_FILE = ".n-dx-preview.pid";
-const PREVIEW_PORT_FILE = ".n-dx-preview.port";
-
 /**
  * A server's state-file paths in a project.
  *
  * A function of the project rather than a pair of names, because the
  * dashboard's markers moved into `.ndx/` with everything else: where they live
- * is the resolver's answer, and only it knows which layout `dir` is on. The
- * `files` parameter threaded through the functions below selects *which*
- * server's markers, not where they sit.
+ * is the resolver's answer, and only it knows which layout `dir` is on.
  *
  * @callback ServerFiles
  * @param {string} dir  Project root.
@@ -113,18 +94,6 @@ const DASHBOARD_FILES = (dir) => {
   const { webPidFile, webPortFile } = resolveLayout(dir);
   return { pid: webPidFile, port: webPortFile };
 };
-
-/**
- * @type {ServerFiles} State-file paths for the preview server — deliberately
- * disjoint from the dashboard's. The preview writes nothing under `.rex/` or
- * `.sourcevision/` and is not part of a project's n-dx state, so its two
- * markers stay at the project root under both layouts and the resolver does
- * not own them.
- */
-const PREVIEW_FILES = (dir) => ({
-  pid: join(dir, PREVIEW_PID_FILE),
-  port: join(dir, PREVIEW_PORT_FILE),
-});
 
 // Mirrors the server's own fallback allocator (PORT_RANGE_START / PORT_RANGE_END
 // in packages/web/src/server/port.ts). Duplicated rather than imported: this is
@@ -911,7 +880,7 @@ export function isProcessRunning(pid) {
  * @param {string} dir
  * @param {string} [label]
  * @param {number} [gracePeriodMs]  Grace period before SIGKILL. Default: 2 000 ms.
- * @param {{pid: string, port: string}} [files]  State-file names. Preview mode passes its own pair.
+ * @param {ServerFiles} [files]  State-file paths. Defaults to the dashboard's.
  */
 async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000), files = DASHBOARD_FILES, hubPortFlag = null) {
   const info = await readPidFile(dir, files);
@@ -963,17 +932,14 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
 
 /**
  * Show status of a background server.
- *
- * @param {boolean} [showMcp]  Print the MCP endpoint URLs. False for the preview
- *                             server, which serves one HTML document and no MCP.
  */
-async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FILES, showMcp = true, hubPortFlag = null) {
+async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FILES, hubPortFlag = null) {
   const info = await readPidFile(dir, files);
   if (!info) {
     // This user's hub may be up without this directory registered with it —
     // and on the default port, the hub *is* the process on the port, which
     // the generic note below would call "another process".
-    const hub = showMcp ? await findOwnRunningHub(hubHome(), hubPortFlag) : null;
+    const hub = await findOwnRunningHub(hubHome(), hubPortFlag);
     const shownDir = resolve(dir) === resolve(process.cwd()) ? "." : dir;
     for (const line of formatUnrecordedStatus({ port, hub, portInUse: await isPortInUse(port), dir: shownDir })) log(line);
     return;
@@ -998,10 +964,8 @@ async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FI
   if (running && portActive) {
     log(`${label} is running (PID ${info.pid}, port ${actualPort}).`);
     log(`  URL: http://127.0.0.1:${actualPort}`);
-    if (showMcp) {
-      log(`  MCP (rex):          http://127.0.0.1:${actualPort}/mcp/rex`);
-      log(`  MCP (sourcevision): http://127.0.0.1:${actualPort}/mcp/sourcevision`);
-    }
+    log(`  MCP (rex):          http://127.0.0.1:${actualPort}/mcp/rex`);
+    log(`  MCP (sourcevision): http://127.0.0.1:${actualPort}/mcp/sourcevision`);
     log(`  Started: ${info.startedAt}`);
   } else if (running) {
     log(`Server process is running (PID ${info.pid}) but port ${actualPort} is not responding.`);
@@ -1211,7 +1175,7 @@ async function mintLandingNonce(request) {
 }
 
 /**
- * A single-project or preview server's landing nonce, asked of `port` only
+ * A single-project server's landing nonce, asked of `port` only
  * once its one listener is `pid` — the process `ndx start` itself spawned —
  * so the per-user token goes nowhere else.
  *
@@ -1249,23 +1213,21 @@ function checkoutOf(web) {
  * Which server a fix is for, and the commands that stop and start it.
  *
  * @typedef {object} ServerCommands
- * @property {"hub" | "here"} kind  The per-user hub, or a single-project (or preview) server.
+ * @property {"hub" | "here"} kind  The per-user hub, or a single-project server.
  * @property {string} stop          The command that stops it.
  * @property {string} start         The command that starts it again as the same kind of server.
  */
 
 /**
- * The single-project or preview server `ndx <commandName>` started, by the
- * commands that address it again. `--here` is always named: a bare `ndx start`
- * registers with the hub instead.
+ * The single-project server `ndx <commandName>` started, by the commands that
+ * address it again. `--here` is always named: a bare `ndx start` registers
+ * with the hub instead.
  *
  * @param {string} commandName  "start" or "web".
- * @param {boolean} isPreview
  * @returns {ServerCommands}
  */
-export function hereServerCommands(commandName, isPreview) {
-  const mode = isPreview ? "--preview" : "--here";
-  return { kind: "here", stop: `ndx ${commandName} ${mode} stop`, start: `ndx ${commandName} ${mode}` };
+export function hereServerCommands(commandName) {
+  return { kind: "here", stop: `ndx ${commandName} --here stop`, start: `ndx ${commandName} --here` };
 }
 
 /**
@@ -2964,7 +2926,7 @@ function parseWebArgs(rest, dir) {
 }
 
 /**
- * Before a single-project or preview server starts: deal with what this
+ * Before a single-project server starts: deal with what this
  * directory's previous one left in `files` — a hub marker or a stale PID file
  * is cleared, a running server is stopped.
  *
@@ -2976,10 +2938,7 @@ async function retirePreviousHereServer(absDir, label, files) {
   const existing = await readPidFile(absDir, files);
   if (existing && isHubMarker(existing)) {
     // The marker points at the hub, which keeps serving the other projects.
-    // A single-project server here just takes the marker files over. Only the
-    // dashboard is ever hub-registered, so this never fires for preview — but
-    // the file set is passed through regardless, since `files` selects which
-    // pid/port pair is being cleared.
+    // A single-project server here just takes the marker files over.
     log(`This directory was registered with the n-dx hub (project "${existing.projectId}"); starting a single-project server here instead.`);
     await removePidFile(absDir, files);
     await removePortFile(absDir, files);
@@ -2995,7 +2954,7 @@ async function retirePreviousHereServer(absDir, label, files) {
 }
 
 /**
- * The port a single-project or preview server should bind, starting from
+ * The port a single-project server should bind, starting from
  * `port`. A busy port gets up to 2s to be released; after that an occupant
  * that must be left alone is moved past (another port is chosen) and any
  * other is killed. Resolves to null, after printing why, when neither works.
@@ -3003,31 +2962,14 @@ async function retirePreviousHereServer(absDir, label, files) {
  * @param {number} port
  * @param {string} absDir
  * @param {string} label
- * @param {boolean} isPreview
  * @returns {Promise<number | null>}
  */
-async function claimHerePort(port, absDir, label, isPreview) {
+async function claimHerePort(port, absDir, label) {
   if (!(await isPortInUse(port))) return port;
   // Give the just-stopped process time to release the socket (up to 2s)
   for (let i = 0; i < 10; i++) {
     await new Promise((r) => setTimeout(r, 200));
     if (!(await isPortInUse(port))) return port;
-  }
-
-  if (isPreview) {
-    // Preview mode never kills whatever is on the port. The most likely
-    // occupant is the dashboard this preview is meant to sit beside, and a
-    // design-time tool must not be able to take the real server down.
-    const next = await findRelocationPort(port);
-    if (next === null) {
-      console.error(
-        `Port ${port} is in use and no free port was found near it or in ` +
-        `${PORT_RANGE_START}–${PORT_RANGE_END}. Choose one with --port=N.`,
-      );
-      return null;
-    }
-    log(`Port ${port} is in use; starting the preview on :${next}`);
-    return next;
   }
 
   // Ask the occupant who it is before killing it. The PID file above only
@@ -3105,17 +3047,18 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
   _quiet = !!(flags.quiet);
 
-  // Preview mode: serve the static UI layout document instead of the dashboard.
-  // It gets its own default port and its own pid/port files so it can run next
-  // to a real `ndx start` without either one stopping the other.
-  const isPreview = !!flags.preview;
-  const files = isPreview ? PREVIEW_FILES : DASHBOARD_FILES;
+  // The UI layout preview was removed. Refused rather than ignored: falling
+  // through would turn `ndx start --preview stop` into a stop of the dashboard.
+  if (flags.preview) {
+    console.error(`--preview was removed: ndx ${commandName} no longer serves the UI layout preview. Run 'ndx ${commandName} .' for the dashboard.`);
+    exit(1);
+    return;
+  }
+
+  const files = DASHBOARD_FILES;
 
   // Resolve port: --port flag > .n-dx.json config > default.
-  // `web.port` is the dashboard's port — applying it to the preview would put
-  // both servers on the same port, which is the one thing preview mode exists
-  // to avoid — so preview reads --port only.
-  let port = isPreview ? DEFAULT_PREVIEW_PORT : DEFAULT_PORT;
+  let port = DEFAULT_PORT;
   if (flags.port) {
     const parsed = parseInt(flags.port, 10);
     if (isNaN(parsed) || parsed < 1 || parsed > 65535) {
@@ -3123,7 +3066,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       exit(1);
     }
     port = parsed;
-  } else if (!isPreview) {
+  } else {
     const configPort = await loadConfigPort(absDir);
     if (configPort) port = configPort;
   }
@@ -3131,10 +3074,8 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   const isBackground = flags.background || flags.daemon || flags.bg;
 
   // Labels for user-facing messages
-  const label = isPreview
-    ? "n-dx UI preview"
-    : commandName === "start" ? "n-dx server" : "n-dx dashboard";
-  const stopCmd = isPreview ? `ndx ${commandName} --preview stop` : `ndx ${commandName} stop`;
+  const label = commandName === "start" ? "n-dx server" : "n-dx dashboard";
+  const stopCmd = `ndx ${commandName} stop`;
 
   // --- Subcommand: stop ---
   // `--port` names the hub port for a hub-registered directory, as it did
@@ -3147,7 +3088,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
   // --- Subcommand: status ---
   if (subcommand === "status") {
-    await showStatus(absDir, port, label, files, !isPreview, hubPortFlag);
+    await showStatus(absDir, port, label, files, hubPortFlag);
     return 0;
   }
 
@@ -3164,10 +3105,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // Precedence, flags over config: --here wins outright, then --hub (still
   // accepted, and the way to override web.mode "here" for one run), then the
   // config, then the hub.
-  // --preview is never hub-registered: it serves a static document on its own
-  // port with its own pid/port files, so it has no project to register and
-  // must not be routed here — it would never reach the preview branch below.
-  if (!isPreview && !flags.here && (flags.hub || (await loadConfigMode(absDir)) !== "here")) {
+  if (!flags.here && (flags.hub || (await loadConfigMode(absDir)) !== "here")) {
     return runHubMode(absDir, flags, { tools, __dir, label, stopCmd });
   }
 
@@ -3176,7 +3114,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
   // If port is still occupied, wait briefly for the OS to release it after the
   // graceful stop above. If it's still busy after that, force-kill the occupant.
-  const herePort = await claimHerePort(port, absDir, label, isPreview);
+  const herePort = await claimHerePort(port, absDir, label);
   if (herePort === null) return 1;
   port = herePort;
 
@@ -3187,9 +3125,8 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // `ndx start`. Without this, `ndx start --background --debug` silently
   // ran a non-debug server — the flag was parsed into `flags` here, in this
   // process, and then dropped on the floor.
-  const serveArgs = [isPreview ? "preview" : "serve", `--port=${port}`, absDir];
-  if (isPreview && typeof flags.file === "string") serveArgs.push(`--file=${flags.file}`);
-  // Single-project and preview servers take the same per-user token the hub
+  const serveArgs = ["serve", `--port=${port}`, absDir];
+  // A single-project server takes the same per-user token the hub
   // would. Created here so a background start can ask its server for a
   // landing nonce to print.
   const hereAuthEnabled = await loadAuthEnabled(absDir, !!flags["no-auth"]);
@@ -3202,7 +3139,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   const webEntry = resolve(__dir, tools.web);
   if (!(await prepareWebBuild(webEntry))) return 1;
   const web = packageBuildIdentity(webEntry);
-  const hereServer = hereServerCommands(commandName, isPreview);
+  const hereServer = hereServerCommands(commandName);
 
   // --- Background mode ---
   if (isBackground) {
@@ -3286,12 +3223,6 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     }
     log(`  URL: ${urlWithNonce(`http://127.0.0.1:${actualPort}/`, hereNonce)}`);
     if (hereToken && !hereNonce) log(noNonceNote(hereNonceStatus, serverRefreshFix(web, hereServer)));
-
-    // The preview serves one HTML document — no MCP endpoints to advertise.
-    if (isPreview) {
-      log(`Use '${stopCmd}' to stop it.`);
-      return 0;
-    }
 
     log(`  MCP (rex):          http://127.0.0.1:${actualPort}/mcp/rex`);
     log(`  MCP (sourcevision): http://127.0.0.1:${actualPort}/mcp/sourcevision`);
