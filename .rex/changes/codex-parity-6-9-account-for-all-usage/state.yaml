@@ -30,7 +30,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c73a021f-4560-4bb6-9091-6d1622d860b9":
     startedAt: "2026-11-17T00:10:18.037Z"
-    activeIntervals: [{"end":"2026-11-17T00:36:03.430Z","start":"2026-11-17T00:10:18.037Z"},{"end":"2026-11-17T00:46:10.806Z","start":"2026-11-17T00:40:38.887Z"}]
-    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED PATH=/Users/ryankeith/.nvm/versions/node/v22.22.2/bin:$PATH CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-tests.…\nLast 2 lines of the test gate output:\nenv: Support/Coursier/bin:/Users/ryankeith/.codeium/windsurf/bin:/Users/ryankeith/Library/pnpm:/Users/ryankeith/.local/bin:/Applications/ChatGPT.app/Contents/Resources:/Users/ryankeith/.cache/codex-runtimes/codex-primary-runtime/dependenci…\nenv: Support/Coursier/bin:/Users/ryankeith/.codeium/windsurf/bin:/Users/ryankeith/Library/pnpm:/Users/ryankeith/.local/bin:/Applications/ChatGPT.app/Contents/Resources:/Users/ryankeith/.cache/codex-runtimes/codex-primary-runtime/dependenci…"
-    lastModified: "2026-11-17T00:46:12.166Z"
+    activeIntervals: [{"end":"2026-11-17T00:36:03.430Z","start":"2026-11-17T00:10:18.037Z"},{"end":"2026-11-17T00:46:10.806Z","start":"2026-11-17T00:40:38.887Z"},{"end":"2026-11-17T01:24:34.656Z","start":"2026-11-17T00:49:37.105Z"}]
+    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED PATH=\"/Users/ryankeith/.nvm/versions/node/v22.22.2/bin:$PATH\" CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-test…\nFailing tests (2):\n- covers every DEFAULT_ROUTES key\n- tests/unit/server/routes-llm-tiers.test.ts > task class labels > covers every DEFAULT_ROUTES key\n  AssertionError: expected [ 'agent.review' ] to deeply equal []"
+    lastModified: "2026-11-17T01:24:35.626Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

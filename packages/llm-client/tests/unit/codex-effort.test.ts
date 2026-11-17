@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createCodexCliClient } from "../../src/codex-cli-provider.js";
 import { createOpenAiApiProvider } from "../../src/openai-api-provider.js";
 import { resolveOpenAiEffort } from "../../src/codex-effort.js";
+import { resolveTaskModel } from "../../src/config.js";
 import { codexSessionDriver } from "../../src/vendor-session-driver.js";
 import { writeFakeCli } from "../helpers/fake-cli.js";
 
@@ -77,6 +78,35 @@ describe("Codex effort at completion boundaries", () => {
     expect(resolveOpenAiEffort("o3-2025-04-16", "low")).toBe("low");
     expect(resolveOpenAiEffort("gpt-5", "max")).toBeUndefined();
     expect(warning).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    ["agent.execute", "low"],
+    ["agent.review", "max"],
+    ["prd.propose", undefined],
+  ] as const)("carries configured effort precedence to both API paths for %s", async (taskClass, expected) => {
+    const warning = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [] })))
+      .mockResolvedValueOnce(new Response("data: [DONE]\n\n"));
+    vi.stubGlobal("fetch", fetchMock);
+    const resolution = resolveTaskModel(taskClass, {
+      vendor: "codex",
+      tiers: { codex: { heavy: "gpt-6.1-sol" } },
+      routes: { "*": "heavy" },
+      effort: { "agent.*": "low", "agent.review": "max" },
+    });
+    const provider = createOpenAiApiProvider({ codexConfig: { api_key: "fixture" }, maxRetries: 0 });
+    const request = { prompt: "fixture", model: resolution.model, effort: resolution.effort, taskClass };
+    await provider.complete(request);
+    await Array.fromAsync(provider.stream!(request));
+    for (const [, init] of fetchMock.mock.calls) {
+      const body = JSON.parse(init.body);
+      expect(body.model).toBe("gpt-6.1-sol");
+      if (expected === undefined) expect(body).not.toHaveProperty("reasoning_effort");
+      else expect(body.reasoning_effort).toBe(expected);
+    }
+    expect(warning).not.toHaveBeenCalled();
   });
 
   it.each([false, true])("session driver carries validated effort on fresh/resumed turns (%s)", (resume) => {
