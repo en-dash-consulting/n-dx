@@ -38,4 +38,4 @@ Goldens: `tests/fixtures/language-packs/php/` (`php52/`, `php53/`, `php8/`), upd
 
 ### Scripts
 
-`build:grammars` builds the grammar into `build/grammars` (CI and release run it first); grammar tests skip without it unless `SV_REQUIRE_GRAMMARS=1`.
+`scripts/php-parse-errors.mjs <file>…` prints where the grammar fails on a file (positions and node types, never its text), after the legacy-syntax rewrite. `build:grammars` builds the grammar into `build/grammars` (CI and release run it first); grammar tests skip without it unless `SV_REQUIRE_GRAMMARS=1`.

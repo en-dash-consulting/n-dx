@@ -61,10 +61,12 @@ function rolesOf(inventory: Inventory): Map<string, string> {
  */
 export function packRouteGroups(facts: PackFrameworkFacts, inventory: Inventory): ServerRouteGroup[] {
   const roles = rolesOf(inventory);
+  // A mirror copy's routes are its source file's, already listed (mirrors.ts).
+  const mirrored = new Set(inventory.files.filter((f) => f.mirrorOf !== undefined).map((f) => f.path));
   const groups: ServerRouteGroup[] = [];
   for (const { path: file, routes: found } of facts) {
     const role = roles.get(file);
-    if (!found?.length || role === undefined || ROUTE_SKIP_ROLES.has(role)) continue;
+    if (!found?.length || role === undefined || ROUTE_SKIP_ROLES.has(role) || mirrored.has(file)) continue;
     const routes: ServerRoute[] = [];
     const seen = new Set<string>();
     for (const fact of found) {

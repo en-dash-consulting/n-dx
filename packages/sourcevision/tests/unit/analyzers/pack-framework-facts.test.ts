@@ -179,3 +179,21 @@ describe("packEntryPointSignals", () => {
     expect(packEntryPointSignals([{ path: "a.php", entryPoints: [] }]).size).toBe(0);
   });
 });
+
+describe("packRouteGroups and mirror copies", () => {
+  it("leaves out a mirror copy's routes, which its source file already serves", async () => {
+    const { packRouteGroups } = await import("../../../src/analyzers/pack-framework-facts.js");
+    const file = (path: string, mirrorOf?: string) => ({ path, size: 1, language: "PHP", lineCount: 1, hash: path, role: "source" as const, category: "general", ...(mirrorOf ? { mirrorOf } : {}) });
+    const inventory = { files: [file("app/htdocs/a.php"), file("edit/htdocs/a.php", "app/htdocs/a.php"), file("edit/htdocs/b.php")], summary: {} } as never;
+    const route = { method: "GET", path: "/a.php", source: "docroot x", position: { line: 1, column: 0 } };
+    const groups = packRouteGroups(
+      [
+        { path: "app/htdocs/a.php", routes: [route] },
+        { path: "edit/htdocs/a.php", routes: [route] },
+        { path: "edit/htdocs/b.php", routes: [{ ...route, path: "/b.php" }] },
+      ] as never,
+      inventory,
+    );
+    expect(groups.map((g) => g.file)).toEqual(["app/htdocs/a.php", "edit/htdocs/b.php"]);
+  });
+});
