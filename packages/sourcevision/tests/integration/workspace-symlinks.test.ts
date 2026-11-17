@@ -163,6 +163,21 @@ describe("sub-analysis discovery and symlinks", () => {
     expect(listed.filter((d) => /[\\/]s[123]([\\/]|$)/.test(d))).toEqual([]);
   });
 
+  it("refuses a real directory whose .ndx container links outside the project", () => {
+    base = realpathSync(mkdtempSync(join(tmpdir(), "sv-symlink-")));
+    const proj = join(base, "proj");
+    write(proj, FILES);
+    write(join(base, "outside-proj"), {
+      ".ndx/sourcevision/manifest.json": JSON.stringify({ schemaVersion: "1.0.0", toolVersion: "0", analyzedAt: "", targetPath: "x", modules: {} }),
+    });
+    mkdirSync(join(proj, "pkg"));
+    // The walk sees `pkg` as a real directory; only the containment check
+    // sees that its analysis resolves outside the root.
+    link(join(base, "outside-proj", ".ndx"), join(proj, "pkg", ".ndx"));
+
+    expect(detectSubAnalyses(proj)).toEqual([]);
+  });
+
   it("does not take a link to an ancestor holding an analysis as a sub-analysis", async () => {
     base = realpathSync(mkdtempSync(join(tmpdir(), "sv-symlink-")));
     const proj = join(base, "proj");

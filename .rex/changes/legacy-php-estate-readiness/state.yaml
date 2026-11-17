@@ -40,8 +40,12 @@ items:
     lastModified: "2026-11-17T00:13:30.547Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f9173794-5641-4098-b703-826467da5886":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-17T00:41:17.950Z"
-    activeIntervals: [{"start":"2026-11-17T00:41:17.950Z"}]
-    lastModified: "2026-11-17T00:41:18.677Z"
+    completedAt: "2026-11-17T01:03:25.128Z"
+    endedAt: "2026-11-17T01:03:25.128Z"
+    activeIntervals: [{"end":"2026-11-17T01:03:25.128Z","start":"2026-11-17T00:41:17.950Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "findSubSvDirs skips symlinked dirs (lstat) and symlinked analysis dirs; detectSubAnalyses (shared by --deep) refuses candidates whose dir or analysis realpath is outside the root realpath. IaC, contract, go.mod and Java root walks read regular files only. Integration + lang-kit tests, red before."
+    lastModified: "2026-11-17T01:03:25.128Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
