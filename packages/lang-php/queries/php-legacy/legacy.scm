@@ -21,6 +21,23 @@
 (encapsed_string "{" . (dynamic_variable_name) @legacy.string-braced-variable)
 (heredoc_body "{" . (dynamic_variable_name) @legacy.string-braced-variable)
 (php_tag) @legacy.php-tag
+
+; ── Long superglobal arrays and $HTTP_RAW_POST_DATA ──
+; Captured in contexts we know are uses, not declarations:
+; - in global statements
+; - in expressions (assignments, function calls, returns, comparisons)
+; - in string interpolation (encapsed/heredoc)
+(global_declaration (variable_name) @legacy.superglobal-variable)
+(assignment_expression left: (variable_name) @legacy.superglobal-variable)
+(assignment_expression right: (variable_name) @legacy.superglobal-variable)
+(encapsed_string (variable_name) @legacy.superglobal-variable)
+(heredoc_body (variable_name) @legacy.superglobal-variable)
+(argument (variable_name) @legacy.superglobal-variable)
+(return_statement (variable_name) @legacy.superglobal-variable)
+(binary_expression left: (variable_name) @legacy.superglobal-variable)
+(binary_expression right: (variable_name) @legacy.superglobal-variable)
+(subscript_expression (variable_name) @legacy.superglobal-variable)
+
 ; `==`, `!=`, `<>` with a string literal on one side and a number on the other.
 (binary_expression
   left: [(string) (encapsed_string)] @legacy.compare-string

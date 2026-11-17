@@ -77,7 +77,7 @@ describe("php legacy constructs", () => {
   it("reports nothing for near misses or a namespaced class", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const facts = await byPath();
-    for (const file of ["clean/near-misses.php", "clean/namespaced.php"]) expect(at(facts.get(file)), file).toEqual([]);
+    for (const file of ["clean/near-misses.php", "clean/namespaced.php", "clean/superglobal-property-names.php"]) expect(at(facts.get(file)), file).toEqual([]);
   });
 
   it("reports no call of a removed function the repository declares itself, in any file", async (ctx) => {
@@ -142,6 +142,21 @@ describe("php legacy constructs", () => {
     const facts = await byPath();
     // Only the `<%=` outside every script element (line 13) is an ASP tag.
     expect(at(facts.get("shapes/js-templates.php"))).toEqual(["asp-tags@13:0"]);
+  });
+
+  it("counts long superglobal arrays and $HTTP_RAW_POST_DATA across all contexts: globals, strings, assignments", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const facts = await byPath();
+    const superglobals = facts.get("shapes/legacy-superglobals.php") ?? [];
+    const longSuperglobalCount = superglobals.filter((f) => f.rule === "long-superglobal-arrays").length;
+    const rawPostDataCount = superglobals.filter((f) => f.rule === "http-raw-post-data").length;
+    // Should have multiple hits across different contexts
+    expect(longSuperglobalCount).toBeGreaterThan(1);
+    expect(rawPostDataCount).toBeGreaterThan(0);
+    // Verify these are properly tagged
+    expect(superglobals.some((f) => f.rule === "long-superglobal-arrays" && f.construct === "$HTTP_GET_VARS")).toBe(true);
+    expect(superglobals.some((f) => f.rule === "long-superglobal-arrays" && f.construct === "$HTTP_POST_VARS")).toBe(true);
+    expect(superglobals.some((f) => f.rule === "http-raw-post-data" && f.construct === "$HTTP_RAW_POST_DATA")).toBe(true);
   });
 
   it("reads nothing when legacy constructs are not wanted", async (ctx) => {

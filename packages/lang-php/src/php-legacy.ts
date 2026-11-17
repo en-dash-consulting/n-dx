@@ -113,6 +113,16 @@ export const LEGACY_RULES = {
     changed: at("8.0", "incompatible"),
     notice: { source: `${MANUAL}migration80.incompatible.php` },
   },
+  "long-superglobal-arrays": {
+    construct: "$HTTP_GET_VARS, $HTTP_POST_VARS, $HTTP_COOKIE_VARS, $HTTP_SERVER_VARS, $HTTP_ENV_VARS, $HTTP_SESSION_VARS or $HTTP_POST_FILES",
+    deprecated: at("5.3", "deprecated"),
+    removed: at("5.4", "incompatible"),
+  },
+  "http-raw-post-data": {
+    construct: "$HTTP_RAW_POST_DATA",
+    deprecated: at("5.6", "deprecated"),
+    removed: at("7.0", "incompatible"),
+  },
 } as const satisfies Record<string, PhpLegacyRule>;
 
 export type PhpLegacyRuleId = keyof typeof LEGACY_RULES;
@@ -121,6 +131,27 @@ export type PhpLegacyRuleId = keyof typeof LEGACY_RULES;
 export function legacyStatus(rule: PhpLegacyRule): LegacyStatus {
   if (rule.notice !== undefined) return "notice";
   return rule.removed !== undefined ? "removed" : "deprecated";
+}
+
+/** Long superglobal variable names. */
+const LONG_SUPERGLOBALS: ReadonlySet<string> = new Set([
+  "$HTTP_GET_VARS",
+  "$HTTP_POST_VARS",
+  "$HTTP_COOKIE_VARS",
+  "$HTTP_SERVER_VARS",
+  "$HTTP_ENV_VARS",
+  "$HTTP_SESSION_VARS",
+  "$HTTP_POST_FILES",
+]);
+
+/** $HTTP_RAW_POST_DATA variable. */
+const HTTP_RAW_POST_DATA = "$HTTP_RAW_POST_DATA";
+
+/** Determine which rule a variable name matches, if any. */
+function variableRule(name: string): PhpLegacyRuleId | undefined {
+  if (LONG_SUPERGLOBALS.has(name)) return "long-superglobal-arrays";
+  if (name === HTTP_RAW_POST_DATA) return "http-raw-post-data";
+  return undefined;
 }
 
 /** Global functions by lower-cased name; prefixes after. */
@@ -340,6 +371,19 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
     if (c.nodeType === "encapsed_string" && c.text.includes("$")) continue;
     if (!NUMERIC_STRING.test(c.text.slice(1, -1))) hits.push({ rule: "string-number-comparison", position: c.start });
   }
+  // Long superglobals and $HTTP_RAW_POST_DATA: captured as variable uses
+  const seenSuperglobalPositions = new Set<string>();
+  for (const v of by.get("superglobal-variable") ?? []) {
+    const rule = variableRule(v.text);
+    if (rule !== undefined) {
+      const posKey = `${v.start.line}:${v.start.column}`;
+      if (!seenSuperglobalPositions.has(posKey)) {
+        seenSuperglobalPositions.add(posKey);
+        hits.push({ rule, position: v.start, construct: `${v.text}` });
+      }
+    }
+  }
+
   hits.push(...inlineHtmlHits(by.get("inline-html") ?? []));
   hits.push(...classHits(by), ...curlyOffsetHits(by));
   return hits.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
