@@ -58,9 +58,6 @@ items:
     resolutionDetail: "Option A: validation-slot.ts remembers tokens whose release failed; this process's next acquire reclaims such a record instead of waiting on itself."
     lastModified: "2026-11-12T18:41:18.200Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "391a5838-082d-4b5d-928e-7759329ad87a":
-    lastModified: "2026-11-12T17:57:26.059Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3928f6b4-d0f8-4943-8185-f0c6cba12ddb":
     status: "completed"
     startedAt: "2026-11-12T17:51:47.410Z"
@@ -120,9 +117,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "finalizeRun-level maxWorkers cases in test-gate-flaky-rerun.test.ts (mutation-checked against both shared.ts sites); resolveSessionCliEnv extracted to store/project-config.ts with unit tests; test-worker-cap.test.ts header now points at them."
     lastModified: "2026-11-14T05:08:30.435Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
-  "51f1f218-d1e0-4a74-8a98-e3b5a1a9d8d7":
-    lastModified: "2026-11-12T18:09:39.348Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "53be00af-2a22-4259-a5ce-ef69d8171b17":
     status: "completed"
@@ -299,8 +293,10 @@ items:
     lastModified: "2026-11-12T18:27:08.200Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b772b0c5-c910-4e92-83bf-776a266c413a":
+    appliedAt: "2026-11-16T18:26:30.780Z"
+    appliedAmendsHash: "de835cabc2e02daf88c8e99dad66dcad4c0031adfa2e7e365e33bdaa7058cc31"
     createdAt: "2026-11-12T17:26:37.734Z"
-    lastModified: "2026-11-16T17:31:41.456Z"
+    lastModified: "2026-11-16T18:26:30.780Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c1e742ad-552e-47c7-8587-b0d5212cde09":
     status: "completed"
