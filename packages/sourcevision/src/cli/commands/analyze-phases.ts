@@ -83,6 +83,8 @@ export interface AnalyzeContext {
   narrate: boolean;
   /** `--wait`: narrate escalated zones inline instead of in a detached child. */
   wait: boolean;
+  /** `--include-minified`: map minified bundles in the call graph too. */
+  includeMinified?: boolean;
   /** Final zone ids the cascade left for `sv narrate`; set by the zones phase. */
   pendingNarration?: string[];
   /** Final zone ids whose generated names `sv narrate` still has to produce. */
@@ -655,11 +657,16 @@ export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
 
     const fileSetChanged = didFileSetChange(ctx);
 
-    const callGraph = await analyzeCallGraph(ctx.absDir, inventory, importsData, !ctx.fullMode && previousCallGraph ? {
-      previousCallGraph,
-      changedFiles: ctx.inventoryResult?.changedFiles,
-      fileSetChanged,
-    } : undefined);
+    const callGraph = await analyzeCallGraph(ctx.absDir, inventory, importsData, {
+      ...(!ctx.fullMode && previousCallGraph ? {
+        previousCallGraph,
+        changedFiles: ctx.inventoryResult?.changedFiles,
+        fileSetChanged,
+      } : {}),
+      includeMinified: ctx.includeMinified,
+      onMinifiedLeftOut: (count) =>
+        info(`  ${count} minified ${count === 1 ? "file" : "files"} left out of the call graph (--include-minified maps them)`),
+    });
     const outPath = join(ctx.svDir, DATA_FILES.callGraph);
     writeFileSync(outPath, toCanonicalJSON(callGraph));
     updateManifestModule(ctx.absDir, "callgraph", "complete");

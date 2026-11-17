@@ -454,6 +454,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     fastMode,
     narrate: extraArgs.includes("--narrate"),
     wait: extraArgs.includes("--wait"),
+    includeMinified: extraArgs.includes("--include-minified"),
     targetPass: parseTargetPass(extraArgs),
     tokenUsage: emptyAnalyzeTokenUsage(),
     inventoryResult: null,

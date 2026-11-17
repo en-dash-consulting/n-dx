@@ -62,6 +62,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--target-pass=<N>", description: "Run enrichment passes up to pass N (2–4)" },
       { flag: "--deep", description: "Re-analyze sub-packages before root analysis" },
       { flag: "--per-zone", description: "Per-zone enrichment (smaller context, parallelizable)" },
+      { flag: "--include-minified", description: "Map minified bundles (*.min.js, long-line files) in callgraph.json too" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
     examples: [

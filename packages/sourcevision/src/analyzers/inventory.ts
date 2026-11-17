@@ -13,6 +13,7 @@ import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { sourcevisionVersion } from "../language/package-paths.js";
+import { isMinifiedFile, isMinifiedName, MINIFIED_RULES } from "./minified.js";
 import {
   csharpConfig,
   javaConfig,
@@ -293,8 +294,16 @@ function hasGeneratedHeader(filePath: string, head: string, config: LanguageConf
 /**
  * @param head leading text of the file; lets language header rules
  *   (`LanguageConfig.generatedHeaders`) mark generated files path patterns miss.
+ * @param minified whether the file is a minified bundle ({@link isMinifiedFile});
+ *   defaults to the name rules alone.
  */
-export function classifyRole(filePath: string, language: string, langConfig?: LanguageConfig, head?: string): FileRole {
+export function classifyRole(
+  filePath: string,
+  language: string,
+  langConfig?: LanguageConfig,
+  head?: string,
+  minified: boolean = isMinifiedName(filePath),
+): FileRole {
   const name = basename(filePath);
   const lower = filePath.toLowerCase();
   const ext = extname(filePath).toLowerCase();
@@ -322,9 +331,10 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
     return "test";
   }
 
-  // 2. Generated — universal checks + language-specific patterns
+  // 2. Generated — universal checks (lockfiles, minified bundles) + language-specific patterns
   if (
     LOCKFILE_NAMES.has(name) ||
+    minified ||
     lower.includes("generated") ||
     config.generatedFilePatterns.some((pat) => pat.test(filePath)) ||
     (head !== undefined && hasGeneratedHeader(filePath, head, config))
@@ -559,7 +569,9 @@ export async function analyzeInventory(
     const buf = await readFile(fullPath);
     const hash = createHash("sha256").update(buf).digest("hex");
     const language = detectLanguage(relPath, langConfig);
-    const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig));
+    const role = classifyRole(
+      relPath, language, langConfig, readHeaderText(relPath, buf, langConfig), isMinifiedFile(relPath, buf),
+    );
     const category = deriveCategory(relPath);
 
     let lineCount = 0;
@@ -660,11 +672,11 @@ function canonicalConfigValue(_key: string, value: unknown): unknown {
  * Fingerprint of everything that decides a cached {@link FileEntry}: the
  * sourcevision version (the classifier's code) and the language config's
  * rules (test, generated, config and entry patterns, header rules, skip
- * rules). A previous inventory is reusable only under the same fingerprint;
- * the caller stores it outside inventory.json.
+ * rules), plus the minified-bundle rules. A previous inventory is reusable
+ * only under the same fingerprint; the caller stores it outside inventory.json.
  */
 export function inventoryFingerprint(langConfig: LanguageConfig, version: string = sourcevisionVersion()): string {
   return createHash("sha256")
-    .update(JSON.stringify({ version, config: langConfig }, canonicalConfigValue))
+    .update(JSON.stringify({ version, config: langConfig, minified: MINIFIED_RULES }, canonicalConfigValue))
     .digest("hex");
 }

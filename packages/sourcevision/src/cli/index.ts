@@ -70,6 +70,7 @@ for (const a of args.slice(1)) {
   } else if (
     a.startsWith("--phase=") || a.startsWith("--only=") || a.startsWith("--target-pass=")
     || a === "--fast" || a === "--full" || a === "--deep" || a === "--lite" || a === "--narrate" || a === "--per-zone" || a === "--wait"
+    || a === "--include-minified"
   ) {
     passthrough.push(a);
   }

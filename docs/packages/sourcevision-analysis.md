@@ -114,6 +114,7 @@ ndx analyze .              # default: 1-2 enrichment passes
 ndx analyze --fast .       # static only: no model or network calls (algorithmic only)
 ndx analyze --full .       # run all 4 enrichment passes
 ndx analyze --per-zone .   # per-zone enrichment (smaller context per call)
+ndx analyze --include-minified .  # map minified bundles in callgraph.json too
 ```
 
 The `--per-zone` mode sends each zone individually to the LLM (max 3 concurrent) instead of batching 5 zones per call. Better for large codebases or budget-constrained runs.
@@ -245,7 +246,7 @@ All output is written to `.sourcevision/`:
 | `classifications.json` | File-to-archetype mappings |
 | `zones.json` | Zone boundaries, cohesion/coupling metrics, findings, enrichment metadata |
 | `components.json` | React component catalog with props and usage edges |
-| `callgraph.json` | Function/method definitions and call edges |
+| `callgraph.json` | Function/method definitions and call edges, for JavaScript and TypeScript only: PHP call facts are not in it yet. Files with role `generated` or `asset` are left out, minified bundles included (`*.min.js`, `*-min.js`, `*.bundle.js`, or a line over 2,000 characters in the first 64 KiB); `--include-minified` maps minified ones |
 | `config.json` | **New.** Config reads and feature-flag checks from language packs, per file, with flag and config-key indexes; no values. Only written when a pack produces them |
 | `llms.txt` | Structured Markdown summary for LLM consumption |
 | `CONTEXT.md` | Dense XML-tagged summary optimized for Claude |

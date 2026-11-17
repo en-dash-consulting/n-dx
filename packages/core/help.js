@@ -890,6 +890,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--deep", description: "Enable AI-enriched zone analysis (slower, richer findings)" },
       { flag: "--full", description: "Re-analyze all phases, ignoring cache" },
       { flag: "--lite", description: "File-name-only scan (faster, less detail)" },
+      { flag: "--include-minified", description: "Map minified bundles (*.min.js, long-line files) in callgraph.json too" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
     examples: [
