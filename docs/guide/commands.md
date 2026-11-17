@@ -148,6 +148,7 @@ Generated assistant artifacts:
 ndx analyze .                # standard analysis
 ndx analyze --deep .         # full multi-pass analysis
 ndx analyze --lite .         # fast single-pass (skips LLM enrichment)
+ndx analyze --fast .         # static only: no model or network call, no update check
 ```
 
 Scans the codebase: file inventory, import graph, zone detection (Louvain community detection), component catalog. Results drive recommendations and planning.

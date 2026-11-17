@@ -3853,9 +3853,11 @@ async function main() {
   // A top-level flag (--version, --help) is still n-dx's.
   const builtin = builtinCommandNames().includes(command);
   const extension = Boolean(command) && !builtin;
-  // `ndx init --no-llm` makes no network request, the registry included.
-  const staticInit = command === "init" && rest.includes(INIT_NO_LLM_FLAG);
-  if (!updateCheckQuiet && !staticInit && !(extension && !command.startsWith("-"))) {
+  // The static-only batch path (`ndx init --no-llm`, `ndx analyze --fast`)
+  // makes no network request, the registry included.
+  const staticRun =
+    (command === "init" && rest.includes(INIT_NO_LLM_FLAG)) || (command === "analyze" && rest.includes("--fast"));
+  if (!updateCheckQuiet && !staticRun &&!(extension && !command.startsWith("-"))) {
     try {
       const { version: currentVersion } = JSON.parse(
         readFileSync(join(__dir, "package.json"), "utf-8"),

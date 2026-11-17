@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "01376afa-1f03-4da1-b42e-2baef55d2c9b":
+    status: "completed"
+    startedAt: "2026-11-17T02:13:56.196Z"
+    completedAt: "2026-11-17T02:13:56.196Z"
+    endedAt: "2026-11-17T02:13:56.196Z"
+    activeIntervals: [{"end":"2026-11-17T02:13:56.196Z","start":"2026-11-17T02:13:56.196Z"}]
+    appliedAt: "2026-11-17T02:13:56.196Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-17T00:10:50.148Z"
-    lastModified: "2026-11-17T00:13:35.635Z"
+    lastModified: "2026-11-17T02:13:56.196Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0db6172b-4827-4226-98b5-60ca5841656c":
     status: "completed"
@@ -45,7 +52,14 @@ items:
     lastModified: "2026-11-17T01:51:07.006Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "845a96b6-0a33-4fe6-96fb-03a9a6369299":
-    lastModified: "2026-11-17T00:13:35.635Z"
+    status: "completed"
+    startedAt: "2026-11-17T02:05:02.701Z"
+    completedAt: "2026-11-17T02:13:56.196Z"
+    endedAt: "2026-11-17T02:13:56.196Z"
+    activeIntervals: [{"end":"2026-11-17T02:13:56.196Z","start":"2026-11-17T02:05:02.701Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Invented fixture packages/sourcevision/tests/fixtures/php-legacy-estate (19 KB; non-UTF-8 files written by the test) + e2e tests/e2e/cli-legacy-php-estate.test.ts running ndx init --no-llm then ndx analyze --fast through core with fake vendors, TypeSafe key and fetch recorder. Test found ndx analyze --fast still ran the npm update check; core now skips it for analyze --fast (help, docs, changeset)."
+    lastModified: "2026-11-17T02:13:56.196Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8480df4a-5852-49f0-a6bf-7a8cc5532364":
     status: "completed"
