@@ -59,11 +59,9 @@ describe("GET /api/llm/config — effectiveProblems", () => {
     expect(await problems()).toEqual([]);
   });
 
-  it("flags codex with provider api", async () => {
-    await configure({ llm: { vendor: "codex" } }, { provider: "api" });
-    const found = await problems();
-    expect(found.map((p) => p.field)).toEqual(["provider"]);
-    expect(found[0].message).toContain('"codex"');
+  it("accepts codex with provider api", async () => {
+    await configure({ llm: { vendor: "codex", codex: { model: "gpt-6-astra" } } }, { provider: "api" });
+    expect(await problems()).toEqual([]);
   });
 
   it("flags codex with a claude-* model", async () => {
@@ -73,12 +71,12 @@ describe("GET /api/llm/config — effectiveProblems", () => {
     expect(found[0].message).toContain("claude-sonnet-4-6");
   });
 
-  it("reports provider and model together", async () => {
+  it("still rejects an incompatible model on the supported Codex API provider", async () => {
     await configure(
       { llm: { vendor: "codex", codex: { model: "claude-sonnet-4-6" } } },
       { provider: "api" },
     );
-    expect((await problems()).map((p) => p.field)).toEqual(["provider", "model"]);
+    expect((await problems()).map((p) => p.field)).toEqual(["model"]);
   });
 
   it("does not check the model for the local vendor", async () => {

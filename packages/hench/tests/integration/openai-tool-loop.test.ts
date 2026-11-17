@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { commitGitFixtureBaseline, disableMemoryGuard } from "../helpers/index.js";
 import { initConfig, loadConfig } from "../../src/store/config.js";
+import { listRuns } from "../../src/store/runs.js";
+import { ExecutionQueue } from "../../src/queue/execution-queue.js";
 import { agentLoop } from "../../src/agent/lifecycle/loop.js";
 import { createStore } from "@n-dx/rex/dist/store/index.js";
 import type { HenchConfig } from "../../src/schema/index.js";
@@ -102,6 +104,24 @@ describe("direct OpenAI agent execution", () => {
     });
     expect((await store.getItem("task-1"))?.status).toBe("completed");
     expect((await store.getItem("task-2"))?.status).toBe("completed");
+    expect(requests).toHaveLength(8);
+  });
+
+  it("queues the explicitly selected lower-priority task first on the API loop", async () => {
+    const acquire = vi.spyOn(ExecutionQueue.prototype, "acquire");
+    script([...scriptFor("second.ts"), ...scriptFor("first.ts")]);
+    const { cmdRun } = await import("../../src/cli/commands/run.js");
+    await cmdRun(projectDir, {
+      loop: "true", task: "task-2", provider: "api", model: "gpt-6-astra", yes: "true",
+      "no-review": "true", "skip-test-gate": "true", "allow-dirty": "true", "loop-pause": "1",
+    });
+
+    expect(acquire).toHaveBeenNthCalledWith(1, "task-2", "medium");
+    const records = (await listRuns(henchDir)).reverse();
+    expect(records.map(run => [run.taskId, run.invocationContext, run.status])).toEqual([
+      ["task-2", "api", "completed"],
+      ["task-1", "api", "completed"],
+    ]);
     expect(requests).toHaveLength(8);
   });
 

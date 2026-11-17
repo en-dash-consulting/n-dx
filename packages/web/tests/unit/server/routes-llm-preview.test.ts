@@ -132,10 +132,22 @@ describe("POST /api/llm/config/preview", () => {
       editProblems: Array<{ path: string; message: string }>;
     };
 
-    expect(body.editProblems.map((p) => p.path).sort()).toEqual(["llm.codex.model", "llm.nope", "provider"]);
+    expect(body.editProblems.map((p) => p.path).sort()).toEqual(["llm.codex.model", "llm.nope"]);
     // The accepted edit still applies; the refused ones are absent.
     expect(body.effective.vendor).toBe("codex");
-    expect(body.effective.provider).toBe("cli");
+    expect(body.effective.provider).toBe("api");
+    expect(await hashConfigs()).toBe(before);
+  });
+
+  it("reports an unsupported provider edit against the newly selected vendor", async () => {
+    await writeConfigs({ llm: { vendor: "claude" } }, { provider: "api" });
+    const before = await hashConfigs();
+
+    const res = await preview({ changes: { "llm.vendor": "google" }, provider: "cli" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.editProblems).toEqual([{ path: "provider", message: expect.stringContaining("google") }]);
+    expect(body.effective).toMatchObject({ vendor: "google", provider: "api" });
     expect(await hashConfigs()).toBe(before);
   });
 
