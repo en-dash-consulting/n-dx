@@ -14,8 +14,8 @@ describe("VENDOR_PROVIDERS", () => {
     expect(VENDOR_PROVIDERS[LLM_VENDOR.CLAUDE]).toEqual(["cli", "api"]);
   });
 
-  it("codex accepts cli only — hench has no API loop for it", () => {
-    expect(VENDOR_PROVIDERS[LLM_VENDOR.CODEX]).toEqual(["cli"]);
+  it("codex accepts cli or direct api", () => {
+    expect(VENDOR_PROVIDERS[LLM_VENDOR.CODEX]).toEqual(["cli", "api"]);
   });
 
   it("google accepts api only — no CLI binary exists", () => {

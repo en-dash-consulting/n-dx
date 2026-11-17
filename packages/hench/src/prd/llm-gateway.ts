@@ -311,6 +311,8 @@ export { parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion } from 
 export {
   ProviderRegistry,
   defaultRegistry,
+  createOpenAiApiProvider,
+  supportsOpenAiTurns,
 } from "@n-dx/llm-client";
 
 // ---- Type re-exports --------------------------------------------------------

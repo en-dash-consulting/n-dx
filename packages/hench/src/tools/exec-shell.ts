@@ -15,6 +15,7 @@ export interface ExecShellOptions {
   env?: NodeJS.ProcessEnv;
   /** When set, the shell runs inside this OS sandbox. */
   sandbox?: ToolSandbox | null;
+  signal?: AbortSignal;
 }
 
 /** Options for {@link execArgv} — a shell-free spawn of one binary with argv. */
@@ -33,6 +34,7 @@ export interface ExecArgvOptions {
   env?: NodeJS.ProcessEnv;
   /** When set, the binary runs inside this OS sandbox. */
   sandbox?: ToolSandbox | null;
+  signal?: AbortSignal;
 }
 
 /**
@@ -81,6 +83,7 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
     maxBuffer = 1024 * 1024,
     env = { ...process.env },
     sandbox,
+    signal,
   } = opts;
 
   const liveTail = createLiveTail();
@@ -88,14 +91,14 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
     const base = await sandbox.prepareSpawn(env);
     // The same shell execShellCmd would pick, wrapped by the backend.
     const inv = sandbox.wrapShell(command);
-    const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...base, ...inv.env }, onData: liveTail.onData });
+    const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...base, ...inv.env }, onData: liveTail.onData, ...(signal ? { signal } : {}) });
     liveTail.flush();
     return formatExecOutcome(result, timeout);
   }
   // execShellCmd, not exec("sh", ...) — `sh` does not resolve on Windows
   // outside a POSIX environment, and the resulting ENOENT reported as
   // exitCode 1 with no output looked exactly like a failing command.
-  const result = await execShellCmd(command, { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
+  const result = await execShellCmd(command, { cwd, timeout, maxBuffer, env, onData: liveTail.onData, ...(signal ? { signal } : {}) });
   liveTail.flush();
   return formatExecOutcome(result, timeout);
 }
@@ -120,12 +123,13 @@ export async function execArgv(opts: ExecArgvOptions): Promise<string> {
     maxBuffer = 1024 * 1024,
     env = { ...process.env },
     sandbox,
+    signal,
   } = opts;
 
   const liveTail = createLiveTail();
   const base = sandbox ? await sandbox.prepareSpawn(env) : env;
   const inv = sandbox ? sandbox.wrap(file, args) : { file, args, env: {} };
-  const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...base, ...inv.env }, onData: liveTail.onData });
+  const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...base, ...inv.env }, onData: liveTail.onData, ...(signal ? { signal } : {}) });
   liveTail.flush();
   return formatExecOutcome(result, timeout);
 }

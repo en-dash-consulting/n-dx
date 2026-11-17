@@ -426,31 +426,31 @@ describe("Hench Config API routes", () => {
   // ── PUT /api/hench/config — vendor-aware provider validation ────────
 
   it("PUT /api/hench/config rejects a provider the active vendor does not support", async () => {
-    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "google" } }));
     const before = await readFile(join(henchDir, "config.json"), "utf-8");
 
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ changes: { provider: "api" } }),
+      body: JSON.stringify({ changes: { provider: "cli" } }),
     });
     expect(res.status).toBe(400);
 
     const body = await res.json();
-    expect(body.error).toContain("codex");
-    expect(body.error).toContain("cli");
+    expect(body.error).toContain("google");
+    expect(body.error).toContain("api");
     // Naming both the vendor and its allowed providers, per the acceptance
     // criterion — and the file must stay untouched, same as every other
     // rejected write in this suite.
     expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
   });
 
-  it("PUT /api/hench/config still accepts a provider the active vendor supports", async () => {
+  it.each(["cli", "api"])("PUT /api/hench/config accepts Codex %s", async (provider) => {
     await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ changes: { provider: "cli" } }),
+      body: JSON.stringify({ changes: { provider } }),
     });
     expect(res.status).toBe(200);
   });

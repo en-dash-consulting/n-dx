@@ -24,6 +24,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   await rm(dir, { recursive: true, force: true });
 });
 it("offers and validates the client catalog without a key; reports provenance/version/time", async () => {
@@ -66,4 +67,52 @@ it("accepts client models in saved task and launch settings and preserves CLI re
   expect((await checkSavedRun(dir, { models: { codex: "gpt-client-only" } })).ok).toBe(true);
   expect((await validateRunOptions(dir, { model: "gpt-client-only" })).ok).toBe(true);
   expect(resolveVendorModel("codex", { vendor: "codex", codex: { model: "gpt-client-only" } })).toBe("gpt-client-only");
+});
+
+it("uses API discovery and readiness without invoking Codex, and validates the same catalog", async () => {
+  await writeFile(join(dir, ".n-dx.local.json"), JSON.stringify({
+    hench: { provider: "api" }, llm: { vendor: "codex", codex: { auth: "api", api_key: "fixture-key" } },
+  }));
+  const fetch = vi.fn(async (_url: string) => new Response(JSON.stringify({ data: [{ id: "gpt-6-astra" }, { id: "gpt-api-only" }] }), { headers: { "Content-Type": "application/json" } }));
+  vi.stubGlobal("fetch", fetch);
+  const catalog = await buildLlmCatalog(dir, false);
+  expect(catalog.codex).toMatchObject({
+    models: ["gpt-6-astra"], providers: ["cli", "api"], provenance: "vendor-api",
+    readiness: { state: "ready", apiKey: true },
+  });
+  expect(await validateCatalogModel(dir, "codex", "gpt-api-only")).toMatch(/support/i);
+  expect(fetch.mock.calls.map(([url]) => url)).toContain("https://api.openai.com/v1/models");
+  expect(catalog.codex.cli).toBeUndefined();
+  expect(mocks.list).not.toHaveBeenCalled();
+  expect(mocks.exec.mock.calls.some(([binary]) => binary === "codex")).toBe(false);
+  expect(fetch.mock.calls.length).toBeGreaterThan(0);
+});
+
+it("does not send a key when Codex direct API conflicts with CLI-login authentication", async () => {
+  await writeFile(join(dir, ".n-dx.local.json"), JSON.stringify({
+    hench: { provider: "api" }, llm: { vendor: "codex", codex: { auth: "cli", api_key: "fixture-key" } },
+  }));
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  const probe = await getLiveVendorProbe("codex", dir, { provider: "api" });
+  expect(probe.listing.ok).toBe(false);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(mocks.exec).not.toHaveBeenCalled();
+});
+
+it("keeps custom-endpoint credentials out of public catalog requests", async () => {
+  await writeFile(join(dir, ".n-dx.local.json"), JSON.stringify({
+    llm: { codex: { api_endpoint: "https://fixture.invalid/v1", auth: "api", api_key: "fixture-key" } },
+  }));
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  const probe = await getLiveVendorProbe("codex", dir, { provider: "api" });
+  expect(probe.listing).toMatchObject({ ok: false, reason: expect.stringContaining("custom") });
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("uses the task or launch provider override for a CLI-only model", async () => {
+  await writeFile(join(dir, ".n-dx.local.json"), JSON.stringify({ hench: { provider: "api" }, llm: { vendor: "codex" } }));
+  expect((await checkSavedRun(dir, { provider: "cli", models: { codex: "gpt-client-only" } })).ok).toBe(true);
+  expect((await validateRunOptions(dir, { provider: "cli", model: "gpt-client-only" })).ok).toBe(true);
 });

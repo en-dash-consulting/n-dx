@@ -119,7 +119,14 @@ ndx config llm.vendor claude .    # or: codex
 | Vendor | Rex Behavior | Hench Behavior | Token Accounting |
 |--------|-------------|----------------|------------------|
 | `claude` | Shared LLM client; API when key configured, CLI fallback | Both `api` and `cli` providers | Full support |
-| `codex` | Codex CLI adapter (`codex exec`) | CLI-only (`api` rejected) | Limited (CLI doesn't return usage) |
+| `codex` | CLI or OpenAI API, selected by authentication mode | Both `cli` and direct Responses `api` providers | Request usage on API; reported CLI usage |
+
+For direct OpenAI tasks, use `n-dx work --provider=api --model=gpt-6-astra .`
+with `llm.vendor=codex` and OpenAI API authentication. The agent codec supports
+`gpt-6.1-sol` and `gpt-6-astra`; other model pins are refused, not replaced.
+`hench.provider=cli` with `llm.codex.auth=api` remains CLI execution authenticated
+with an API key. Direct API runs support diff approval; CLI self/pair review and
+OpenAI model/vendor failover are not supported on this path.
 
 ## Claude Configuration
 

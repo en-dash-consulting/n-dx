@@ -487,21 +487,14 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
     expect(r.warnings).toEqual([]);
   });
 
-  it("skips a saved provider the active vendor has no loop for, and warns naming the task", () => {
-    // `api` on codex: there is no API loop, and `resolveRunProvider` offers no
-    // fallback. Refusing would end a whole --loop on one task's saved value.
+  it("honours a saved direct API provider for Codex", () => {
     const r = resolveFor({
-      vendor: "codex",
-      llm: { vendor: "codex" },
-      item: task({ provider: "api" }, "Mis-saved provider"),
+      vendor: "codex", llm: { vendor: "codex", codex: { auth: "api", api_key: "fixture" } },
+      item: task({ provider: "api" }, "API task"),
     });
-
-    expect(r.provider.value).toBe("cli");
-    expect(r.provider.source).not.toBe("task.run");
+    expect(r.provider).toMatchObject({ value: "api", source: "task.run" });
     expect(r.provider.error).toBeUndefined();
-    expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0].code).toBe("saved-provider-unavailable");
-    expect(r.warnings[0].message).toContain("Mis-saved provider");
+    expect(r.warnings).toEqual([]);
   });
 
   it("still switches a saved provider the vendor can only serve the other way, with no warning", () => {

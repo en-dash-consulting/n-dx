@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { OpenAiAgentTurn } from "./openai-agent-turn.js";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails, createToolSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
@@ -22,7 +23,7 @@ import {
   resolveLLMVendor,
   withVendorOverride,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, createOpenAiApiProvider, resolveTaskModel, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -71,6 +72,7 @@ import {
 import type { SharedLoopOptions } from "./shared.js";
 import {
   detectPlanOnlyIteration,
+  runHasCodeModifications,
   createExecutionReminder,
 } from "../analysis/plan-only-detection.js";
 
@@ -293,11 +295,8 @@ interface ApiResources {
 /**
  * Initialize API resources from a resolved LLM provider.
  *
- * Accepts any {@link LLMProvider} from the registry. Currently the API loop
- * requires the raw Anthropic SDK for its multi-turn tool-use pattern, so
- * only Claude-compatible providers are supported. Non-Claude providers will
- * be supported when the loop is refactored to use the generic LLMProvider
- * completion interface with tool schemas.
+ * Build the Claude branch's raw Anthropic SDK client. Other API vendors use
+ * their own turn codecs and share the guarded tool context and finalization.
  */
 async function initApiResources(
   provider: LLMProvider,
@@ -313,13 +312,11 @@ async function initApiResources(
 ): Promise<ApiResources> {
   const vendor = provider.info.vendor;
 
-  // The API loop currently requires the raw Anthropic SDK for multi-turn
-  // tool-use. Non-Claude providers will be supported when the loop is
-  // refactored to use LLMProvider.complete() with tool schemas.
+  // This resource builder belongs to the Claude SDK branch only.
   if (vendor !== LLM_VENDOR.CLAUDE) {
     throw new Error(
       `Hench API loop requires a Claude-compatible provider (got "${vendor}"). ` +
-      "Non-Claude API providers are not yet supported. Use provider=cli for non-Claude vendors.",
+      "Use the vendor's dedicated API turn path.",
     );
   }
 
@@ -356,6 +353,7 @@ async function initApiResources(
     testMaxWorkers: config.testGate?.maxWorkers,
     validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
     configBackstop,
+    abortSignal,
   };
 
   return { client, provider, vendor, toolCtx };
@@ -489,11 +487,13 @@ async function executeToolCalls(
   turn: number,
   run: RunRecord,
   detector: LivelockDetector,
+  signal?: AbortSignal,
 ): Promise<Anthropic.ToolResultBlockParam[]> {
   const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
   for (const block of assistantContent) {
     if (block.type !== "tool_use") continue;
+    signal?.throwIfAborted();
 
     const startMs = Date.now();
     stream("Tool", `${block.name}(${JSON.stringify(block.input).slice(0, 100)})`);
@@ -522,6 +522,7 @@ async function executeToolCalls(
       type: "tool_result",
       tool_use_id: block.id,
       content: output,
+      is_error: /^(\[GUARD\]|\[ERROR\]|Unknown tool:)/.test(output),
     });
 
     stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
@@ -594,6 +595,7 @@ function initGoogleApiResources(
     testMaxWorkers: config.testGate?.maxWorkers,
     validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
     configBackstop,
+    abortSignal,
   };
 }
 
@@ -1944,9 +1946,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Read on the host now, so confined commands are handed the slot directory.
   if (sandboxPosture.state === "confined") startHostIdentityLookup();
 
-  // Shared: transition task to in_progress
-  await transitionToInProgress(store, taskId, brief.task.status);
-
+  const llmConfig = withVendorOverride(await loadLLMConfig(henchDir), opts.vendorOverride);
+  const effectiveVendor = resolveLLMVendor(llmConfig);
   // API-specific: resolve provider, API key, build client and tool context
   const startingHead = captureStartingHead(projectDir);
   // Snapshot untracked files before the agent runs, so a rollback removes only
@@ -1957,17 +1958,13 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // apart from the operator's at commit time (see stageRunWork).
   const baselineDirty = await captureBaselineDirty(projectDir);
 
-  // Resolve provider — registry or legacy path based on config flag
-  // An escalated attempt runs on another vendor (see cli-loop.ts).
-  const llmConfig = withVendorOverride(await loadLLMConfig(henchDir), opts.vendorOverride);
-  const effectiveVendor = resolveLLMVendor(llmConfig);
-
   // The previous run failed only at the test gate with its work committed:
   // re-run the gate instead of an agent loop (#539). Placed before provider
   // resolution, so it covers every API vendor and needs no API client. The API
   // loop has no review pass, so there is no review to inherit or run.
   const gateOnly = await planGateOnlyRetry({ projectDir, taskId, runHistory: opts.runHistory, claims: opts.claims });
   if (gateOnly) {
+    await transitionToInProgress(store, taskId, brief.task.status);
     const { run, memoryCtx } = await initRunRecord({
       taskId,
       taskTitle: brief.task.title,
@@ -2011,9 +2008,21 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     return { run };
   }
 
+  const codexProvider = effectiveVendor === "codex"
+    ? createOpenAiApiProvider({ codexConfig: { ...llmConfig.codex, model }, maxTokens: config.maxTokens })
+    : undefined;
+  if (codexProvider && !codexProvider.info.capabilities.includes("function-calling")) {
+    throw new Error(`OpenAI model "${model}" has no verified agent-turn support. Select a supported API model explicitly.`);
+  }
+
+  // Shared: transition task to in_progress
+  await transitionToInProgress(store, taskId, brief.task.status);
+
   let provider: LLMProvider;
 
-  if (config.useRegistryProvider || effectiveVendor === "google" || effectiveVendor === "local") {
+  if (effectiveVendor === "codex") {
+    provider = codexProvider!;
+  } else if (config.useRegistryProvider || effectiveVendor === "google" || effectiveVendor === "local") {
     // New path: ProviderRegistry resolution.
     // Google and local always use the registry (they have no legacy API path).
     provider = defaultRegistry.getActiveProvider(llmConfig);
@@ -2021,8 +2030,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     // Legacy path: manual vendor check with original error message
     if (effectiveVendor !== "claude") {
       throw new Error(
-        `Hench API mode requires llm.vendor=claude. Current vendor: ${effectiveVendor}. ` +
-        "Use provider=cli for Codex.",
+        `Unsupported API vendor: ${effectiveVendor}. Select claude, codex, google or local.`,
       );
     }
     provider = defaultRegistry.create("claude", llmConfig);
@@ -2078,9 +2086,18 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     });
   }
 
-  const { client, vendor, toolCtx } = await initApiResources(
+  const openAi = effectiveVendor === "codex" ? new OpenAiAgentTurn(provider) : undefined;
+  const controller = new AbortController();
+  const signal = opts.abortSignal
+    ? AbortSignal.any([opts.abortSignal, controller.signal]) : controller.signal;
+  const resources = openAi ? undefined : await initApiResources(
     provider, config, henchDir, projectDir, store, taskId,
-    brief.project.testCommand, startingHead, opts.configBackstop, opts.abortSignal,
+    brief.project.testCommand, startingHead, opts.configBackstop, signal,
+  );
+  const vendor = effectiveVendor;
+  const toolCtx = resources?.toolCtx ?? initGoogleApiResources(
+    config, projectDir, store, taskId, brief.project.testCommand,
+    startingHead, opts.configBackstop, signal,
   );
 
   // Shared: initialize run record + capture start memory snapshot
@@ -2093,7 +2110,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     vendor,
     sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
-    parseMode: "api-sdk",
+    parseMode: openAi ? "openai-responses" : "api-sdk",
     invocationContext: "api",
     session: API_SESSION_DECISION,
     // The tier of the model actually sent; see RunRecord.weight.
@@ -2108,9 +2125,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     { role: "user", content: briefText },
   ];
 
-  // Resolved once per run, not per turn. initApiResources has already
-  // rejected any vendor but Claude, so this is always a Claude API request.
-  const effort = resolveAgentApiEffort(model, llmConfig);
+  // Claude request effort; the OpenAI codec validates its own effort dialect.
+  const effort = openAi ? undefined : resolveAgentApiEffort(model, llmConfig);
 
   // Batched, summarizing prune. Cutting the oldest turns every turn — the old
   // behavior — changed the prompt prefix on every request and made the cache
@@ -2118,7 +2134,14 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const pruner = new ConversationPruner(
     anthropicPruneShape(),
     createContextSummarizer({
-      provider,
+      provider: openAi ? {
+        info: provider.info,
+        complete: request => provider.completeTurn!({
+          model: request.model ?? model,
+          messages: [{ role: "user", content: request.prompt }], tools: [],
+          effort: request.effort, taskClass: "context.summarize", signal,
+        }),
+      } : provider,
       llmConfig,
       vendor,
       taskTitle: brief.task.title,
@@ -2157,13 +2180,14 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       process.exit(1);
     }
     cancelled = true;
+    controller.abort();
   };
   process.on("SIGINT", handleSignal);
 
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       // Check if cancellation was requested
-      if (cancelled) {
+      if (cancelled || signal.aborted) {
         run.status = "cancelled";
         stream("Cancelled", "Run interrupted by user");
         break;
@@ -2175,12 +2199,24 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
       recordPruneUsage(run, await pruner.prune(messages), turn + 1, vendor, model);
+      if (openAi) {
+        signal.throwIfAborted();
+        const budgetAfterPrune = checkTokenBudget(run.tokenUsage, tokenBudget);
+        if (budgetAfterPrune.exceeded) {
+          await handleBudgetExceeded(store, taskId, run, budgetAfterPrune);
+          break;
+        }
+        if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
+      }
 
       const _t0 = Date.now();
-      const response = await withHeartbeat(
+      const response = await withHeartbeat<Anthropic.Message | Awaited<ReturnType<OpenAiAgentTurn["call"]>>>(
         `waiting on ${vendor}/${model} response`,
-        callWithFailover(
-          client,
+        openAi ? openAi.call({
+          model, systemPrompt, messages, signal,
+          effort: resolveTaskModel("agent.execute", llmConfig).effort,
+        }) : callWithFailover(
+          resources!.client,
           buildCachedMessageRequest({
             model,
             maxTokens: config.maxTokens,
@@ -2206,11 +2242,25 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       const _latencyMs = Date.now() - _t0;
 
       // Track token usage for this turn
-      recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, vendor, model);
+      if ("accounting" in response) {
+        recordTurnTokenUsageNormalized(run, response.accounting.tokenUsage ?? { input: 0, output: 0 }, turn + 1, vendor, response.accounting.model);
+        if (response.accounting.effort && run.diagnostics) {
+          const note = `openai_effort:${response.accounting.effort}`;
+          if (!run.diagnostics.notes.includes(note)) run.diagnostics.notes.push(note);
+        }
+        const last = run.turnTokenUsage!.at(-1)!;
+        last.diagnosticStatus = response.accounting.usageStatus === "measured" ? "complete"
+          : response.accounting.tokenUsage ? "partial" : "unavailable";
+      } else {
+        recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, vendor, model);
+      }
+      signal.throwIfAborted();
+      if (response.stop_reason === "refusal") throw new Error("OpenAI refused the agent request");
 
       // Emit tok/s metric — parsed by the web server for live dashboard display
       {
-        const outTokens = (response.usage as unknown as Record<string, unknown>)?.["output_tokens"];
+        const outTokens = "accounting" in response ? response.accounting.tokenUsage?.output
+          : (response.usage as unknown as Record<string, unknown>)?.["output_tokens"];
         const _outTok = typeof outTokens === "number" ? outTokens : 0;
         if (_outTok > 0 && _latencyMs > 0) {
           const _tokPerSec = Math.round((_outTok / _latencyMs) * 1000 * 10) / 10;
@@ -2232,7 +2282,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       streamAssistantText(assistantContent, formatModelLabel(model));
 
       // Detect plan-only iterations before handling completion
-      const planDetection = detectPlanOnlyIteration(assistantContent);
+      const planDetection = openAi && runHasCodeModifications(run.toolCalls)
+        ? { isPlanOnly: false } : detectPlanOnlyIteration(assistantContent);
 
       // Handle stop reasons
       if (response.stop_reason === "end_turn") {
@@ -2310,7 +2361,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       }
 
       // Process tool calls
-      const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run, livelock);
+      const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run, livelock, signal);
       if (await failOnLivelock(livelock, run, store, taskId)) break;
       messages.push({ role: "user", content: toolResults });
 
@@ -2323,14 +2374,21 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       run.status = "timeout";
       run.error = `Exceeded max turns (${maxTurns})`;
 
-      await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+      await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
     }
   } catch (err) {
-    run.status = "failed";
-    run.error = (err as Error).message;
+    if (openAi && err instanceof Error && "tokenUsage" in err) {
+      const accounting = err as Error & Partial<Awaited<ReturnType<OpenAiAgentTurn["call"]>>["accounting"]>;
+      recordTurnTokenUsageNormalized(run, accounting.tokenUsage, run.turns, vendor, model);
+      if (accounting.tokenUsage) {
+        run.turnTokenUsage!.at(-1)!.diagnosticStatus = accounting.usageStatus === "measured" ? "complete" : "partial";
+      }
+    }
+    run.status = signal.aborted ? "cancelled" : "failed";
+    run.error = signal.aborted ? "Run interrupted by user" : (err as Error).message;
     console.error(`[Error] ${run.error}`);
 
-    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
   } finally {
     // Remove SIGINT handler to restore default behavior
     process.removeListener("SIGINT", handleSignal);

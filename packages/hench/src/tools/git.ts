@@ -46,6 +46,7 @@ export async function toolGit(
   guard: ToolGuard,
   projectDir: string,
   params: { subcommand: string; args?: string },
+  signal?: AbortSignal,
 ): Promise<string> {
   guard.checkGitSubcommand(params.subcommand);
 
@@ -66,6 +67,7 @@ export async function toolGit(
     timeout: GIT_TIMEOUT,
     env: guard.childEnv,
     sandbox: guard.sandbox,
+    signal,
   });
 }
 

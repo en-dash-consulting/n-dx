@@ -282,6 +282,8 @@ export {
 
 export { codexUserConfigPath, codexUserModelProvider } from "./codex-user-config.js";
 
+export { supportsOpenAiTurns } from "./openai-responses.js";
+
 export {
   createOpenAiApiProvider,
   resolveOpenAiApiKey,

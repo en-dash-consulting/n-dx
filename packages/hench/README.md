@@ -147,3 +147,30 @@ npm run build       # tsc
 npm test            # vitest
 npm run dev         # tsc --watch
 ```
+
+### Direct OpenAI task execution
+
+Set `llm.vendor=codex`, choose a codec-supported model (`gpt-6.1-sol` or
+`gpt-6-astra`), and select `hench.provider=api` to run tasks through OpenAI
+Responses. For example:
+
+```sh
+n-dx work --provider=api --model=gpt-6-astra --task=<task-id> .
+n-dx work --provider=api --model=gpt-6-astra --loop .
+```
+
+Provide `OPENAI_API_KEY`, or select `llm.codex.auth=api` with a stored credential.
+API execution never falls back to the Codex CLI. `hench.provider=cli` with
+`llm.codex.auth=api` remains a separate option: it runs the CLI using API-key
+authentication. Intentional model pins are preserved; unsupported agent models
+are refused before execution rather than remapped.
+
+Direct runs share the API tool guard, task claims, budgets, completion/test
+gates and recovery. `--approve-diff` is supported; CLI self/pair review remains
+unavailable on API runs, as on Claude API. Explicit incompatible review flags
+are refused; saved/configured self-review follows the existing warning policy.
+OpenAI model/vendor failover is not enabled by this task.
+
+The Responses codec is tested against synthetic transport fixtures. Model
+listing and codec support do not prove live account access. The dashboard lists
+Codex CLI models for CLI execution and OpenAI API models for direct execution.

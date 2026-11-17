@@ -37,7 +37,7 @@ function config(over: Json = {}): Json {
 
 const CATALOG: Json = {
   claude: { models: ["claude-sonnet-5"], providers: ["cli", "api"], defaultModel: "claude-sonnet-5", source: "live", checkedAt: "2026-10-01T12:00:00.000Z", cli: { found: true, version: "2.1.0", path: "/bin/claude" } },
-  codex: { models: ["gpt-5.6-sol"], providers: ["cli"], defaultModel: "gpt-5.6-sol", source: "built-in", checkedAt: null, cli: { found: false, version: null, path: null }, readiness: { state: "needs-setup", summary: "CLI not found" } },
+  codex: { models: ["gpt-5.6-sol"], providers: ["cli", "api"], defaultModel: "gpt-5.6-sol", source: "built-in", checkedAt: null, cli: { found: false, version: null, path: null }, readiness: { state: "needs-setup", summary: "CLI not found" } },
   google: { models: ["gemini-2.5-pro"], providers: ["api"], defaultModel: "gemini-2.5-pro", source: "built-in", checkedAt: null },
   local: { models: [], providers: ["api"], defaultModel: "", reachable: false },
 };
@@ -205,23 +205,17 @@ describe("Robot Wrangler run card", () => {
     expect(card().querySelector(".llm-runcard-model-id")?.textContent).toBe("claude-sonnet-5");
   });
 
-  it("shows the banner with the server's message for a refused configuration, and never offers an API switch for Codex", async () => {
+  it("offers Codex API without a CLI-missing refusal", async () => {
     stubApi({
       config: config({
         vendor: "codex",
-        effective: effective("codex", "gpt-5.6-sol", { provider: "api" }),
-        effectiveProblems: [{ field: "provider", message: 'Provider "api" is not supported for vendor "codex". Allowed: cli.' }],
+        effective: effective("codex", "gpt-6-astra", { provider: "api" }),
       }),
     });
     await mount();
-
-    expect(card().classList.contains("llm-runcard-refused")).toBe(true);
-    const banner = root.querySelector('.llm-runcard-banner[role="alert"]')!;
-    expect(banner.textContent).toContain("n-dx work would refuse this.");
-    expect(banner.textContent).toContain('Provider "api" is not supported for vendor "codex". Allowed: cli.');
-    expect(banner.textContent).toContain("Codex runs on its CLI only.");
-    expect(banner.textContent).not.toMatch(/\bAPI\b.*(switch|use|connection)|use the api/i);
-    expect(root.querySelector(".llm-connection-card-api")).toBeNull();
+    expect(card().classList.contains("llm-runcard-refused")).toBe(false);
+    expect(root.querySelector(".llm-connection-card-api")).toBeTruthy();
+    expect(root.querySelector(".llm-runcard-banner")).toBeNull();
   });
 
   it("offers How to install and pick another vendor when the Codex CLI is missing", async () => {
