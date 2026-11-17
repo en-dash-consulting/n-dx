@@ -56,8 +56,10 @@
  * the source of its first part (a database host written as a whole value,
  * not a connection string, never takes partial text: it is the source of
  * its first part that is not computable, never `literal`); a variable takes the target of its last
- * plain assignment before the call in its scope; anything else is `unknown`
- * with target `""`.
+ * plain assignment before the call in its scope; a constant or configuration
+ * key no definition computes is `config` with its name; anything else is
+ * `unknown`, with the argument as written (credentials dropped) as target, or
+ * `""` when there is no argument.
  *
  * Confidence is `certain`: the functions are PHP's own (called unqualified
  * or with a leading `\`), the classes are qualified as PHP does, and a
@@ -301,6 +303,15 @@ export function connectionKeyValues(text: string): Map<string, string> {
 /** A literal target without a URI's user and password. */
 const credentialFree = (target: Target): Target => (target.targetSource === "literal" ? { ...target, target: withoutCredentials(target.target) } : target);
 
+/** Longest argument kept as written for an unresolved target. */
+const MAX_WRITTEN = 200;
+
+/** An unresolved argument as written: whitespace collapsed, credentials dropped, at most {@link MAX_WRITTEN} characters; `unknown`. */
+const asWritten = (text: string): Target => {
+  const written = withoutCredentials(text.replace(/\s+/g, " ").trim());
+  return { target: written.length > MAX_WRITTEN ? `${written.slice(0, MAX_WRITTEN - 1)}…` : written, targetSource: "unknown" };
+};
+
 const literal = (target: string): Target => (target === "" ? UNKNOWN : { target: withoutCredentials(target), targetSource: "literal" });
 
 /**
@@ -356,8 +367,18 @@ class TargetReader {
     this.assignments = readAssignments(file).map((a) => ({ ...a, scope: scopeAt(file, a.start) }));
   }
 
-  /** Where an argument written at `at` points. */
+  /**
+   * Where an argument written at `at` points. Called for the argument itself
+   * (`depth` 0), a target that resolves to nothing is the argument as written
+   * (`$this->host . '/soap.php'`), still `unknown`, so a call whose endpoint
+   * comes from a property, a parameter or a call result still names it.
+   */
   of(text: string, at: SourcePosition, depth = 0): Target {
+    const target = this.resolve(text, at, depth);
+    return depth === 0 && target.targetSource === "unknown" && target.target === "" ? asWritten(text) : target;
+  }
+
+  private resolve(text: string, at: SourcePosition, depth: number): Target {
     const t = text.trim();
     if (depth > MAX_DEPTH || t === "") return UNKNOWN;
     const value = this.evaluate(t, at, depth);

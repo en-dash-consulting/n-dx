@@ -36,7 +36,7 @@ describe("php outbound calls", () => {
       // A variable, then the computable leading text of the concatenation; CURL_INIT in any case.
       'curl.php:18 http curl "https://reports.example.com/daily?id=" (literal, certain)',
       // A parameter.
-      'curl.php:22 http curl "" (unknown, certain)',
+      'curl.php:22 http curl "$url" (unknown, certain)',
       'env.php:2 env getenv "DB_HOST" (env, certain)',
       'env.php:3 env $_ENV "APP_ENV" (env, certain)',
       'env.php:4 env $_SERVER "APP_SECRET" (env, certain)',
@@ -77,7 +77,7 @@ describe("php outbound calls", () => {
     expect(result.facts.flatMap((f) => (f.outboundCalls ?? []).map((c) => `${c.position.line} ${c.target} (${c.targetSource})`))).toEqual([
       "5 https://short.example.com/q?a=1&b=2 (literal)",
       // Past the depth bound, the target is unknown rather than guessed.
-      "68  (unknown)",
+      "68 $long (unknown)",
     ]);
   });
 

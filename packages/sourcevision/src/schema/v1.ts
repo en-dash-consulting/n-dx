@@ -1753,7 +1753,9 @@ export interface OutboundDependency {
   /**
    * Where the call points — a URL or address when `targetSource` is
    * `literal`, the environment variable's name when it is `env`, the config
-   * key when it is `config`, and the empty string when it is `unknown`.
+   * key when it is `config`, and for `unknown` the expression as written when
+   * a pack keeps it (PHP: `$this->host . '/soap.php'`, credentials dropped),
+   * else the empty string.
    */
   target: string;
   /**

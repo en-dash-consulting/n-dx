@@ -161,6 +161,24 @@ function applicationOutbound<D extends { dependencies: { file: string; thirdPart
   return dependencies === data.dependencies ? data : { ...data, dependencies };
 }
 
+/**
+ * One line counting outbound targets by how they were found: resolved
+ * (`literal`), named (`env`, `config`, or `unknown` with the expression as
+ * written) and blank, e.g. `  outbound targets: 13 literal, 6 env, 2 config,
+ * 58 unknown (4 blank)`; undefined with no dependency.
+ */
+export function describeOutboundTargets(deps: readonly { target: string; targetSource: string }[]): string | undefined {
+  if (deps.length === 0) return undefined;
+  const counts: Record<string, number> = { literal: 0, env: 0, config: 0, unknown: 0 };
+  let blank = 0;
+  for (const d of deps) {
+    counts[d.targetSource] = (counts[d.targetSource] ?? 0) + 1;
+    if (d.target === "") blank++;
+  }
+  const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([source, n]) => `${n} ${source}`);
+  return `  outbound targets: ${parts.join(", ")}${blank > 0 ? ` (${blank} blank)` : ""}`;
+}
+
 function parsePhaseFilter(extraArgs: string[]): PhaseFilter {
   for (const a of extraArgs) {
     if (a.startsWith("--phase=")) {
@@ -859,10 +877,10 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // Deterministic and LLM-free, so it runs on every analysis including
     // `--fast`, and is written canonically for the same reason as the file
     // above it. Language packs' outbound calls join the detectors' entries.
-    writeFileSync(
-      join(ctx.svDir, DATA_FILES.outbound),
-      toCanonicalJSON(applicationOutbound(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory)), inventory)),
-    );
+    const outbound = applicationOutbound(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory)), inventory);
+    writeFileSync(join(ctx.svDir, DATA_FILES.outbound), toCanonicalJSON(outbound));
+    const targetsLine = describeOutboundTargets(outbound.dependencies);
+    if (targetsLine) info(targetsLine);
 
     // Config reads and flag checks, only when a language pack produced them:
     // without one there is no config.json, and a stale one from a run that
