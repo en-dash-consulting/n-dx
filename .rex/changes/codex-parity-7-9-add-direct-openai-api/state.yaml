@@ -15,7 +15,7 @@ items:
     startedAt: "2026-11-17T21:27:08.846Z"
     activeIntervals: [{"end":"2026-11-17T22:10:10.280Z","start":"2026-11-17T21:27:08.846Z"}]
     failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED PATH=\"/Users/ryankeith/.nvm/versions/node/v22.22.2/bin:$PATH\" CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-test…\nFailing tests (1):\n- keeps the loop alive when a task saved a provider this vendor has no loop for"
-    lastModified: "2026-11-17T22:10:10.824Z"
+    lastModified: "2026-11-17T22:10:55.606Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ee45742e-70be-47ff-a5af-22fa9b711412":
     createdAt: "2026-11-11T21:06:08.556Z"
