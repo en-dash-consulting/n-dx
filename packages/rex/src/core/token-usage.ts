@@ -23,6 +23,18 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
+type UsageStatus = "complete" | "partial" | "unavailable";
+
+function mergeUsageStatus(...values: Array<UsageStatus | undefined>): UsageStatus | undefined {
+  return values.includes("unavailable") ? "unavailable" : values.includes("partial") ? "partial"
+    : values.includes("complete") ? "complete" : undefined;
+}
+
+function carryUsageStatus(target: { diagnosticStatus?: UsageStatus }, ...values: Array<UsageStatus | undefined>): void {
+  const status = mergeUsageStatus(target.diagnosticStatus, ...values);
+  if (status) target.diagnosticStatus = status;
+}
+
 /**
  * Aggregated token usage for a single package.
  *
@@ -33,6 +45,8 @@ import {
  * approximation, it is the wrong number.
  */
 export interface TokenCounts {
+  /** Missing/partial measured spend remains unknown after grouping. */
+  diagnosticStatus?: UsageStatus;
   /** Fresh (uncached) input tokens. */
   inputTokens: number;
   /** Total output tokens. */
@@ -73,6 +87,7 @@ export interface PackageTokenUsage extends TokenCounts {
 
 /** Combined token usage across all packages. */
 export interface AggregateTokenUsage {
+  diagnosticStatus?: UsageStatus;
   /** Per-package breakdown. */
   packages: {
     rex: PackageTokenUsage;
@@ -211,6 +226,8 @@ function combinePackages(
   for (const pkg of [rex, hench, sv]) mergeByModel(byModel, pkg.byModel);
 
   return {
+    ...(mergeUsageStatus(rex.diagnosticStatus, hench.diagnosticStatus, sv.diagnosticStatus)
+      ? { diagnosticStatus: mergeUsageStatus(rex.diagnosticStatus, hench.diagnosticStatus, sv.diagnosticStatus) } : {}),
     packages: { rex, hench, sv },
     totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
     totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
@@ -306,6 +323,8 @@ export function extractRexTokenUsage(
 
 /** Timestamped token event used internally for grouping and command breakdown. */
 export interface TokenEvent {
+  diagnosticStatus?: UsageStatus;
+  cacheProvenance?: string;
   timestamp: string;
   command: string;
   package: "rex" | "hench" | "sv";
@@ -327,6 +346,7 @@ export interface TokenEvent {
 
 /** Minimal shape of a hench RunRecord for token extraction. */
 interface HenchRunSummary {
+  diagnostics?: { tokenDiagnosticStatus?: UsageStatus };
   id?: string;
   startedAt: string;
   model?: string;
@@ -337,6 +357,8 @@ interface HenchRunSummary {
     cacheReadInput?: number;
   };
   turnTokenUsage?: Array<{
+    diagnosticStatus?: UsageStatus;
+    cacheProvenance?: string;
     input: number;
     output: number;
     cacheCreationInput?: number;
@@ -377,6 +399,7 @@ export async function extractHenchTokenUsage(
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, filter)) continue;
 
+      carryUsageStatus(usage, run.diagnostics?.tokenDiagnosticStatus, ...(run.turnTokenUsage ?? []).map(t => t.diagnosticStatus));
       usage.runs = (usage.runs ?? 0) + 1;
       // `calls` counts LLM calls (turns), matching what the per-turn event
       // stream sums to. A run without turn records is at least one call — the
@@ -556,6 +579,8 @@ export async function extractHenchTokenEvents(
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
         for (const turn of run.turnTokenUsage) {
           events.push({
+            ...(turn.diagnosticStatus ? { diagnosticStatus: turn.diagnosticStatus } : {}),
+            ...(turn.cacheProvenance ? { cacheProvenance: turn.cacheProvenance } : {}),
             timestamp: run.startedAt,
             command: "run",
             package: "hench",
@@ -573,6 +598,7 @@ export async function extractHenchTokenEvents(
       }
 
       events.push({
+        ...(run.diagnostics?.tokenDiagnosticStatus ? { diagnosticStatus: run.diagnostics.tokenDiagnosticStatus } : {}),
         timestamp: run.startedAt,
         command: "run",
         package: "hench",
@@ -675,6 +701,7 @@ export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
       };
       map.set(key, entry);
     }
+    carryUsageStatus(entry, ev.diagnosticStatus);
     entry.inputTokens += ev.inputTokens;
     entry.outputTokens += ev.outputTokens;
     entry.cacheCreationTokens += ev.cacheCreationTokens;
@@ -778,6 +805,7 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
 
   for (const ev of events) {
     const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
+    carryUsageStatus(pkg, ev.diagnosticStatus);
     pkg.inputTokens += ev.inputTokens;
     pkg.outputTokens += ev.outputTokens;
     pkg.cacheCreationTokens += ev.cacheCreationTokens;

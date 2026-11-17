@@ -41,6 +41,8 @@ delete process.env.CLAUDE_CONFIG_DIR;
 // `ndx migrate` would fail inside a gate while passing in CI. Tests that want
 // the refusal set the variable on the spawn (tests/e2e/cli-agent-run-env.test.js).
 delete process.env.NDX_AGENT_RUN;
+// Managed child ownership must not suppress standalone assisted test fixtures.
+delete process.env.NDX_MANAGED_USAGE;
 
 // `packages/core/cli.js` exports NDX_CLI_PATH and hench's test gate inherits it.
 // graview's planProductFace then asks that real CLI for the graview-face

@@ -46,6 +46,13 @@ export async function cmdUsage(
 }
 
 async function cmdUsageMark(dir: string, flags: Record<string, string>): Promise<void> {
+  if (process.env.NDX_MANAGED_USAGE === "1") {
+    result(flags.format === "json"
+      ? JSON.stringify({ skipped: true, reason: "managed-execution-owns-usage" })
+      : "Usage belongs to the managed execution; assisted bookkeeping skipped.");
+    return;
+  }
+
   const task = flags.task;
   if (!task) throw new CLIError("Missing --task.", USAGE_TEXT);
 

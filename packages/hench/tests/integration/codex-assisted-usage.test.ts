@@ -37,6 +37,20 @@ describe("Codex assisted marks through record persistence", () => {
   const mark = (dir: string, task: string) => cmdUsage(dir, ["mark"], { task });
   const record = (dir: string, task: string) => cmdRecord(dir, { task, format: "json" });
 
+  it("does not create marks, records or claims within managed execution/review", async () => {
+    await writeFile(transcript, [meta(), usage(10)].join("\n"));
+    vi.stubEnv("NDX_MANAGED_USAGE", "1");
+    await mark(dir, "automated-review");
+    await cmdRecord(dir, { task: "automated-review", "input-tokens": "123", format: "json" });
+    expect(await listRuns(henchDir)).toEqual([]);
+    expect((await loadUsageCursor(henchDir, "session-a")).marks).toBeUndefined();
+    vi.stubEnv("NDX_MANAGED_USAGE", "");
+    await mark(dir, "standalone");
+    await writeFile(transcript, [meta(), usage(10), usage(11)].join("\n"));
+    await record(dir, "standalone");
+    expect((await listRuns(henchDir))[0].tokenUsage.input).toBe(6);
+  });
+
   it("discovers the exact session and persists three nested deltas without double charging", async () => {
     await writeFile(transcript, [meta(), usage(1)].join("\n"));
     await mark(dir, "outer");

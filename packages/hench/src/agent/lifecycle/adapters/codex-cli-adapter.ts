@@ -105,6 +105,7 @@ export const codexCliAdapter: VendorAdapter = {
 
     return {
       binary,
+      usageResumeSessionId: opts.resumeSessionId,
       args,
       env: {},
       // The prompt always travels on stdin; see the driver for why not argv.

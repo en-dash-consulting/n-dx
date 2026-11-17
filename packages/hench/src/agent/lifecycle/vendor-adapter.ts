@@ -53,6 +53,8 @@ import type { PermissionMode } from "../../schema/index.js";
  *   is portable and doesn't depend on Node.js typings.
  */
 export interface SpawnConfig {
+  /** Codex cumulative usage boundary, including inherited fork history. */
+  readonly usageResumeSessionId?: string;
   /** Path to the vendor CLI binary (e.g. "claude", "codex", or absolute path). */
   readonly binary: string;
 

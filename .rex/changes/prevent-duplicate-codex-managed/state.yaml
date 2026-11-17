@@ -1,7 +1,10 @@
 schema: "rex/v2"
 items:
   "73d10116-abbe-45bb-abf8-aa96073c4429":
-    lastModified: "2026-11-17T05:14:29.622Z"
+    startedAt: "2026-11-17T05:15:37.584Z"
+    activeIntervals: [{"end":"2026-11-17T05:41:43.379Z","start":"2026-11-17T05:15:37.584Z"}]
+    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED PATH=\"/Users/ryankeith/.nvm/versions/node/v22.22.2/bin:$PATH\" CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-test…\nFailing tests (23):\n- resumes the failed fork child, preserving its work and accounting\n- Codex run reported zero tokens (input and output). This indicates token retrieval failure.\n- accumulates Codex token totals across retries and enforces budget using cumulative totals\n- extracts tokens from text output when JSON usage is absent\n- extracts tokens from text output under the event pipeline (non-JSON stdout)\n- emits no token event when Codex output contains no token line\n- extracts tokens from two-line Codex format and accumulates in run record\n- cumulative two-line token totals at run end match sum of per-turn counts\n… and 15 more"
+    lastModified: "2026-11-17T05:41:44.063Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c271e65c-898c-40af-acb6-a88b631f660f":
     createdAt: "2026-11-17T05:14:26.915Z"
