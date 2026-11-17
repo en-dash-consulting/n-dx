@@ -409,6 +409,7 @@ describe("hench → llm-client gateway contract", () => {
     "getAvailableMemory",
     "createAvailableMemoryReader",
     "resolveClaudeCliEffort",
+    "resolveCodexCliEffort",
     "vendorSessionDriver",
     "normalizeCodexResponse",
     "parseMaybeJson",
@@ -930,6 +931,8 @@ describe("gateway export auto-detection", () => {
         // The CLI loop's counterpart: `--effort` on a spawned Claude Code run
         // follows the same llm.effort rule as the API turn loop.
         "resolveClaudeCliEffort",
+        // Codex validates the rule against the selected client's catalog.
+        "resolveCodexCliEffort",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage", "createPromptEnvelope", "assemblePrompt", "assemblePromptText",
         // Prompt section measurement. Lives in llm-client rather than hench so

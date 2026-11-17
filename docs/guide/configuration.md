@@ -150,7 +150,7 @@ Hench's `apiKeyEnv`, the variable the API loop sends as the Anthropic key, follo
 
 ### Reasoning effort
 
-`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). Values depend on the model and client; common levels are `low`, `medium`, `high`, `xhigh` and `max`. Codex CLI can also advertise `ultra`.
+`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). `n-dx config` accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` and `ultra`; support depends on the model and client. Codex CLI can advertise `ultra`, while some API models support `none` or `minimal`.
 
 Codex CLI also honors these rules, including `agent.execute` and `agent.review`. It checks the selected binary's `model/list` catalog for the selected model's advertised reasoning efforts before sending `-c model_reasoning_effort=...`. An unsupported value, missing model, older client without effort metadata, or failed catalog probe prints a warning and leaves the client setting unchanged. A catalog entry describes client support, not account entitlement.
 
@@ -456,4 +456,5 @@ account access. [Official model guidance](https://learn.chatgpt.com/docs/models?
 was checked on 2026-11-16. GPT-5.5's retirement from ChatGPT-authenticated Codex
 does not retire it from the API or API-key sessions. Retained API pins remain
 usable subject to provider availability. Codex effort recommendations are not
-applied here: client defaults remain in effect pending Codex effort support.
+applied automatically: client defaults remain in effect unless an explicit
+supported `llm.effort` rule applies.

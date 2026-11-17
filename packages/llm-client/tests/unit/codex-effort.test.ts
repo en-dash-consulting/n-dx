@@ -11,7 +11,7 @@ import { writeFakeCli } from "../helpers/fake-cli.js";
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("Codex effort at completion boundaries", () => {
-  it.each([undefined, "high", "ultra", "bogus"])("CLI checks advertised efforts, preserving operator flags: %s", async (effort) => {
+  it.each([undefined, "high", "ultra", "max", "bogus"])("CLI checks advertised efforts, preserving operator flags: %s", async (effort) => {
     const warning = vi.spyOn(console, "error").mockImplementation(() => {});
     const dir = await mkdtemp(join(tmpdir(), "codex-effort-"));
     try {
@@ -24,7 +24,7 @@ describe("Codex effort at completion boundaries", () => {
             const msg = JSON.parse(line);
             if (msg.method === 'initialize') console.log(JSON.stringify({ id: msg.id, result: {} }));
             if (msg.method === 'model/list') console.log(JSON.stringify({ id: msg.id, result: {
-              data: [{ model: 'custom-model', supportedReasoningEfforts: [{reasoningEffort:'high'}] }], nextCursor: null
+              data: [{ model: 'custom-model', supportedReasoningEfforts: [{reasoningEffort:'high'}, {reasoningEffort:'ultra'}] }], nextCursor: null
             } }));
           }
         } else {
@@ -37,10 +37,11 @@ describe("Codex effort at completion boundaries", () => {
         cliFlags: ["-c", 'model_reasoning_effort="low"'] });
       const args = JSON.parse(result.text) as string[];
       const overrides = args.filter(x => x.startsWith("model_reasoning_effort="));
-      expect(overrides).toEqual(effort === "high"
-        ? ['model_reasoning_effort="low"', 'model_reasoning_effort="high"']
+      const supported = effort === "high" || effort === "ultra";
+      expect(overrides).toEqual(supported
+        ? ['model_reasoning_effort="low"', `model_reasoning_effort="${effort}"`]
         : ['model_reasoning_effort="low"']);
-      expect(warning).toHaveBeenCalledTimes(effort && effort !== "high" ? 1 : 0);
+      expect(warning).toHaveBeenCalledTimes(effort && !supported ? 1 : 0);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -72,6 +73,7 @@ describe("Codex effort at completion boundaries", () => {
     expect(resolveOpenAiEffort("gpt-6-sol", "none")).toBe("none");
     expect(resolveOpenAiEffort("gpt-6.1-terra", "none")).toBe("none");
     expect(resolveOpenAiEffort("gpt-6-luna", "none")).toBe("none");
+    expect(resolveOpenAiEffort("gpt-5", "minimal")).toBe("minimal");
     expect(resolveOpenAiEffort("o3-2025-04-16", "low")).toBe("low");
     expect(resolveOpenAiEffort("gpt-5", "max")).toBeUndefined();
     expect(warning).toHaveBeenCalledTimes(4);
