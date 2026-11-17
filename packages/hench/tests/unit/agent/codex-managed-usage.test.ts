@@ -25,6 +25,42 @@ describe("managed Codex cumulative counters", () => {
     const fresh = new CodexManagedUsage(); start(fresh, "session-b");
     expect(fresh.observe(count(15, 5, 8, 4), 1)?.tokenUsage?.input).toBe(15);
   });
+  it("preserves bounded output on partial snapshots and recovers input without replay", () => {
+    const tracker = new CodexManagedUsage(); start(tracker);
+    tracker.observe(count(10, 2, 4), 1);
+    const partial = tracker.observe({ type: "turn.failed", usage: { input_tokens: 30, output_tokens: 5 } }, 2)!;
+    expect(partial.tokenUsage).toEqual({ input: 0, output: 3, cacheReadInput: 0, cacheCreationInput: 0 });
+    expect(partial.tokenDiagnosticStatus).toBe("partial");
+    expect(partial.tokenCacheProvenance).toBe("unavailable");
+    expect(tracker.observe(count(20, 7, 10), 3)?.tokenUsage)
+      .toEqual({ input: 10, output: 2, cacheReadInput: 6, cacheCreationInput: 0 });
+    expect(tracker.observe(count(20, 7, 10), 4)).toBeNull();
+  });
+  it("ignores replayed partial counters without poisoning later measured spend", () => {
+    const tracker = new CodexManagedUsage(); start(tracker);
+    const partial = (output: number) => ({ type: "turn.completed", usage: { output_tokens: output } });
+    expect(tracker.observe(partial(2), 1)?.tokenUsage?.output).toBe(2);
+    expect(tracker.observe(partial(5), 2)?.tokenUsage?.output).toBe(3);
+    expect(tracker.observe(partial(2), 3)).toBeNull();
+    expect(tracker.observe(count(20, 7, 10), 4)?.tokenUsage)
+      .toEqual({ input: 20, output: 2, cacheReadInput: 10, cacheCreationInput: 0 });
+  });
+  it("still rejects an unseen partial counter regression", () => {
+    const tracker = new CodexManagedUsage(); start(tracker);
+    tracker.observe({ type: "turn.completed", usage: { output_tokens: 5 } }, 1);
+    expect(tracker.observe({ type: "turn.completed", usage: { output_tokens: 1 } }, 2)?.tokenDiagnosticStatus)
+      .toBe("unavailable");
+    expect(tracker.observe(count(20, 7, 10), 3)?.tokenUsage?.output).toBe(0);
+  });
+  it("retains measured cache provenance when complete counters follow partial output", () => {
+    const tracker = new CodexManagedUsage(); start(tracker);
+    tracker.observe(count(10, 2, 4), 1);
+    tracker.observe({ type: "turn.failed", usage: { output_tokens: 5 } }, 2);
+    const recovered = tracker.observe(count(20, 7, 10), 3)!;
+    expect(recovered.tokenUsage?.cacheReadInput).toBe(6);
+    expect(recovered.tokenCacheProvenance).toBe("measured");
+    expect(recovered.tokenDiagnosticStatus).toBe("partial");
+  });
   it("refuses reset epochs even after counters exceed the old boundary", () => {
     const tracker = new CodexManagedUsage(); start(tracker);
     tracker.observe(count(10, 2, 4), 1);

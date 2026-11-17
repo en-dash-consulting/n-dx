@@ -929,8 +929,11 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress, abortSignal,
   } = opts;
-  const managedUsage = adapter.vendor === LLM_VENDOR.CODEX
+  const codexUsage = adapter.vendor === LLM_VENDOR.CODEX
     ? await CodexManagedUsage.start(spawnConfig.usageResumeSessionId, cliEnv, !!opts.forkParentId) : undefined;
+  // Resumes must never fall back to charging an unbounded session summary.
+  // Fresh legacy wrappers, however, still report invocation-local JSON/text.
+  let managedUsage = spawnConfig.usageResumeSessionId ? codexUsage : undefined;
   const pidHolder = liveProgress ?? opts.pidHolder;
   const timeoutMs = opts.timeoutMs !== undefined && opts.timeoutMs > 0 ? opts.timeoutMs : 0;
   const maxTurns = opts.maxTurns !== undefined && opts.maxTurns > 0 ? opts.maxTurns : 0;
@@ -1382,6 +1385,12 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
      */
     function captureSessionId(rawJson: unknown): void {
       unfinishedTracker?.observe(rawJson);
+      if (codexUsage && rawJson && typeof rawJson === "object") {
+        const type = (rawJson as Record<string, unknown>).type;
+        if (type === "thread.started" || type === "turn.started" || type === "turn.completed" || type === "turn.failed") {
+          managedUsage = codexUsage;
+        }
+      }
       if (result.sessionId) return;
       if (adapter.extractSessionId) {
         const id = adapter.extractSessionId(rawJson);

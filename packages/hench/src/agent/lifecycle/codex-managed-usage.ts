@@ -22,9 +22,13 @@ export class CodexManagedUsage {
   private observed = false;
   private invalid = false;
   private partial = false;
+  private outputBoundary: number | undefined;
   private readonly seen = new Set<string>();
+  private readonly seenPartialOutputs = new Set<number>();
   readonly notes: string[] = [];
-  constructor(private previous: Required<TokenUsage> | undefined = zero(), private readonly expected?: string) {}
+  constructor(private previous: Required<TokenUsage> | undefined = zero(), private readonly expected?: string) {
+    this.outputBoundary = previous?.output;
+  }
 
   static async start(session: string | undefined, env: NodeJS.ProcessEnv, fork = false): Promise<CodexManagedUsage> {
     if (!session) return new CodexManagedUsage();
@@ -40,6 +44,7 @@ export class CodexManagedUsage {
     }
     const tracker = new CodexManagedUsage(undefined, fork ? undefined : session);
     tracker.previous = undefined;
+    tracker.outputBoundary = undefined;
     tracker.notes.push("Codex resumed usage baseline unavailable; first observation establishes a boundary without charging history.");
     tracker.partial = true;
     return tracker;
@@ -83,8 +88,28 @@ export class CodexManagedUsage {
     const u = raw.usage as Record<string, unknown> | undefined;
     const valid = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n >= 0;
     let usage = zero();
+    let completeObservation = false;
     let status: "complete" | "partial" | "unavailable" = this.partial ? "partial" : "complete";
-    if (!this.session || this.invalid || !u || !valid(u.input_tokens) || !valid(u.output_tokens) ||
+    if (this.session && !this.invalid && u && valid(u.output_tokens) &&
+        (!valid(u.input_tokens) || !valid(u.cached_input_tokens))) {
+      // Output is independently measured. Do not label inclusive input as
+      // fresh spend when its cache split is absent. Retain the input boundary
+      // so a later complete snapshot can recover that uncharged portion.
+      // A replay of an already observed partial counter is not a reset.
+      if (this.seenPartialOutputs.has(u.output_tokens)) return null;
+      status = "partial";
+      this.partial = true;
+      if (this.outputBoundary !== undefined && u.output_tokens < this.outputBoundary) {
+        this.invalid = true;
+        status = "unavailable";
+      } else {
+        if (this.outputBoundary !== undefined) usage.output = u.output_tokens - this.outputBoundary;
+        this.outputBoundary = u.output_tokens;
+        this.seenPartialOutputs.add(u.output_tokens);
+        if (this.previous) this.previous.output = u.output_tokens;
+      }
+      this.notes.push("Codex partial usage: input/cache split unavailable; only bounded output charged.");
+    } else if (!this.session || this.invalid || !u || !valid(u.input_tokens) || !valid(u.output_tokens) ||
         !valid(u.cached_input_tokens) || (u.cache_write_input_tokens !== undefined && !valid(u.cache_write_input_tokens)) ||
         u.cached_input_tokens + Number(u.cache_write_input_tokens ?? 0) > u.input_tokens) {
       status = "unavailable";
@@ -95,18 +120,24 @@ export class CodexManagedUsage {
       const identity = keys.map(k => current[k]).join(":");
       if (this.seen.has(identity)) return null;
       this.seen.add(identity);
-      if (this.previous && keys.some(k => current[k] < this.previous![k])) {
+      if ((this.previous && keys.some(k => current[k] < this.previous![k])) ||
+          (this.outputBoundary !== undefined && current.output < this.outputBoundary)) {
         this.invalid = true;
         status = "unavailable";
         this.notes.push("Codex cumulative counters regressed; epoch cannot be attributed.");
       } else {
         if (this.previous) for (const k of keys) usage[k] = current[k] - this.previous[k];
-        else { status = "partial"; this.partial = true; }
+        else {
+          status = "partial"; this.partial = true;
+          if (this.outputBoundary !== undefined) usage.output = current.output - this.outputBoundary;
+        }
         this.previous = current;
+        this.outputBoundary = current.output;
+        completeObservation = true;
       }
     }
-    this.observed = status !== "unavailable";
+    this.observed = completeObservation;
     return { type: "token_usage", vendor: "codex", turn, timestamp: new Date().toISOString(),
-      tokenUsage: usage, tokenDiagnosticStatus: status, tokenCacheProvenance: status === "unavailable" ? "unavailable" : "measured" };
+      tokenUsage: usage, tokenDiagnosticStatus: status, tokenCacheProvenance: completeObservation ? "measured" : "unavailable" };
   }
 }
