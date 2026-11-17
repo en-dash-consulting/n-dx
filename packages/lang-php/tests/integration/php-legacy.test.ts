@@ -144,19 +144,25 @@ describe("php legacy constructs", () => {
     expect(at(facts.get("shapes/js-templates.php"))).toEqual(["asp-tags@13:0"]);
   });
 
-  it("counts long superglobal arrays and $HTTP_RAW_POST_DATA across all contexts: globals, strings, assignments", async (ctx) => {
+  it("counts every use of the long superglobal arrays and $HTTP_RAW_POST_DATA, in any expression, global statement or string", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const facts = await byPath();
-    const superglobals = facts.get("shapes/legacy-superglobals.php") ?? [];
-    const longSuperglobalCount = superglobals.filter((f) => f.rule === "long-superglobal-arrays").length;
-    const rawPostDataCount = superglobals.filter((f) => f.rule === "http-raw-post-data").length;
-    // Should have multiple hits across different contexts
-    expect(longSuperglobalCount).toBeGreaterThan(1);
-    expect(rawPostDataCount).toBeGreaterThan(0);
-    // Verify these are properly tagged
-    expect(superglobals.some((f) => f.rule === "long-superglobal-arrays" && f.construct === "$HTTP_GET_VARS")).toBe(true);
-    expect(superglobals.some((f) => f.rule === "long-superglobal-arrays" && f.construct === "$HTTP_POST_VARS")).toBe(true);
-    expect(superglobals.some((f) => f.rule === "http-raw-post-data" && f.construct === "$HTTP_RAW_POST_DATA")).toBe(true);
+    const uses = (facts.get("shapes/legacy-superglobals.php") ?? []).map((f) => `${f.rule}@${f.position.line}:${f.position.column} ${f.construct}`);
+    expect(uses).toEqual([
+      "long-superglobal-arrays@2:7 $HTTP_GET_VARS",
+      "long-superglobal-arrays@2:23 $HTTP_POST_VARS",
+      "long-superglobal-arrays@3:9 $HTTP_POST_VARS",
+      "long-superglobal-arrays@4:4 $HTTP_COOKIE_VARS",
+      "long-superglobal-arrays@5:8 $HTTP_SERVER_VARS",
+      "long-superglobal-arrays@5:38 $HTTP_SERVER_VARS",
+      "long-superglobal-arrays@6:8 $HTTP_ENV_VARS",
+      "long-superglobal-arrays@7:26 $HTTP_SESSION_VARS",
+      "long-superglobal-arrays@8:0 $HTTP_POST_FILES",
+      "long-superglobal-arrays@9:16 $HTTP_POST_VARS",
+      "long-superglobal-arrays@9:41 $HTTP_GET_VARS",
+      "http-raw-post-data@11:5 $HTTP_RAW_POST_DATA",
+      "http-raw-post-data@13:5 $HTTP_RAW_POST_DATA",
+    ]);
   });
 
   it("reads nothing when legacy constructs are not wanted", async (ctx) => {

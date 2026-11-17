@@ -26,6 +26,9 @@
  *   the same name, a global polyfill) are not PHP's function; `\mysql_query()`
  *   is PHP's even beside a namespaced helper of that name.
  * - `__autoload`: a function declared with that name.
+ * - `long-superglobal-arrays`, `http-raw-post-data`: each read or write of
+ *   the variable, in `global`, strings and heredocs too; a property, static
+ *   property or parameter of that name, or an array key, is not a use.
  * - `string-dollar-brace`: `"${…}"` in a string or heredoc, never
  *   `"{${…}}"` (a variable variable in the complex syntax).
  * - `php4-constructor`: a method named as its class (no `__construct`, class
@@ -371,17 +374,10 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
     if (c.nodeType === "encapsed_string" && c.text.includes("$")) continue;
     if (!NUMERIC_STRING.test(c.text.slice(1, -1))) hits.push({ rule: "string-number-comparison", position: c.start });
   }
-  // Long superglobals and $HTTP_RAW_POST_DATA: captured as variable uses
-  const seenSuperglobalPositions = new Set<string>();
+  const declarations = by.get("superglobal-declaration") ?? [];
   for (const v of by.get("superglobal-variable") ?? []) {
     const rule = variableRule(v.text);
-    if (rule !== undefined) {
-      const posKey = `${v.start.line}:${v.start.column}`;
-      if (!seenSuperglobalPositions.has(posKey)) {
-        seenSuperglobalPositions.add(posKey);
-        hits.push({ rule, position: v.start, construct: `${v.text}` });
-      }
-    }
+    if (rule !== undefined && !declarations.some((d) => samePosition(d.start, v.start))) hits.push({ rule, position: v.start, construct: v.text });
   }
 
   hits.push(...inlineHtmlHits(by.get("inline-html") ?? []));

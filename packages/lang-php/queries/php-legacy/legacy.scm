@@ -23,20 +23,18 @@
 (php_tag) @legacy.php-tag
 
 ; ── Long superglobal arrays and $HTTP_RAW_POST_DATA ──
-; Captured in contexts we know are uses, not declarations:
-; - in global statements
-; - in expressions (assignments, function calls, returns, comparisons)
-; - in string interpolation (encapsed/heredoc)
-(global_declaration (variable_name) @legacy.superglobal-variable)
-(assignment_expression left: (variable_name) @legacy.superglobal-variable)
-(assignment_expression right: (variable_name) @legacy.superglobal-variable)
-(encapsed_string (variable_name) @legacy.superglobal-variable)
-(heredoc_body (variable_name) @legacy.superglobal-variable)
-(argument (variable_name) @legacy.superglobal-variable)
-(return_statement (variable_name) @legacy.superglobal-variable)
-(binary_expression left: (variable_name) @legacy.superglobal-variable)
-(binary_expression right: (variable_name) @legacy.superglobal-variable)
-(subscript_expression (variable_name) @legacy.superglobal-variable)
+; Every `$HTTP_*_VARS`, `$HTTP_POST_FILES` and `$HTTP_RAW_POST_DATA`, in any
+; expression, `global` statement, string or heredoc. A property `->HTTP_…` is
+; a (name), never a variable_name. Declarations that only share the name
+; (properties, static properties, parameters) are captured to be left out.
+((variable_name (name) @_long_array) @legacy.superglobal-variable
+  (#match? @_long_array "^HTTP_((GET|POST|COOKIE|SERVER|ENV|SESSION)_VARS|POST_FILES|RAW_POST_DATA)$"))
+([(property_element (variable_name (name) @_declared) @legacy.superglobal-declaration)
+  (property_promotion_parameter name: (variable_name (name) @_declared) @legacy.superglobal-declaration)
+  (scoped_property_access_expression name: (variable_name (name) @_declared) @legacy.superglobal-declaration)
+  (simple_parameter name: (variable_name (name) @_declared) @legacy.superglobal-declaration)
+  (variadic_parameter name: (variable_name (name) @_declared) @legacy.superglobal-declaration)]
+  (#match? @_declared "^HTTP_"))
 
 ; `==`, `!=`, `<>` with a string literal on one side and a number on the other.
 (binary_expression
