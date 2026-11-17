@@ -18,6 +18,7 @@ import {
   rename,
   rm,
 } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { execFileSyncCli, spawnSyncCli } from "./win-spawn.js";
@@ -398,6 +399,51 @@ async function loadProjectConfigLayers(dir) {
 export async function loadProjectConfig(dir) {
   const { merged } = await loadProjectConfigLayers(dir);
   return merged;
+}
+
+/**
+ * Warn about root config files a `.ndx/` project never reads.
+ *
+ * On the `.ndx/` layout the project config is `.ndx/config.json` and
+ * `.ndx/config.local.json`; a `.n-dx.json` or `.n-dx.local.json` left at the
+ * root (written by hand, by a script that predates the layout, or copied from
+ * another checkout) is ignored without a word, so a setting such as
+ * `cli.timeouts.analyze: 0` simply never applies. This names each ignored file
+ * and its top-level sections — never values, which may be secrets — and says
+ * where they belong. It does not read the file as a fallback: two files that
+ * can both hold a setting would make "which one won" a question every reader
+ * has to answer.
+ *
+ * @param {string} dir  Project root.
+ * @returns {string | null} The warning, or null when nothing is ignored.
+ */
+export function ignoredRootConfigWarning(dir) {
+  const layout = resolveLayout(dir);
+  if (layout.mode !== "ndx") return null;
+  const legacy = resolveLayout(dir, { mode: "legacy" });
+  const lines = [];
+  for (const [file, target] of [
+    [legacy.configFile, layout.configFile],
+    [legacy.localConfigFile, layout.localConfigFile],
+  ]) {
+    if (!existsSync(file)) continue;
+    let sections = "";
+    try {
+      const data = JSON.parse(readFileSync(file, "utf-8"));
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const keys = Object.keys(data).filter((k) => !FORBIDDEN_SETTING_SEGMENTS.has(k));
+        if (keys.length > 0) sections = ` (sections: ${keys.join(", ")})`;
+      }
+    } catch {
+      // Unparseable: still ignored, still worth naming.
+    }
+    lines.push(
+      `Warning: ${relativeToRoot(legacy, file)} is ignored${sections}. ` +
+        `This project keeps its config in ${relativeToRoot(layout, target)}; ` +
+        `move the settings there (or set them with \`ndx config\`) and delete ${relativeToRoot(legacy, file)}.`,
+    );
+  }
+  return lines.length > 0 ? lines.join("\n") : null;
 }
 
 /**

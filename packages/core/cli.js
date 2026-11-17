@@ -42,7 +42,7 @@ import { ensureSourceBuild } from "./source-build.js";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings, loadExtensionConfig } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, ignoredRootConfigWarning, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings, loadExtensionConfig } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -546,6 +546,24 @@ function noteLegacyLayoutOnce(command, dir) {
   if (!isLegacyV1Project(dir)) return;
   if (!updateCheckQuiet) console.error(LEGACY_LAYOUT_NOTICE);
   process.env.NDX_LEGACY_NOTICE = "off";
+}
+
+/**
+ * Warn, once per process tree, when a `.ndx/` project also has a root
+ * `.n-dx.json` or `.n-dx.local.json` that nothing reads — otherwise a setting
+ * written there (a command timeout, say) silently never applies. Printed even
+ * under `--quiet`: it explains behaviour the operator did not ask for.
+ */
+function noteIgnoredRootConfigOnce(dir) {
+  if (process.env.NDX_IGNORED_CONFIG_NOTICE === "off") return;
+  let warning = null;
+  try {
+    warning = ignoredRootConfigWarning(dir);
+  } catch {
+    // Best-effort, like the config read itself.
+  }
+  if (warning) console.error(warning);
+  process.env.NDX_IGNORED_CONFIG_NOTICE = "off";
 }
 
 /** BETA experimental flags to forward to children. Empty unless opted in. */
@@ -3928,6 +3946,7 @@ async function main() {
   }
 
   if (command && !hasHelp) noteLegacyLayoutOnce(command, dir);
+  if (builtin && !hasHelp) noteIgnoredRootConfigOnce(dir);
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
