@@ -188,6 +188,7 @@ const PackParseIssuesSchema = z.object({
   oversized: ParseIssueSampleSchema,
   unreadable: ParseIssueSampleSchema,
   notUtf8: ParseIssueSampleSchema,
+  legacySyntax: ParseIssueSampleSchema.extend({ constructs: z.record(z.string(), z.number().int().nonnegative()) }).optional(),
 });
 
 const ImportsSummarySchema = z.object({

@@ -76,6 +76,33 @@ describe("parseIssuesNotice", () => {
       "[php-parse] 1 file: 1 over 512 KiB not parsed; listed in imports.json summary.parseIssues.",
     );
   });
+
+  it("counts legacy-syntax files apart from syntax errors, with construct totals", () => {
+    const issues = parseIssuesOf({
+      files: 4,
+      sizeLimitBytes: 1024 * 1024,
+      syntaxErrors: ["c.php"],
+      oversized: [],
+      unreadable: [],
+      notUtf8: [],
+      legacySyntax: [
+        { path: "b.php", constructs: { "brace-offset": 3 } },
+        { path: "a.php", constructs: { "brace-offset": 1 } },
+      ],
+    });
+    expect(issues.clean).toBe(1);
+    expect(issues.syntaxErrors.count).toBe(1);
+    expect(issues.legacySyntax).toEqual({ count: 2, examples: ["a.php", "b.php"], constructs: { "brace-offset": 4 } });
+    expect(parseIssuesNotice("php", issues)).toBe(
+      "[php-parse] 1 of 4 files has syntax errors (facts read from the partial tree); " +
+        "2 use legacy syntax the grammar cannot parse (4 brace-offset), rewritten in place and parsed; listed in imports.json summary.parseIssues.",
+    );
+  });
+
+  it("has no legacySyntax key when the pack rewrote nothing", () => {
+    const issues = parseIssuesOf({ files: 1, sizeLimitBytes: 1024, syntaxErrors: ["a.php"], oversized: [], unreadable: [], notUtf8: [] });
+    expect(issues).not.toHaveProperty("legacySyntax");
+  });
 });
 
 describe("isPackFile", () => {

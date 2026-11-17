@@ -382,6 +382,13 @@ export interface PackParseIssues {
   unreadable: ParseIssueSample;
   /** Not valid UTF-8; decoded with replacement characters and parsed. */
   notUtf8: ParseIssueSample;
+  /**
+   * Valid in an older version of the language but not in the grammar (PHP 5's
+   * `$s{0}`): rewritten in place and parsed cleanly, so their facts are whole.
+   * Never counted under `syntaxErrors`. `constructs` totals the rewrites by
+   * construct. Absent when there are none.
+   */
+  legacySyntax?: ParseIssueSample & { constructs: Record<string, number> };
 }
 
 /** How many example paths {@link ParseIssueSample} keeps. */

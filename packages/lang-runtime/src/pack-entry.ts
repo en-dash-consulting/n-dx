@@ -31,6 +31,7 @@ import type {
   FactKind,
   FileFacts,
   LanguagePackEntry,
+  PackLegacySyntaxFile,
   PackParseReport,
   PackProjectRequest,
   PackProjectResult,
@@ -43,6 +44,7 @@ import type {
   PackResolver,
   PackSourceFile,
   PreparedResolver,
+  SourceRewrite,
 } from "./pack.js";
 import type { PackPackage } from "./pack-package.js";
 import {
@@ -72,6 +74,15 @@ export interface TreeSitterEntryOptions {
   readonly runner?: RunnerOptions;
   /** A complete declaration prefix whose imports can be read when the full file is oversized. */
   readonly oversizedImportSource?: (source: string) => string | undefined;
+  /**
+   * For a file whose parse has error or missing nodes: the same text with the
+   * constructs an older version of the language allowed, and the grammar does
+   * not, rewritten in place to the same length (PHP's `$s{0}` → `$s[0]`), or
+   * `undefined` when there are none. The rewrite is parsed instead, its
+   * rewrites travel on `PackSourceFile.rewrites`, and a file it parses cleanly
+   * is reported under `parse.legacySyntax`, not `syntaxErrors`.
+   */
+  readonly legacySyntax?: (source: string) => { readonly source: string; readonly rewrites: readonly SourceRewrite[] } | undefined;
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -145,6 +156,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     const importsOnly = new Set<string>();
     const fallbackNotices: string[] = [];
     const issues = { syntaxErrors: [] as string[], oversized: [] as string[], unreadable: [] as string[], notUtf8: [] as string[] };
+    const legacySyntax: PackLegacySyntaxFile[] = [];
     for (const path of request.files) {
       let bytes: Buffer;
       try {
@@ -173,15 +185,38 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
           fallbackNotices.push(`${path} oversized import recovery failed (${errorText(error)}); left unparsed`);
         }
       }
+      // Legacy syntax: parse the same-length rewrite instead, so the facts come from a whole tree.
+      let rewrites: readonly SourceRewrite[] | undefined;
+      if (result.status === "parsed" && !importsOnly.has(path) && (result.hasErrorNodes || result.hasMissingNodes) && options.legacySyntax) {
+        try {
+          const rewritten = options.legacySyntax(source);
+          if (rewritten !== undefined && rewritten.rewrites.length > 0 && rewritten.source.length === source.length) {
+            const reparsed = await runner.parseSource(target, path, rewritten.source);
+            if (reparsed.status === "parsed") {
+              result = reparsed;
+              rewrites = rewritten.rewrites;
+              if (!reparsed.hasErrorNodes && !reparsed.hasMissingNodes) legacySyntax.push({ path, constructs: countConstructs(rewrites) });
+            }
+          }
+        } catch (error) {
+          fallbackNotices.push(`${path} legacy-syntax rewrite failed (${errorText(error)}); facts read from the partial tree`);
+        }
+      }
       // A file whose imports came from its declaration prefix is still oversized: its structure was not parsed.
       if (result.status === "skipped" || importsOnly.has(path)) issues.oversized.push(path);
       else if (result.hasErrorNodes || result.hasMissingNodes) issues.syntaxErrors.push(path);
-      if (result.status === "parsed") parsed.push({ path, captures: result.captures });
+      if (result.status === "parsed") parsed.push(rewrites === undefined ? { path, captures: result.captures } : { path, captures: result.captures, rewrites });
       else unparsed.push(path);
     }
-    const parse: PackParseReport | undefined = Object.values(issues).every((paths) => paths.length === 0)
-      ? undefined
-      : { files: request.files.length, sizeLimitBytes: options.runner?.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES, ...issues };
+    const parse: PackParseReport | undefined =
+      Object.values(issues).every((paths) => paths.length === 0) && legacySyntax.length === 0
+        ? undefined
+        : {
+            files: request.files.length,
+            sizeLimitBytes: options.runner?.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES,
+            ...issues,
+            ...(legacySyntax.length === 0 ? {} : { legacySyntax }),
+          };
 
     // Prepared for imports, or on a framework's first lookup: a framework that never follows a reference costs nothing.
     let preparedOnce: PreparedResolver | undefined;
@@ -218,6 +253,13 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
   } finally {
     runner.dispose();
   }
+}
+
+/** Rewrites by construct, keys in first-seen order. */
+function countConstructs(rewrites: readonly SourceRewrite[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const r of rewrites) counts[r.construct] = (counts[r.construct] ?? 0) + 1;
+  return counts;
 }
 
 /**

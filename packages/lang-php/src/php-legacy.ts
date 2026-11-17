@@ -39,8 +39,10 @@
  *   `likely`: a property can still be declared where no rule sees it.
  * - Constructs the grammar cannot parse are read from what parsing left:
  *   ASP tags (outside script elements: a `<%` in one is a JavaScript
- *   template) and `<script language="php">` from inline HTML, and a
- *   curly-brace offset (`$s{0}`) from a statement ending in a MISSING token
+ *   template) and `<script language="php">` from inline HTML. A curly-brace
+ *   offset is usually rewritten to `$s[0]` before the parse
+ *   (`php-legacy-syntax.ts`) and read from `PackSourceFile.rewrites`; one the
+ *   rewrite missed is read from a statement ending in a MISSING token
  *   right before a `{`, or from an ERROR node's text (strings and comments
  *   skipped). php-corpus-report.mjs counts a file whose every parse error sits
  *   on a curly-offset line as legacy, not as a grammar failure.
@@ -302,12 +304,17 @@ function classHits(by: ReadonlyMap<string, Capture[]>): LegacyHit[] {
   return hits;
 }
 
-/** Curly-brace offsets: a MISSING-ended statement right before a `{`, and offsets inside ERROR text. */
-function curlyOffsetHits(by: ReadonlyMap<string, Capture[]>): LegacyHit[] {
+/**
+ * Curly-brace offsets: those rewritten before the parse (`php-legacy-syntax.ts`),
+ * then, in a file still parsed with errors, a MISSING-ended statement right
+ * before a `{` and offsets inside ERROR text. Each position counts once.
+ */
+function curlyOffsetHits(by: ReadonlyMap<string, Capture[]>, rewrites: PackSourceFile["rewrites"] = []): LegacyHit[] {
   const seen: SourcePosition[] = [];
   const hit = (position: SourcePosition) => {
     if (!seen.some((p) => samePosition(p, position))) seen.push(position);
   };
+  for (const r of rewrites) if (r.construct === "brace-offset") hit(r.position);
   const bases = by.get("brace-base") ?? [];
   const opens = by.get("brace-open") ?? [];
   for (const base of bases) {
@@ -381,7 +388,7 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
   }
 
   hits.push(...inlineHtmlHits(by.get("inline-html") ?? []));
-  hits.push(...classHits(by), ...curlyOffsetHits(by));
+  hits.push(...classHits(by), ...curlyOffsetHits(by, file.rewrites));
   return hits.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
 }
 

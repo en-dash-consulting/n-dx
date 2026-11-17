@@ -50,6 +50,47 @@ describe("php parse report", () => {
     expect(result.facts.map((f) => f.path)).toEqual(["broken.php", "bytes.php", "clean.php", "latin1.php"]);
   });
 
+  it("reports PHP 5 brace offsets as legacy syntax and reads whole facts from the rewritten parse", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    writeFileSync(join(dir, "lib.php"), "<?php\nfunction helper($s) { return $s; }\n");
+    // Short tag, brace offsets in a condition and an assignment, interpolation that must stay, then an include, a call and a class.
+    const legacy = [
+      "<?",
+      "require_once 'lib.php';",
+      "if ($name{0} == 'x') { $first = $name{1}; }",
+      'echo "{$name}";',
+      "class Legacy { function run($v) { return helper($v{0}); } }",
+      "",
+    ].join("\n");
+    writeFileSync(join(dir, "legacy.php"), legacy);
+
+    const result = await pack.analyzeProject({ projectDir: dir, files: ["legacy.php", "lib.php"], kinds: ["imports", "symbols", "calls", "legacyConstructs"] });
+
+    expect(result.parse).toEqual({
+      files: 2,
+      sizeLimitBytes: DEFAULT_MAX_FILE_BYTES,
+      syntaxErrors: [],
+      oversized: [],
+      unreadable: [],
+      notUtf8: [],
+      legacySyntax: [{ path: "legacy.php", constructs: { "brace-offset": 3 } }],
+    });
+    const facts = result.facts.find((f) => f.path === "legacy.php");
+    expect(facts?.imports?.files.map((ref) => ref.to)).toEqual(["lib.php"]);
+    expect(facts?.symbols?.map((s) => s.name)).toEqual(expect.arrayContaining(["Legacy", "run"]));
+    expect(facts?.calls?.some((c) => c.callee === "helper")).toBe(true);
+    // Positions are the source's: the method sits where it is written.
+    expect(facts?.symbols?.find((s) => s.name === "run")?.position).toEqual({ line: 5, column: 24 });
+    // Each brace offset counted once, the short tag once, at source positions.
+    const legacyFacts = facts?.legacyConstructs ?? [];
+    expect(legacyFacts.filter((f) => f.rule === "curly-offset").map((f) => f.position)).toEqual([
+      { line: 3, column: 9 },
+      { line: 3, column: 37 },
+      { line: 5, column: 50 },
+    ]);
+    expect(legacyFacts.filter((f) => f.rule === "short-open-tag")).toHaveLength(1);
+  });
+
   it("has no parse report when every file parses cleanly", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     writeFileSync(join(dir, "a.php"), "<?php\nrequire 'b.php';\n");

@@ -86,6 +86,18 @@ export interface PackSourceFile {
   readonly path: string;
   /** Captures per query name, in document order. */
   readonly captures: Readonly<Record<string, readonly Capture[]>>;
+  /**
+   * Legacy constructs the entry's `legacySyntax` rewrote before this parse
+   * (`TreeSitterEntryOptions.legacySyntax`). The captures come from the
+   * rewritten text, so a rule that counts such a construct reads it here.
+   */
+  readonly rewrites?: readonly SourceRewrite[];
+}
+
+/** One construct rewritten in place before parsing; `position` is the same in the source and the rewrite. */
+export interface SourceRewrite {
+  readonly construct: string;
+  readonly position: SourcePosition;
 }
 
 /** What a resolver returns is lang-kit's imports fact. */

@@ -75,6 +75,21 @@ export interface PackParseReport {
   readonly unreadable: readonly string[];
   /** Not valid UTF-8; decoded with replacement characters and parsed. */
   readonly notUtf8: readonly string[];
+  /**
+   * Valid in an older version of the language, but not in the grammar: the
+   * pack rewrote those constructs in place (same length, so every position is
+   * the source's) and parsed the file again, cleanly. Its facts come from that
+   * parse. Each entry counts the rewrites by construct (`brace-offset`).
+   * Exclusive with `syntaxErrors`; absent when the pack rewrites nothing.
+   */
+  readonly legacySyntax?: readonly PackLegacySyntaxFile[];
+}
+
+/** One file in {@link PackParseReport.legacySyntax}. */
+export interface PackLegacySyntaxFile {
+  readonly path: string;
+  /** Rewrites by construct. */
+  readonly constructs: Readonly<Record<string, number>>;
 }
 
 /** A pack's answer for one project. */

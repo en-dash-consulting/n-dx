@@ -122,7 +122,12 @@ const sample = (paths: readonly string[]): ParseIssueSample => ({
 
 /** A pack's parse report as imports.json records it: counts, and the first example paths in sort order. */
 export function parseIssuesOf(report: PackParseReport): PackParseIssues {
-  const notClean = new Set([...report.syntaxErrors, ...report.oversized, ...report.unreadable, ...report.notUtf8]);
+  const legacy = report.legacySyntax ?? [];
+  const notClean = new Set([...report.syntaxErrors, ...report.oversized, ...report.unreadable, ...report.notUtf8, ...legacy.map((f) => f.path)]);
+  const constructs: Record<string, number> = {};
+  for (const file of legacy) {
+    for (const [construct, n] of Object.entries(file.constructs)) constructs[construct] = (constructs[construct] ?? 0) + n;
+  }
   return {
     files: report.files,
     clean: report.files - notClean.size,
@@ -131,8 +136,12 @@ export function parseIssuesOf(report: PackParseReport): PackParseIssues {
     oversized: sample(report.oversized),
     unreadable: sample(report.unreadable),
     notUtf8: sample(report.notUtf8),
+    ...(legacy.length === 0 ? {} : { legacySyntax: { ...sample(legacy.map((f) => f.path)), constructs: sortedKeys(constructs) } }),
   };
 }
+
+const sortedKeys = (record: Record<string, number>): Record<string, number> =>
+  Object.fromEntries(Object.entries(record).sort(([a], [b]) => cmp(a, b)));
 
 const count = (n: number): string => n.toLocaleString("en-US");
 
@@ -150,6 +159,11 @@ export function parseIssuesNotice(packId: string, issues: PackParseIssues): stri
   if (oversized.count > 0) parts.push(`${count(oversized.count)} over ${sizeText(issues.sizeLimitBytes)} not parsed`);
   if (unreadable.count > 0) parts.push(`${count(unreadable.count)} unreadable`);
   if (notUtf8.count > 0) parts.push(`${count(notUtf8.count)} not UTF-8 (parsed with replacement characters)`);
+  const legacy = issues.legacySyntax;
+  if (legacy !== undefined && legacy.count > 0) {
+    const by = Object.entries(legacy.constructs).map(([construct, n]) => `${count(n)} ${construct}`).join(", ");
+    parts.push(`${count(legacy.count)} use legacy syntax the grammar cannot parse (${by}), rewritten in place and parsed`);
+  }
   const lead = syntaxErrors.count > 0 ? "" : `${count(issues.files)} ${issues.files === 1 ? "file" : "files"}: `;
   return `[${packId}-parse] ${lead}${parts.join("; ")}; listed in imports.json summary.parseIssues.`;
 }

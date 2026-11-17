@@ -21,7 +21,7 @@
 report for every file that is not clean: error or missing nodes (facts still
 read), over the size limit (an `oversizedImportSource` recovery included),
 unreadable, or not valid UTF-8 (decoded with replacement characters and
-parsed). sourcevision writes it to imports.json `summary.parseIssues`.
+parsed). An entry's optional `legacySyntax` rewrites, in place and to the same length, constructs an older language version allowed (PHP's `$s{0}`) in a file that parsed with errors; the rewrite is parsed instead, its rewrites ride on `PackSourceFile.rewrites`, and a clean reparse is listed under `parse.legacySyntax`. sourcevision writes it to imports.json `summary.parseIssues`.
 
 An entry may supply `oversizedImportSource`, a complete declaration prefix for
 files the runner skips for size. A valid prefix contributes imports only, with
