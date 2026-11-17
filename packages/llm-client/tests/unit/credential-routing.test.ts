@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
 import { loadClaudeConfig } from "../../src/config.js";
 import { resolveVendorCliEnv } from "../../src/child-env.js";
+import { createOpenAiApiProvider } from "../../src/openai-api-provider.js";
 import { createGoogleApiProvider } from "../../src/google-api-provider.js";
 import { withoutTrustGatedFields } from "../../src/credential-routing.js";
 import { evaluateRepoTrust, recordRepoTrust } from "../../src/repo-trust.js";
@@ -114,6 +115,22 @@ describe("project-config credential routing in an untrusted repository", () => {
     const sent = new Headers(init.headers).get("x-goog-api-key");
     expect(sent === TOKEN_SENTINEL).toBe(false);
     expect(sent === GEMINI_SENTINEL).toBe(true);
+  });
+
+  it("routes Responses through the trust-gated endpoint without logging the API key", async () => {
+    hostileProject();
+    vi.stubEnv("OPENAI_API_KEY", "responses-fixture-key");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({
+      status: "completed", output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] }],
+    }));
+    const turn = { model: "gpt-6.1-sol", messages: [{ role: "user" as const, content: "fixture" }], tools: [] };
+    await createOpenAiApiProvider({ codexConfig: (await loadLLMConfig(repo)).codex }).completeTurn!(turn);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.openai.com/v1/responses");
+    recordRepoTrust(repo);
+    await createOpenAiApiProvider({ codexConfig: (await loadLLMConfig(repo)).codex }).completeTurn!(turn);
+    expect(fetchMock.mock.calls[1][0]).toBe(`${ATTACKER}/responses`);
+    const printed = (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls.flat().join("\n");
+    expect(printed.includes("responses-fixture-key")).toBe(false);
   });
 
   it("warns, naming the fields but not their values", async () => {

@@ -2,9 +2,11 @@
  * OpenAI API provider — calls OpenAI-compatible APIs via native fetch.
  *
  * Implements the generic {@link LLMProvider} interface for the "codex" vendor
- * in "api" mode. Uses the OpenAI Chat Completions API format:
+ * in "api" mode. Text completions retain the Chat Completions format;
+ * completeTurn/streamTurn use Responses for verified tool-capable models:
  *
- * - `POST /v1/chat/completions` for completions
+ * - `POST /v1/chat/completions` for text completions
+ * - `POST /v1/responses` for agent turns (no tool execution here)
  * - `GET /v1/models` for auth validation
  *
  * ## When this provider is selected
@@ -25,6 +27,7 @@
  * @see {@link createCodexCliClient} in `codex-cli-provider.ts` for the CLI alternative
  */
 
+import { createOpenAiTurns, supportsOpenAiTurns } from "./openai-responses.js";
 import { resolveOpenAiEffort } from "./codex-effort.js";
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
@@ -183,11 +186,12 @@ export function createOpenAiApiProvider(
     vendor: LLM_VENDOR.CODEX,
     mode: "api",
     ...(defaultModel ? { model: defaultModel } : {}),
-    capabilities: ["streaming", "function-calling"],
+    capabilities: supportsOpenAiTurns(defaultModel) ? ["streaming", "function-calling"] : ["streaming"],
   };
 
   return {
     info,
+    ...createOpenAiTurns({ baseUrl, headers, maxTokens, maxRetries, baseDelayMs, parseUsage }),
 
     async validateAuth(): Promise<boolean> {
       try {

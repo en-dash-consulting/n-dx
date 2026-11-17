@@ -97,6 +97,11 @@
 
 // Generic provider interface (vendor-agnostic)
 export type {
+  ProviderToolCall,
+  ProviderMessage,
+  ProviderTurnRequest,
+  ProviderTurnResult,
+  ProviderTurnEvent,
   ProviderAuthMode,
   ProviderCapability,
   ProviderInfo,
