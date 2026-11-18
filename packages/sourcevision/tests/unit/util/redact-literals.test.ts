@@ -14,6 +14,38 @@ describe("redactLiterals", () => {
     expect(redactLiterals(input)).toBe(expected);
   });
 
+  it.each([
+    ["mysql://app:pa/ss@db/app", "mysql://db/app"],
+    ["tcp://:se/cret@redis:6379", "tcp://redis:6379"],
+    ["postgres://u:p#ss@h/db", "postgres://h/db"],
+    ["pgsql://app:p@ss@pg/app", "pgsql://pg/app"],
+    ["redis://:a/b?c#d@cache:6379/0", "redis://cache:6379/0"],
+    ["mysql://u:a/b@10.0.0.7:3306", "mysql://10.0.0.7:3306"],
+    ["mysql://u:a/b@[::1]/db", "mysql://[::1]/db"],
+    ["see https://a:b@h.example.invalid/x?next=https://c:d/e@h2.example.invalid/", "see https://h.example.invalid/x?next=https://h2.example.invalid/"],
+  ])("drops a password holding /, ? or # in %s", (input, expected) => {
+    expect(redactLiterals(input)).toBe(expected);
+    expect(redactLiterals(expected)).toBe(expected);
+  });
+
+  it.each([
+    "https://example.com/a@b",
+    "https://registry.example.org/@scope/pkg",
+    "https://host:8080/x@y",
+    "git@example.com:org/repo.git",
+    "mailto:a@b.example",
+  ])("keeps %s, which has no userinfo", (text) => {
+    expect(redactLiterals(text)).toBe(text);
+  });
+
+  it("keeps a value of = padding alone and redacts any other", () => {
+    for (const text of ["abcKey==", "abcKey=", "https://h.example.invalid/x?key==", "mysql:host=h;dbKey=="]) {
+      expect(redactLiterals(text)).toBe(text);
+    }
+    expect(redactLiterals("key=value")).toBe(`key=${REDACTED}`);
+    expect(redactLiterals("https://h.example.invalid/x?key=abc==")).toBe(`https://h.example.invalid/x?key=${REDACTED}`);
+  });
+
   it("replaces secret-shaped query values and keeps every other part", () => {
     expect(redactLiterals("https://api.example.invalid:8443/v2/items?id=7&api_key=abc123&Access-Token=xyz#top")).toBe(
       `https://api.example.invalid:8443/v2/items?id=7&api_key=${REDACTED}&Access-Token=${REDACTED}#top`,

@@ -70,7 +70,7 @@
  */
 
 import { join } from "node:path";
-import type { FactKind, FileFacts, OutboundCallFact, SourcePosition } from "@n-dx/lang-kit";
+import { withoutUrlUserinfo, type FactKind, type FileFacts, type OutboundCallFact, type SourcePosition } from "@n-dx/lang-kit";
 import { innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
 import { before, readAssignments, scopeAt, type Assignment } from "./php-assignments.js";
@@ -210,11 +210,8 @@ export interface Connection {
 /** A connection string that stops right after a host key (`mysql:host=`), the host coming next. */
 const OPEN_HOST_KEY = /(?:^|[;:\s])(?:host|server|hostaddr)\s*=\s*$/i;
 
-/** `user:password@` after a URI's scheme. */
-const CREDENTIALS = /^([A-Za-z][\w+.-]*:\/\/)[^@/]*@/;
-
-/** A URI without its user and password. */
-export const withoutCredentials = (target: string): string => target.replace(CREDENTIALS, "$1");
+/** A URI without its user and password: lang-kit's rule, the one sourcevision's redaction applies. */
+export const withoutCredentials = (target: string): string => withoutUrlUserinfo(target);
 
 /** `host:port`, unless the host already names a port or is a socket path. */
 function joinPort(host: string, port: string): string {

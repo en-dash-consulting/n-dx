@@ -12,19 +12,24 @@
  * Three shapes are rewritten, wherever they appear in a string:
  *
  * - **URL userinfo.** `scheme://user:password@host` and `scheme://:pw@host`
- *   lose everything before the last `@` of the authority. A user alone goes
- *   too: a token is often sent as the user (`https://<token>@host`).
+ *   lose their userinfo, a password holding `/`, `?`, `#` or `@` included,
+ *   by lang-kit's `withoutUrlUserinfo` (the rule the packs apply to their
+ *   URL targets). A user alone goes too: a token is often sent as the user
+ *   (`https://<token>@host`).
  * - **Secret-shaped query parameters** (`?token=…`, `&api_key=…`): the name
  *   is kept and the value becomes {@link REDACTED}.
  * - **Key=value connection strings** (`mysql:host=h;password=…`,
  *   `Server=h;Password=…`, `jdbc:…;password=…`): the same, for each
  *   secret-shaped key.
  *
+ * A value of `=` padding alone (`abcKey==`) is not a value and is kept.
  * Scheme, host, port, path and every other parameter are kept. Connection
  * strings are matched across the text (a value may be quoted or hold spaces);
  * URLs are matched in whitespace- and quote-delimited tokens. Every pattern is
  * bounded, so the cost is linear in the text. Redaction is idempotent.
  */
+
+import { withoutUrlUserinfo } from "@n-dx/lang-kit";
 
 /** What a secret value is replaced with. */
 export const REDACTED = "REDACTED";
@@ -62,9 +67,6 @@ export function isSecretName(name: string): boolean {
   return SECRET_WORDS.has(words[words.length - 1]);
 }
 
-/** A scheme and `://`; the authority runs to the first `/`, `?` or `#`. */
-const URL_AUTHORITY = /([A-Za-z][A-Za-z0-9+.-]{0,31}:\/\/)([^/?#]*)/g;
-
 /** One query parameter: `?` or `&`, a name, `=`, the value up to the next parameter or the fragment. */
 const QUERY_PARAMETER = /([?&])([^?&;:=/#]{1,64})=([^&;#]*)/g;
 
@@ -77,6 +79,9 @@ const QUERY_PARAMETER = /([?&])([^?&;:=/#]{1,64})=([^&;#]*)/g;
  */
 const DSN_ENTRY = /(^|[;:])([ \t]*)([A-Za-z][\w .-]{0,63}?)=('[^'\n]*'|"[^"\n]*"|\{[^}\n]*\}|[^;\n]*)/g;
 
+/** A value that is only base64 `=` padding, not a value: `abcKey==` reads as `abcKey` = `=`. */
+const PADDING = /^=+$/;
+
 /** Text with nothing to redact: no `@` and no `=`. */
 const NOTHING_TO_REDACT = /^[^@=]*$/;
 
@@ -85,11 +90,8 @@ const TOKEN = /[^\s"'`<>]+/g;
 
 function redactToken(token: string): string {
   if (NOTHING_TO_REDACT.test(token)) return token;
-  const withoutUserinfo = token.replace(URL_AUTHORITY, (_m, scheme: string, authority: string) =>
-    scheme + authority.slice(authority.lastIndexOf("@") + 1),
-  );
-  return withoutUserinfo.replace(QUERY_PARAMETER, (match, separator: string, name: string, value: string) =>
-    value.length > 0 && isSecretName(name) ? `${separator}${name}=${REDACTED}` : match,
+  return withoutUrlUserinfo(token).replace(QUERY_PARAMETER, (match, separator: string, name: string, value: string) =>
+    value.length > 0 && !PADDING.test(value) && isSecretName(name) ? `${separator}${name}=${REDACTED}` : match,
   );
 }
 
@@ -103,7 +105,7 @@ function redactedValue(value: string): string {
 export function redactLiterals(text: string): string {
   if (NOTHING_TO_REDACT.test(text)) return text;
   const withoutDsnSecrets = text.replace(DSN_ENTRY, (match, separator: string, space: string, name: string, value: string) =>
-    value.trim().length > 0 && isSecretName(name) && redactedValue(value) !== value
+    value.trim().length > 0 && !PADDING.test(value.trim()) && isSecretName(name) && redactedValue(value) !== value
       ? `${separator}${space}${name}=${redactedValue(value)}`
       : match,
   );

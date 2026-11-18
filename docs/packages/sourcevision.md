@@ -187,7 +187,7 @@ targets, config keys, expressions as written, findings) are redacted before
 any of these files is written, for every language
 (`src/util/redact-literals.ts`):
 
-- **URLs lose their userinfo:** `https://u:pw@host/v1` becomes `https://host/v1`.
+- **URLs lose their userinfo:** `https://u:pw@host/v1` becomes `https://host/v1`, and a password holding `/`, `?`, `#` or `@` goes whole (`mysql://app:pa/ss@db/app` becomes `mysql://db/app`). A value of `=` padding alone (`abcKey==`) is kept.
 - **Secret values are replaced:** a secret-shaped query parameter or
   key=value connection-string entry (`password`, `pwd`, `pass`, `secret`,
   `token`, `api_key`, `access_key`, `auth`, `key`, `sig`, `signature`,

@@ -120,6 +120,8 @@ fails the test by name instead of hanging the suite.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java, Go and PHP packs share it without depending on each other.
+`withoutUrlUserinfo` (`src/url-userinfo.ts`) is the one URL userinfo rule,
+for sourcevision's output redaction and the packs' URL targets alike.
 
 Detection takes the config override and the
 project file search as arguments (`detectLanguage(rootDir, { override,

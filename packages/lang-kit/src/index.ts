@@ -52,3 +52,6 @@ export * from "./yaml-subset.js";
 
 // Linear trims of a repeated character
 export * from "./text-trim.js";
+
+// URL userinfo removal (sourcevision's redaction and the packs' URL targets)
+export * from "./url-userinfo.js";

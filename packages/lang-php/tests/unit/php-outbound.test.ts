@@ -57,6 +57,14 @@ describe("connectionTarget", () => {
     expect(connectionTarget("mysql://app:secret@db/app", "plain").target.target).toBe("mysql://db/app");
     expect(withoutCredentials("tcp://:secret@cache:6379")).toBe("tcp://cache:6379");
     expect(withoutCredentials("https://example.com/a@b")).toBe("https://example.com/a@b");
+    expect(withoutCredentials("https://host:8080/x@y")).toBe("https://host:8080/x@y");
+  });
+
+  it("drops a password holding /, ?, # or @ whole", () => {
+    expect(connectionTarget("mysql://app:pa/ss@db/app", "plain").target.target).toBe("mysql://db/app");
+    expect(withoutCredentials("tcp://:se/cret@redis:6379")).toBe("tcp://redis:6379");
+    expect(withoutCredentials("postgres://u:p#ss@h/db")).toBe("postgres://h/db");
+    expect(withoutCredentials("pgsql://app:p@ss@pg/app")).toBe("pgsql://pg/app");
   });
 });
 
