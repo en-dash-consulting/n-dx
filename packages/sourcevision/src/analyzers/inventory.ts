@@ -489,6 +489,17 @@ export interface InventoryResult extends Inventory {
   minifiedByContent?: string[];
 }
 
+/**
+ * True when `role` is `generated` only because the content rule found the file
+ * minified: without that rule (name, path and header rules alone) it would not be.
+ */
+function generatedByContentOnly(
+  relPath: string, language: string, langConfig: LanguageConfig, head: Buffer, role: FileRole,
+): boolean {
+  return role === "generated" && isMinifiedByContent(relPath, head)
+    && classifyRole(relPath, language, langConfig, readHeaderText(relPath, head, langConfig), false) !== "generated";
+}
+
 /** First {@link MINIFIED_HEAD_BYTES} of a file. */
 async function readHead(fullPath: string): Promise<Buffer> {
   const handle = await open(fullPath, "r");
@@ -587,7 +598,8 @@ export async function analyzeInventory(
       // The cache does not record why a file is generated; re-read the head of
       // the few that could be minified by content, so the log line is stable.
       if (prevEntry.role === "generated" && !isMinifiedName(relPath) && checksMinifiedContent(relPath)
-        && isMinifiedByContent(relPath, await readHead(fullPath))) {
+        && classifyRole(relPath, prevEntry.language, langConfig, undefined, false) !== "generated"
+        && generatedByContentOnly(relPath, prevEntry.language, langConfig, await readHead(fullPath), prevEntry.role)) {
         byContent.push(relPath);
       }
       continue;
@@ -599,7 +611,7 @@ export async function analyzeInventory(
     const language = detectLanguage(relPath, langConfig);
     const minified = isMinifiedFile(relPath, buf);
     const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig), minified);
-    if (role === "generated" && minified && !isMinifiedName(relPath)) byContent.push(relPath);
+    if (minified && generatedByContentOnly(relPath, language, langConfig, buf, role)) byContent.push(relPath);
     const category = deriveCategory(relPath);
 
     let lineCount = 0;
