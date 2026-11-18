@@ -21,6 +21,7 @@ export class OpenAiAgentTurn {
     messages: Anthropic.MessageParam[];
     effort?: string;
     signal: AbortSignal;
+    timeoutMs?: number;
   }) {
     const messages: Message[] = [{ role: "system", content: args.systemPrompt }];
     for (const message of args.messages) {
@@ -31,6 +32,15 @@ export class OpenAiAgentTurn {
       const original = this.continuations.get(message.content);
       if (original) {
         messages.push(original);
+        continue;
+      }
+      const toolCalls = message.content.filter(block => block.type === "tool_use");
+      if (toolCalls.length) {
+        messages.push({ role: "assistant", content: message.content
+          .filter(block => block.type === "text").map(block => block.text).join("\n"),
+          toolCalls: toolCalls.map(block => ({ id: block.id, name: block.name,
+            arguments: block.input as Record<string, unknown> })),
+        });
         continue;
       }
       for (const block of message.content) {
@@ -46,7 +56,7 @@ export class OpenAiAgentTurn {
     }
     const result = await this.provider.completeTurn!({
       model: args.model, messages, tools: TOOL_DEFINITIONS_NEUTRAL,
-      effort: args.effort, signal: args.signal, taskClass: "agent.execute",
+      effort: args.effort, signal: args.signal, timeoutMs: args.timeoutMs, taskClass: "agent.execute",
     });
     const content: Anthropic.ContentBlock[] = [];
     if (result.message.content) content.push({ type: "text", text: result.message.content, citations: null });

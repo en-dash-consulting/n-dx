@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { OpenAiFailover } from "./openai-failover.js";
 import { OpenAiAgentTurn } from "./openai-agent-turn.js";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
@@ -2086,7 +2087,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     });
   }
 
-  const openAi = effectiveVendor === "codex" ? new OpenAiAgentTurn(provider) : undefined;
+  const openAi = effectiveVendor === "codex" ? new OpenAiFailover(provider, model, llmConfig, config) : undefined;
   const controller = new AbortController();
   const signal = opts.abortSignal
     ? AbortSignal.any([opts.abortSignal, controller.signal]) : controller.signal;
@@ -2211,10 +2212,34 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       const _t0 = Date.now();
       const response = await withHeartbeat<Anthropic.Message | Awaited<ReturnType<OpenAiAgentTurn["call"]>>>(
-        `waiting on ${vendor}/${model} response`,
+        `waiting on ${openAi?.selection.vendor ?? vendor}/${openAi?.selection.model ?? model} response`,
         openAi ? openAi.call({
           model, systemPrompt, messages, signal,
           effort: resolveTaskModel("agent.execute", llmConfig).effort,
+        }, {
+          beforeAttempt: async () => {
+            const budget = checkTokenBudget(run.tokenUsage, tokenBudget);
+            if (budget.exceeded) {
+              await handleBudgetExceeded(store, taskId, run, budget);
+              throw new Error("Token budget exceeded during failover");
+            }
+            if (await stopOnSpendCap(spendGate, run, store, taskId)) {
+              throw new Error("Spend cap exceeded during failover");
+            }
+          },
+          failed: (error, selection) => {
+            const accounting = error as Partial<Awaited<ReturnType<OpenAiAgentTurn["call"]>>["accounting"]> | null;
+            if (!llmConfig.autoFailover && !accounting?.tokenUsage) return;
+            recordTurnTokenUsageNormalized(run, accounting?.tokenUsage ?? { input: 0, output: 0 },
+              turn + 1, selection.vendor, selection.model);
+            run.turnTokenUsage!.at(-1)!.diagnosticStatus = accounting?.usageStatus === "measured"
+              ? "complete" : accounting?.tokenUsage ? "partial" : "unavailable";
+          },
+          switched: (from, to, reason) => {
+            const note = `failover:${from.vendor}/${from.model} → ${to.vendor}/${to.model}: ${reason}; recorded cost USD ${priceRunUsd(run)}`;
+            run.diagnostics?.notes.push(note);
+            stream("Failover", note);
+          },
         }) : callWithFailover(
           resources!.client,
           buildCachedMessageRequest({
@@ -2241,9 +2266,14 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       );
       const _latencyMs = Date.now() - _t0;
 
+      // Attribute each attempt to the provider/model actually used, including after a switch.
+      const turnVendor = openAi?.selection.vendor ?? vendor;
+      const turnModel = openAi?.selection.model ?? model;
+      run.vendor = turnVendor;
+      run.model = turnModel;
       // Track token usage for this turn
       if ("accounting" in response) {
-        recordTurnTokenUsageNormalized(run, response.accounting.tokenUsage ?? { input: 0, output: 0 }, turn + 1, vendor, response.accounting.model);
+        recordTurnTokenUsageNormalized(run, response.accounting.tokenUsage ?? { input: 0, output: 0 }, turn + 1, turnVendor, response.accounting.model);
         if (response.accounting.effort && run.diagnostics) {
           const note = `openai_effort:${response.accounting.effort}`;
           if (!run.diagnostics.notes.includes(note)) run.diagnostics.notes.push(note);
@@ -2252,7 +2282,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         last.diagnosticStatus = response.accounting.usageStatus === "measured" ? "complete"
           : response.accounting.tokenUsage ? "partial" : "unavailable";
       } else {
-        recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, vendor, model);
+        recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, turnVendor, turnModel);
       }
       signal.throwIfAborted();
       if (response.stop_reason === "refusal") throw new Error("OpenAI refused the agent request");
@@ -2279,7 +2309,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       const assistantContent = response.content;
       messages.push({ role: "assistant", content: assistantContent });
 
-      streamAssistantText(assistantContent, formatModelLabel(model));
+      streamAssistantText(assistantContent, formatModelLabel(turnModel));
 
       // Detect plan-only iterations before handling completion
       const planDetection = openAi && runHasCodeModifications(run.toolCalls)
@@ -2377,18 +2407,17 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
     }
   } catch (err) {
-    if (openAi && err instanceof Error && "tokenUsage" in err) {
-      const accounting = err as Error & Partial<Awaited<ReturnType<OpenAiAgentTurn["call"]>>["accounting"]>;
-      recordTurnTokenUsageNormalized(run, accounting.tokenUsage, run.turns, vendor, model);
-      if (accounting.tokenUsage) {
-        run.turnTokenUsage!.at(-1)!.diagnosticStatus = accounting.usageStatus === "measured" ? "complete" : "partial";
-      }
+    if (openAi) {
+      run.vendor = openAi.selection.vendor;
+      run.model = openAi.selection.model;
     }
-    run.status = signal.aborted ? "cancelled" : "failed";
-    run.error = signal.aborted ? "Run interrupted by user" : (err as Error).message;
-    console.error(`[Error] ${run.error}`);
+    if (run.status !== "budget_exceeded") {
+      run.status = signal.aborted ? "cancelled" : "failed";
+      run.error = signal.aborted ? "Run interrupted by user" : (err as Error).message;
+      console.error(`[Error] ${run.error}`);
 
-    await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
+      await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
+    }
   } finally {
     // Remove SIGINT handler to restore default behavior
     process.removeListener("SIGINT", handleSignal);

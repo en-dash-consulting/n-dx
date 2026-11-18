@@ -96,6 +96,81 @@ describe("direct OpenAI agent execution", () => {
     expect(requests.every(request => request.model === "gpt-6-astra" && request.store === false)).toBe(true);
   });
 
+  it("continues tools on a fallback model and records effective usage and switch cost", async () => {
+    await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: {
+      autoFailover: true, codex: { lightModel: "gpt-6.1-sol" },
+    } }));
+    script(scriptFor("fallback.ts"));
+    const success = globalThis.fetch;
+    let failed = false;
+    vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+      const body = JSON.parse(init.body as string);
+      // Fail after the first tool result: switching must preserve the tool-call history.
+      if (!failed && body.input.some((item: any) => item.type === "function_call_output")) {
+        failed = true;
+        return new Response("private provider payload", { status: 429, headers: { "Retry-After": "120" } });
+      }
+      const result = await success(url, init);
+      const data = await result.json();
+      return new Response(JSON.stringify({ ...data, model: body.model }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const { run: record } = await run();
+    expect(record.status).toBe("completed");
+    expect(record.model).toBe("gpt-6.1-sol");
+    expect(record.turnTokenUsage?.map(turn => [turn.model, turn.diagnosticStatus])).toEqual([
+      ["gpt-6-astra", "complete"], ["gpt-6-astra", "unavailable"],
+      ["gpt-6.1-sol", "complete"], ["gpt-6.1-sol", "complete"], ["gpt-6.1-sol", "complete"],
+    ]);
+    expect(record.tokenUsage).toMatchObject({ input: 300, output: 80, cacheReadInput: 100 });
+    expect(record.diagnostics?.notes.some(note => note.includes("failover:") && note.includes("recorded cost USD"))).toBe(true);
+    expect(JSON.stringify(record)).not.toContain("private provider payload");
+    expect(requests[1].input.some((item: any) => item.type === "function_call" && item.call_id === "write")).toBe(true);
+    expect(requests[1].input.some((item: any) => item.type === "reasoning")).toBe(false);
+  });
+
+  it("keeps a terminal Claude fallback error body out of the run record", async () => {
+    await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: {
+      autoFailover: true, codex: { lightModel: "gpt-6.1-sol" },
+      claude: { auth: "api", api_key: "private-claude-fixture" },
+    } }));
+    vi.stubGlobal("fetch", vi.fn(async url => String(url).includes("openai")
+      ? new Response("", { status: 401 })
+      : new Response("invalid header value private-claude-fixture", { status: 400 })));
+    const { run: record } = await run();
+    expect(record.status).toBe("failed");
+    expect(record.error).toContain("400");
+    expect(JSON.stringify(record)).not.toContain("private-claude-fixture");
+  });
+
+  it("uses Anthropic tools after cross-vendor failover and prices usage against Claude", async () => {
+    await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: {
+      autoFailover: true, codex: { lightModel: "gpt-6.1-sol" },
+      claude: { auth: "api", api_key: "claude-fixture", model: "claude-sonnet-4-6" },
+    } }));
+    const turns = scriptFor("cross-vendor.ts");
+    let index = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+      const body = JSON.parse(init.body as string);
+      if (String(url).includes("openai")) return new Response("", { status: 401 });
+      expect(new Headers(init.headers).get("x-api-key")).toBe("claude-fixture");
+      expect(body.tools[0].input_schema).toBeDefined();
+      const content = turns[index++].filter((item: any) => item.type !== "reasoning").map((item: any) => item.type === "function_call"
+        ? { type: "tool_use", id: item.call_id, name: item.name, input: JSON.parse(item.arguments) }
+        : { type: "text", text: "Implemented and verified the file." });
+      return new Response(JSON.stringify({ id: "msg_fixture", type: "message", role: "assistant", model: body.model,
+        content, stop_reason: content.some((block: any) => block.type === "tool_use") ? "tool_use" : "end_turn",
+        usage: { input_tokens: 50, output_tokens: 10 },
+      }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const { run: record } = await run();
+    expect(record.status).toBe("completed");
+    expect(record.vendor).toBe("claude");
+    expect(record.model).toBe("claude-sonnet-4-6");
+    expect(record.tokenUsage).toMatchObject({ input: 200, output: 40 });
+    expect(record.turnTokenUsage?.slice(2).every(turn => turn.vendor === "claude" && turn.model === "claude-sonnet-4-6")).toBe(true);
+    expect(JSON.stringify(record)).not.toContain("claude-fixture");
+  });
+
   it("runs the command's sequential loop with real selection and claims", async () => {
     script([...scriptFor("first.ts"), ...scriptFor("second.ts")]);
     const { cmdRun } = await import("../../src/cli/commands/run.js");
