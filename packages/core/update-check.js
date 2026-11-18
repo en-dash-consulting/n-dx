@@ -13,10 +13,11 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REGISTRY_URL = "https://registry.npmjs.org/@n-dx/core/latest";
+const RELEASES_URL = "https://github.com/en-dash-consulting/n-dx/releases/latest";
 
 /** Cache TTL: 24 hours. Exported for tests. */
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -117,11 +118,21 @@ function isNewer(current, latest) {
  *  - yarn classic installs globals under a `yarn/` data directory.
  *  - anything else (including npm's prefix and a local dev checkout) → npm.
  *
+ * A standalone executable (scripts/build-exe.mjs) is checked first: it runs
+ * from the runtime it unpacked, named by `NDX_STANDALONE_ROOT`, and is
+ * replaced by downloading a new executable, not by any package manager.
+ *
  * @param {string} [modulePath] Absolute path to a file inside the install.
  *   Defaults to this module. Injectable for tests.
- * @returns {"pnpm"|"yarn"|"npm"}
+ * @param {Record<string, string | undefined>} [env] Injectable for tests.
+ * @returns {"pnpm"|"yarn"|"npm"|"standalone"}
  */
-export function detectInstallManager(modulePath = fileURLToPath(import.meta.url)) {
+export function detectInstallManager(modulePath = fileURLToPath(import.meta.url), env = process.env) {
+  const standaloneRoot = env.NDX_STANDALONE_ROOT;
+  if (standaloneRoot) {
+    const rel = relative(standaloneRoot, modulePath);
+    if (rel && !rel.startsWith("..") && !isAbsolute(rel)) return "standalone";
+  }
   // Normalize Windows separators so one set of segment checks covers both
   // platforms; lowercase because Windows paths are case-insensitive.
   const path = modulePath.replace(/\\/g, "/").toLowerCase();
@@ -140,10 +151,14 @@ export function detectInstallManager(modulePath = fileURLToPath(import.meta.url)
  * boundary, so the user stays stranded on the old line no matter how many times
  * they "upgrade". `@latest` pins past it.
  *
- * @param {"pnpm"|"yarn"|"npm"} [manager]
+ * A standalone executable has no command: the "command" is where to get the
+ * new executable.
+ *
+ * @param {"pnpm"|"yarn"|"npm"|"standalone"} [manager]
  * @returns {string}
  */
 export function formatUpgradeCommand(manager = detectInstallManager()) {
+  if (manager === "standalone") return RELEASES_URL;
   if (manager === "pnpm") return "pnpm add -g @n-dx/core@latest";
   if (manager === "yarn") return "yarn global add @n-dx/core@latest";
   return "npm i -g @n-dx/core@latest";
@@ -192,7 +207,7 @@ export async function startUpdateCheck({ currentVersion } = {}) {
  * installed this copy — see `detectInstallManager` for why a hardcoded
  * `npm i -g` silently breaks pnpm and yarn users.
  *
- * @param {{ current: string, latest: string, manager?: "pnpm"|"yarn"|"npm" }} info
+ * @param {{ current: string, latest: string, manager?: "pnpm"|"yarn"|"npm"|"standalone" }} info
  * @returns {string}
  */
 export function formatUpdateNotice({ current, latest, manager }) {
@@ -202,10 +217,11 @@ export function formatUpdateNotice({ current, latest, manager }) {
   const bold = (t) => `\x1b[1m${t}\x1b[22m`;
   const cyan = (t) => `\x1b[36m${t}\x1b[39m`;
 
-  const command = formatUpgradeCommand(manager ?? detectInstallManager());
+  const resolved = manager ?? detectInstallManager();
+  const command = formatUpgradeCommand(resolved);
+  const action = resolved === "standalone"
+    ? `${dim("Download it from")} ${bold(command)}${dim(".")}`
+    : `${dim("Run")} ${bold(command)} ${dim("to update.")}`;
 
-  return (
-    `\n  ${dim("Update available:")} ${dim(current)} → ${cyan(bold(latest))}` +
-    `  ${dim("Run")} ${bold(command)} ${dim("to update.")}`
-  );
+  return `\n  ${dim("Update available:")} ${dim(current)} → ${cyan(bold(latest))}  ${action}`;
 }

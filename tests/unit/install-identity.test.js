@@ -145,6 +145,27 @@ describe("classifyInstall", () => {
     expect(result.root).toBeNull();
   });
 
+  it("classifies a CLI inside the standalone runtime as the executable", () => {
+    const runtime = resolve("/cache/n-dx/runtime/0.10.4-abc");
+    const result = classifyInstall(
+      { cliPath: join(runtime, "node_modules", "@n-dx", "core", "cli.js"), argvPath: null },
+      { ...deps, env: { NDX_STANDALONE_ROOT: runtime, NDX_STANDALONE_EXE: "/usr/local/bin/ndx" } },
+    );
+    expect(result.kind).toBe(INSTALL_KIND.STANDALONE);
+    expect(result.label).toBe("standalone executable");
+    expect(result.root).toBe("/usr/local/bin/ndx");
+  });
+
+  it("ignores an inherited standalone root that does not hold the CLI", () => {
+    // A child of the executable that runs some other n-dx install inherits
+    // NDX_STANDALONE_ROOT; that install is still what it is.
+    const result = classifyInstall(
+      { cliPath: NPM_CLI, argvPath: null },
+      { ...deps, env: { NDX_STANDALONE_ROOT: resolve("/cache/n-dx/runtime/0.10.4-abc") } },
+    );
+    expect(result.kind).toBe(INSTALL_KIND.NPM);
+  });
+
   it("gives every kind a label", () => {
     for (const kind of Object.values(INSTALL_KIND)) {
       expect(INSTALL_KIND_LABELS[kind]).toBeTruthy();

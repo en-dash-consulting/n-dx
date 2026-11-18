@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "pnpm -r run build",
+    "build:exe": "node scripts/build-exe.mjs",
     "dev": "pnpm -r run dev",
     "typecheck": "node scripts/check-dependency-drift.mjs && pnpm -r run typecheck",
     "deps:check": "node scripts/check-dependency-drift.mjs",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
+    "postject": "1.0.0-alpha.6",
     "vitepress": "^1.6.4",
     "vitest": "^5.0.5"
   },

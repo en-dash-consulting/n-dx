@@ -1,0 +1,142 @@
+# Standalone executables: `ndx` / `ndx.exe` with Node.js built in.
+#
+# scripts/build-exe.mjs packs a production install of @n-dx/core into a Node
+# Single Executable Application. Each target builds on its own native runner:
+# a macOS binary has to be signed on macOS, and building natively means the
+# smoke test runs the binary that ships.
+#
+# Triggers:
+#  - workflow_dispatch: build every target; with `release-tag` (for example
+#    `@n-dx/core@0.10.5`), also attach the archives to that GitHub release.
+#    Run by hand after a release: changesets/action creates releases with
+#    GITHUB_TOKEN, and events from that token start no other workflow.
+#  - pull_request touching the build: catch a broken build before merge.
+
+name: Standalone executables
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: "Attach the archives to this GitHub release (e.g. @n-dx/core@0.10.5); empty builds only"
+        required: false
+        default: ""
+  pull_request:
+    paths:
+      - scripts/build-exe.mjs
+      - scripts/exe/**
+      - .github/workflows/standalone-exe.yml
+
+permissions: {}
+
+concurrency:
+  group: standalone-exe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-x64, runner: ubuntu-24.04 }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm }
+          - { target: darwin-arm64, runner: macos-15 }
+          - { target: darwin-x64, runner: macos-15-intel }
+          - { target: win-x64, runner: windows-2025 }
+          - { target: win-arm64, runner: windows-11-arm }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      # The executable embeds this Node: its version is the one users run.
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache grammar build downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/lang-runtime/build/cache
+          key: grammars-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
+
+      - name: Build executable
+        run: node scripts/build-exe.mjs --target=${{ matrix.target }}
+
+      - name: Smoke test
+        shell: bash
+        env:
+          NDX_EXE_CACHE: ${{ runner.temp }}/ndx-exe-cache
+        run: |
+          set -euo pipefail
+          dir="dist-exe/${{ matrix.target }}"
+          exe="$dir/ndx"; [ -f "$exe.exe" ] && exe="$exe.exe"
+          "$exe" --standalone-info
+          expected=$(node -p "require('./packages/core/package.json').version")
+          actual=$("$exe" --version)
+          [ "$actual" = "$expected" ] || { echo "ndx --version printed '$actual', expected '$expected'"; exit 1; }
+          "$exe" which | grep -q "standalone executable"
+          "$exe" rex --help > /dev/null
+          "$exe" sv --help > /dev/null
+
+      - name: Archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./packages/core/package.json').version")
+          name="ndx-${version}-${{ matrix.target }}"
+          cd "dist-exe/${{ matrix.target }}"
+          if [ -f ndx.exe ]; then
+            7z a -tzip "../${name}.zip" ndx.exe > /dev/null
+          else
+            tar -czf "../${name}.tar.gz" ndx
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ndx-${{ matrix.target }}
+          path: |
+            dist-exe/*.zip
+            dist-exe/*.tar.gz
+          if-no-files-found: error
+
+  attach:
+    name: Attach to release
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.release-tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ndx-*
+          merge-multiple: true
+          path: archives
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release-tag }}
+        run: |
+          set -euo pipefail
+          cd archives
+          sha256sum ndx-* > SHA256SUMS.txt
+          gh release upload "$TAG" ndx-* SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"

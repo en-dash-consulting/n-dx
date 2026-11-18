@@ -85,3 +85,7 @@ claude_commands.log*
 .test-logs/
 # Coverage reports from `pnpm test:coverage` / a package's `test:coverage` (tests/vitest-coverage.mjs).
 coverage/
+
+# Standalone executable build (scripts/build-exe.mjs): staging and output.
+.sea-build/
+dist-exe/

@@ -40,6 +40,8 @@ export const INSTALL_KIND = {
   LINK: "link",
   /** A checkout executed directly, e.g. `node packages/core/cli.js`. */
   WORKSPACE: "workspace",
+  /** Unpacked from a standalone executable (scripts/build-exe.mjs). */
+  STANDALONE: "standalone",
   /** Outside `node_modules` with no workspace root above it. */
   UNKNOWN: "unknown",
 };
@@ -49,6 +51,7 @@ export const INSTALL_KIND_LABELS = {
   [INSTALL_KIND.NPM]: "npm registry install",
   [INSTALL_KIND.LINK]: "pnpm global link",
   [INSTALL_KIND.WORKSPACE]: "workspace checkout",
+  [INSTALL_KIND.STANDALONE]: "standalone executable",
   [INSTALL_KIND.UNKNOWN]: "unknown",
 };
 
@@ -108,7 +111,7 @@ function isInside(parent, child) {
  * since both execute the very same file.
  *
  * @param {{ cliPath: string, argvPath?: string|null }} input
- * @param {{ existsSync?: (p: string) => boolean }} [deps]
+ * @param {{ existsSync?: (p: string) => boolean, env?: Record<string, string | undefined> }} [deps]  `env` defaults to `process.env`.
  * @returns {{ kind: string, label: string, root: string|null }}
  */
 export function classifyInstall({ cliPath, argvPath = null }, deps = {}) {
@@ -117,6 +120,14 @@ export function classifyInstall({ cliPath, argvPath = null }, deps = {}) {
     label: INSTALL_KIND_LABELS[kind],
     root,
   });
+
+  // The executable's launcher exports where it unpacked the runtime. Checked
+  // against cliPath, not trusted alone: the variable is inherited by every
+  // child, including another n-dx install a child happens to run.
+  const env = deps.env ?? process.env;
+  if (env.NDX_STANDALONE_ROOT && isInside(env.NDX_STANDALONE_ROOT, cliPath)) {
+    return describe(INSTALL_KIND.STANDALONE, env.NDX_STANDALONE_EXE || null);
+  }
 
   if (isUnderNodeModules(cliPath)) return describe(INSTALL_KIND.NPM);
 
@@ -199,7 +210,9 @@ export function collectInstallIdentity(
   // paying for a subprocess that we already know will fail.
   const gitDir = install.root ?? dirname(cliPath);
   const git =
-    install.kind === INSTALL_KIND.NPM ? null : readGitIdentity(gitDir, deps);
+    install.kind === INSTALL_KIND.NPM || install.kind === INSTALL_KIND.STANDALONE
+      ? null
+      : readGitIdentity(gitDir, deps);
 
   return {
     version,
