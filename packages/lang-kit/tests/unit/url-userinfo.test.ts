@@ -15,6 +15,9 @@ describe("withoutUrlUserinfo", () => {
     ["pgsql://app:p@ss@pg/app", "pgsql://pg/app"],
     ["redis://:a/b?c#d@cache:6379/0", "redis://cache:6379/0"],
     ["mysql://u:a/b@[::1]:3306/db", "mysql://[::1]:3306/db"],
+    ["redis://:/abc@cache:6379", "redis://cache:6379"],
+    ["mysql://u:/abc@db/app", "mysql://db/app"],
+    ["mysql://u:123456/x@db/app", "mysql://db/app"],
   ])("drops the userinfo of %s", (input, expected) => {
     expect(withoutUrlUserinfo(input)).toBe(expected);
     expect(withoutUrlUserinfo(expected)).toBe(expected);
@@ -24,6 +27,8 @@ describe("withoutUrlUserinfo", () => {
     "https://example.com/a@b",
     "https://registry.example.org/@scope/pkg",
     "https://host:8080/x@y",
+    "https://[::1]:8080/x@y",
+    "https://[::1]/x@y",
     "git@example.com:org/repo.git",
     "mailto:a@b.example",
     "https://u:p/w@not a host",

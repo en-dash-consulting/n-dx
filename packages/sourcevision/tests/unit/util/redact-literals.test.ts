@@ -22,6 +22,8 @@ describe("redactLiterals", () => {
     ["redis://:a/b?c#d@cache:6379/0", "redis://cache:6379/0"],
     ["mysql://u:a/b@10.0.0.7:3306", "mysql://10.0.0.7:3306"],
     ["mysql://u:a/b@[::1]/db", "mysql://[::1]/db"],
+    ["redis://:/abc@cache.example.invalid:6379", "redis://cache.example.invalid:6379"],
+    ["mysql://u:/abc@db.example.invalid/app", "mysql://db.example.invalid/app"],
     ["see https://a:b@h.example.invalid/x?next=https://c:d/e@h2.example.invalid/", "see https://h.example.invalid/x?next=https://h2.example.invalid/"],
   ])("drops a password holding /, ? or # in %s", (input, expected) => {
     expect(redactLiterals(input)).toBe(expected);

@@ -10,7 +10,9 @@
  *   quotes, and the text after that `@` starts with a host (name, IPv4 or
  *   `[IPv6]`) followed by `:port`, `/`, `?`, `#` or the end. A password
  *   holding `/`, `?`, `#` or `@` goes whole. Not when the text before the
- *   first `/`, `?` or `#` is `host:port` (`https://host:8080/x@y`).
+ *   first `/`, `?` or `#` is `host:port` or an `[IPv6]` host
+ *   (`https://host:8080/x@y`), which a password of one to five digits
+ *   before its first `/` cannot be told from (`u:12/x@h` is kept).
  * - **First `/`.** Otherwise the authority ends at the first `/`, `?` or
  *   `#`, and everything before its last `@` goes, a user alone included (a
  *   token is often sent as the user: `https://<token>@host`).
@@ -24,8 +26,12 @@ const SCHEME = /[A-Za-z][A-Za-z0-9+.-]{0,31}:\/\//g;
 /** A user with no `/?#@:`, then `:` and a password with no whitespace or quote. */
 const USERINFO = /^[^/?#@:\s"'`]*:[^\s"'`]*$/;
 
-/** An authority that is a host and a port, with no userinfo. */
-const HOST_AND_PORT = /^[^@:]*:\d*$/;
+/**
+ * An authority that is a host and a port (one to five digits) or an
+ * `[IPv6]` host, with no userinfo. A port needs a digit and a host a
+ * character, so `:/pw` and `u:/pw` (a password starting with `/`) are not one.
+ */
+const HOST_AND_PORT = /^(?:[^@:[\]]+:\d{1,5}|\[[^\]@]*\](?::\d*)?)$/;
 
 /** A host name, IPv4 or `[IPv6]`, an optional `:port`, then `/`, `?`, `#` or the end. */
 const HOST = /^(?:[A-Za-z0-9_~-]+(?:\.[A-Za-z0-9_~-]+)*|\[[0-9A-Fa-f:.]+\])(?::\d*)?(?:[/?#]|$)/;
