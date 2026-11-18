@@ -819,6 +819,33 @@ describe("enrichClassificationsWithLLM — Jev route", () => {
     }
   });
 
+  it("keeps the files earlier slices answered when a later slice fails with a transient error", async () => {
+    const { ClaudeClientError } = await import("@n-dx/llm-client");
+    const paths = ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"];
+    const base = makeBase(paths);
+    mockedAskJev.mockImplementation((async (request: { state: { files: Record<string, { path: string }> } }) => {
+      const files = Object.entries(request.state.files);
+      if (files.length > 2) {
+        throw new ClaudeClientError('TypeSafe returned 400: {"detail":{"error_type":"max_tokens_exceeded"}}', "unknown", false);
+      }
+      if (files.some(([, f]) => f.path === "src/c.ts")) {
+        throw new ClaudeClientError("rate limited", "rate-limit", true);
+      }
+      return jevResponse(Object.fromEntries(files.map(([id]) => [id, { choice: "service", probabilities: { service: 0.9 } }])));
+    }) as never);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const result = await enrichClassificationsWithLLM(base, makeInventory([...paths, "src/index.ts"]), emptyImports);
+      expect(result.updatedFiles.map((f) => f.path).sort()).toEqual(["src/a.ts", "src/b.ts"]);
+      expect(mockedCallClaude).not.toHaveBeenCalled();
+      const failures = warn.mock.calls.map(([m]) => String(m)).filter((m) => m.includes("Jev request failed (rate-limit)"));
+      expect(failures).toHaveLength(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("takes the text path untouched when no judgment route is resolved", async () => {
     mockedGetJudgmentRoute.mockReturnValue(undefined);
     const base = makeBase(["src/analyzer.ts"]);

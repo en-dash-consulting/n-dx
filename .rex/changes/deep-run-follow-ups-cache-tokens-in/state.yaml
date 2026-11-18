@@ -18,7 +18,14 @@ items:
     lastModified: "2026-11-18T01:13:13.960Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a913d67e-2106-45d8-9bef-76991a30c1f7":
-    lastModified: "2026-11-18T01:12:36.896Z"
+    status: "completed"
+    startedAt: "2026-11-18T03:35:43.331Z"
+    completedAt: "2026-11-18T03:37:22.371Z"
+    endedAt: "2026-11-18T03:37:22.371Z"
+    activeIntervals: [{"end":"2026-11-18T03:37:22.371Z","start":"2026-11-18T03:35:43.331Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added classify.test.ts case: split batch, later slice rate-limit; earlier slices kept, one warning. Commit f05e19fda."
+    lastModified: "2026-11-18T03:37:22.371Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d842839a-6478-4367-97bc-962252fffa99":
     status: "completed"
