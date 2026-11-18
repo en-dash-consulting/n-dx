@@ -80,6 +80,7 @@ function InfraArchBody({ data, opened = false }: InfraArchPanelProps): Component
     idBase: opened ? "infra-actions-opened" : "infra-actions",
     opened,
     onItemHover: shared.setHovered,
+    capture: shared.capture,
   });
 
   if (!shared.delivery && list.items.length === 0) {

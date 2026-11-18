@@ -19,11 +19,14 @@ import { useContext, useMemo, useState } from "preact/hooks";
 import type { LoadedData } from "../types.js";
 import { deliveryAnalysisStamp, useDeliveryData, type DeliveryData } from "./delivery.js";
 import { useNextSteps } from "./next-steps.js";
+import { isDeployedMode } from "../deployed-mode.js";
 import {
   buildHealthActions,
   buildInfraActions,
   zoneIssues,
+  useRecommendationCapture,
   type ActionItem,
+  type RecommendationCapture,
   type ActionList,
   type ZoneMark,
 } from "./action-items.js";
@@ -38,6 +41,8 @@ export interface AnalyzeActions {
   /** The item the pointer is over in either list. */
   hovered: ActionItem | null;
   setHovered: (item: ActionItem | null) => void;
+  /** Adds recommendations to the PRD; null in a static export, which has no server. */
+  capture: RecommendationCapture | null;
 }
 
 const AnalyzeActionsContext = createContext<AnalyzeActions | null>(null);
@@ -47,12 +52,14 @@ export function AnalyzeActionsProvider({ data, children }: { data: LoadedData; c
   const steps = useNextSteps(5);
   const delivery = useDeliveryData(deliveryAnalysisStamp(data.manifest));
   const [hovered, setHovered] = useState<ActionItem | null>(null);
+  const recommendationCapture = useRecommendationCapture();
+  const capture = isDeployedMode() ? null : recommendationCapture;
   const health = useMemo(() => buildHealthActions(data, steps), [data.zones, data.manifest, steps]);
   const infra = useMemo(() => buildInfraActions(data, delivery?.readiness ?? null), [data.zones, data.manifest, delivery]);
   const issues = useMemo(() => zoneIssues(data, [...health.items, ...infra.items]), [data.zones, health, infra]);
   const value = useMemo(
-    () => ({ health, infra, delivery, issues, hovered, setHovered }),
-    [health, infra, delivery, issues, hovered],
+    () => ({ health, infra, delivery, issues, hovered, setHovered, capture }),
+    [health, infra, delivery, issues, hovered, capture],
   );
   return h(AnalyzeActionsContext.Provider, { value }, children);
 }

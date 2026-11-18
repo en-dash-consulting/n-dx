@@ -1608,3 +1608,43 @@
 @media (max-width: 700px) {
   .map-note { left: var(--space-3); right: var(--space-3); max-width: none; }
 }
+
+/* ── Adding a recommendation to the PRD (action-items.ts) ── */
+
+.health-action-add {
+  flex: none;
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+/* Quiet until its row is pointed at or reached by keyboard; a result stays visible. */
+.health-action:hover .health-action-add,
+.health-action-add:focus-visible,
+.health-action-add--pending,
+.health-action-add--created,
+.health-action-add--exists,
+.health-action-add--error { opacity: 1; }
+
+.health-action-add:hover:not(:disabled) { border-color: var(--accent); }
+.health-action-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.health-action-add:disabled { cursor: default; }
+.health-action-add--created,
+.health-action-add--exists { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+.health-action-add--error { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+
+.health-actions-captured { display: block; margin: var(--space-2) 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .health-action-add { transition: none; }
+}

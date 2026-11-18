@@ -18,6 +18,10 @@
  * Hovering an item lights its zones on the codebase map; an item whose remedy
  * adds files the map cannot draw yet carries a `note` the map shows beside it
  * (analyze-actions-context.ts).
+ *
+ * Any item can be added to the PRD — "+ PRD" on its row, or every item shown
+ * at once from the opened tile — through POST /api/rex/capture-recommendations:
+ * one Inbox change each on v2, skipping any the PRD already holds.
  */
 
 import { h } from "preact";
@@ -29,7 +33,7 @@ import { zoneConcerns, zoneNeedsAttention } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { effectiveEnrichmentPass } from "../enrichment-pass.js";
 import { dimensionRows, scoreBand, type Readiness } from "./delivery.js";
-import { NextStepsCapture, copyText, stepsToMarkdown, type NextStep } from "./next-steps.js";
+import { copyText, stepsToMarkdown, type NextStep } from "./next-steps.js";
 
 // ── The item model ─────────────────────────────────────────────
 
@@ -344,6 +348,136 @@ export function concernCardProps(focus: ConcernFocus, counts: Record<string, num
   };
 }
 
+// ── Adding recommendations to the PRD ──────────────────────────
+
+/** The endpoint that adds recommendations: an Inbox change each on v2. */
+export const CAPTURE_RECOMMENDATIONS_ENDPOINT = "/api/rex/capture-recommendations";
+
+/** Where an item stands: being added, added now, already in the PRD, or refused. */
+export type CaptureState = "pending" | "created" | "exists" | "error";
+
+export interface RecommendationCapture {
+  /** Item key → where it stands; absent until it is added. */
+  state: Readonly<Record<string, CaptureState>>;
+  /** The last add's outcome, in words. */
+  message: { ok: boolean; text: string } | null;
+  add: (items: readonly ActionItem[]) => Promise<void>;
+}
+
+/** What the server is sent for an item; a gap's remedy is its acceptance criterion. */
+export function recommendationPayload(item: ActionItem) {
+  return {
+    title: item.title,
+    ...(item.detail ? { detail: item.detail } : {}),
+    kind: item.kind,
+    level: item.level,
+    zones: [...item.zones],
+    ...(item.note ? { note: item.note } : {}),
+    ...(item.kind === "gap" && item.detail ? { acceptanceCriteria: [item.detail] } : {}),
+  };
+}
+
+interface CaptureResponse {
+  created?: number;
+  skipped?: number;
+  destination?: string;
+  results?: Array<"created" | "exists">;
+  error?: string;
+}
+
+/**
+ * Adds recommendations to the PRD through {@link CAPTURE_RECOMMENDATIONS_ENDPOINT}
+ * and remembers, per item, what happened — so an item added from the tile reads
+ * as added in the opened tile too, and a second press is not a second request.
+ */
+export function useRecommendationCapture(): RecommendationCapture {
+  const [state, setState] = useState<Record<string, CaptureState>>({});
+  const [message, setMessage] = useState<RecommendationCapture["message"]>(null);
+
+  const add = useCallback(async (items: readonly ActionItem[]) => {
+    if (items.length === 0) return;
+    const mark = (to: (i: number) => CaptureState) =>
+      setState((prev) => ({ ...prev, ...Object.fromEntries(items.map((it, i) => [it.key, to(i)])) }));
+    mark(() => "pending");
+    setMessage(null);
+    try {
+      const res = await fetch(CAPTURE_RECOMMENDATIONS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: items.map(recommendationPayload) }),
+      });
+      const body = await res.json().catch(() => ({})) as CaptureResponse;
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      const results = body.results ?? [];
+      mark((i) => results[i] ?? "created");
+      const created = body.created ?? 0;
+      const skipped = body.skipped ?? 0;
+      const where = body.destination === "Inbox" ? "the Inbox" : `"${body.destination ?? "the PRD"}"`;
+      setMessage({
+        ok: true,
+        text: created > 0
+          ? `✓ Added ${created} to ${where}` + (skipped > 0 ? ` (${skipped} already in the PRD)` : "")
+          : `Already in the PRD${items.length > 1 ? ` — all ${items.length}` : ""}`,
+      });
+    } catch (err) {
+      mark(() => "error");
+      setMessage({ ok: false, text: err instanceof Error ? err.message : String(err) });
+    }
+  }, []);
+
+  return { state, message, add };
+}
+
+const CAPTURE_LABEL: Record<CaptureState, string> = {
+  pending: "Adding…",
+  created: "✓ Added",
+  exists: "✓ In PRD",
+  error: "Retry",
+};
+
+/** An item's "+ PRD" control: adds it, then says where it stands. */
+function AddToPrd({ item, capture }: { item: ActionItem; capture: RecommendationCapture }): ComponentChild {
+  const state = capture.state[item.key];
+  const done = state === "created" || state === "exists";
+  return h("button", {
+    type: "button",
+    class: `health-action-add${state ? ` health-action-add--${state}` : ""}`,
+    disabled: state === "pending" || done,
+    onClick: (e: Event) => { e.stopPropagation(); void capture.add([item]); },
+    title: done
+      ? (state === "created" ? "Added to the PRD" : "Already in the PRD")
+      : "Add this recommendation to the PRD (the Inbox, on a v2 PRD)",
+    "aria-label": done ? `${CAPTURE_LABEL[state]}: ${item.title}` : `Add to the PRD: ${item.title}`,
+  }, state ? CAPTURE_LABEL[state] : "+ PRD");
+}
+
+/** "Add all to PRD" for the items shown, with a confirm step. */
+function AddAllToPrd({ items, capture }: { items: readonly ActionItem[]; capture: RecommendationCapture }): ComponentChild {
+  const [confirming, setConfirming] = useState(false);
+  const open = items.filter((a) => {
+    const s = capture.state[a.key];
+    return s !== "created" && s !== "exists" && s !== "pending";
+  });
+  if (open.length === 0) return null;
+  const n = `${open.length} recommendation${open.length === 1 ? "" : "s"}`;
+  return confirming
+    ? h("span", { class: "next-steps-confirm" },
+        `Add ${n} to the PRD?`,
+        h("button", {
+          type: "button",
+          class: "cmd-inline-trigger health-actions-add-confirm",
+          onClick: () => { setConfirming(false); void capture.add(open); },
+        }, "Confirm"),
+        h("button", { type: "button", class: "cmd-inline-trigger", onClick: () => setConfirming(false) }, "Cancel"),
+      )
+    : h("button", {
+        type: "button",
+        class: "cmd-inline-trigger health-actions-add-all",
+        onClick: () => setConfirming(true),
+        title: "Add every recommendation shown to the PRD — the Inbox, on a v2 PRD; ones already there are skipped",
+      }, `+ Add ${n} to PRD`);
+}
+
 // ── The list ───────────────────────────────────────────────────
 
 interface ActionListProps {
@@ -359,11 +493,13 @@ interface ActionListProps {
   links?: ReadonlyArray<{ label: string; onClick: () => void }>;
   /** An item hovered, or null when the pointer leaves the list: lights its zones on the map. */
   onItemHover?: (item: ActionItem | null) => void;
+  /** Adds items to the PRD; absent where there is no server to add them (a static export). */
+  capture?: RecommendationCapture | null;
 }
 
 /** "What to do": a tile's items, each tagged with its kind, under the tile's stats. */
 export function ActionItemList({
-  list, focus, idBase, opened = false, limit = 25, links = [], onItemHover,
+  list, focus, idBase, opened = false, limit = 25, links = [], onItemHover, capture,
 }: ActionListProps): ComponentChild {
   const [copied, setCopied] = useState(false);
   const { items, gated, steps } = list;
@@ -424,6 +560,7 @@ export function ActionItemList({
                 h("span", { class: "health-action-title" }, a.title),
                 a.concerns.map((c) => h("span", { key: c, class: `health-concern health-concern--${c}` }, c)),
                 a.note ? h("span", { class: "health-concern health-concern--new", title: a.note }, "new files") : null,
+                capture ? h(AddToPrd, { item: a, capture }) : null,
               ),
               opened && a.detail && a.detail !== a.title
                 ? h("p", { class: "health-action-detail" }, a.detail)
@@ -440,8 +577,15 @@ export function ActionItemList({
           gated.map((g) => `${g.label[0]!.toUpperCase()}${g.label.slice(1)} need enrichment pass ${g.pass}`).join(" · "),
           " — run Full analysis to unlock them.")
       : null,
-    opened && (steps.length > 0 || links.length > 0)
+    capture?.message
+      ? h("p", {
+          class: `cmd-inline-result ${capture.message.ok ? "cmd-inline-result-ok" : "cmd-inline-result-err"} health-actions-captured`,
+          role: capture.message.ok ? "status" : "alert",
+        }, capture.message.text)
+      : null,
+    opened && (steps.length > 0 || links.length > 0 || capture)
       ? h("div", { class: "health-actions-foot" },
+          capture ? h(AddAllToPrd, { items: filtered, capture }) : null,
           steps.length > 0
             ? h("button", {
                 type: "button",
@@ -451,7 +595,6 @@ export function ActionItemList({
               }, copied ? "✓ Copied" : "Copy next steps")
             : null,
           links.map((l) => h("button", { key: l.label, type: "button", class: "link-btn", onClick: l.onClick }, l.label)),
-          steps.length > 0 ? h(NextStepsCapture, { steps }) : null,
         )
       : null,
   );

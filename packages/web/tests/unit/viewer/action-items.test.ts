@@ -8,10 +8,12 @@ import {
   buildInfraActions,
   concernCounts,
   zoneIssues,
+  recommendationPayload,
 } from "../../../src/viewer/views/action-items.js";
+import { InfraArchPanel } from "../../../src/viewer/views/infra-arch.js";
 import type { NextStep } from "../../../src/viewer/views/next-steps.js";
 import type { Readiness } from "../../../src/viewer/views/delivery.js";
-import { HealthSummary, MapPanel } from "../../../src/viewer/views/overview.js";
+import { HealthDetail, HealthSummary, MapPanel } from "../../../src/viewer/views/overview.js";
 import { AnalyzeActionsProvider } from "../../../src/viewer/views/analyze-actions-context.js";
 import { ENRICHMENT_THRESHOLDS } from "../../../src/viewer/views/enrichment-thresholds.js";
 import type { LoadedData } from "../../../src/viewer/types.js";
@@ -206,5 +208,88 @@ describe("HealthSummary", () => {
     expect(note()).toContain("Not on the map");
     act(() => { el.querySelector(".health-actions")!.dispatchEvent(new MouseEvent("mouseleave")); });
     expect(note()).toBeNull();
+  });
+});
+
+describe("adding recommendations to the PRD", () => {
+  let root: HTMLElement | undefined;
+  let posted: Array<{ items: Array<Record<string, unknown>> }>;
+  afterEach(() => {
+    if (root) { act(() => { render(null, root!); }); root.remove(); }
+    vi.unstubAllGlobals();
+    delete (window as { __NDX_DEPLOYED__?: unknown }).__NDX_DEPLOYED__;
+  });
+
+  async function show(tree: (d: LoadedData) => ReturnType<typeof h>): Promise<HTMLElement> {
+    posted = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.startsWith("/api/sv/next-steps")) return { ok: true, json: async () => ({ steps: [STEP] }) };
+      if (url === "/api/rex/capture-recommendations") {
+        const body = JSON.parse(String(init?.body)) as { items: Array<Record<string, unknown>> };
+        posted.push(body);
+        // The first item of any request is already in the PRD; the rest are added.
+        const results = body.items.map((_, i) => (i === 0 && body.items.length > 1 ? "exists" : "created"));
+        return {
+          ok: true,
+          json: async () => ({ ok: true, destination: "Inbox", results, created: results.filter((r) => r === "created").length, skipped: results.filter((r) => r === "exists").length }),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    }));
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    await act(async () => { render(tree(data()), root!); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    return root;
+  }
+  const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  const row = (el: HTMLElement, title: string) => [...el.querySelectorAll<HTMLElement>(".health-action")]
+    .find((li) => li.querySelector(".health-action-title")?.textContent === title)!;
+
+  it("adds one recommendation from its row, sending what it found, then says it was added", async () => {
+    const el = await show((d) => h(HealthSummary, { data: d }));
+    const add = row(el, "Rename the admin helpers").querySelector<HTMLButtonElement>(".health-action-add")!;
+    expect(add.textContent).toBe("+ PRD");
+    act(() => add.click());
+    await settle();
+    expect(posted).toEqual([{ items: [{ title: "Rename the admin helpers", kind: "suggestion", level: "warning", zones: ["admin"] }] }]);
+    expect(add.textContent).toBe("✓ Added");
+    expect(add.disabled).toBe(true);
+    expect(el.querySelector(".health-actions-captured")?.textContent).toBe("✓ Added 1 to the Inbox");
+  });
+
+  it("opened, adds every item shown after a confirm, and marks each as the server reports", async () => {
+    const el = await show((d) => h(HealthDetail, { data: d, openTile: vi.fn(), setDetail: vi.fn() }));
+    const addAll = el.querySelector<HTMLButtonElement>(".health-actions-add-all")!;
+    expect(addAll.textContent).toBe("+ Add 4 recommendations to PRD");
+    act(() => addAll.click());
+    expect(posted).toHaveLength(0);
+    act(() => el.querySelector<HTMLButtonElement>(".health-actions-add-confirm")!.click());
+    await settle();
+    expect(posted[0]!.items.map((i) => i.title)).toEqual([
+      "Split the god page", "Bidirectional imports between web and rex", "Rename the admin helpers", "Extract a base handler",
+    ]);
+    expect([...el.querySelectorAll(".health-action-add")].map((b) => b.textContent)).toEqual(["✓ In PRD", "✓ Added", "✓ Added", "✓ Added"]);
+    expect(el.querySelector(".health-actions-captured")?.textContent).toBe("✓ Added 3 to the Inbox (1 already in the PRD)");
+    // Nothing left to add: the bulk control goes away.
+    expect(el.querySelector(".health-actions-add-all")).toBeNull();
+  });
+
+  it("sends a readiness gap's remedy as its acceptance criterion", async () => {
+    const el = await show((d) => h(AnalyzeActionsProvider, { data: d }, h(InfraArchPanel, { data: d })));
+    // The delivery read failed in this stub, so the list holds the findings; a gap is checked directly.
+    const gap = buildInfraActions(data(), READINESS).items[0]!;
+    expect(recommendationPayload(gap)).toEqual({
+      title: "Testing: No test command", detail: "A `test` script", kind: "gap", level: "high", zones: [],
+      note: "Not on the map — closing it adds files: A `test` script", acceptanceCriteria: ["A `test` script"],
+    });
+    expect(el.querySelectorAll(".health-action-add").length).toBeGreaterThan(0);
+  });
+
+  it("offers no add in a static export, which has no server to write the PRD", async () => {
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
+    const el = await show((d) => h(HealthSummary, { data: d }));
+    expect(el.querySelectorAll(".health-action")).not.toHaveLength(0);
+    expect(el.querySelector(".health-action-add")).toBeNull();
   });
 });

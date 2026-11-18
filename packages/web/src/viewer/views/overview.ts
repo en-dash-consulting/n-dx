@@ -765,7 +765,7 @@ function useHealthActions() {
   const shared = useAnalyzeActions()!;
   const counts = useMemo(() => concernCounts(shared.health.items, ["cohesion", "coupling"]), [shared.health]);
   const concern = useConcernFocus();
-  return { list: shared.health, onItemHover: shared.setHovered, concern, statsFocus: { concern, counts } };
+  return { list: shared.health, onItemHover: shared.setHovered, capture: shared.capture, concern, statsFocus: { concern, counts } };
 }
 
 /**
@@ -779,10 +779,10 @@ export function HealthSummary({ data }: { data: LoadedData }): ComponentChild {
 }
 
 function HealthSummaryBody({ data }: { data: LoadedData }): ComponentChild {
-  const { list, onItemHover, concern, statsFocus } = useHealthActions();
+  const { list, onItemHover, capture, concern, statsFocus } = useHealthActions();
   return h("div", { class: "health-summary" },
     h(CodebaseStats, { data, focus: statsFocus }),
-    h(ActionItemList, { list, focus: concern, idBase: "health-actions", onItemHover }),
+    h(ActionItemList, { list, focus: concern, idBase: "health-actions", onItemHover, capture }),
   );
 }
 
@@ -811,7 +811,7 @@ export function HealthDetail(props: HealthDetailProps): ComponentChild {
 
 function HealthDetailBody({ data, openTile, setDetail, navigateTo }: HealthDetailProps): ComponentChild {
   const { zones, imports, inventory } = data;
-  const { list, onItemHover, concern, statsFocus } = useHealthActions();
+  const { list, onItemHover, capture, concern, statsFocus } = useHealthActions();
   const files = useMemo(() => new Map((inventory?.files ?? []).map((f) => [f.path, f])), [inventory]);
   const attention = useMemo(
     () => (zones?.zones ?? [])
@@ -848,6 +848,7 @@ function HealthDetailBody({ data, openTile, setDetail, navigateTo }: HealthDetai
       idBase: "health-actions-opened",
       opened: true,
       onItemHover,
+      capture,
       links: navigateTo
         ? [
             { label: "All problems ↗", onClick: () => navigateTo("problems") },
