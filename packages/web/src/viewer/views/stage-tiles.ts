@@ -94,13 +94,19 @@ function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex
   list?.querySelector<HTMLButtonElement>(`[data-tab="${view}"]`)?.focus();
 }
 
+/** The tab key of a tile's own panel, ahead of its views (`StageTile.panelTab`). */
+const PANEL_TAB = "@panel" as ViewId;
+
 /** A tile's whole content: its panel, or its view with the tile's tabs. */
-function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase }: TileContentProps) {
+function TileContent({ grid, tile, opened, tabs: viewTabs, renderView, renderPanel, idBase }: TileContentProps) {
   const layout = useStatusLayout();
-  const [active, setActive] = useState<ViewId>(tile.view);
+  const panelFirst = opened && !!tile.panel && !!tile.panelTab;
+  const [active, setActive] = useState<ViewId>(panelFirst ? PANEL_TAB : tile.view);
   // An opened panel tile that lists tabs (Open changes: List, Tree) shows them.
-  if (tile.panel && !(opened && tile.tabs?.length)) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
-  const shown = tabs.some((t) => t.view === active) ? active : tile.view;
+  if (tile.panel && !(opened && (tile.tabs?.length || tile.panelTab))) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
+  // Opened with `panelTab`, the panel is the first tab and the views follow.
+  const tabs: readonly StageTab[] = panelFirst ? [{ view: PANEL_TAB, label: tile.panelTab }, ...viewTabs] : viewTabs;
+  const shown = tabs.some((t) => t.view === active) ? active : tabs[0]?.view ?? tile.view;
   return h("div", { class: "stage-tile-content" },
     tabs.length > 1
       ? h("div", { class: "stage-section-tablist stage-tile-tablist", role: "tablist", "aria-label": `${tileTitle(tile, layout)} views` },
@@ -123,7 +129,7 @@ function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase
         )
       : null,
     h("div", tabs.length > 1 ? { id: `${idBase}-panel`, role: "tabpanel", "aria-labelledby": `${idBase}-tab-${shown}` } : {},
-      renderView(shown),
+      shown === PANEL_TAB && tile.panel ? renderPanel(tile.panel, true, grid) : renderView(shown),
     ),
   );
 }

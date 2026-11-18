@@ -189,7 +189,9 @@ stale one when the analysis is gone. The face's door serves it at
 frames it focused on that zone through the embed contract's
 `{ type: "ndx-iso", focus: "<zone id>" }` message, which opens the area scene
 holding the zone and selects it, expanding the parent when the zone is a tile
-on its top.
+on its top. The same contract takes `issues` (zone id → `"warn"` or `"crit"`,
+a "!" on each block that is or holds one) and `lit` (zone ids, or `null`); the
+n-dx dashboard's Analyze page sends both, the face sends neither.
 
 ## Places the declaration opens with
 

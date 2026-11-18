@@ -155,7 +155,7 @@ export function scoreBand(score: number): "good" | "fair" | "poor" {
 
 // ── Data ───────────────────────────────────────────────────────
 
-interface DeliveryData {
+export interface DeliveryData {
   readiness: Readiness | null;
   infrastructure: Infrastructure | null;
 }
@@ -177,7 +177,7 @@ export function deliveryAnalysisStamp(
 }
 
 /** Both artifacts, refetched whenever the analysis they belong to changes. */
-function useDeliveryData(stamp: string): DeliveryData | null {
+export function useDeliveryData(stamp: string): DeliveryData | null {
   const [data, setData] = useState<DeliveryData | null>(null);
   useEffect(() => {
     let live = true;

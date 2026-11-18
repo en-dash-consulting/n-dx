@@ -369,9 +369,9 @@ describe("iso-map view registration", () => {
 
   // The isometric map is the Analysis dashboard's hero tile — its embedded
   // form, with its own controls — and is dropped in a static export.
-  it("is the Analysis dashboard's hero tile, dropped in a static export", () => {
+  it("is the Analysis dashboard's full-width map under the top row, dropped in a static export", () => {
     const tile = STAGES.analyze.tiles?.find((t) => t.view === "iso-map");
-    expect(tile).toMatchObject({ cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true });
+    expect(tile).toMatchObject({ cols: 12, rows: 3, chromeless: true, hiddenWhenDeployed: true });
   });
 
   it("is named by the navigation model", () => {

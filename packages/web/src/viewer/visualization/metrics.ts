@@ -15,5 +15,16 @@ export function meterClass(value: number, invert: boolean = false): string {
 
 /** A zone the health views flag: cohesion under 0.4 or coupling over 0.5. */
 export function zoneNeedsAttention(zone: { cohesion: number; coupling: number }): boolean {
-  return zone.cohesion < 0.4 || zone.coupling > 0.5;
+  return zoneConcerns(zone).length > 0;
+}
+
+/** The two zone metrics the health views judge a zone by. */
+export type ZoneConcern = "cohesion" | "coupling";
+
+/** Which of a zone's metrics flag it: cohesion under 0.4, coupling over 0.5. */
+export function zoneConcerns(zone: { cohesion: number; coupling: number }): ZoneConcern[] {
+  const concerns: ZoneConcern[] = [];
+  if (zone.cohesion < 0.4) concerns.push("cohesion");
+  if (zone.coupling > 0.5) concerns.push("coupling");
+  return concerns;
 }

@@ -31,7 +31,11 @@ export interface RenderIsoMapOptions {
    * tile of. A host links a zone page to its place on the map this way, since
    * the URL hash names only an area's scene. The map answers each focus with
    * `{ type: "ndx-iso-focus", focus, found }`; a zone it does not draw clears
-   * the selection. Only the window that frames the map steers it.
+   * the selection. `issues: { "<zone id>": "warn" | "crit" }` puts a "!" badge on
+   * each block that is, or holds, a listed zone (replacing the last set), and
+   * `lit: ["<zone id>", …]` lights those blocks and dims the rest until `lit:
+   * null` — the dashboard's recommendation lists drive both. Only the window
+   * that frames the map steers it.
    */
   embed?: boolean;
 }
@@ -306,6 +310,12 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .risk-critical,.risk-catastrophic{color:var(--crit)}
 .sev-warning{color:var(--warn)}
 .sev-critical{color:var(--crit)}
+/* The host's marks: a "!" on blocks with issues, and the blocks a hovered recommendation names. */
+.issue-badge circle{fill:var(--warn);stroke:var(--bg);stroke-width:1.5}
+.issue-badge.crit circle{fill:var(--crit)}
+.issue-badge text{fill:#fff}
+.node.lit{opacity:1;filter:drop-shadow(0 0 6px var(--warn))}
+.node.unlit{opacity:.18}
 .link,.wirelink{
   background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:.86rem;
   cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px;
@@ -379,6 +389,8 @@ var CELL = 19, CX = 0.866, CY = 0.5, CZ = 0.62;
 var NODES = MODEL.nodes, EDGES = MODEL.edges, B = MODEL.bounds;
 var COLOR = {}, LABEL = {}, GLYPH = {};
 MODEL.kinds.forEach(function(k){ COLOR[k.id] = k.color; LABEL[k.id] = k.label; GLYPH[k.id] = k.glyph; });
+// Zone id to "warn" | "crit" (badges) and zone ids lit by the host; see paintMarks.
+var ISSUES = {}, LIT = null;
 var BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
 function renderCrumbs(){
   var crumbs = document.getElementById("crumbs");
@@ -782,9 +794,20 @@ order.forEach(function(n){
   t.setAttribute("class", "tagtext");
   t.textContent = label;
   tg.appendChild(t);
+  // The host's issue mark, at the tag's top-right corner; paintMarks shows it.
+  var badge = el("g", { "class": "issue-badge", display: "none" });
+  var bx = tagX + tw / 2, by = tagY - th / 2;
+  badge.appendChild(el("circle", { cx: bx, cy: by, r: "8" }));
+  var bang = el("text", {
+    x: bx, y: by, "text-anchor": "middle", "dominant-baseline": "central",
+    "font-family": "ui-sans-serif,system-ui,sans-serif", "font-size": "11", "font-weight": "700"
+  });
+  bang.textContent = "!";
+  badge.appendChild(bang);
+  tg.appendChild(badge);
   gTag.appendChild(tg);
 
-  blockEls[n.id] = { g: g, tag: tg, rect: rect, text: t, top: top, base: base, tiles: tileEls };
+  blockEls[n.id] = { g: g, tag: tg, rect: rect, text: t, top: top, base: base, tiles: tileEls, badge: badge };
 
   // Only "click" — listening on pointerup as well fires pick twice per press.
   function pick(ev){
@@ -1149,6 +1172,48 @@ function highlighted(){
   return set;
 }
 
+/** Rank of a mark: a critical one outranks a warning, which outranks none. */
+function markRank(v){ return v === "crit" ? 2 : v ? 1 : 0; }
+/**
+ * The strongest mark a drawn block carries from a zone-keyed set: its own, a
+ * tile's on its top face, or a zone anywhere beneath it (through
+ * ROOT.parents, which runs sub-zone, zone, ... up to "area:<id>").
+ */
+function markOf(n, set){
+  if (!set) return null;
+  var best = ownKey(set, n.id) ? set[n.id] : null;
+  var tiles = n.tiles || [];
+  for (var i = 0; i < tiles.length; i++) {
+    if (ownKey(set, tiles[i].id) && markRank(set[tiles[i].id]) > markRank(best)) best = set[tiles[i].id];
+  }
+  var parents = ROOT.parents || {};
+  for (var id in set) {
+    if (!ownKey(set, id) || markRank(set[id]) <= markRank(best)) continue;
+    var cur = id, guard = 0;
+    while (ownKey(parents, cur) && guard++ < 24) {
+      cur = parents[cur];
+      if (cur === n.id) { best = set[id]; break; }
+    }
+  }
+  return best;
+}
+/** Show the host's marks: issue badges, and while a recommendation is hovered, its blocks lit. */
+function paintMarks(){
+  var anyLit = false;
+  if (LIT) for (var k in LIT) if (ownKey(LIT, k)) { anyLit = true; break; }
+  NODES.forEach(function(n){
+    var b = blockEls[n.id];
+    if (!b || !b.badge) return;
+    var issue = markOf(n, ISSUES);
+    b.badge.setAttribute("display", issue ? "inline" : "none");
+    b.badge.setAttribute("class", "issue-badge" + (issue === "crit" ? " crit" : ""));
+    var on = anyLit && !!markOf(n, LIT);
+    b.g.classList.toggle("lit", on);
+    b.g.classList.toggle("unlit", anyLit && !on);
+    b.tag.classList.toggle("unlit", anyLit && !on);
+  });
+}
+
 function refresh(scrollPanel){
   var focused = (curNode !== null || curEdge !== null);
   var near = highlighted();
@@ -1184,6 +1249,7 @@ function refresh(scrollPanel){
     var label = b.g.getAttribute("aria-label").replace(/, [0-9]+ matching inside$/, "");
     b.g.setAttribute("aria-label", hits > 0 ? label + ", " + hits + " matching inside" : label);
   });
+  paintMarks();
 
   edgeEls.forEach(function(x, i){
     var selFrame = curNode !== null && BY[curNode] && BY[curNode].frame ? curNode : null;
@@ -1367,6 +1433,23 @@ if (EMBED) {
     if (!d || d.type !== "ndx-iso") return;
     if (typeof d.wheelZoom === "boolean") wheelZoom = d.wheelZoom;
     if (d.theme === "light" || d.theme === "dark") document.documentElement.setAttribute("data-theme", d.theme);
+    var marks = false;
+    if (d.issues && typeof d.issues === "object") {
+      ISSUES = {};
+      for (var ik in d.issues) {
+        if (ownKey(d.issues, ik) && (d.issues[ik] === "warn" || d.issues[ik] === "crit")) ISSUES[ik] = d.issues[ik];
+      }
+      marks = true;
+    }
+    if (ownKey(d, "lit")) {
+      LIT = null;
+      if (Array.isArray(d.lit)) {
+        LIT = {};
+        d.lit.forEach(function(id){ if (typeof id === "string") LIT[id] = "warn"; });
+      }
+      marks = true;
+    }
+    if (marks) paintMarks();
     if (typeof d.focus === "string") {
       // A zone the map does not draw clears the last selection, so the map never shows another zone under this one's name,
       // and the host is told, so it can say why nothing is selected. The reply names an id and a yes or no: nothing private.

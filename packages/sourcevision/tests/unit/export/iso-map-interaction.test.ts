@@ -425,6 +425,32 @@ describe("iso map embedded in a host page", () => {
     await post({ type: "ndx-iso", focus: "api" });
     expect(doc.querySelector("#dossier h3")?.textContent).toBe("Api");
   });
+
+  const badges = () => [...doc.querySelectorAll("#iso .issue-badge")].filter((b) => b.getAttribute("display") !== "none");
+
+  it("puts a ! on the zones the host marks, critical ones in their own colour, and replaces the set each time", async () => {
+    expect(badges()).toHaveLength(0);
+    await post({ type: "ndx-iso", issues: { db: "crit", api: "warn", nowhere: "warn", core: "bogus" } });
+    expect(badges()).toHaveLength(2);
+    expect(badges().filter((b) => b.getAttribute("class")!.includes("crit"))).toHaveLength(1);
+    expect(badges().every((b) => b.textContent === "!")).toBe(true);
+    await post({ type: "ndx-iso", issues: { core: "warn" } });
+    expect(badges()).toHaveLength(1);
+    // A message without issues leaves them as they are.
+    await post({ type: "ndx-iso", wheelZoom: false });
+    expect(badges()).toHaveLength(1);
+  });
+
+  it("lights the zones a host names and dims the rest, until it sends lit: null", async () => {
+    const lit = () => doc.querySelectorAll("#iso .node.lit").length;
+    const unlit = () => doc.querySelectorAll("#iso .node[role=button].unlit").length;
+    await post({ type: "ndx-iso", lit: ["db"] });
+    expect(lit()).toBe(1);
+    expect(unlit()).toBeGreaterThan(0);
+    await post({ type: "ndx-iso", lit: null });
+    expect(lit()).toBe(0);
+    expect(doc.querySelectorAll("#iso .node.unlit").length).toBe(0);
+  });
 });
 
 describe("iso map focus over areas and sub-zones", () => {
@@ -479,6 +505,15 @@ describe("iso map focus over areas and sub-zones", () => {
     focus("web-a-x");
     expect(crumbs()).toContain("Web area");
     expect(selected()).toBe("WEB-A-X");
+  });
+
+  it("marks the block that holds a marked zone, at any depth", () => {
+    const shown = () => [...doc.querySelectorAll("#iso .issue-badge")].filter((b) => b.getAttribute("display") !== "none").length;
+    focus("web");
+    win.dispatchEvent(new win.MessageEvent("message", { data: { type: "ndx-iso", issues: { "web-a-x": "warn" } } }));
+    expect(shown()).toBeGreaterThan(0);
+    win.dispatchEvent(new win.MessageEvent("message", { data: { type: "ndx-iso", issues: {} } }));
+    expect(shown()).toBe(0);
   });
 
   it("takes no message from a window other than the page that frames it", () => {

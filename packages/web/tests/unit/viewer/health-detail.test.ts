@@ -21,10 +21,12 @@ const data = {
 } as unknown as LoadedData;
 
 let root: HTMLElement | undefined;
-afterEach(() => { if (root) act(() => { render(null, root!); }); });
+afterEach(() => { if (root) { act(() => { render(null, root!); }); root.remove(); } });
 
 function show(openTile = vi.fn(), setDetail = vi.fn()) {
   root = document.createElement("div");
+  // In the document, so a stat card can take focus.
+  document.body.appendChild(root);
   act(() => { render(h(HealthDetail, { data, openTile, setDetail }), root!); });
   return { el: root, openTile, setDetail };
 }
@@ -35,8 +37,20 @@ describe("HealthDetail", () => {
     const cards = [...el.querySelectorAll<HTMLButtonElement>(".overview-stat-open")];
     act(() => cards.find((c) => c.getAttribute("aria-label")!.startsWith("Files"))!.click());
     expect(openTile).toHaveBeenLastCalledWith("files");
-    act(() => cards.find((c) => c.getAttribute("aria-label")!.startsWith("Avg cohesion"))!.click());
+    act(() => cards.find((c) => c.getAttribute("aria-label")!.startsWith("Zones"))!.click());
     expect(openTile).toHaveBeenLastCalledWith("zones");
+  });
+
+  it("makes Avg cohesion a filter toggle and lights the zones it flags while hovered", () => {
+    const { el, openTile } = show();
+    const cohesion = [...el.querySelectorAll<HTMLButtonElement>(".overview-stat-open")]
+      .find((c) => c.getAttribute("aria-label")!.startsWith("Avg cohesion"))!;
+    expect(cohesion.getAttribute("aria-pressed")).toBe("false");
+    act(() => cohesion.click());
+    expect(openTile).not.toHaveBeenCalled();
+    expect(cohesion.getAttribute("aria-pressed")).toBe("true");
+    act(() => { cohesion.focus(); });
+    expect(el.querySelector(".health-table tbody tr")?.className).toBe("health-row--lit");
   });
 
   it("lists only the zones needing attention, and opens one's detail", () => {
