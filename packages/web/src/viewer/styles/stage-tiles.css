@@ -780,22 +780,20 @@
 
 .health-action {
   padding: var(--space-2);
-  border: 1px solid transparent;
-  border-left: 3px solid var(--border);
   border-radius: 6px;
-  transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
+  /* A text-colour wash lightens the card on dark and darkens it on light;
+     the kind badge carries the colour. */
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  transition: opacity 0.15s, background-color 0.15s;
 }
 
-.health-action--step { border-left-color: var(--accent); }
-.health-action--problem { border-left-color: var(--red); }
-.health-action--suggestion { border-left-color: var(--text-dim); }
+.health-action:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
 
 /* A metric hovered: its items stand out, the rest step back. */
 .health-actions--lit .health-action { opacity: 0.4; }
 .health-actions--lit .health-action--lit {
   opacity: 1;
-  border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
 }
 
 .health-action-row {
