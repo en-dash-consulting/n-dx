@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "3bdfc1be-1390-4109-97dc-491665d29d97":
+    status: "completed"
+    startedAt: "2026-11-18T02:09:57.700Z"
+    completedAt: "2026-11-18T02:09:57.700Z"
+    endedAt: "2026-11-18T02:09:57.700Z"
+    activeIntervals: [{"end":"2026-11-18T02:09:57.700Z","start":"2026-11-18T02:09:57.700Z"}]
+    appliedAt: "2026-11-18T02:09:57.700Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T01:40:19.579Z"
-    lastModified: "2026-11-18T01:41:39.661Z"
+    lastModified: "2026-11-18T02:09:57.700Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "60218746-fbc5-4786-9452-a1af5a2e1fa1":
     status: "completed"
@@ -25,8 +32,11 @@ items:
     lastModified: "2026-11-18T02:06:40.602Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "9a92e145-bb91-4061-85d6-d444a9233e2c":
+    status: "completed"
     startedAt: "2026-11-18T01:41:58.186Z"
-    activeIntervals: [{"end":"2026-11-18T02:01:17.101Z","start":"2026-11-18T01:41:58.186Z"}]
+    completedAt: "2026-11-18T02:09:57.700Z"
+    endedAt: "2026-11-18T02:09:57.700Z"
+    activeIntervals: [{"end":"2026-11-18T02:01:17.101Z","start":"2026-11-18T01:41:58.186Z"},{"end":"2026-11-18T02:09:57.700Z","start":"2026-11-18T02:09:57.700Z"}]
     failureReason: "Test gate failed [command: npm run test]: lang-runtime, rex\nFailing tests (8):\n- stops it on POST /api/hub/extensions/:name/stop, and the next request starts it again\n- downloads and extracts when the marker is undefined, then removes the archive\n- downloads and extracts when the marker is mismatched, then removes the archive\n- no runtime module imports the v2 modules yet\n- tests/e2e/extension-fixture.test.js > the fixture extension behind the hub > stops it on POST /api/hub/extensions/:name/stop, and the next request starts it again\n  AssertionError: expected 12912 not to be 12912 // Object.is equality\n- tests/unit/toolchain-cache.test.ts > downloads and extracts when the marker is undefined, then removes the archive\n- tests/unit/toolchain-cache.test.ts > downloads and extracts when the marker is mismatched, then removes the archive\n  AssertionError: expected 2 to be +0 // Object.is equality\n- tests/unit/schema/v2.test.ts > isolation > no runtime module imports the v2 modules yet\n  AssertionError: expected [ 'core\\change-attachments.ts' ] to deeply equal []"
-    lastModified: "2026-11-18T02:01:18.613Z"
+    lastModified: "2026-11-18T02:09:57.700Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
