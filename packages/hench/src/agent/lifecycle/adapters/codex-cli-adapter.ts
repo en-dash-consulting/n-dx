@@ -83,9 +83,9 @@ export const codexCliAdapter: VendorAdapter = {
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
 
-    // policy.allowedGitSubcommands is intentionally not consulted — Codex has no
-    // per-command allowlist surface (its safety model is the sandbox/approval
-    // flags), so git-subcommand scoping is a Claude-CLI-only control.
+    // Hench resolution and run diagnostics report command/Git/blocked-path guards
+    // that this sandbox cannot enforce. This adapter only compiles the native
+    // filesystem, network and approval controls; it must not claim allowlists.
     //
     // Fork/resume reapply the execution policy; neither inherits permission.
     const { binary, args, stdin } = codexSessionDriver.turnSpawn({

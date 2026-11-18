@@ -22,6 +22,7 @@
  * @see packages/hench/src/agent/lifecycle/event-accumulator.ts — legacy mutation-based parsers
  */
 
+import { codexGuardLimitations } from "./codex-policy.js";
 import { CodexManagedUsage } from "./codex-managed-usage.js";
 import { createHash } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
@@ -2708,6 +2709,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     return { run };
   }
 
+  const policyLimitations = codexGuardLimitations(vendor, "cli");
+  if (policyLimitations) stream("Guard", policyLimitations);
+
   // Shared: transition task to in_progress
   // Confinement: Codex runs inside its own sandbox; the Claude CLI runs
   // inside ours, and an autonomous run never runs it unconfined by accident.
@@ -2781,6 +2785,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     ...(opts.loop ? { loop: opts.loop } : {}),
     ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
+
+  if (policyLimitations) {
+    run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: adapter.parseMode, notes: [] };
+    run.diagnostics.notes.push(policyLimitations);
+  }
 
   // The brief as sent: the run's commit trailers included, so the agent's own
   // commits carry N-DX-Item (the autoCommit path writes no trailers of hench's).

@@ -151,7 +151,8 @@ export interface ExecutionPolicy {
    * (`Bash(git commit:*)`) instead of a blanket `Bash(git:*)`, keeping
    * destructive subcommands (`reset`, `clean`, `revert`, `push`) off the
    * auto-approve list. When omitted, `git` is granted unscoped for backward
-   * compatibility. Sandbox-based vendors (Codex) ignore this field.
+   * compatibility. Codex native sandbox flags cannot enforce this field; Hench CLI
+   * resolution and run diagnostics report this capability limit explicitly.
    */
   readonly allowedGitSubcommands?: ReadonlyArray<string>;
   /** File operation tools the agent may use (e.g. `["Read", "Edit", "Write"]`). */

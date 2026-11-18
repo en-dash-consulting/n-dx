@@ -22,6 +22,8 @@ const SHELL_ENV = [
   "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
 ];
 
+const WORKSPACE = ["--strict-config", "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}'];
+
 describe("Codex policy flag compilation", () => {
   describe("mapSandboxToCodexFlag", () => {
     it("maps read-only to read-only", () => {
@@ -101,9 +103,37 @@ describe("Codex policy flag compilation", () => {
   });
 
   describe("compileCodexPolicyFlags", () => {
+    it("replaces ambient network and writable-root grants on fresh and resumed turns", () => {
+      const policy = { ...DEFAULT_EXECUTION_POLICY, writableRoots: [".", "build output"] };
+      for (const resume of [false, true]) {
+        expect(compileCodexPolicyFlags(policy, { resume })).toContain(
+          'sandbox_workspace_write={network_access=false,writable_roots=["build output"],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}',
+        );
+        expect(compileCodexPolicyFlags({ ...policy, networkAccess: true }, { resume })).toContain(
+          'sandbox_workspace_write={network_access=true,writable_roots=["build output"],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}',
+        );
+      }
+    });
+
+    it("refuses to pretend workspace-write can restrict writes to a subdirectory", () => {
+      for (const writableRoots of [[], ["src"]]) {
+        expect(() => compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, writableRoots }))
+          .toThrow(/workspace-write.*project root/);
+      }
+    });
+
+    it("accepts equivalent relative spellings of the project root on every turn", () => {
+      for (const root of ["./", "././", process.platform === "win32" ? ".\\" : ".//"]) {
+        for (const resume of [false, true]) {
+          expect(compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, writableRoots: [root] }, { resume }))
+            .toEqual(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume }));
+        }
+      }
+    });
+
     it("states sandbox and approvals explicitly for the default unattended policy", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
-      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", ...SHELL_ENV]);
+      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", ...WORKSPACE, ...SHELL_ENV]);
     });
 
     it("ends every policy with the shell-environment overrides", () => {
@@ -119,7 +149,7 @@ describe("Codex policy flag compilation", () => {
       // codex exec resume rejects --sandbox, and a resumed thread does not keep
       // its starting policy, so both halves travel as config overrides.
       expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true })).toEqual([
-        "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', ...SHELL_ENV,
+        "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', ...WORKSPACE, ...SHELL_ENV,
       ]);
       expect(compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only" }, { resume: true })).toEqual([
         "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="never"', ...SHELL_ENV,
@@ -165,7 +195,7 @@ describe("Codex policy flag compilation", () => {
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=on-request", ...SHELL_ENV]);
+      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=on-request", ...WORKSPACE, ...SHELL_ENV]);
     });
 
     it("compiles danger-full-access + never policy", () => {
@@ -206,13 +236,13 @@ describe("Codex policy flag compilation", () => {
       ).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...SHELL_ENV]);
 
       // Everything else is the explicit sandbox + approval_policy pair.
-      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(4 + SHELL_ENV.length);
+      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(4 + WORKSPACE.length + SHELL_ENV.length);
       expect(
         compileCodexPolicyFlags({
           ...DEFAULT_EXECUTION_POLICY,
           approvals: "on-request",
         }),
-      ).toHaveLength(4 + SHELL_ENV.length);
+      ).toHaveLength(4 + WORKSPACE.length + SHELL_ENV.length);
     });
   });
 });

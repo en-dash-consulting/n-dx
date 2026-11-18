@@ -204,17 +204,34 @@ export function compileCodexPolicyFlags(
   policy: ExecutionPolicy,
   options: { resume?: boolean } = {},
 ): string[] {
+  // Replace the whole table: inherited roots or network grants must not
+  // survive a more restrictive n-dx policy. Codex always grants the cwd in
+  // workspace-write mode, so a narrower root list cannot be represented.
+  // Only dot components and separators are interchangeable here. Collapsing
+  // "dir/.." could cross a symlink and incorrectly authorize the entire cwd.
+  const additionalRoots = policy.writableRoots.filter(root => {
+    const path = process.platform === "win32" ? root.replaceAll("\\", "/") : root;
+    return !/^\.(?:\/+\.)*\/*$/.test(path);
+  });
+  if (policy.sandbox === "workspace-write" && additionalRoots.length === policy.writableRoots.length) {
+    throw new Error("Codex workspace-write always permits the project root; writableRoots must include '.' or use read-only");
+  }
+  const workspaceFlags = policy.sandbox === "workspace-write" ? [
+    "--strict-config",
+    "-c",
+    `sandbox_workspace_write={network_access=${policy.networkAccess},writable_roots=${JSON.stringify(additionalRoots)},exclude_tmpdir_env_var=true,exclude_slash_tmp=true}`,
+  ] : [];
   if (options.resume) {
     return [
       "-c",
       `sandbox_mode="${mapSandboxToCodexFlag(policy.sandbox)}"`,
       "-c",
       `approval_policy="${mapApprovalToCodexFlag(policy.approvals)}"`,
-      ...codexShellEnvFlags(),
+      ...workspaceFlags, ...codexShellEnvFlags(),
     ];
   }
   if (policy.approvals === "never" && policy.sandbox === "danger-full-access") {
-    return ["--dangerously-bypass-approvals-and-sandbox", ...codexShellEnvFlags()];
+    return ["--dangerously-bypass-approvals-and-sandbox", ...workspaceFlags, ...codexShellEnvFlags()];
   }
 
   return [
@@ -222,7 +239,7 @@ export function compileCodexPolicyFlags(
     mapSandboxToCodexFlag(policy.sandbox),
     "-c",
     `approval_policy=${mapApprovalToCodexFlag(policy.approvals)}`,
-    ...codexShellEnvFlags(),
+    ...workspaceFlags, ...codexShellEnvFlags(),
   ];
 }
 

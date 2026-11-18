@@ -207,6 +207,8 @@ describe("codex batch resume — contract", () => {
       "--skip-git-repo-check",
       "-c", 'sandbox_mode="workspace-write"',
       "-c", 'approval_policy="never"',
+      "--strict-config",
+      "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}',
       "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
@@ -214,6 +216,7 @@ describe("codex batch resume — contract", () => {
     ]);
     expect(run.session).toMatchObject({ strategy: "batch", outcome: "hit", reason: "chain-continued" });
     expect(run.session?.sessionId).toBe(THREAD);
+    expect(run.diagnostics?.notes).toContainEqual(expect.stringContaining("does not enforce hench.guard.allowedCommands"));
   });
 
   it("counts the resumed task against the chain rather than restarting it", async () => {

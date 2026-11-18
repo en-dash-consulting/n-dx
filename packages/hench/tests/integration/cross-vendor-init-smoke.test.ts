@@ -224,6 +224,7 @@ describe("cross-vendor init-to-run smoke", () => {
       expect(flags).not.toContain("--full-auto");
       expect(flags).toEqual([
         "--sandbox", "workspace-write", "-c", "approval_policy=never",
+        "--strict-config", "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}',
         "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
         "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
         "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",

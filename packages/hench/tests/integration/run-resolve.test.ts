@@ -316,6 +316,10 @@ describe("the resolution report", () => {
     const r = await resolve({ task: "t-pending" });
 
     expect(r.resolved.permissionMode).toEqual({ value: null, source: "built-in" });
+    expect(r.warnings).toContainEqual(expect.objectContaining({
+      code: "policy-unsupported",
+      message: expect.stringContaining("hench.guard.allowedGitSubcommands"),
+    }));
     expect(r.options.find((o) => o.key === "provider")?.values).toEqual(["cli", "api"]);
   });
 
