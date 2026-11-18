@@ -1,21 +1,19 @@
 schema: "rex/v2"
 items:
   "8d9b361a-d4d1-4e20-a500-b37555d961c5":
-    status: "completed"
+    status: "failing"
     startedAt: "2026-11-18T04:49:28.789Z"
-    completedAt: "2026-11-18T04:49:28.789Z"
-    endedAt: "2026-11-18T04:49:28.789Z"
     activeIntervals: [{"end":"2026-11-18T04:49:28.789Z","start":"2026-11-18T04:49:28.789Z"}]
+    failureReason: "PR8 completion was premature: executor/reviewer recorded incomplete boundary criteria. Host runtime evidence now available; all-mode/config/version validation and accurate evidence documentation still require same-task completion."
     appliedAt: "2026-11-18T04:49:28.789Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-11T21:06:38.810Z"
-    lastModified: "2026-11-18T04:49:28.789Z"
+    lastModified: "2026-11-18T04:54:03.826Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9285e760-055c-4638-adf0-63358f35a339":
-    status: "completed"
+    status: "failing"
     startedAt: "2026-11-18T04:35:31.841Z"
-    completedAt: "2026-11-18T04:49:28.789Z"
-    endedAt: "2026-11-18T04:49:28.789Z"
     activeIntervals: [{"end":"2026-11-18T04:44:49.676Z","start":"2026-11-18T04:35:31.841Z"},{"end":"2026-11-18T04:49:28.789Z","start":"2026-11-18T04:49:28.789Z"}]
-    lastModified: "2026-11-18T04:49:32.156Z"
+    failureReason: "PR8 completion was premature: executor/reviewer recorded incomplete boundary criteria. Host runtime evidence now available; all-mode/config/version validation and accurate evidence documentation still require same-task completion."
+    lastModified: "2026-11-18T04:54:01.132Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
