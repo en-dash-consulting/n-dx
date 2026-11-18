@@ -12,5 +12,5 @@ items:
     startedAt: "2026-11-18T22:28:26.427Z"
     activeIntervals: [{"end":"2026-11-18T22:31:24.310Z","start":"2026-11-18T22:28:26.427Z"},{"end":"2026-11-18T22:38:17.039Z","start":"2026-11-18T22:33:45.157Z"},{"end":"2026-11-18T22:45:11.896Z","start":"2026-11-18T22:44:21.719Z"},{"end":"2026-11-18T22:54:25.439Z","start":"2026-11-18T22:47:14.974Z"},{"end":"2026-11-18T22:59:29.909Z","start":"2026-11-18T22:59:29.909Z"}]
     failureReason: "Candidate committed in d06cd147 but executor and fresh reviewer explicitly report remaining real host/broker/network/browser/connected-tool admission criteria. Preserve raw completion, retain failing task until actual acceptance."
-    lastModified: "2026-11-18T23:00:49.718Z"
+    lastModified: "2026-11-18T23:07:53.155Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
