@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "23035796-603b-4124-87fb-e718e35dda79":
-    lastModified: "2026-11-18T22:50:47.465Z"
+    status: "completed"
+    startedAt: "2026-11-18T22:51:09.141Z"
+    completedAt: "2026-11-18T22:51:31.481Z"
+    endedAt: "2026-11-18T22:51:31.481Z"
+    activeIntervals: [{"end":"2026-11-18T22:51:31.481Z","start":"2026-11-18T22:51:09.141Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Lead rewritten to 26 words; mechanism moved to second paragraph; changeset-body-policy passes."
+    lastModified: "2026-11-18T22:51:31.481Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d45299e0-9e49-4cb5-afc7-94f9803b2f03":
+    status: "completed"
+    startedAt: "2026-11-18T22:51:31.481Z"
+    completedAt: "2026-11-18T22:51:31.481Z"
+    endedAt: "2026-11-18T22:51:31.481Z"
+    activeIntervals: [{"end":"2026-11-18T22:51:31.481Z","start":"2026-11-18T22:51:31.481Z"}]
+    appliedAt: "2026-11-18T22:51:31.481Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T22:50:39.841Z"
-    lastModified: "2026-11-18T22:50:47.465Z"
+    lastModified: "2026-11-18T22:51:31.481Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
