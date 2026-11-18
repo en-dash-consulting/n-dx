@@ -340,6 +340,44 @@ describe("judgeTypedFindings", () => {
       ]);
     });
 
+    it("cuts the zone evidence one level at a time: headers, then symbols, then the file sample", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "sv-typed-trim-"));
+      const files = Array.from({ length: 12 }, (_, i) => `src/part${i}.ts`);
+      mkdirSync(join(dir, "src"));
+      for (const [i, f] of files.entries()) writeFileSync(join(dir, f), `/**\n * Part ${i} of the invented core.\n * Pure helpers.\n */\nexport function part${i}() {}\n`);
+      const imports = emptyImports();
+      imports.edges.push({ from: "src/user.ts", to: files[0], type: "static", symbols: ["part0"] });
+      const lone: TypedFinding = {
+        kind: "hub-file",
+        finding: { type: "observation", pass: 1, scope: "core", text: "finding lone", severity: "warning" },
+        edges: [{ from: "src/user.ts", to: files[0] }],
+      };
+      const zonesAsked: Array<Record<string, unknown>> = [];
+      mockedAskJev.mockImplementation((async (request: { state: unknown }) => {
+        zonesAsked.push((request.state as { zones: Record<string, Record<string, unknown>> }).zones.core);
+        if (zonesAsked.length < 4) throw tooLarge();
+        return { answers: { t0: noulAnswer(0.9) } };
+      }) as never);
+
+      try {
+        const result = await judgeTypedFindings([lone], { zones: [zone("core", files)], imports, projectDir: dir });
+        expect(result.trimmedLevels.get("finding lone")).toBe(3);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+
+      const [full, one, two, three] = zonesAsked;
+      expect(Object.keys(full.headers as object).length).toBeGreaterThan(0);
+      expect((full.declarations as string[]).length).toBeGreaterThan(0);
+      expect(full.exportedSymbols).toEqual(["part0"]);
+      expect(full.files).toHaveLength(12);
+      const { headers: _headers, ...withoutHeaders } = full;
+      expect(one).toEqual(withoutHeaders);
+      const { declarations: _declarations, exportedSymbols: _exported, ...withoutSymbols } = withoutHeaders;
+      expect(two).toEqual(withoutSymbols);
+      expect(three).toEqual({ ...withoutSymbols, files: files.slice(0, 10) });
+    });
+
     it("cuts a finding's edges to four at the last trim level", async () => {
       const many: TypedFinding = {
         kind: "hub-file",

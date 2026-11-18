@@ -1,14 +1,25 @@
 schema: "rex/v2"
 items:
   "140e0c03-294f-4e8d-9870-83cd3761ae04":
+    status: "completed"
+    startedAt: "2026-11-18T03:47:49.783Z"
+    completedAt: "2026-11-18T03:47:49.783Z"
+    endedAt: "2026-11-18T03:47:49.783Z"
+    activeIntervals: [{"end":"2026-11-18T03:47:49.783Z","start":"2026-11-18T03:47:49.783Z"}]
+    appliedAt: "2026-11-18T03:47:49.783Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T00:51:59.684Z"
-    lastModified: "2026-11-18T01:13:58.433Z"
+    lastModified: "2026-11-18T03:47:49.783Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1e1b26d9-6e14-41b1-9232-3d32869355d1":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-18T03:37:31.636Z"
-    activeIntervals: [{"start":"2026-11-18T03:37:31.636Z"}]
-    lastModified: "2026-11-18T03:37:32.399Z"
+    completedAt: "2026-11-18T03:47:49.783Z"
+    endedAt: "2026-11-18T03:47:49.783Z"
+    activeIntervals: [{"end":"2026-11-18T03:47:49.783Z","start":"2026-11-18T03:37:31.636Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "packBySize + JEV_REQUEST_BYTE_CEILING (128 KiB, sourcevision.jev.requestByteCeiling) in jev-split.ts; typed-findings and classify pack by bytes and count; lone refused typed finding retried at trim levels 1-4; trimmedLevels + summary-line count; debug request-size log; tests, docs, changeset."
+    lastModified: "2026-11-18T03:47:49.783Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6fc82dbd-405e-4b0c-b80e-2c16b37a8707":
     status: "completed"
