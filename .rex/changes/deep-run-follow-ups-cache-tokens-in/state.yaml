@@ -2,10 +2,20 @@ schema: "rex/v2"
 items:
   "140e0c03-294f-4e8d-9870-83cd3761ae04":
     createdAt: "2026-11-18T00:51:59.684Z"
-    lastModified: "2026-11-18T00:52:28.823Z"
+    lastModified: "2026-11-18T01:12:36.896Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6fc82dbd-405e-4b0c-b80e-2c16b37a8707":
-    lastModified: "2026-11-18T00:52:28.823Z"
+    status: "completed"
+    startedAt: "2026-11-18T01:07:57.650Z"
+    completedAt: "2026-11-18T01:13:13.960Z"
+    endedAt: "2026-11-18T01:13:13.960Z"
+    activeIntervals: [{"end":"2026-11-18T01:13:13.960Z","start":"2026-11-18T01:07:57.650Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "jev-split.ts halves too-large Jev requests; typed-findings and classify use it; summary counts judged only; tests and changeset added (18553ccf6)."
+    lastModified: "2026-11-18T01:13:13.960Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a913d67e-2106-45d8-9bef-76991a30c1f7":
+    lastModified: "2026-11-18T01:12:36.896Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d842839a-6478-4367-97bc-962252fffa99":
     status: "completed"

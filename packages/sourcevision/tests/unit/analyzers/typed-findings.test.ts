@@ -27,7 +27,7 @@ vi.mock("@n-dx/llm-client", async () => {
 });
 
 import { getJudgmentRoute } from "../../../src/analyzers/claude-client.js";
-import { askJev } from "@n-dx/llm-client";
+import { askJev, ClaudeClientError } from "@n-dx/llm-client";
 import {
   computeTypedFindings,
   judgeTypedFindings,
@@ -257,6 +257,50 @@ describe("judgeTypedFindings", () => {
     const result = await judgeTypedFindings(typedCycle(), { zones: cycleInput.zones });
     expect(result.uncertain).toBe(1);
     expect(result.findings[0].severity).toBe("warning");
+  });
+
+  describe("a request TypeSafe refuses as too large", () => {
+    const tooLarge = () => new ClaudeClientError('TypeSafe returned 400: {"detail":{"error_type":"max_tokens_exceeded"}}', "unknown", false);
+    // Five invented findings; `big` is too large to judge even alone.
+    const names = ["alpha", "beta", "gamma", "delta", "big"];
+    const five: TypedFinding[] = names.map((n) => ({
+      kind: "hub-file",
+      finding: { type: "observation", pass: 1, scope: "core", text: `finding ${n}`, severity: "warning", anchors: [{ file: `src/${n}.ts` }] },
+      edges: [{ from: `src/${n}.ts`, to: "src/shared.ts" }],
+    }));
+    const texts = (request: { state: unknown }) =>
+      Object.values((request.state as { findings: Record<string, { text: string }> }).findings).map((f) => f.text);
+
+    it("asks again in halves until each fits, landing each answer on its own finding", async () => {
+      mockedAskJev.mockImplementation((async (request: { state: unknown; questions: Record<string, unknown> }) => {
+        const asked = texts(request);
+        if (asked.length > 2 || asked.includes("finding big")) throw tooLarge();
+        return { answers: Object.fromEntries(asked.map((t, i) => [`t${i}`, noulAnswer(0.81 + 0.01 * names.indexOf(t.slice(8)))])) };
+      }) as never);
+      const warn = vi.mocked(console.warn);
+      const log = vi.mocked(console.log);
+
+      const result = await judgeTypedFindings(five, { zones: [zone("core", ["src/alpha.ts"])] });
+
+      expect(result.calls).toBe(3);
+      expect(result.findings.map((f) => f.confidence)).toEqual([0.81, 0.82, 0.83, 0.84, undefined]);
+      expect(result.findings[4].severity).toBe("warning");
+      expect(result.probabilities.size).toBe(4);
+      expect(warn.mock.calls.map(([m]) => m)).toEqual([
+        "  [judge] 1 typed finding(s) too large for one request — keeping derived severities",
+      ]);
+      expect(log.mock.calls[0][0]).toContain("typed findings: 4 of 5 judged in 3 request(s)");
+      expect(log.mock.calls[0][0]).toContain("4/4 outside the uncertain band");
+    });
+
+    it("still stops on any other failure, keeping every derived severity", async () => {
+      mockedAskJev.mockRejectedValue(new ClaudeClientError("TypeSafe returned 400: bad request", "unknown", false));
+      const result = await judgeTypedFindings(five, { zones: [zone("core", ["src/alpha.ts"])] });
+      expect(mockedAskJev).toHaveBeenCalledTimes(1);
+      expect(result.calls).toBe(0);
+      expect(result.findings.every((f) => f.confidence === undefined && f.severity === "warning")).toBe(true);
+      expect(vi.mocked(console.warn).mock.calls[0][0]).toContain("typed-finding judgment failed (unknown)");
+    });
   });
 
   it("makes no request without a judgment route and returns the findings as derived", async () => {

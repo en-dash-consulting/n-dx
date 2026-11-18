@@ -35,6 +35,7 @@ import type { PromptEnvelope } from "@n-dx/llm-client";
 import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
 import { collectFileHeaders } from "./file-headers.js";
 import { markBatch } from "./analyze-progress.js";
+import { askSplittingWhenTooLarge } from "./jev-split.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -666,24 +667,51 @@ async function classifyBatchWithJev(
   tokenUsage: AnalyzeTokenUsage,
   projectLanguages: string[],
 ): Promise<JevClassifyBatch | null | "auth-error"> {
-  const { state, questions, ids } = buildJevClassifyRequest(batch, archetypes, projectLanguages);
-  const spinner = startSpinner(`  [classify]${batchLabel} Asking Jev (${batch.length} files)...`);
+  // A request refused as too large is asked again as halves; what each slice
+  // answers is merged, so the batch reads as one.
+  let merged: JevClassifyBatch | null = null;
+  try {
+    const alone = await askSplittingWhenTooLarge(batch, async (files) => {
+      const judged = await askJevForFiles(files, archetypes, projectLanguages, tokenUsage, batchLabel);
+      merged ??= { results: [], escalate: [] };
+      merged.results.push(...judged.results);
+      merged.escalate.push(...judged.escalate);
+    });
+    if (alone.length > 0) {
+      console.warn(`  [classify]${batchLabel} ${alone.length} file(s) too large for one Jev request — leaving them unclassified`);
+    }
+  } catch (err) {
+    if (!(err instanceof ClaudeClientError)) throw err;
+    if (err.reason === "auth") {
+      console.warn("  [classify] TypeSafe authentication error — check the key (`ndx config credentials.typesafe`, or an exported TYPESAFE_API_KEY)");
+      console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
+      return "auth-error";
+    }
+    console.warn(`  [classify]${batchLabel} Jev request failed (${err.reason}) — leaving files unclassified`);
+  }
+  return merged;
+}
+
+/**
+ * One Jev request for `files`. Throws what `askJev` throws; a failed request
+ * still counts as a call.
+ */
+async function askJevForFiles(
+  files: FileClassification[],
+  archetypes: ArchetypeDefinition[],
+  projectLanguages: string[],
+  tokenUsage: AnalyzeTokenUsage,
+  batchLabel: string,
+): Promise<JevClassifyBatch> {
+  const { state, questions, ids } = buildJevClassifyRequest(files, archetypes, projectLanguages);
+  const spinner = startSpinner(`  [classify]${batchLabel} Asking Jev (${files.length} files)...`);
 
   let response;
   try {
     response = await askJev({ state, questions }, { taskClass: "code.classify" });
   } catch (err) {
     spinner.stop();
-    if (err instanceof ClaudeClientError) {
-      accumulateTokenUsage(tokenUsage, undefined);
-      if (err.reason === "auth") {
-        console.warn("  [classify] TypeSafe authentication error — check the key (`ndx config credentials.typesafe`, or an exported TYPESAFE_API_KEY)");
-        console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
-        return "auth-error";
-      }
-      console.warn(`  [classify]${batchLabel} Jev request failed (${err.reason}) — leaving files unclassified`);
-      return null;
-    }
+    if (err instanceof ClaudeClientError) accumulateTokenUsage(tokenUsage, undefined);
     throw err;
   }
   spinner.stop();

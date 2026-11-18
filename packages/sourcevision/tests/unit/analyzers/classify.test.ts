@@ -773,6 +773,52 @@ describe("enrichClassificationsWithLLM — Jev route", () => {
     expect(mockedCallClaude).not.toHaveBeenCalled();
   });
 
+  it("asks a batch refused as too large again in halves, answering every file", async () => {
+    const { ClaudeClientError } = await import("@n-dx/llm-client");
+    const paths = ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts", "src/e.ts"];
+    const base = makeBase(paths);
+    const asked: string[][] = [];
+    mockedAskJev.mockImplementation((async (request: { state: { files: Record<string, { path: string }> } }) => {
+      const files = Object.entries(request.state.files);
+      asked.push(files.map(([, f]) => f.path));
+      if (files.length > 2) {
+        throw new ClaudeClientError('TypeSafe returned 400: {"detail":{"error_type":"max_tokens_exceeded"}}', "unknown", false);
+      }
+      return jevResponse(Object.fromEntries(files.map(([id]) => [id, { choice: "service", probabilities: { service: 0.9 } }])));
+    }) as never);
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory([...paths, "src/index.ts"]), emptyImports);
+
+    expect(asked.filter((a) => a.length <= 2).flat().sort()).toEqual(paths);
+    expect(result.updatedFiles.map((f) => f.path).sort()).toEqual(paths);
+    expect(result.updatedFiles.every((f) => f.archetype === "service")).toBe(true);
+    expect(mockedCallClaude).not.toHaveBeenCalled();
+  });
+
+  it("leaves a file too large on its own unclassified with one warning, keeping the rest", async () => {
+    const { ClaudeClientError } = await import("@n-dx/llm-client");
+    const paths = ["src/a.ts", "src/big.ts", "src/c.ts"];
+    const base = makeBase(paths);
+    mockedAskJev.mockImplementation((async (request: { state: { files: Record<string, { path: string }> } }) => {
+      const files = Object.entries(request.state.files);
+      if (files.some(([, f]) => f.path === "src/big.ts")) {
+        throw new ClaudeClientError('TypeSafe returned 400: {"detail":{"error_type":"max_tokens_exceeded"}}', "unknown", false);
+      }
+      return jevResponse(Object.fromEntries(files.map(([id]) => [id, { choice: "service", probabilities: { service: 0.9 } }])));
+    }) as never);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const result = await enrichClassificationsWithLLM(base, makeInventory([...paths, "src/index.ts"]), emptyImports);
+      expect(result.updatedFiles.map((f) => f.path).sort()).toEqual(["src/a.ts", "src/c.ts"]);
+      expect(warn.mock.calls.map(([m]) => m)).toEqual([
+        "  [classify] 1 file(s) too large for one Jev request — leaving them unclassified",
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("takes the text path untouched when no judgment route is resolved", async () => {
     mockedGetJudgmentRoute.mockReturnValue(undefined);
     const base = makeBase(["src/analyzer.ts"]);

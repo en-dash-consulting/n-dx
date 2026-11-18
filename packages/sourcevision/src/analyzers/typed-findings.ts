@@ -45,6 +45,7 @@ import { askJev, noul } from "@n-dx/llm-client";
 import type { JevQuestion, JsonValue } from "@n-dx/llm-client";
 import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { buildZoneEvidence } from "./enrich-judge.js";
+import { askSplittingWhenTooLarge } from "./jev-split.js";
 import type { FindingEvidence } from "./enrich-judge.js";
 import { extractTopLevelDeclarations, isTestPath } from "./zone-symbols.js";
 import { addCallTokens } from "./token-usage.js";
@@ -378,8 +379,8 @@ export async function judgeTypedFindings(
   const usage: TokenUsage = { input: 0, output: 0 };
   const out = [...result.findings];
 
-  for (let start = 0; start < typed.length; start += TYPED_PER_REQUEST) {
-    const slice = typed.slice(start, start + TYPED_PER_REQUEST);
+  let judged = 0;
+  const askSlice = async (slice: TypedFinding[], start: number): Promise<void> => {
     const fState: Record<string, JsonValue> = {};
     const questions: Record<string, JevQuestion> = {};
     slice.forEach((t, i) => {
@@ -400,14 +401,7 @@ export async function judgeTypedFindings(
       findings: fState,
       zones: buildZoneEvidence(slice.map((t) => t.finding.scope), evidence),
     };
-    let response;
-    try {
-      response = await askJev({ state, questions }, { taskClass: "finding.judge" });
-    } catch (err) {
-      if (!(err instanceof ClaudeClientError)) throw err;
-      console.warn(`  [judge] typed-finding judgment failed (${err.reason}) — keeping derived severities: ${err.message.slice(0, 160)}`);
-      break;
-    }
+    const response = await askJev({ state, questions }, { taskClass: "finding.judge" });
     result.calls++;
     addCallTokens(usage, response.tokenUsage);
     slice.forEach((t, i) => {
@@ -415,6 +409,7 @@ export async function judgeTypedFindings(
       if (a?.type !== "noul") return;
       const p = Math.round(a.noul * 100) / 100;
       const index = start + i;
+      judged++;
       result.probabilities.set(t.finding.text, p);
       if (p <= TYPED_ARTIFACT_MAX_PROBABILITY) {
         out[index] = { ...t.finding, severity: "info", confidence: p };
@@ -424,15 +419,34 @@ export async function judgeTypedFindings(
         if (p < TYPED_REAL_MIN_PROBABILITY) result.uncertain++;
       }
     });
+  };
+
+  // A refused-as-too-large request is asked again as halves; any other
+  // failure stops judgment and the findings left keep their derived severity.
+  let tooLarge = 0;
+  for (let start = 0; start < typed.length; start += TYPED_PER_REQUEST) {
+    const chunk = typed.slice(start, start + TYPED_PER_REQUEST);
+    try {
+      const alone = await askSplittingWhenTooLarge(chunk, (slice, offset) => askSlice(slice, start + offset));
+      tooLarge += alone.length;
+    } catch (err) {
+      if (!(err instanceof ClaudeClientError)) throw err;
+      console.warn(`  [judge] typed-finding judgment failed (${err.reason}) — keeping derived severities: ${err.message.slice(0, 160)}`);
+      break;
+    }
+  }
+  if (tooLarge > 0) {
+    console.warn(`  [judge] ${tooLarge} typed finding(s) too large for one request — keeping derived severities`);
   }
 
   result.findings = out;
   result.tokenUsage = result.calls > 0 ? usage : undefined;
   if (result.calls > 0) {
-    const outside = typed.length - result.uncertain;
+    const outside = judged - result.uncertain;
+    const of = judged === typed.length ? "" : ` of ${typed.length}`;
     console.log(
-      `  [judge] typed findings: ${typed.length} judged in ${result.calls} request(s) — ` +
-        `${result.demoted} demoted to info, ${outside}/${typed.length} outside the uncertain band ` +
+      `  [judge] typed findings: ${judged}${of} judged in ${result.calls} request(s) — ` +
+        `${result.demoted} demoted to info, ${outside}/${judged} outside the uncertain band ` +
         `(${usage.input} in / ${usage.output} out)`,
     );
   }
