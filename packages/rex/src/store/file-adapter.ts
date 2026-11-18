@@ -31,7 +31,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
-import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
+import { PRD_FILENAME, PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
 import { readPerfFlags } from "./perf-flags.js";
 import { preImageOf, tryTargetedItemWrite } from "./targeted-update.js";
 import type { PRDStore, StoreCapabilities, WriteOptions, SaveFileReport } from "./contracts.js";
@@ -51,8 +51,8 @@ function stripControlCharacters(text: string): string {
   return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
 }
 
-/** Canonical filename for the consolidated PRD document. */
-export const PRD_FILENAME = "prd.json";
+/** Canonical filename for the consolidated PRD document; declared in paths.ts. */
+export { PRD_FILENAME };
 
 /**
  * Thrown when the v1 store is asked to read or write a v2 tree. Without it the

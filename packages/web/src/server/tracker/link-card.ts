@@ -10,7 +10,7 @@
  * already has) raises no card.
  */
 
-import type { CarryOutResult } from "../sidecar/carry-out.js";
+import type { CarryOutResult } from "../sidecar/carry-out-result.js";
 import { workspaceConnectionService } from "../connections/connection-service.js";
 import { resolveStore } from "../rex-gateway.js";
 import type { SidecarLink } from "../../shared/index.js";

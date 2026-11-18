@@ -18,13 +18,11 @@
 
 import { useState, useCallback } from "preact/hooks";
 import type { VNode } from "preact";
-import { h } from "preact";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import type { TaskUsageSummary, WeeklyBudgetResolution } from "../components/prd-tree/types.js";
 import type { AddItemInput } from "../components/prd-tree/add-item-form.js";
 import type { InlineAddInput } from "../components/prd-tree/inline-add-form.js";
 import type { DetailItem, NavigateTo } from "../types.js";
-import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import { prdDetailOf, useItemSelection } from "./use-item-selection.js";
@@ -60,6 +58,25 @@ async function postNewItem(input: object): Promise<{ type?: string; level?: stri
 /** Active tab in the command bar. */
 export type CommandTab = null | "add" | "merge" | "prune";
 
+/**
+ * What the detail panel is given for the selected item — the Tasks view's
+ * TaskDetail props. The hook builds them; the view, which may import
+ * components, renders them (`renderDetail`), so no hook imports a component.
+ */
+export interface PRDDetailProps {
+  item: PRDItemData;
+  taskUsage?: TaskUsageSummary;
+  weeklyBudget?: WeeklyBudgetResolution | null;
+  showTokenBudget?: boolean;
+  allItems: PRDItemData[];
+  onUpdate?: (id: string, updates: Partial<PRDItemData>) => void;
+  onNavigateToItem?: (id: string) => void;
+  onPrdChanged?: () => void;
+  onAddChild?: (input: { title: string; parentId: string; type: string; description?: string; acceptanceCriteria?: string[]; priority?: string }) => Promise<void>;
+  onRemove?: (id: string) => Promise<void>;
+  navigateTo?: NavigateTo;
+}
+
 export interface PRDActionsDeps {
   /** Current PRD document data. */
   data: PRDDocumentData | null;
@@ -76,6 +93,9 @@ export interface PRDActionsDeps {
   /** External callback for detail panel content (parent layout). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onDetailContent?: (content: VNode<any> | null) => void;
+  /** Renders the selected item's detail panel; without it the panel gets nothing. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  renderDetail?: (props: PRDDetailProps) => VNode<any>;
   /** Per-task usage summaries. */
   taskUsageById: Record<string, TaskUsageSummary>;
   /** Resolved weekly budget. */
@@ -167,6 +187,7 @@ export function usePRDActions({
   weeklyBudget,
   showTokenBudget,
   navigateTo,
+  renderDetail,
 }: PRDActionsDeps): PRDActionsState {
   const [activeTab, setActiveTab] = useState<CommandTab>(null);
   const [addParentId, setAddParentId] = useState<string | null>(null);
@@ -314,8 +335,12 @@ export function usePRDActions({
       onSelectItem(prdDetailOf(item));
     }
 
+    if (!renderDetail) {
+      onDetailContent(null);
+      return;
+    }
     onDetailContent(
-      h(TaskDetail, {
+      renderDetail({
         item,
         taskUsage: taskUsageById[item.id],
         weeklyBudget,
@@ -347,6 +372,7 @@ export function usePRDActions({
     handleAddChild,
     handleRemoveFromDetail,
     navigateTo,
+    renderDetail,
   ]);
 
   return {

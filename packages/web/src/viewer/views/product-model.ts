@@ -328,6 +328,9 @@ export type PlacementRelation = "touches" | "amends";
 /** How firmly rex's rules back a candidate, from its score. */
 export type PlacementStrength = "strong" | "possible" | "weak";
 
+/** A best guess's strength as the Inbox shows it: the candidate's, or "tied" when two lead. */
+export type GuessStrength = PlacementStrength | "tied";
+
 /** One candidate home on the placement shortlist, best first. */
 export interface PlacementCandidate {
   target: string;

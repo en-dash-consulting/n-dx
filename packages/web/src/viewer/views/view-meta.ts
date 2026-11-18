@@ -18,7 +18,7 @@
  */
 
 import type { ViewId } from "../types.js";
-import type { PixelIconName } from "../components/index.js";
+import type { PixelIconName } from "../types.js";
 
 /** The package a view belongs to; `global` for views no single package owns. */
 export type ViewProduct = "sourcevision" | "rex" | "hench" | "global";

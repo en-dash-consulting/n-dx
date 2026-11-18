@@ -28,15 +28,29 @@
 import { h, Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { PlaceWithSidecarButton, StrengthChip, useProjectStatus } from "../components/index.js";
-import type { GuessStrength } from "../components/index.js";
-import { placementDraftNote, prunePlacementDrafts } from "../components/prd-tree/placement-draft.js";
-import { resolveCliLabel, useCliName, useRefetchableProductRead } from "../hooks/index.js";
-import type { Load } from "../hooks/index.js";
+import { placementDraftNote } from "../components/prd-tree/placement-draft.js";
+import { resolveCliLabel, useCliName } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { Pending, StaleNotice } from "./product-pages.js";
-import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
+import { placementTab } from "../route-state.js";
+import { Pending, StaleNotice } from "./product-notices.js";
+import type { ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
 import { shortChangeId } from "./product-model.js";
+import { bestGuess, guessOf, sortInbox, useInbox, type Guess, type InboxRow } from "./inbox-read.js";
 import { errorMessage } from "../utils/format.js";
+
+// The Inbox's data — its read, order and guesses — is in inbox-read.ts, which
+// the detail panel's placement section and placement mode read without
+// importing this page; re-exported here for the callers that always had it.
+export {
+  bestGuess,
+  isAppliedUnplaced,
+  sortInbox,
+  useInbox,
+  type Guess,
+  type InboxRead,
+  type InboxRow,
+  type ShortlistRead,
+} from "./inbox-read.js";
 
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
@@ -47,48 +61,6 @@ export const INBOX_SECTION_ROWS = 5;
  */
 export const HELD_EXPLANATION =
   "A change held in the Inbox cannot close, and {cli} work skips its tasks until it is placed.";
-
-/** IB7: strongest first, then possible, tied, weak. */
-const STRENGTH_RANK: Record<GuessStrength, number> = { strong: 0, possible: 1, tied: 2, weak: 3 };
-/** A row with no guess yet (loading, failed, or an empty shortlist) sorts last. */
-const NO_GUESS_RANK = 4;
-
-/**
- * A shortlist read: the answer, or why it failed. Absent from the map while
- * the read is in flight.
- */
-export type ShortlistRead = { placement: ChangePlacement } | { error: string };
-
-export interface InboxRow {
-  change: ChangeRow;
-  shortlist?: ShortlistRead;
-}
-
-export interface Guess {
-  candidate: PlacementCandidate;
-  strength: GuessStrength;
-}
-
-/** The best guess on a shortlist, or null when it has none. */
-export function bestGuess(placement: ChangePlacement): Guess | null {
-  const candidate = placement.shortlist[0];
-  if (!candidate) return null;
-  return { candidate, strength: placement.tied ? "tied" : candidate.strength };
-}
-
-function guessOf(row: InboxRow): Guess | null {
-  return row.shortlist && "placement" in row.shortlist ? bestGuess(row.shortlist.placement) : null;
-}
-
-/** Strongest guess first; within a strength the higher score, then the read's order. */
-export function sortInbox(rows: readonly InboxRow[]): InboxRow[] {
-  const keyed = rows.map((row, index) => {
-    const guess = guessOf(row);
-    return { row, index, rank: guess ? STRENGTH_RANK[guess.strength] : NO_GUESS_RANK, score: guess?.candidate.score ?? 0 };
-  });
-  keyed.sort((a, b) => a.rank - b.rank || b.score - a.score || a.index - b.index);
-  return keyed.map((k) => k.row);
-}
 
 // ── Best-guess placement ─────────────────────────────────────────────
 
@@ -418,11 +390,6 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
   );
 }
 
-/** An applied change still flagged for placement: history that can take a touches. */
-export function isAppliedUnplaced(change: Pick<ChangeRow, "appliedAt" | "needsPlacement">): boolean {
-  return !!change.appliedAt && !!change.needsPlacement;
-}
-
 /** The day of an ISO timestamp, or the text itself when it is not a date. */
 function appliedDay(at: string | undefined): string {
   return at && /^\d{4}-\d{2}-\d{2}/.test(at) ? at.slice(0, 10) : at ?? "";
@@ -467,79 +434,6 @@ export function AppliedHistory({ count, rows = [], onOpen }: {
 }
 
 // ── Page ─────────────────────────────────────────────────────────────
-
-export interface InboxRead {
-  /** Every change, as `GET /api/rex/changes` answers. */
-  load: Load<ChangeRow[]>;
-  /** Open changes awaiting placement, with their shortlists, in the section's order. */
-  rows: InboxRow[];
-  /** Applied changes never placed, with their shortlists, strongest guess first. */
-  applied: InboxRow[];
-  /** Read again now, rather than on the next `rex:prd-changed`. */
-  refetch: () => void;
-}
-
-/**
- * The Inbox as the Plan section orders it. The detail panel's placement
- * reads it too, so "N of M" and "Place & next" follow the same order.
- */
-export function useInbox(): InboxRead {
-  const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
-  const waiting = useMemo(
-    () => (load.state === "ready" ? load.data.filter((c) => c.inbox || isAppliedUnplaced(c)) : null),
-    [load],
-  );
-  // A change placed by any route (here, the CLI, another session) no longer waits: its draft goes (WF10).
-  useEffect(() => {
-    if (waiting) prunePlacementDrafts(new Set(waiting.map((c) => c.id)));
-  }, [waiting]);
-  const shortlists = useShortlists(waiting);
-  const { rows, applied } = useMemo(() => {
-    const all = (waiting ?? []).map((change) => ({ change, shortlist: shortlists.get(change.id) }));
-    return {
-      rows: sortInbox(all.filter((r) => !isAppliedUnplaced(r.change))),
-      applied: sortInbox(all.filter((r) => isAppliedUnplaced(r.change))),
-    };
-  }, [waiting, shortlists]);
-  return { load, rows, applied, refetch };
-}
-
-/** Read every row's shortlist in one request, each time the change list is read. */
-function useShortlists(changes: readonly ChangeRow[] | null): ReadonlyMap<string, ShortlistRead> {
-  const [reads, setReads] = useState<ReadonlyMap<string, ShortlistRead>>(new Map());
-  useEffect(() => {
-    if (!changes) return;
-    let live = true;
-    readShortlists(changes.map((c) => c.id)).then((next) => {
-      if (live) setReads(next);
-    });
-    return () => { live = false; };
-  }, [changes]);
-  return reads;
-}
-
-/** `GET /api/rex/changes/placements`: one model load on the server, however many rows. */
-async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<string, ShortlistRead>> {
-  const reads = new Map<string, ShortlistRead>();
-  const failAll = (error: string) => ids.forEach((id) => reads.set(id, { error }));
-  try {
-    const res = await fetch("/api/rex/changes/placements");
-    const body = await res.json() as Partial<ChangePlacements> & { error?: unknown };
-    if (!res.ok || !body.placements) {
-      failAll(typeof body.error === "string" ? body.error : `HTTP ${res.status}`);
-      return reads;
-    }
-    for (const id of ids) {
-      const read = body.placements[id];
-      if (!read) reads.set(id, { error: "No shortlist for this change" });
-      else if ("error" in read) reads.set(id, { error: read.error });
-      else reads.set(id, { placement: read });
-    }
-  } catch (err) {
-    failAll(errorMessage(err));
-  }
-  return reads;
-}
 
 /**
  * The Inbox in its Plan section: `limit` rows, each opening its change in

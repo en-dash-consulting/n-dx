@@ -16,7 +16,9 @@
 
 import { h } from "preact";
 
-export type PixelIconName = "robot-wrangler" | "project" | "workflow" | "commands" | "settings";
+import type { PixelIconName } from "../types.js";
+
+export type { PixelIconName };
 export type PixelTileName = Exclude<PixelIconName, "settings">;
 
 const TILE_SIZE = 22;

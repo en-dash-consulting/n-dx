@@ -23,8 +23,9 @@ import { PlaceWithSidecarContext, StrengthChip, useProjectStatus } from "../comp
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
 import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
-import { AppliedHistory, PlaceBestGuesses, bestGuess, takeInboxSelection, useInbox, type InboxRow } from "./inbox.js";
-import { Pending, StaleNotice } from "./product-pages.js";
+import { AppliedHistory, PlaceBestGuesses, takeInboxSelection } from "./inbox.js";
+import { bestGuess, useInbox, type InboxRow } from "./inbox-read.js";
+import { Pending, StaleNotice } from "./product-notices.js";
 import { shortChangeId } from "./product-model.js";
 
 // ── Shortcuts ────────────────────────────────────────────────────────

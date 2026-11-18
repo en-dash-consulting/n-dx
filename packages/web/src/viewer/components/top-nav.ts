@@ -20,7 +20,8 @@
 
 import { h } from "preact";
 import type { ViewId, NavigateTo } from "../api.js";
-import { useProjectStatus, openInboxCount, inboxCountLabel, stageForView, visibleStages, stageProduct, viewLabelFor, viewGlyph, isLiveView } from "../api.js";
+import { useProjectStatus, stageForView, visibleStages, stageProduct, viewLabelFor, viewGlyph, isLiveView } from "../api.js";
+import { openInboxCount, inboxCountLabel } from "./status-indicators.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { LiveTab } from "./live-tab.js";

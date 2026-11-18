@@ -28,7 +28,7 @@ import { errorMessage } from "../response-utils.js";
 import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import type { SidecarPlacement, SidecarPlacementCheck } from "../../shared/index.js";
-import type { CarryOutResult } from "./carry-out.js";
+import type { CarryOutResult } from "./carry-out-result.js";
 
 /** The most reasons one card carries, and the longest each may be. */
 export const PLACEMENT_MAX_REASONS = 10;

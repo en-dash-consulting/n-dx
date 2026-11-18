@@ -32,7 +32,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { JevAnswer, JevQuestion, JsonValue } from "./jev-client.js";
+import type { JevAnswer, JevQuestion, JsonValue } from "./jev-types.js";
 
 export const JUDGMENT_CACHE_FILE = "judgments.json";
 export const JUDGMENT_CACHE_MAX_ENTRIES = 20_000;
