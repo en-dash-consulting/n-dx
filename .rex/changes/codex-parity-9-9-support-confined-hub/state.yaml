@@ -11,5 +11,5 @@ items:
     startedAt: "2026-11-18T22:28:26.427Z"
     activeIntervals: [{"end":"2026-11-18T22:31:24.310Z","start":"2026-11-18T22:28:26.427Z"},{"end":"2026-11-18T22:38:17.039Z","start":"2026-11-18T22:33:45.157Z"},{"end":"2026-11-18T22:45:11.896Z","start":"2026-11-18T22:44:21.719Z"}]
     failureReason: "Broker-only production confinement remains unproven. Previous native canary probe is insufficient for arbitrary repository denial, broker approvals, fresh/resume, Stop and restart/browser acceptance. Recorded real Codex binary is outside the project and inaccessible under this task scope; no project-local Codex executable. Keep hub selector disabled; no superficial implementation."
-    lastModified: "2026-11-18T22:45:45.509Z"
+    lastModified: "2026-11-18T22:46:44.764Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
