@@ -78,7 +78,8 @@ describe("direct OpenAI agent execution", () => {
     yes: true, autonomous: true, abortSignal,
   });
 
-  it("completes explicit tasks sequentially through Responses, preserving continuation and disjoint usage", async () => {
+  it.each([false, true])("completes explicit tasks through Responses with useRegistryProvider=%s, preserving continuation and disjoint usage", async (useRegistryProvider) => {
+    config.useRegistryProvider = useRegistryProvider;
     script([...scriptFor("first.ts"), ...scriptFor("second.ts")]);
     for (const id of ["task-1", "task-2"]) {
       const { run: record } = await run(id);
