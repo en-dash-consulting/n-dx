@@ -8,8 +8,10 @@ items:
     lastModified: "2026-11-11T21:06:55.731Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b42b3957-511c-42f7-aed8-37980dfe6d13":
+    status: "completed"
     startedAt: "2026-11-18T22:28:26.427Z"
-    activeIntervals: [{"end":"2026-11-18T22:31:24.310Z","start":"2026-11-18T22:28:26.427Z"},{"end":"2026-11-18T22:38:17.039Z","start":"2026-11-18T22:33:45.157Z"},{"end":"2026-11-18T22:45:11.896Z","start":"2026-11-18T22:44:21.719Z"}]
-    failureReason: "Broker-only production confinement remains unproven. Previous native canary probe is insufficient for arbitrary repository denial, broker approvals, fresh/resume, Stop and restart/browser acceptance. Recorded real Codex binary is outside the project and inaccessible under this task scope; no project-local Codex executable. Keep hub selector disabled; no superficial implementation."
-    lastModified: "2026-11-18T22:46:44.764Z"
+    completedAt: "2026-11-18T22:59:29.909Z"
+    endedAt: "2026-11-18T22:59:29.909Z"
+    activeIntervals: [{"end":"2026-11-18T22:31:24.310Z","start":"2026-11-18T22:28:26.427Z"},{"end":"2026-11-18T22:38:17.039Z","start":"2026-11-18T22:33:45.157Z"},{"end":"2026-11-18T22:45:11.896Z","start":"2026-11-18T22:44:21.719Z"},{"end":"2026-11-18T22:54:25.439Z","start":"2026-11-18T22:47:14.974Z"},{"end":"2026-11-18T22:59:29.909Z","start":"2026-11-18T22:59:29.909Z"}]
+    lastModified: "2026-11-18T22:59:32.631Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
