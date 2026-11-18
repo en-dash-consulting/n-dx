@@ -186,17 +186,17 @@
 
 .audit-task-stale {
   border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
-  border-left: 3px solid var(--orange);
+  background: color-mix(in srgb, var(--orange) 8%, var(--bg-surface));
 }
 
 .audit-task-heartbeat-warning {
   border-color: color-mix(in srgb, var(--orange) 30%, var(--border));
-  border-left: 3px solid var(--orange);
+  background: color-mix(in srgb, var(--orange) 6%, var(--bg-surface));
 }
 
 .audit-task-unresponsive {
   border-color: color-mix(in srgb, var(--red) 40%, var(--border));
-  border-left: 3px solid var(--red);
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
 }
 
 .audit-task-header {

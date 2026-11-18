@@ -24,11 +24,11 @@
   gap: var(--space-2-5);
 }
 
-/* The seeded finding, shown above the question it grounds. Tinted on its
-   leading edge rather than boxed in an accent colour: it is context for the
-   question, not a result or a warning. */
+/* The seeded finding, shown above the question it grounds. A faint tint
+   rather than a box in an accent colour: it is context for the question, not
+   a result or a warning. */
 .sv-ask-seed {
-  border-left: 3px solid var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 6%, var(--bg-surface));
   gap: var(--space-2);
 }
 
@@ -136,7 +136,7 @@
 }
 
 .sv-ask-error {
-  border-left: 3px solid var(--red);
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
 }
 
 .sv-ask-error-message,
@@ -170,7 +170,7 @@
 }
 
 .sv-ask-answer {
-  border-left: 3px solid var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 6%, var(--bg-surface));
 }
 
 .sv-ask-question {

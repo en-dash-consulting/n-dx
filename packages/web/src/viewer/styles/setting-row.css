@@ -119,7 +119,6 @@
 .srow-details {
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--accent-subtle);
   color: var(--text-dim);

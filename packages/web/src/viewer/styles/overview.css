@@ -310,9 +310,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 14px;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--orange) 10%, var(--bg));
   border-radius: 8px;
-  border-left: 3px solid var(--orange);
 }
 
 .attention-name {

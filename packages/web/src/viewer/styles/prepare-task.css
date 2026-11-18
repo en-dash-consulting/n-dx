@@ -126,13 +126,12 @@
 .prep-preflight li {
   margin-bottom: var(--space-1);
   padding: var(--space-1-5) var(--space-2-5);
-  border-left: 3px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg);
 }
-.prep-preflight .prep-refusal { border-left-color: var(--red); }
-.prep-preflight .prep-warn { border-left-color: var(--orange); }
-.prep-preflight .prep-ok { border-left-color: var(--green); }
+.prep-preflight .prep-refusal { background: color-mix(in srgb, var(--red) 10%, var(--bg)); }
+.prep-preflight .prep-warn { background: color-mix(in srgb, var(--orange) 10%, var(--bg)); }
+.prep-preflight .prep-ok { background: color-mix(in srgb, var(--green) 10%, var(--bg)); }
 .prep-hint { color: var(--text-muted); }
 .prep-preflight .prep-btn { margin-left: var(--space-2); }
 

@@ -42,18 +42,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  /* A leading edge rather than a full accent border: each card is one pending
-     decision, and boxing every one in colour would make the list read as a
-     list of warnings. */
-  border-left: 3px solid var(--border-strong);
+  /* A pending card keeps the plain card surface; only a settled one is tinted,
+     so the list does not read as a list of warnings. */
 }
 
 .sv-ask-proposal-applied {
-  border-left-color: var(--green);
+  background: color-mix(in srgb, var(--green) 8%, var(--bg-surface));
 }
 
 .sv-ask-proposal-refused {
-  border-left-color: var(--red);
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
 }
 
 .sv-ask-proposal-title,
