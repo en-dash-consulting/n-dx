@@ -329,7 +329,7 @@ A library copied into the repository by hand (a spreadsheet library in `lib/`, a
 
 - a glob in `sourcevision.thirdParty` (project config), reason `config <glob>`;
 - a glob passed as `--third-party=<glob>` or listed in `--third-party-file=<path>` (one per line, or a JSON array), reason `cli <glob>`; a caller with its own library catalogue passes it this way;
-- a built-in fingerprint, reason `library <Name>`: a library's own header in the file's first 2 KiB (a `@package PHPExcel` docblock, a YUI or Highcharts version banner), a directory named as a well-known library (`edit_area`, `tinymce`, `PHPExcel`), or a directory where at least 80% of the files carry one library's header.
+- a built-in fingerprint, reason `library <Name>`: a library's own header in the file's first 2 KiB (a `@package PHPExcel` docblock, a YUI or Highcharts version banner), a directory named as a well-known library (EditArea in a folder named edit_area, TinyMCE in tinymce, PHPExcel in PHPExcel), or a directory where at least 80% of the files carry one library's header.
 
 Globs use `**`, `*` and `?`; a trailing `/` means the whole directory, and a name without `/` matches at any depth. A glob starting with `!` denies, overriding every rule, so a wrong fingerprint is undone with `"!lib/our-tinymce-plugin/**"`.
 
