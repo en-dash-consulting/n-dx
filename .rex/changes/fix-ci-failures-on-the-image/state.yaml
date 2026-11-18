@@ -5,7 +5,14 @@ items:
     lastModified: "2026-11-18T01:41:39.661Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "60218746-fbc5-4786-9452-a1af5a2e1fa1":
-    lastModified: "2026-11-18T01:40:38.773Z"
+    status: "completed"
+    startedAt: "2026-11-18T02:02:13.289Z"
+    completedAt: "2026-11-18T02:02:57.692Z"
+    endedAt: "2026-11-18T02:02:57.692Z"
+    activeIntervals: [{"end":"2026-11-18T02:02:57.692Z","start":"2026-11-18T02:02:13.289Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added core/change-attachments.ts to v2Files in packages/rex/tests/unit/schema/v2.test.ts with the reason in the comment; v2.test.ts passes 50/50."
+    lastModified: "2026-11-18T02:02:57.692Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "63211e6a-29bf-4b6e-a69d-33cf10ddcbd2":
     lastModified: "2026-11-18T01:40:43.912Z"
