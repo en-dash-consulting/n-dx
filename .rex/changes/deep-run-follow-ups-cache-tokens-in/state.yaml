@@ -8,5 +8,12 @@ items:
     lastModified: "2026-11-18T00:52:28.823Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d842839a-6478-4367-97bc-962252fffa99":
-    lastModified: "2026-11-18T00:52:27.221Z"
+    status: "completed"
+    startedAt: "2026-11-18T01:05:38.077Z"
+    completedAt: "2026-11-18T01:05:38.077Z"
+    endedAt: "2026-11-18T01:05:38.077Z"
+    activeIntervals: [{"end":"2026-11-18T01:05:38.077Z","start":"2026-11-18T01:05:38.077Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Code from hench run b10eee03 (claude-sonnet-5-5, review claude-opus-5-5: 1 low finding, not worth fixing). The run could not commit or run tests because ~/.claude-max had not trusted the checkout. The operator verified the targeted tests (sourcevision run-ledger and token-usage, 30 passing; llm-client cli-provider, 17 passing) and the sourcevision typecheck, then committed the run's paths."
+    lastModified: "2026-11-18T01:05:38.077Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -20,6 +20,10 @@ export interface LLMClassUsage {
   calls: number;
   inputTokens: number;
   outputTokens: number;
+  /** Prompt-cache write tokens; present only when greater than 0. */
+  cacheCreationTokens?: number;
+  /** Prompt-cache read tokens; present only when greater than 0. */
+  cacheReadTokens?: number;
   durationMs: number;
   vendor: string;
   model: string;

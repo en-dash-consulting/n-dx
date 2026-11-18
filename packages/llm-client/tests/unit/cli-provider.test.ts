@@ -186,7 +186,7 @@ describe("createCliClient — stdout error envelope", () => {
       subtype: "success",
       is_error: false,
       result: "SINGLE_RESULT",
-      usage: { input_tokens: 1200, output_tokens: 80, cache_read_input_tokens: 300 },
+      usage: { input_tokens: 1200, output_tokens: 80, cache_read_input_tokens: 300, cache_creation_input_tokens: 45 },
     });
     const { dir, path } = makeFakeCli(body, 0);
 
@@ -194,7 +194,12 @@ describe("createCliClient — stdout error envelope", () => {
       const client = createCliClient({ claudeConfig: { cli_path: path }, maxRetries: 0 });
       const result = await client.complete({ prompt: "test", model: "claude-haiku-4-5" });
       expect(result.text).toBe("SINGLE_RESULT");
-      expect(result.tokenUsage).toMatchObject({ input: 1200, output: 80 });
+      expect(result.tokenUsage).toEqual({
+        input: 1200,
+        output: 80,
+        cacheReadInput: 300,
+        cacheCreationInput: 45,
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

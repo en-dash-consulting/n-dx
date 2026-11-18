@@ -17,6 +17,8 @@ const LLMClassUsageSchema = z.object({
   calls: z.number().int().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
+  cacheCreationTokens: z.number().int().nonnegative().optional(),
+  cacheReadTokens: z.number().int().nonnegative().optional(),
   durationMs: z.number().nonnegative(),
   vendor: z.string(),
   model: z.string(),

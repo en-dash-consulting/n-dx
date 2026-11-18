@@ -72,6 +72,11 @@ export function formatTokenUsage(usage: AnalyzeTokenUsage): string {
     `/ ${usage.outputTokens.toLocaleString()} out)`,
   ];
 
+  const cached = (usage.cacheCreationInputTokens ?? 0) + (usage.cacheReadInputTokens ?? 0);
+  if (cached > 0) {
+    parts.push(`+ ${cached.toLocaleString()} cached`);
+  }
+
   if (usage.calls > 1) {
     parts.push(`across ${usage.calls} LLM calls`);
   }
