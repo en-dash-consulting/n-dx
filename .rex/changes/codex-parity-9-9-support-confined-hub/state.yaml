@@ -11,5 +11,5 @@ items:
     startedAt: "2026-11-18T22:28:26.427Z"
     activeIntervals: [{"end":"2026-11-18T22:31:24.310Z","start":"2026-11-18T22:28:26.427Z"},{"end":"2026-11-18T22:38:17.039Z","start":"2026-11-18T22:33:45.157Z"},{"end":"2026-11-18T22:45:11.896Z","start":"2026-11-18T22:44:21.719Z"},{"end":"2026-11-18T22:54:25.439Z","start":"2026-11-18T22:47:14.974Z"},{"end":"2026-11-18T22:59:29.909Z","start":"2026-11-18T22:59:29.909Z"},{"end":"2026-11-18T23:09:24.234Z","start":"2026-11-18T23:08:20.119Z"}]
     failureReason: "Admission remains unproven. Previous candidate is commit f0c9a83ca (d06cd147 is its run ID), not a completed implementation. This run confirmed loopback listen EPERM, preventing real broker host tests. Live CLI/browser/network/connected-tool admission evidence remains unavailable; installed CLI version was not executed under the workspace-only access restriction. Existing 9 candidate and 18 root evidence/startup checks pass with workspace TMPDIR; these are not confinement proof. Selector and refusal preserved. No source fix established; no superficial changes or completion claim."
-    lastModified: "2026-11-18T23:09:34.197Z"
+    lastModified: "2026-11-18T23:12:23.616Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
