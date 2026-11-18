@@ -11,5 +11,8 @@ items:
     lastModified: "2026-11-18T01:40:43.912Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "9a92e145-bb91-4061-85d6-d444a9233e2c":
-    lastModified: "2026-11-18T01:40:33.067Z"
+    startedAt: "2026-11-18T01:41:58.186Z"
+    activeIntervals: [{"end":"2026-11-18T02:01:17.101Z","start":"2026-11-18T01:41:58.186Z"}]
+    failureReason: "Test gate failed [command: npm run test]: lang-runtime, rex\nFailing tests (8):\n- stops it on POST /api/hub/extensions/:name/stop, and the next request starts it again\n- downloads and extracts when the marker is undefined, then removes the archive\n- downloads and extracts when the marker is mismatched, then removes the archive\n- no runtime module imports the v2 modules yet\n- tests/e2e/extension-fixture.test.js > the fixture extension behind the hub > stops it on POST /api/hub/extensions/:name/stop, and the next request starts it again\n  AssertionError: expected 12912 not to be 12912 // Object.is equality\n- tests/unit/toolchain-cache.test.ts > downloads and extracts when the marker is undefined, then removes the archive\n- tests/unit/toolchain-cache.test.ts > downloads and extracts when the marker is mismatched, then removes the archive\n  AssertionError: expected 2 to be +0 // Object.is equality\n- tests/unit/schema/v2.test.ts > isolation > no runtime module imports the v2 modules yet\n  AssertionError: expected [ 'core\\change-attachments.ts' ] to deeply equal []"
+    lastModified: "2026-11-18T02:01:18.613Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
