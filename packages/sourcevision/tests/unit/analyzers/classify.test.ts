@@ -645,7 +645,8 @@ describe("buildClassificationMap", () => {
 
 // ── Jev (judgment) classification ────────────────────────────────────────────
 
-import { buildJevClassifyRequest } from "../../../src/analyzers/classify.js";
+import { buildJevClassifyRequest, jevClassifyFileBytes } from "../../../src/analyzers/classify.js";
+import { setJevRequestByteCeiling } from "../../../src/analyzers/jev-split.js";
 
 describe("enrichClassificationsWithLLM — Jev route", () => {
   beforeEach(() => {
@@ -771,6 +772,38 @@ describe("enrichClassificationsWithLLM — Jev route", () => {
     expect(result.updatedFiles).toHaveLength(0);
     expect(result.tokenUsage.calls).toBe(1);
     expect(mockedCallClaude).not.toHaveBeenCalled();
+  });
+
+  describe("packing under the request byte ceiling", () => {
+    const paths = Array.from({ length: 35 }, (_, i) => `src/mod${String(i).padStart(2, "0")}.ts`);
+    const answerAll = (async (request: { state: { files: Record<string, unknown> } }) =>
+      jevResponse(Object.fromEntries(Object.keys(request.state.files).map((id) => [id, { choice: "service", probabilities: { service: 0.9 } }])))) as never;
+    const batchSizes = () => mockedAskJev.mock.calls.map(([r]) => Object.keys((r.state as { files: object }).files).length);
+    const run = async () => {
+      const result = await enrichClassificationsWithLLM(makeBase(paths), makeInventory([...paths, "src/index.ts"]), emptyImports);
+      return result.updatedFiles.map((f) => [f.path, f.archetype, f.confidence]);
+    };
+
+    it("batches as count batching did when every batch fits, with the same results", async () => {
+      mockedAskJev.mockImplementation(answerAll);
+      const results = await run();
+      expect(batchSizes()).toEqual([30, 5]);
+      expect(results).toEqual(paths.map((p) => [p, "service", 0.9]));
+    });
+
+    it("packs smaller batches under a smaller ceiling, with the same results and no refusal", async () => {
+      const base = makeBase(paths);
+      const file = base.files.find((f) => f.path === paths[0])!;
+      setJevRequestByteCeiling(10 * jevClassifyFileBytes(file, base.archetypes, ["typescript"]));
+      try {
+        mockedAskJev.mockImplementation(answerAll);
+        const results = await run();
+        expect(batchSizes()).toEqual([10, 10, 10, 5]);
+        expect(results).toEqual(paths.map((p) => [p, "service", 0.9]));
+      } finally {
+        setJevRequestByteCeiling(undefined);
+      }
+    });
   });
 
   it("asks a batch refused as too large again in halves, answering every file", async () => {

@@ -7,7 +7,7 @@
  * fine", not "that number is fine".
  */
 
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -37,6 +37,7 @@ import {
   TYPED_REAL_MIN_PROBABILITY,
 } from "../../../src/analyzers/typed-findings.js";
 import type { TypedFinding, TypedFindingInput } from "../../../src/analyzers/typed-findings.js";
+import { jsonBytes, setJevRequestByteCeiling } from "../../../src/analyzers/jev-split.js";
 
 const mockedRoute = vi.mocked(getJudgmentRoute);
 const mockedAskJev = vi.mocked(askJev);
@@ -293,6 +294,72 @@ describe("judgeTypedFindings", () => {
       expect(log.mock.calls[0][0]).toContain("4/4 outside the uncertain band");
     });
 
+    it("retries a lone refused finding on trimmed evidence and records the level it was judged at", async () => {
+      const zonesAsked: Array<Record<string, Record<string, unknown>>> = [];
+      let bigAsked = 0;
+      mockedAskJev.mockImplementation((async (request: { state: unknown }) => {
+        const asked = texts(request);
+        zonesAsked.push((request.state as { zones: Record<string, Record<string, unknown>> }).zones);
+        // `big` is refused untrimmed and at level 1, answered at level 2.
+        if (asked.includes("finding big") && (asked.length > 1 || ++bigAsked < 3)) throw tooLarge();
+        return { answers: Object.fromEntries(asked.map((_, i) => [`t${i}`, noulAnswer(0.9)])) };
+      }) as never);
+      const log = vi.mocked(console.log);
+
+      const result = await judgeTypedFindings(five, { zones: [zone("core", ["src/alpha.ts"])] });
+
+      expect(result.findings[4].confidence).toBe(0.9);
+      expect(result.trimmedLevels).toEqual(new Map([["finding big", 2]]));
+      expect(zonesAsked.at(-1)!.core).not.toHaveProperty("headers");
+      expect(zonesAsked[0].core).toHaveProperty("headers");
+      expect(vi.mocked(console.warn)).not.toHaveBeenCalled();
+      expect(log.mock.calls[0][0]).toContain("typed findings: 5 judged in");
+      expect(log.mock.calls[0][0]).toContain(", 1 on trimmed evidence (");
+    });
+
+    it("counts in the warning only a finding refused at every trim level", async () => {
+      const bigRequests: string[][] = [];
+      mockedAskJev.mockImplementation((async (request: { state: unknown }) => {
+        const asked = texts(request);
+        if (asked.includes("finding big")) {
+          bigRequests.push(asked);
+          throw tooLarge();
+        }
+        return { answers: Object.fromEntries(asked.map((_, i) => [`t${i}`, noulAnswer(0.9)])) };
+      }) as never);
+
+      const result = await judgeTypedFindings(five, { zones: [zone("core", ["src/alpha.ts"])] });
+
+      // Alone: untrimmed, then levels 1–4.
+      expect(bigRequests.filter((r) => r.length === 1)).toHaveLength(5);
+      expect(result.findings[4].confidence).toBeUndefined();
+      expect(result.findings[4].severity).toBe("warning");
+      expect(result.trimmedLevels.size).toBe(0);
+      expect(vi.mocked(console.warn).mock.calls.map(([m]) => m)).toEqual([
+        "  [judge] 1 typed finding(s) too large for one request — keeping derived severities",
+      ]);
+    });
+
+    it("cuts a finding's edges to four at the last trim level", async () => {
+      const many: TypedFinding = {
+        kind: "hub-file",
+        finding: { type: "observation", pass: 1, scope: "core", text: "finding many", severity: "warning" },
+        edges: Array.from({ length: 12 }, (_, i) => ({ from: `src/m${i}.ts`, to: "src/hub.ts" })),
+      };
+      const edgesAsked: number[] = [];
+      mockedAskJev.mockImplementation((async (request: { state: unknown }) => {
+        const f0 = (request.state as { findings: Record<string, { edges: string[] }> }).findings.f0;
+        edgesAsked.push(f0.edges.length);
+        if (f0.edges.length > 4) throw tooLarge();
+        return { answers: { t0: noulAnswer(0.9) } };
+      }) as never);
+
+      const result = await judgeTypedFindings([many], { zones: [zone("core", ["src/hub.ts"])] });
+
+      expect(edgesAsked).toEqual([12, 12, 12, 12, 4]);
+      expect(result.trimmedLevels.get("finding many")).toBe(4);
+    });
+
     it("still stops on any other failure, keeping every derived severity", async () => {
       mockedAskJev.mockRejectedValue(new ClaudeClientError("TypeSafe returned 400: bad request", "unknown", false));
       const result = await judgeTypedFindings(five, { zones: [zone("core", ["src/alpha.ts"])] });
@@ -300,6 +367,53 @@ describe("judgeTypedFindings", () => {
       expect(result.calls).toBe(0);
       expect(result.findings.every((f) => f.confidence === undefined && f.severity === "warning")).toBe(true);
       expect(vi.mocked(console.warn).mock.calls[0][0]).toContain("typed-finding judgment failed (unknown)");
+    });
+  });
+
+  describe("packing under the request byte ceiling", () => {
+    afterEach(() => setJevRequestByteCeiling(undefined));
+
+    // Six invented findings over two zones.
+    const six: TypedFinding[] = ["a1", "a2", "a3", "b1", "b2", "b3"].map((n) => ({
+      kind: "hub-file",
+      finding: { type: "observation", pass: 1, scope: `zone-${n[0]}`, text: `finding ${n}`, severity: "warning", anchors: [{ file: `src/${n}.ts` }] },
+      edges: [{ from: `src/${n}.ts`, to: "src/shared.ts" }],
+    }));
+    const zones = [zone("zone-a", ["src/a1.ts", "src/a2.ts"]), zone("zone-b", ["src/b1.ts"])];
+    const answerAll = (async (request: { questions: Record<string, unknown> }) => ({
+      answers: Object.fromEntries(Object.keys(request.questions).map((id) => [id, noulAnswer(0.9)])),
+    })) as never;
+    const asked = () => mockedAskJev.mock.calls.map(([r]) => Object.keys((r.state as { findings: object }).findings).length);
+
+    it("sends one request when everything fits, the same request as before packing", async () => {
+      mockedAskJev.mockImplementation(answerAll);
+      const result = await judgeTypedFindings(six, { zones });
+      expect(asked()).toEqual([6]);
+      const [request] = mockedAskJev.mock.calls[0];
+      expect(Object.keys(request.state as object)).toEqual(["findings", "zones"]);
+      expect(Object.keys((request.state as { zones: object }).zones)).toEqual(["zone-a", "zone-b"]);
+      expect(vi.mocked(console.log).mock.calls[0][0]).toBe(
+        "  [judge] typed findings: 6 judged in 1 request(s) — 0 demoted to info, 6/6 outside the uncertain band (0 in / 0 out)",
+      );
+      expect(result.trimmedLevels.size).toBe(0);
+    });
+
+    it("sends more, smaller requests under a small ceiling, with no refusal", async () => {
+      mockedAskJev.mockImplementation(answerAll);
+      // Measure one finding and one zone from an unpacked request, then leave
+      // room for three findings and one zone.
+      await judgeTypedFindings(six, { zones });
+      const [full] = mockedAskJev.mock.calls[0] as unknown as [{ state: { findings: Record<string, unknown>; zones: Record<string, unknown> }; questions: Record<string, unknown> }];
+      const finding = jsonBytes(full.state.findings.f0) + jsonBytes(full.questions.t0);
+      setJevRequestByteCeiling(3 * finding + jsonBytes(full.state.zones["zone-a"]) + 1);
+      mockedAskJev.mockClear();
+
+      const result = await judgeTypedFindings(six, { zones });
+
+      expect(asked()).toEqual([3, 3]);
+      expect(mockedAskJev.mock.calls.map(([r]) => Object.keys((r.state as { zones: object }).zones))).toEqual([["zone-a"], ["zone-b"]]);
+      expect(result.findings.every((f) => f.confidence === 0.9)).toBe(true);
+      expect(vi.mocked(console.warn)).not.toHaveBeenCalled();
     });
   });
 

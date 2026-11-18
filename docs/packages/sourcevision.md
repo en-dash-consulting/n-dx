@@ -386,6 +386,16 @@ A folder that is a near-copy of another (a legacy `edit/` kept beside `app/`) wo
 
 A mirror copy is left out of the same phases as third-party code, and its pack totals and outbound calls are dropped, since its source's are already counted. `sourcevision.mirrors` sets a pair (`{ "edit/": "app/" }`) or denies one (`{ "edit/": false }`).
 
+## Jev request size
+
+Typed-finding judgment and Jev file classification send their items to TypeSafe in batches of at most 20 findings or 30 files, packed so each request's JSON also stays under a byte ceiling: 128 KiB by default (`JEV_REQUEST_BYTE_CEILING` in `src/analyzers/jev-split.ts`, which says how it was chosen). A zone's evidence shared by several findings counts once per request. Set `sourcevision.jev.requestByteCeiling` (a positive integer, in bytes) in the project config to change it:
+
+```json
+{ "sourcevision": { "jev": { "requestByteCeiling": 65536 } } }
+```
+
+A request TypeSafe still refuses as too large (`max_tokens_exceeded`) is sent again as two halves, until each fits. A typed finding refused on its own is asked again on less evidence, one level at a time: 1 drops the zone's file headers, 2 also its declarations and exported symbols, 3 cuts its file sample to 10, 4 cuts the finding's edges to 4. The cuts are fixed, never a model summary, so the judgment cache still hits on the next run. The judgment summary line counts findings judged on trimmed evidence (`, N on trimmed evidence`), and the too-large warning counts only those refused at every level, which keep their derived severity. With `--debug`, each request's size in bytes and whether it was refused is logged.
+
 ## Zone Detection
 
 Zones are detected using Louvain community detection on the import graph, then refined through multiple post-processing passes (small zone absorption, satellite merging, large zone splitting). AI enrichment optionally names zones, writes descriptions, and generates per-zone context files.

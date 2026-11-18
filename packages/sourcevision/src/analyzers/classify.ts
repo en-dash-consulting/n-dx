@@ -35,7 +35,7 @@ import type { PromptEnvelope } from "@n-dx/llm-client";
 import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
 import { collectFileHeaders } from "./file-headers.js";
 import { markBatch } from "./analyze-progress.js";
-import { askSplittingWhenTooLarge } from "./jev-split.js";
+import { askSplittingWhenTooLarge, jevRequestByteCeiling, jsonBytes, logJevRequest, packBySize } from "./jev-split.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -403,11 +403,11 @@ export async function enrichClassificationsWithLLM(
     .sort((a, b) => b[1] - a[1])
     .map(([lang]) => lang);
 
-  // Batch unclassified files
-  const batches: FileClassification[][] = [];
-  for (let i = 0; i < unclassified.length; i += LLM_BATCH_SIZE) {
-    batches.push(unclassified.slice(i, i + LLM_BATCH_SIZE));
-  }
+  // Batch unclassified files: by count for the text model, and for Jev also
+  // under the request byte ceiling.
+  const batches = judgmentRoute === "typesafe"
+    ? packBySize(unclassified, (f) => jevClassifyFileBytes(f, archetypeCatalog, projectLanguages), jevRequestByteCeiling(), { maxCount: LLM_BATCH_SIZE })
+    : packBySize(unclassified, () => 0, Infinity, { maxCount: LLM_BATCH_SIZE });
 
   // Valid archetype IDs for validation
   const validIds = new Set(classifications.archetypes.map((a) => a.id));
@@ -654,6 +654,19 @@ export function buildJevClassifyRequest(
 }
 
 /**
+ * What one file adds to a Jev classification request, in UTF-8 bytes: its
+ * state entry and its question, which carries the whole archetype catalog.
+ */
+export function jevClassifyFileBytes(
+  file: FileClassification,
+  archetypes: ArchetypeDefinition[],
+  projectLanguages: string[],
+): number {
+  const { state, questions } = buildJevClassifyRequest([file], archetypes, projectLanguages);
+  return jsonBytes((state as { files: Record<string, JsonValue> }).files.f0) + jsonBytes(questions.f0);
+}
+
+/**
  * Classify a batch by asking Jev. No attempt ladder: the answer is an option
  * id with a probability, so there is no free text to fail to parse. Three
  * outcomes per file: a probability at or above {@link JEV_MIN_PROBABILITY}
@@ -706,14 +719,17 @@ async function askJevForFiles(
   const { state, questions, ids } = buildJevClassifyRequest(files, archetypes, projectLanguages);
   const spinner = startSpinner(`  [classify]${batchLabel} Asking Jev (${files.length} files)...`);
 
+  const bytes = jsonBytes({ state, questions });
   let response;
   try {
     response = await askJev({ state, questions }, { taskClass: "code.classify" });
   } catch (err) {
+    logJevRequest("code.classify", bytes, err);
     spinner.stop();
     if (err instanceof ClaudeClientError) accumulateTokenUsage(tokenUsage, undefined);
     throw err;
   }
+  logJevRequest("code.classify", bytes);
   spinner.stop();
   accumulateTokenUsage(tokenUsage, response.tokenUsage);
   tokenUsage.model = response.model;

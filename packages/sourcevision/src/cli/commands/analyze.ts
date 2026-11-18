@@ -49,6 +49,7 @@ import { markOutboundThirdParty, outsideStructurePredicate, parseThirdPartyGlobF
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { enrichTerraformInfrastructure } from "../../analyzers/terraform-infrastructure.js";
+import { setJevRequestByteCeiling } from "../../analyzers/jev-split.js";
 import { terraformConfig } from "@n-dx/lang-kit";
 import { loadInventoryConfig } from "../../language/detect.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
@@ -231,6 +232,7 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   configureJudgmentCache(cacheOwner);
   configureRerunLog(cacheOwner);
   configureRuleCache(cacheOwner);
+  setJevRequestByteCeiling(loadJevRequestByteCeiling(resolveLayout(absDir).configFile));
   // The Jev client is foundation-tier and cannot import the run ledger, so the
   // accounting is handed to it here — once, beside the cache it also owns.
   setJevObserver({ onCall: recordLLMCall, onCacheStats: recordJudgmentCache });
@@ -976,6 +978,27 @@ export function loadZoneTypes(configPath: string): Record<string, ZoneType> | un
     }
   } catch {
     // Invalid config — no zone types
+  }
+  return undefined;
+}
+
+/**
+ * Load the Jev request byte ceiling from the project config (synchronous).
+ *
+ * Takes the resolved config path, for the reason given on
+ * {@link loadRiskJustifications}.
+ *
+ * Returns `sourcevision.jev.requestByteCeiling` when it is a positive integer,
+ * else undefined (the default ceiling applies).
+ */
+export function loadJevRequestByteCeiling(configPath: string): number | undefined {
+  try {
+    if (!existsSync(configPath)) return undefined;
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const ceiling = data?.sourcevision?.jev?.requestByteCeiling;
+    if (Number.isInteger(ceiling) && ceiling > 0) return ceiling as number;
+  } catch {
+    // Invalid config — default ceiling
   }
   return undefined;
 }
