@@ -81,21 +81,11 @@ what it prints.
 
 ### The Terraform model in infrastructure.json
 
-The Terraform pack produces `resources` facts, not imports.
-`enrichTerraformInfrastructure` (called by `analyze` after
-`computeInfrastructure`) adds optional `module`, `provider` (`{ name,
-version? }`), `references` (`infra:<type>.<name>` ids of listed resources in the
-same module directory) and `attributes` (`engine`, `engineVersion`, `runtime`,
-`image`, `clusterVersion`) to each resource it lists from a `.tf` file whose file
-and `<type>.<name>` match a fact. Values are as written, never normalised; a
-field appears only when the pack supplied it. When the pack resolved a
-module's attributes per instance (several facts at one declaration), an
-attribute is stored resolved only when every instance gives the same value,
-else as the expression written. It never adds or removes a
-resource, link or seam or changes an existing field, so resources only the
-model finds stay out. `analyzers/infrastructure.ts` and `IAC_KINDS` are not
-involved, so the iso-map bundle does not change. Without the pack the file is
-byte-identical. The field names await Sterling H's review (decision 3).
+`enrichTerraformInfrastructure` (after `computeInfrastructure`) only adds
+optional fields to resources already listed, as written; it never adds or
+removes a resource, link or seam, and without the pack the file is
+byte-identical. Fields and rules:
+[Terraform pack facts](../../docs/packages/sourcevision.md#terraform-pack-facts).
 
 ### Pack routes and outbound calls
 
@@ -129,18 +119,12 @@ even with none found.
 
 ### Terraform as a database-engine source
 
-`language/database-engines.ts` takes the Terraform pack's resource facts as
-`DatabaseEngineInput.terraformFacts`, supplied by the caller (today only
-`scripts/database-corpus-report.mjs`); it imports no pack, is not wired into
-`analyze` and writes nothing. A database resource yields a `terraform`-signal
-candidate: a mapped `engine` (Cloud SQL: `database_version`) is strong, an
-engine implied by the type alone (Azure servers) is weak, and a resource that
-gives neither (a reusable module's `var.engine` no call resolves) adds a
-notice. A reusable module yields one candidate per engine its module calls
-pass; the evidence text names where the value is written, and a
-`conditional` value (`cond ? null : var.engine`) is weak. Engine strings
-and resource types live in `TERRAFORM_ENGINE_TABLE` and
-`TERRAFORM_RESOURCE_TABLE`, each entry with its provider page.
+`language/database-engines.ts` takes the Terraform pack's resource facts from
+its caller (today only `scripts/database-corpus-report.mjs`); it imports no
+pack, is not wired into `analyze` and writes nothing. Engine strings and
+resource types live in `TERRAFORM_ENGINE_TABLE` and `TERRAFORM_RESOURCE_TABLE`,
+each entry with its provider page. Signal strengths:
+[Terraform pack facts](../../docs/packages/sourcevision.md#terraform-pack-facts).
 
 ### How packs are installed
 

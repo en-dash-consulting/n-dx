@@ -9,9 +9,23 @@ items:
     lastModified: "2026-11-18T04:45:39.063Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2791860e-20d2-43b8-a2df-665ee467fc28":
+    status: "completed"
+    startedAt: "2026-11-18T04:49:57.266Z"
+    completedAt: "2026-11-18T04:49:57.266Z"
+    endedAt: "2026-11-18T04:49:57.266Z"
+    activeIntervals: [{"end":"2026-11-18T04:49:57.266Z","start":"2026-11-18T04:49:57.266Z"}]
+    appliedAt: "2026-11-18T04:49:57.266Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T04:44:20.901Z"
-    lastModified: "2026-11-18T04:44:40.336Z"
+    lastModified: "2026-11-18T04:49:57.266Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ffd82261-2a28-4400-8a54-c179dbd09d88":
-    lastModified: "2026-11-18T04:44:38.564Z"
+    status: "completed"
+    startedAt: "2026-11-18T04:45:48.750Z"
+    completedAt: "2026-11-18T04:49:57.266Z"
+    endedAt: "2026-11-18T04:49:57.266Z"
+    activeIntervals: [{"end":"2026-11-18T04:49:57.266Z","start":"2026-11-18T04:45:48.750Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-php AGENTS.md 10,938→7,894 B; sourcevision AGENTS.md 10,364→9,189 B. Detail moved verbatim to docs/packages/sourcevision.md (PHP pack rules; new Terraform pack facts section) and linked."
+    lastModified: "2026-11-18T04:49:57.266Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
