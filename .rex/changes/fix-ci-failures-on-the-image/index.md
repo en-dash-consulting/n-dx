@@ -7,6 +7,8 @@ summary: "PR #1085 adds gateway exports and a rex module that imports the v2 rea
 intent: "CI on feat/prd-add-image-attachments fails in root, rex and web suites. Two failures are stale import/export allowlists for the new attachment surface; one is a preact act() leak in the new smart-add-input test."
 acceptanceCriteria:
   - "Tests (root, rex, web) pass for the branch"
+touches:
+  - "3181cbc2-b8b7-45cf-98cc-abccadfe7352"
 priority: "high"
 source: "ndx-capture"
 ---
