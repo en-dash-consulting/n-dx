@@ -129,7 +129,7 @@ const current = { packageDir: join("/c", "packages", "web"), version: "1.2.3", s
 const stale = { ...current, current: false, lagging: true };
 const watchBuilt = { ...current, current: false, lagging: false };
 const published = { packageDir: "/n/node_modules/@n-dx/web", version: "1.2.3", sourceHash: null, sourceLinked: false, current: null, lagging: null };
-const here = hereServerCommands("start", false);
+const here = hereServerCommands("start");
 
 describe("serverRefreshFix", () => {
   it("never tells a single-project server's user to run pnpm: a lagging dist/ was rebuilt before spawning", () => {
@@ -144,10 +144,9 @@ describe("serverRefreshFix", () => {
     expect(serverRefreshFix(published, here)).toBe("reinstall n-dx so @n-dx/web matches this ndx");
   });
 
-  it("names the commands that address the server it is for: --here, --preview, ndx web", () => {
-    expect(hereServerCommands("start", false)).toMatchObject({ stop: "ndx start --here stop", start: "ndx start --here" });
-    expect(hereServerCommands("start", true)).toMatchObject({ stop: "ndx start --preview stop", start: "ndx start --preview" });
-    expect(hereServerCommands("web", false)).toMatchObject({ stop: "ndx web --here stop", start: "ndx web --here" });
+  it("names the commands that address the server it is for: --here, ndx web", () => {
+    expect(hereServerCommands("start")).toMatchObject({ stop: "ndx start --here stop", start: "ndx start --here" });
+    expect(hereServerCommands("web")).toMatchObject({ stop: "ndx web --here stop", start: "ndx web --here" });
   });
 });
 

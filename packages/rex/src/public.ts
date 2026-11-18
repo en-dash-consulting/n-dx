@@ -748,5 +748,9 @@ export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store
 export { buildChangeBrief, renderChangeBrief } from "./core/change-brief.js";
 export type { ChangeBrief, ChangeBriefOptions, BriefCommands, BriefLogEntry } from "./core/change-brief.js";
 
+// Images attached to a change: stored in its folder, listed for the agent brief.
+export { attachImages, listAttachments, AttachmentError } from "./core/change-attachments.js";
+export type { AttachmentImage, NodeAttachments } from "./core/change-attachments.js";
+
 // Whole-tree write policy, shared by CLI, MCP and dashboard bulk routes.
 export { checkBranchGuard, branchGuardRefusal } from "./core/branch-guard.js";

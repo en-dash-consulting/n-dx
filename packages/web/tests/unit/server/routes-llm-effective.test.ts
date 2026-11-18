@@ -285,3 +285,18 @@ describe("GET /api/llm/config — effective block", () => {
     });
   });
 });
+
+describe("GET /api/llm/config — imageInput", () => {
+  const imageInput = async (): Promise<unknown> => (await (await fetch(`${baseUrl}/api/llm/config`)).json()).imageInput;
+
+  it("is true for the default Claude agent model", async () => {
+    expect(await imageInput()).toBe(true);
+  });
+
+  it("follows the model ndx work runs: a local coder model takes no images, a local vision model does", async () => {
+    await writeNdxConfig({ llm: { vendor: "local", local: { model: "qwen2.5-coder:14b" } } });
+    expect(await imageInput()).toBe(false);
+    await writeNdxConfig({ llm: { vendor: "local", local: { model: "llava:13b" } } });
+    expect(await imageInput()).toBe(true);
+  });
+});

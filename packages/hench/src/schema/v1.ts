@@ -2463,6 +2463,12 @@ export interface TaskBrief {
    * code that reads single fields (title, status, acceptance criteria).
    */
   changeBrief?: TaskBriefChangeSection[];
+  /**
+   * On a v2 tree, the images attached to the unit's change (and to the unit
+   * itself when it has a folder of its own), as paths relative to the project
+   * directory when it is known, else absolute. Absent when there are none.
+   */
+  attachments?: string[];
   task: TaskBriefTask;
   parentChain: TaskBriefParent[];
   siblings: TaskBriefSibling[];

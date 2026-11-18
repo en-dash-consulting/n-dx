@@ -38,6 +38,7 @@ import {
   isPlausibleLlmHost,
   isValidPort,
   describeLocalEndpointProblem,
+  acceptsImageInput,
 } from "@n-dx/llm-client";
 import type { LLMConfig, LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import {
@@ -161,6 +162,12 @@ export interface LlmConfigResponse {
    * own, so the rules live only here, beside the validators they come from.
    */
   effectiveProblems: EffectiveProblem[];
+  /**
+   * Whether the model `ndx work` runs ({@link LlmConfigResponse.effective})
+   * takes image input. Quick Add offers to attach images to a new change only
+   * when it does, since that model is the one that will look at them.
+   */
+  imageInput: boolean;
   /**
    * The model tier table for the active vendor: the model each tier resolves
    * to, the key that supplied it, and the commands that run on it. See
@@ -699,6 +706,7 @@ function resolveLlmConfig(snapshot: ConfigSnapshot): LlmResolution {
 
 function extractLlmConfig(projectDir: string): LlmConfigResponse {
   const snapshot = readConfigSnapshot(projectDir);
+  const resolution = resolveLlmConfig(snapshot);
   const config = snapshot.ndx;
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
@@ -748,7 +756,8 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
       ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
     agentModels: readAgentModels(config),
-    ...resolveLlmConfig(snapshot),
+    ...resolution,
+    imageInput: acceptsImageInput(resolution.effective.vendor, resolution.effective.model),
     vendorTiers: buildVendorTiers(parseLLMConfig(config)),
     routeOverrides: buildRouteOverrides(parseLLMConfig(config)),
   };

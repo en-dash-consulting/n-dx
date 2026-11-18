@@ -236,6 +236,8 @@ describe("hench → rex gateway contract", () => {
     "openChangeTasks",
     // v2 agent brief
     "buildChangeBrief",
+    // the change folder's image attachments the brief lists
+    "listAttachments",
     // v2 completion — what update_task_status runs on a v2 tree
     "completeV2Work",
     // v2 applied changes — a failure after the completion keeps an applied change's completion
@@ -569,6 +571,9 @@ describe("web → rex gateway contract", () => {
     "ChangePlacementError",
     "placementStrength",
     "draftChangePlacement",
+    // Quick Add's image attachments, stored in the new change's folder
+    "attachImages",
+    "AttachmentError",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -885,7 +890,7 @@ describe("gateway export auto-detection", () => {
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
-        "openChangeTasks", "buildChangeBrief", "completeV2Work",
+        "openChangeTasks", "buildChangeBrief", "listAttachments", "completeV2Work",
         "isAppliedChange", "indexTree", "enclosingChangeIds", "awaitsPlacement", "loadPrdModel",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
@@ -1062,6 +1067,8 @@ describe("gateway export auto-detection", () => {
         "suggestPlacements", "recordPlacement", "recordProposal", "recordUnplacement", "ChangePlacementError", "placementStrength", "draftChangePlacement",
         // The Sidecar change-set card flags proposed items with smart add's own matcher.
         "findDuplicateItem",
+        // Quick Add's image attachments, stored in the new change's folder.
+        "attachImages", "AttachmentError",
         // Ready to run shows a change with no tasks as one task.
         "changeWorkShape"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",

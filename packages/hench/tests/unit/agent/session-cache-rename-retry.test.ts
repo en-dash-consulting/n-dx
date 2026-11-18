@@ -12,8 +12,7 @@
  * This was not theoretical: a full-suite run failed in `batch-chain.test.ts`
  * with `EPERM: operation not permitted, rename '…session-cache.json.30212.tmp'
  * -> '…session-cache.json'`, from the production path, under load. The same
- * class is documented in `preview.ts`, which serialises its renames for it, and
- * in the test helpers' `RM_RETRY`.
+ * class is documented in the test helpers' `RM_RETRY`.
  *
  * The failure is faked rather than provoked: producing a real EPERM needs a
  * second process holding the file at the exact moment of the rename, which is
@@ -123,8 +122,7 @@ describe("session cache: transient rename failures", () => {
     // the second write overwrites the first's scratch file, and the first
     // rename then publishes contents it never wrote, or fails ENOENT because
     // the other rename already consumed it. The lock makes that unreachable
-    // today, and the name should not be the reason — `preview.ts` reached the
-    // same conclusion from the other direction, having no lock at all.
+    // today, and the name should not be the reason.
     for (let i = 0; i < 5; i++) {
       await writeSessionCache(henchDir, { ...ENTRY, parentId: `sess-${i}` });
     }
