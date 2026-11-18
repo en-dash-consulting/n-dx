@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "9e063540-8e69-4e41-9581-c7bb15663684":
+    status: "completed"
+    startedAt: "2026-11-18T04:43:22.740Z"
+    completedAt: "2026-11-18T04:43:22.740Z"
+    endedAt: "2026-11-18T04:43:22.740Z"
+    activeIntervals: [{"end":"2026-11-18T04:43:22.740Z","start":"2026-11-18T04:43:22.740Z"}]
+    appliedAt: "2026-11-18T04:43:22.740Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T04:41:40.103Z"
-    lastModified: "2026-11-18T04:41:48.050Z"
+    lastModified: "2026-11-18T04:43:22.740Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e54ea948-bd6e-465c-9b6f-3bd8e10564b3":
-    lastModified: "2026-11-18T04:41:48.050Z"
+    status: "completed"
+    startedAt: "2026-11-18T04:42:15.716Z"
+    completedAt: "2026-11-18T04:43:22.740Z"
+    endedAt: "2026-11-18T04:43:22.740Z"
+    activeIntervals: [{"end":"2026-11-18T04:43:22.740Z","start":"2026-11-18T04:42:15.716Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-php vitest.config.ts sets test.maxWorkers from testMaxWorkers(), matching lang-python."
+    lastModified: "2026-11-18T04:43:22.740Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
