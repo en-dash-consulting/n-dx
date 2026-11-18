@@ -1,7 +1,8 @@
 # Codex policy boundary evidence — 2026-11-18
 
-Task: `9285e760-055c-4638-adf0-63358f35a339`. Incomplete; do not use this
-record as admission evidence for Codex hub sessions.
+Task: `9285e760-055c-4638-adf0-63358f35a339`. Supported policy controls and
+capability reporting are verified below. This is not admission evidence for
+Codex hub sessions: native repository-read confinement remains unsupported.
 
 ## Same-task correction — 2026-11-18
 
@@ -38,8 +39,19 @@ access, approval on request, network access and an additional writable root.
 The outside-read canary succeeded on every live turn. Hub admission therefore
 remains refused. The Git update exercised filesystem protection for `.git/config`.
 Native Git-subcommand filtering remains unsupported. The host observations cover
-workspace-write on this macOS binary. Runtime coverage of the other sandbox
-modes, other versions, Windows and browser flows remains outstanding.
+workspace-write on this macOS binary. Other versions, Windows and browser
+flows remain untested.
+
+After the correction completed, the coordinator reran the native sandbox
+probe against the final build in workspace-write and read-only modes. Both
+denied outside and temporary-directory writes, the local socket operation and
+the Git config update; both allowed `git status`. Read-only also denied the
+workspace write. The final workspace-write configuration flags exactly matched
+the original reviewed kernel record. These final native-command results are
+recorded separately as `pr8-final-kernel-workspace-write.json` and
+`pr8-final-kernel-read-only.json`; they are not additional model-session tests.
+No full-access bypass was executed. Live read-only continuation sessions remain
+untested; the real fresh/resume/fork observations above cover workspace-write.
 
 Validation in the correction session: llm-client build passed; 151 focused
 llm-client tests passed; 427 Hench adapter/fixture/Git-guard tests passed, plus
