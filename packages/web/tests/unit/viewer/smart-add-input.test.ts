@@ -1254,11 +1254,16 @@ describe("SmartAddInput image attachments on a v2 PRD", () => {
     throw new Error("timed out waiting for the component");
   }
 
+  /** Let reads an effect started at the end of the last act() land inside act() too. */
+  async function settle() {
+    for (let i = 0; i < 5; i++) await tick();
+  }
+
   async function mount(layout: "v1" | "v2") {
     const root = document.createElement("div");
     mounted.push(root);
     await act(async () => { render(h(SmartAddInput, { onPrdChanged: vi.fn(), layout }), root); });
-    for (let i = 0; i < 5; i++) await tick();
+    await settle();
     return root;
   }
 
@@ -1270,12 +1275,27 @@ describe("SmartAddInput image attachments on a v2 PRD", () => {
     await until(() => root.querySelector(".smart-add-attachment, .smart-add-error") !== null);
   }
 
+  /**
+   * Click `selector` and wait a task inside the same act(), so the handler's
+   * fetch chain commits inside it, then settle: Add's refreshScopes() starts a
+   * scope read in an effect that only runs as that act() ends. A commit outside
+   * act() arms preact's real setTimeout(35) after-paint fallback, which the
+   * frame-leak guard fails the file on when it is still pending at afterAll.
+   */
+  async function click(root: HTMLElement, selector: string) {
+    await act(async () => {
+      root.querySelector<HTMLButtonElement>(selector)!.click();
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+    await settle();
+  }
+
   async function addChange(root: HTMLElement) {
     const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
     await act(async () => { typeInTextarea(textarea, "Redo the checkout header"); });
-    await act(async () => { root.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!.click(); });
+    await click(root, ".smart-add-btn-generate");
     await until(() => root.querySelector(".smart-add-btn-accept") !== null);
-    await act(async () => { root.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!.click(); });
+    await click(root, ".smart-add-btn-accept");
   }
 
   beforeEach(() => {
@@ -1286,7 +1306,7 @@ describe("SmartAddInput image attachments on a v2 PRD", () => {
 
   afterEach(async () => {
     // Let late reads land inside act(), then unmount inside it too.
-    for (let i = 0; i < 5; i++) await tick();
+    await settle();
     for (const root of mounted) await act(async () => { render(null, root); });
     mounted = [];
     vi.restoreAllMocks();
