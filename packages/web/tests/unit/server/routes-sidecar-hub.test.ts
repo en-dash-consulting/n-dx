@@ -244,11 +244,13 @@ describe("one hub session per machine", () => {
     expect(prompts).toHaveLength(2);
   });
 
-  it("refuses Codex, naming that its read-only sandbox can still read repositories", async () => {
+  it("refuses Codex without an available audited executable", async () => {
+    const platform = vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     const host = await startHost(1001, 4321);
     const res = await hubApi(host, "", { method: "POST", body: { vendor: "codex" } });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/Codex: its read-only sandbox can still read repositories/);
+    expect((await res.json()).error).toMatch(/require macOS and codex-cli 0\.167\.0-alpha\.3\.2/);
+    platform.mockRestore();
     expect(existsSync(join(hubSidecarDir(home), "index.json"))).toBe(false);
   });
 

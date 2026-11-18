@@ -52,7 +52,9 @@ import { renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
+import { admitCodexHub, hubCodexSnapshotPath } from "./hub-codex.js";
 import {
+  candidateCodexHubSpawn,
   hubVendorRefusal,
   sidecarCodexSpawn,
   sidecarSpawnFlags,
@@ -245,12 +247,34 @@ export function sidecarSessionConnect(
   envDir?: string,
   idleMs: SidecarRegistryOptions["ttlMs"] = DEFAULT_SIDECAR_TTL_MS,
 ): SidecarSessionConnect {
+  const admitted = new Map<string, { identity: string; spawn: ReturnType<typeof candidateCodexHubSpawn> }>();
   return async (record) => {
     // Checked again here, past the create route: a hand-edited index must not open a hub session on a vendor that can read repositories.
-    const refusal = record.scope === "hub" ? hubVendorRefusal(record.vendor) : null;
+    const hubCodex = record.scope === "hub" && record.vendor === "codex";
+    const refusal = record.scope === "hub" && !hubCodex ? hubVendorRefusal(record.vendor) : null;
     if (refusal) throw new Error(refusal);
     const endpoint = broker?.(record.id);
     const isCodex = record.vendor === "codex";
+    if (hubCodex) {
+      if (!endpoint || !envDir || record.worktree !== dir) throw new Error("Codex hub requires its host, broker and dedicated workspace");
+      const settings = await admitCodexHub(envDir);
+      const previous = admitted.get(record.id);
+      if (previous && previous.identity !== settings.identity) throw new Error("Codex hub executable identity changed; end the session before selecting another executable");
+      previous?.spawn.codex.turnConfigFlags?.();
+      const profile = candidateCodexHubSpawn(endpoint, typeof idleMs === "function" ? idleMs() : idleMs, {
+        cwd: dir, snapshot: hubCodexSnapshotPath(dir, record.id), repositories: [envDir],
+        version: settings.version, platform: process.platform,
+      });
+      const spawn = {
+        ...profile,
+        codex: { ...profile.codex, turnConfigFlags: () => {
+          settings.check();
+          return profile.codex.turnConfigFlags?.() ?? [];
+        } },
+      };
+      if (!previous) admitted.set(record.id, { identity: settings.identity, spawn });
+      return { ...settings, codex: spawn.codex, extraEnv: spawn.env };
+    }
     const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs, record.worktree);
     return {
       ...await resolveSidecarSessionEnv(envDir ?? record.worktree),
@@ -627,6 +651,7 @@ export class SidecarSessionRegistry {
       append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
       guard.observe(event);
     };
+    if (record.scope === "hub" && record.vendor === "codex") await this.connect(record);
     const result = await live.session.sendTurn(this.context?.checkpointPrompt ?? CHECKPOINT_PROMPT);
     record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
     if (result.status !== "completed") {
@@ -784,9 +809,12 @@ export class SidecarSessionRegistry {
   /** The open vendor session, resuming the stored id when there is none — after a restart or the TTL. */
   private async liveSession(record: SidecarSessionRecord, signal: AbortSignal): Promise<LiveSession | undefined> {
     const existing = this.live.get(record.id);
-    if (existing) return existing;
+    // A hub Codex turn revalidates selected binary, config and filesystem
+    // identity even when the previous turn left an in-memory session handle.
+    if (existing && !(record.scope === "hub" && record.vendor === "codex")) return existing;
     const connection = await this.connect(record);
     if (signal.aborted) return undefined;
+    if (existing) return existing;
     const options: VendorSessionOptions = {
       ...connection,
       vendor: record.vendor,

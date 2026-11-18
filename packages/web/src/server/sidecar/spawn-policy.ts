@@ -67,9 +67,9 @@
  *
  * **Hub scope.** The hub session works from the hub snapshot and must not
  * read any repository, so its Claude spawn gets no built-in tool at all
- * (`--tools ""`): the broker is all it has. Codex cannot be confined that
- * far — its read-only sandbox still reads every file — so a hub session is
- * Claude-only ({@link hubVendorRefusal}).
+ * (`--tools ""`): the broker is all it has. Codex uses the exact host-audited
+ * macOS permission profile below, never the ordinary read-only sandbox.
+ * Admission checks the selected executable and paths again on each turn.
  */
 
 import { chmodSync, lstatSync, realpathSync, writeFileSync } from "node:fs";
@@ -88,10 +88,16 @@ export const SIDECAR_READ_TOOLS = ["Read", "Grep", "Glob"] as const;
 export const HUB_SIDECAR_TOOLS: readonly string[] = [];
 
 /** Why a hub-scope session cannot run on `vendor`, or null when it can. */
-export function hubVendorRefusal(vendor: string): string | null {
+export const CODEX_HUB_VERSION = "0.167.0-alpha.3.2";
+export const CODEX_HUB_BINARY = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex";
+export const CODEX_HUB_SHA256 = "a636331ed87605efc4cf84028ac2884a75363f9d10ead63cffb57ea0016d486e";
+export const CODEX_HUB_REQUIREMENT = `Codex hub sessions require macOS and codex-cli ${CODEX_HUB_VERSION}; other platforms and versions are unverified. Configure llm.codex.cli_path to the audited executable, or use Claude.`;
+
+export function hubVendorRefusal(vendor: string, audited?: { platform: NodeJS.Platform; version: string }): string | null {
   if (vendor === "claude") return null;
   if (vendor === "codex") {
-    return "A hub session cannot run on Codex: its read-only sandbox can still read repositories, and the hub session works from the hub snapshot alone";
+    if (audited?.platform === "darwin" && audited.version === CODEX_HUB_VERSION) return null;
+    return `A hub session cannot run on Codex without verified confinement. ${CODEX_HUB_REQUIREMENT}`;
   }
   return `A hub session runs on Claude only, not "${vendor}"`;
 }
@@ -238,7 +244,7 @@ export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, i
   };
 }
 
-/** Inputs for the unadmitted hub policy candidate. Never read from project config. */
+/** Inputs for the host-audited hub profile. Never read from project config. */
 export interface CodexHubCandidateOptions {
   cwd: string;
   /** A dedicated, broker-produced snapshot file, never the session/credential directory. */
@@ -251,19 +257,19 @@ export interface CodexHubCandidateOptions {
 }
 
 /**
- * Host-fixture candidate only: NOT admission evidence or a dashboard opt-in.
+ * The host-audited profile, shared by production admission and the host fixture.
  * Reuses the production broker transport and secret masking. The permission
  * profile replaces (never combines with) legacy read-only flags on fresh and
  * resumed turns. Every turn rechecks path identity before invoking the CLI.
- * Only the supplied macOS version has native filesystem evidence; network,
- * arbitrary repository denial and the full broker lifecycle remain unproven.
+ * Only the supplied macOS version has native filesystem, network and broker
+ * lifecycle evidence. Browser validation remains a separate host acceptance.
  */
 export function candidateCodexHubSpawn(
   endpoint: SidecarBrokerEndpoint,
   idleMs: number,
   options: CodexHubCandidateOptions,
 ): SidecarCodexSpawn {
-  if (options.platform !== "darwin" || options.version !== "0.167.0-alpha.3.2") {
+  if (hubVendorRefusal("codex", options)) {
     throw new Error("Codex hub candidate requires macOS codex-cli 0.167.0-alpha.3.2; other versions/platforms are unverified");
   }
   if (!options.repositories.length) throw new Error("Codex hub candidate requires explicit repository denials");

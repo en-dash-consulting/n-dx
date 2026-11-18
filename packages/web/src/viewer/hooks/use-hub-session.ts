@@ -44,7 +44,7 @@ export function readHubSessionPageConfig(doc: Document = document): HubSessionPa
   return keys.every((k) => typeof parsed[k] === "string") ? (parsed as HubSessionPageConfig) : null;
 }
 
-/** The hub-scope session through the hub: Claude only, on the hub lens. */
+/** The hub lens, defaulting to Claude; the drawer offers admitted vendors. */
 export function hubSidecarEndpoint(config: HubSessionPageConfig): SidecarEndpoint {
   return {
     sessions: config.sessions,
@@ -57,6 +57,7 @@ export function hubSidecarEndpoint(config: HubSessionPageConfig): SidecarEndpoin
 export interface HubLensInfo {
   lens: { id: string; available: boolean; needs?: string };
   ceiling: number;
+  vendors?: Array<{ vendor: string; available: boolean; reason?: string }>;
 }
 
 /** Mirrors `HubSnapshotDeltaResponse` in server/routes-sidecar.ts. */
@@ -109,9 +110,9 @@ export interface HubSessionInfo {
   snapshot: HubSnapshotDelta | "loading" | null;
 }
 
-async function getJson<T>(url: string): Promise<T | null> {
+async function getJson<T>(url: string, method = "GET"): Promise<T | null> {
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { method });
     return res.ok ? (await res.json()) as T : null;
   } catch {
     return null;
@@ -137,7 +138,7 @@ export function useHubSessionInfo(
   useEffect(() => {
     if (!open || lens) return;
     let live = true;
-    void getJson<HubLensInfo>(config.lens).then((body) => {
+    void getJson<HubLensInfo>(config.lens, "POST").then((body) => {
       if (live && body?.lens) setLens(body);
     });
     return () => { live = false; };

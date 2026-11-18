@@ -84,12 +84,12 @@ it("rereads hostile project MCP declarations every turn without granting their t
   expect(candidate.codex.turnConfigFlags!()).toContain("mcp_servers.hostile.enabled=false");
 });
 
-it("does not admit Codex to production hub sessions", async () => {
+it("cannot admit Codex without the production host and broker", async () => {
   candidateCodexHubSpawn(endpoint, 1000, options);
   expect(hubVendorRefusal("codex")).toMatch(/cannot run/);
   const at = new Date().toISOString();
   await expect(sidecarSessionConnect(options.cwd)({
     id: "fixture", scope: "hub", worktree: options.cwd, vendor: "codex", name: "fixture",
     cursor: 0, turns: 0, tokens: { input: 0, output: 0 }, createdAt: at, lastActivityAt: at,
-  })).rejects.toThrow(/cannot run/);
+  })).rejects.toThrow(/requires/);
 });
