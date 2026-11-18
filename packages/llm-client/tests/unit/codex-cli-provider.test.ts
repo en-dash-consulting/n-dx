@@ -103,6 +103,32 @@ describe("Codex policy flag compilation", () => {
   });
 
   describe("compileCodexPolicyFlags", () => {
+    it("refuses limits that the selected sandbox cannot express on fresh and continuation turns", () => {
+      for (const resume of [false, true]) {
+        for (const approvals of ["never", "on-request"] as const) {
+          const policy = { ...DEFAULT_EXECUTION_POLICY, approvals };
+          expect(() => compileCodexPolicyFlags({ ...policy, sandbox: "danger-full-access", writableRoots: [] }, { resume }))
+            .toThrow(/networkAccess=false/);
+          expect(() => compileCodexPolicyFlags({ ...policy, sandbox: "danger-full-access", networkAccess: true }, { resume }))
+            .toThrow(/writableRoots/);
+          expect(() => compileCodexPolicyFlags({ ...policy, sandbox: "read-only", networkAccess: true }, { resume }))
+            .toThrow(/networkAccess=true/);
+        }
+      }
+    });
+
+    it("requires strict config validation for every sandbox and continuation", () => {
+      for (const sandbox of ["read-only", "workspace-write", "danger-full-access"] as const) {
+        for (const approvals of ["never", "on-request"] as const) {
+          for (const resume of [false, true]) {
+            const policy = { ...DEFAULT_EXECUTION_POLICY, sandbox, approvals, networkAccess: sandbox === "danger-full-access", writableRoots: sandbox === "danger-full-access" ? [] : ["."] };
+            expect(compileCodexPolicyFlags(policy, { resume }).filter(flag => flag === "--strict-config"))
+              .toEqual(["--strict-config"]);
+          }
+        }
+      }
+    });
+
     it("replaces ambient network and writable-root grants on fresh and resumed turns", () => {
       const policy = { ...DEFAULT_EXECUTION_POLICY, writableRoots: [".", "build output"] };
       for (const resume of [false, true]) {
@@ -139,7 +165,7 @@ describe("Codex policy flag compilation", () => {
     it("ends every policy with the shell-environment overrides", () => {
       for (const sandbox of ["read-only", "workspace-write", "danger-full-access"] as SandboxMode[]) {
         for (const approvals of ["on-request", "never"] as ApprovalPolicy[]) {
-          const flags = compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, sandbox, approvals });
+          const flags = compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, sandbox, approvals, networkAccess: sandbox === "danger-full-access", writableRoots: sandbox === "danger-full-access" ? [] : ["."] });
           expect(flags.slice(-SHELL_ENV.length)).toEqual(SHELL_ENV);
         }
       }
@@ -152,16 +178,16 @@ describe("Codex policy flag compilation", () => {
         "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', ...WORKSPACE, ...SHELL_ENV,
       ]);
       expect(compileCodexPolicyFlags({ ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only" }, { resume: true })).toEqual([
-        "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="never"', ...SHELL_ENV,
+        "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="never"', "--strict-config", ...SHELL_ENV,
       ]);
     });
 
     it("uses the same two overrides for danger-full-access + never on resume, never the bypass flag", () => {
       const flags = compileCodexPolicyFlags(
-        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "never" },
+        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", networkAccess: true, writableRoots: [], approvals: "never" },
         { resume: true },
       );
-      expect(flags).toEqual(["-c", 'sandbox_mode="danger-full-access"', "-c", 'approval_policy="never"', ...SHELL_ENV]);
+      expect(flags).toEqual(["-c", 'sandbox_mode="danger-full-access"', "-c", 'approval_policy="never"', "--strict-config", ...SHELL_ENV]);
       expect(flags).not.toContain("--dangerously-bypass-approvals-and-sandbox");
       expect(flags).not.toContain("--sandbox");
     });
@@ -171,8 +197,8 @@ describe("Codex policy flag compilation", () => {
         DEFAULT_EXECUTION_POLICY,
         { ...DEFAULT_EXECUTION_POLICY, approvals: "on-request" },
         { ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only", approvals: "on-request" },
-        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "never" },
-        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "on-request" },
+        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", networkAccess: true, writableRoots: [], approvals: "never" },
+        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", networkAccess: true, writableRoots: [], approvals: "on-request" },
       ];
       for (const policy of policies) {
         expect(compileCodexPolicyFlags(policy)).not.toContain("--full-auto");
@@ -186,7 +212,7 @@ describe("Codex policy flag compilation", () => {
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", ...SHELL_ENV]);
+      expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", "--strict-config", ...SHELL_ENV]);
     });
 
     it("compiles workspace-write + on-request policy to a plain sandbox flag", () => {
@@ -202,16 +228,20 @@ describe("Codex policy flag compilation", () => {
       const policy: ExecutionPolicy = {
         ...DEFAULT_EXECUTION_POLICY,
         sandbox: "danger-full-access",
+        networkAccess: true,
+        writableRoots: [],
         approvals: "never",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...SHELL_ENV]);
+      expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", "--strict-config", ...SHELL_ENV]);
     });
 
     it("compiles danger-full-access + on-request to an explicit sandbox flag", () => {
       const policy: ExecutionPolicy = {
         ...DEFAULT_EXECUTION_POLICY,
         sandbox: "danger-full-access",
+        networkAccess: true,
+        writableRoots: [],
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
@@ -220,7 +250,7 @@ describe("Codex policy flag compilation", () => {
         "danger-full-access",
         "-c",
         "approval_policy=on-request",
-        ...SHELL_ENV,
+        "--strict-config", ...SHELL_ENV,
       ]);
     });
 
@@ -231,9 +261,11 @@ describe("Codex policy flag compilation", () => {
         compileCodexPolicyFlags({
           ...DEFAULT_EXECUTION_POLICY,
           sandbox: "danger-full-access",
+        networkAccess: true,
+        writableRoots: [],
           approvals: "never",
         }),
-      ).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...SHELL_ENV]);
+      ).toEqual(["--dangerously-bypass-approvals-and-sandbox", "--strict-config", ...SHELL_ENV]);
 
       // Everything else is the explicit sandbox + approval_policy pair.
       expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(4 + WORKSPACE.length + SHELL_ENV.length);
@@ -265,6 +297,39 @@ async function makeMockBinary(
 }
 
 describe("createCodexCliClient — rate limit retry", () => {
+  it.each(["read-only", "workspace-write", "danger-full-access"] as const)(
+    "does not retry without strict config when an older CLI rejects it in %s mode", async (sandbox) => {
+      const dir = await mkdtemp(join(tmpdir(), "ndx-policy-version-"));
+      try {
+        const binary = writeFakeCli(dir, {
+          name: "unsupported-codex",
+          script: `
+            for await (const chunk of process.stdin) { void chunk; }
+            if (process.argv.includes('--strict-config')) {
+              process.stderr.write('error: unexpected argument --strict-config');
+              process.exit(2);
+            }
+            process.stdout.write('UNSAFE FALLBACK');
+          `,
+        });
+        const retries: number[] = [];
+        const client = createCodexCliClient({
+          codexConfig: { cli_path: binary },
+          policy: { ...DEFAULT_EXECUTION_POLICY, sandbox,
+            networkAccess: sandbox === "danger-full-access",
+            writableRoots: sandbox === "danger-full-access" ? [] : ["."] },
+          maxRetries: 2,
+          onRetry: () => { retries.push(1); },
+        });
+        await expect(client.complete({ prompt: "test", model: "test-model" }))
+          .rejects.toThrow(/strict-config/);
+        expect(retries).toEqual([]);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("calls onRetry with correct arguments when rate limited", async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "ndx-test-"));
     try {

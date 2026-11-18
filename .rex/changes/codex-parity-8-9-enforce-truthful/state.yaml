@@ -11,9 +11,10 @@ items:
     lastModified: "2026-11-18T04:54:03.826Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9285e760-055c-4638-adf0-63358f35a339":
-    status: "failing"
+    status: "completed"
     startedAt: "2026-11-18T04:35:31.841Z"
-    activeIntervals: [{"end":"2026-11-18T04:44:49.676Z","start":"2026-11-18T04:35:31.841Z"},{"end":"2026-11-18T04:49:28.789Z","start":"2026-11-18T04:49:28.789Z"}]
-    failureReason: "PR8 completion was premature: executor/reviewer recorded incomplete boundary criteria. Host runtime evidence now available; all-mode/config/version validation and accurate evidence documentation still require same-task completion."
-    lastModified: "2026-11-18T04:54:30.620Z"
+    completedAt: "2026-11-18T05:08:39.974Z"
+    endedAt: "2026-11-18T05:08:39.974Z"
+    activeIntervals: [{"end":"2026-11-18T04:44:49.676Z","start":"2026-11-18T04:35:31.841Z"},{"end":"2026-11-18T04:49:28.789Z","start":"2026-11-18T04:49:28.789Z"},{"end":"2026-11-18T05:03:09.281Z","start":"2026-11-18T04:55:29.837Z"},{"end":"2026-11-18T05:08:39.974Z","start":"2026-11-18T05:08:39.974Z"}]
+    lastModified: "2026-11-18T05:08:42.467Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -125,6 +125,11 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
     expect(config.args).not.toContain("--approval-policy");
   });
 
+  it("refuses full-access with bounded writable roots before spawning", () => {
+    expect(() => codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), { ...FULL_ACCESS_POLICY, writableRoots: ["."] }, {}))
+      .toThrow(/cannot enforce writableRoots/);
+  });
+
   it("places model override as -m flag", () => {
     const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, { model: "gpt-5-codex" });
 

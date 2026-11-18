@@ -178,6 +178,10 @@ export function mapApprovalToCodexFlag(policy: ApprovalPolicy): CodexApprovalPol
  *
  * Every result ends with {@link codexShellEnvFlags}, which keeps the Codex
  * credentials out of the commands the agent runs.
+ * Every mode requires strict config parsing. Full access is only representable
+ * with network access enabled and no bounded writable roots; read-only cannot
+ * grant network access through these legacy controls. Contradictory requests
+ * throw before spawning. In read-only mode writable roots grant no writes.
  *
  * `codex exec resume` rejects `--sandbox` and the bypass flag, yet a resumed
  * thread does not keep its starting policy: resume reads sandbox and approval
@@ -204,6 +208,19 @@ export function compileCodexPolicyFlags(
   policy: ExecutionPolicy,
   options: { resume?: boolean } = {},
 ): string[] {
+  // A disabled sandbox cannot enforce a network or writable-root restriction.
+  // Refuse contradictory policies instead of silently discarding their limits.
+  if (policy.sandbox === "danger-full-access") {
+    if (!policy.networkAccess) {
+      throw new Error("Codex danger-full-access cannot enforce networkAccess=false; use workspace-write or read-only");
+    }
+    if (policy.writableRoots.length > 0) {
+      throw new Error("Codex danger-full-access cannot enforce writableRoots; use workspace-write for bounded writes");
+    }
+  }
+  if (policy.sandbox === "read-only" && policy.networkAccess) {
+    throw new Error("Codex read-only cannot express networkAccess=true through the supported legacy sandbox controls");
+  }
   // Replace the whole table: inherited roots or network grants must not
   // survive a more restrictive n-dx policy. Codex always grants the cwd in
   // workspace-write mode, so a narrower root list cannot be represented.
@@ -216,11 +233,12 @@ export function compileCodexPolicyFlags(
   if (policy.sandbox === "workspace-write" && additionalRoots.length === policy.writableRoots.length) {
     throw new Error("Codex workspace-write always permits the project root; writableRoots must include '.' or use read-only");
   }
-  const workspaceFlags = policy.sandbox === "workspace-write" ? [
-    "--strict-config",
+  // Strict parsing is required in every mode, including continuation turns.
+  // Older CLIs must reject the flag rather than ignore unfamiliar controls.
+  const workspaceFlags = ["--strict-config", ...(policy.sandbox === "workspace-write" ? [
     "-c",
     `sandbox_workspace_write={network_access=${policy.networkAccess},writable_roots=${JSON.stringify(additionalRoots)},exclude_tmpdir_env_var=true,exclude_slash_tmp=true}`,
-  ] : [];
+  ] : [])];
   if (options.resume) {
     return [
       "-c",

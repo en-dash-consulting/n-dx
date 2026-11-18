@@ -100,7 +100,9 @@ const POLICIES: Array<[string, ExecutionPolicy]> = SANDBOXES.flatMap((sandbox) =
     sandbox === DEFAULT_EXECUTION_POLICY.sandbox && approvals === DEFAULT_EXECUTION_POLICY.approvals
       ? `${sandbox} + ${approvals} (the ndx work default)`
       : `${sandbox} + ${approvals}`,
-    { ...DEFAULT_EXECUTION_POLICY, sandbox, approvals },
+    { ...DEFAULT_EXECUTION_POLICY, sandbox, approvals,
+      networkAccess: sandbox === "danger-full-access",
+      writableRoots: sandbox === "danger-full-access" ? [] : ["."] },
   ]),
 );
 

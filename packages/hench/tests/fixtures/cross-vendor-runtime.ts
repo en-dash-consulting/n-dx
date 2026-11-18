@@ -81,7 +81,7 @@ export const FULL_ACCESS_POLICY: ExecutionPolicy = {
   sandbox: "danger-full-access",
   approvals: "never",
   networkAccess: true,
-  writableRoots: ["."],
+  writableRoots: [], // Full access cannot enforce a bounded root list.
   allowedCommands: ["npm", "git", "node", "tsc"],
   allowedFileTools: ["Read", "Edit", "Write", "Glob", "Grep"],
 };
