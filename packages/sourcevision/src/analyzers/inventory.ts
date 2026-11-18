@@ -3,7 +3,7 @@
  * Replaces the Claude-based phase 1 with pure TypeScript.
  */
 
-import { readFile, stat } from "node:fs/promises";
+import { open, readFile, stat } from "node:fs/promises";
 import { join, extname, basename } from "node:path";
 import { createHash } from "node:crypto";
 import { isVerbose, verbose } from "@n-dx/llm-client";
@@ -13,7 +13,14 @@ import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { sourcevisionVersion } from "../language/package-paths.js";
-import { isMinifiedFile, isMinifiedName, MINIFIED_RULES } from "./minified.js";
+import {
+  checksMinifiedContent,
+  isMinifiedByContent,
+  isMinifiedFile,
+  isMinifiedName,
+  MINIFIED_HEAD_BYTES,
+  MINIFIED_RULES,
+} from "./minified.js";
 import {
   csharpConfig,
   javaConfig,
@@ -478,6 +485,20 @@ export interface InventoryStats {
 export interface InventoryResult extends Inventory {
   stats?: InventoryStats;
   changedFiles?: Set<string>;
+  /** Paths whose role `generated` came from the minified-content rule alone, in inventory order; set only when there are some. */
+  minifiedByContent?: string[];
+}
+
+/** First {@link MINIFIED_HEAD_BYTES} of a file. */
+async function readHead(fullPath: string): Promise<Buffer> {
+  const handle = await open(fullPath, "r");
+  try {
+    const buf = Buffer.alloc(MINIFIED_HEAD_BYTES);
+    const { bytesRead } = await handle.read(buf, 0, MINIFIED_HEAD_BYTES, 0);
+    return buf.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -537,6 +558,7 @@ export async function analyzeInventory(
   }
 
   const files: FileEntry[] = [];
+  const byContent: string[] = [];
   const changedFiles = new Set<string>();
   let cached = 0;
   let changed = 0;
@@ -562,6 +584,12 @@ export async function analyzeInventory(
     if (prevEntry && prevEntry.lastModified === mtime && prevEntry.size === st.size) {
       files.push(prevEntry);
       cached++;
+      // The cache does not record why a file is generated; re-read the head of
+      // the few that could be minified by content, so the log line is stable.
+      if (prevEntry.role === "generated" && !isMinifiedName(relPath) && checksMinifiedContent(relPath)
+        && isMinifiedByContent(relPath, await readHead(fullPath))) {
+        byContent.push(relPath);
+      }
       continue;
     }
 
@@ -569,9 +597,9 @@ export async function analyzeInventory(
     const buf = await readFile(fullPath);
     const hash = createHash("sha256").update(buf).digest("hex");
     const language = detectLanguage(relPath, langConfig);
-    const role = classifyRole(
-      relPath, language, langConfig, readHeaderText(relPath, buf, langConfig), isMinifiedFile(relPath, buf),
-    );
+    const minified = isMinifiedFile(relPath, buf);
+    const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig), minified);
+    if (role === "generated" && minified && !isMinifiedName(relPath)) byContent.push(relPath);
     const category = deriveCategory(relPath);
 
     let lineCount = 0;
@@ -651,6 +679,7 @@ export async function analyzeInventory(
     result.stats = { cached, changed, added, deleted, touched };
     result.changedFiles = changedFiles;
   }
+  if (byContent.length > 0) result.minifiedByContent = byContent.sort();
 
   return result;
 }

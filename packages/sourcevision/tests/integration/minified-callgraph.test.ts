@@ -138,6 +138,44 @@ describe("minified bundles and the call graph", () => {
     expect(JSON.stringify(included)).toBe(JSON.stringify(graph));
   });
 
+  describe("minified by content", () => {
+    const banner = Array.from({ length: 10 }, (_, i) => ` * licence line ${i}`).join("\n") + "\n";
+    const handWritten = Array.from({ length: 400 }, (_, i) => `function f${i}() { return ${i}; }`).join("\n")
+      + `\nconst icon = "data:image/png;base64,${"A".repeat(5000)}";\n`;
+    const CONTENT: Record<string, string> = {
+      "src/icons.js": handWritten,
+      "src/theme.css": handWritten.replace(/function f(\d+)\(\) \{ return \d+; \}/g, ".c$1 { color: red; }"),
+      "theme/js/bundle-a.js": `/*\n${banner} */\n${minifiedLine("ba", 1500)}`,
+      "theme/js/plain.min.js": "function a(){return 1}\n",
+    };
+
+    it("keeps a hand-written file with one long line, marks a bannered bundle, whatever a .min.js holds", async () => {
+      expect(handWritten.length).toBeGreaterThan(15_000);
+      expect(handWritten.length).toBeLessThan(25_000);
+      project = makeProject({ ...PLAIN, ...CONTENT });
+      const inventory = await analyzeInventory(project);
+      const roles = Object.fromEntries(inventory.files.map((f) => [f.path, f.role]));
+      expect(roles["src/icons.js"]).toBe("source");
+      expect(roles["src/theme.css"]).not.toBe("generated");
+      expect(roles["theme/js/bundle-a.js"]).toBe("generated");
+      expect(roles["theme/js/plain.min.js"]).toBe("generated");
+      expect(inventory.minifiedByContent).toEqual(["theme/js/bundle-a.js"]);
+    });
+
+    it("lists the same files on a cached run", async () => {
+      project = makeProject({ ...PLAIN, ...CONTENT });
+      const first = await analyzeInventory(project);
+      const second = await analyzeInventory(project, { previousInventory: first });
+      expect(second.stats?.cached).toBe(first.files.length);
+      expect(second.minifiedByContent).toEqual(["theme/js/bundle-a.js"]);
+    });
+
+    it("sets nothing without such files", async () => {
+      project = makeProject({ ...PLAIN, "js/app.min.js": minifiedLine("app", 200) });
+      expect((await analyzeInventory(project)).minifiedByContent).toBeUndefined();
+    });
+  });
+
   it("the call graph phase logs how many minified files it left out and maps them under includeMinified", async () => {
     project = makeProject({ ...PLAIN, ...MINIFIED });
     vi.spyOn(console, "warn").mockImplementation(() => {});

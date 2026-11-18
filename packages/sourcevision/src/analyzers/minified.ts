@@ -28,8 +28,17 @@ const MINIFIED_CONTENT_EXTENSIONS = new Set([".js", ".mjs", ".cjs", ".css"]);
 /** Bytes of a file's start the content check reads. */
 export const MINIFIED_HEAD_BYTES = 64 * 1024;
 
-/** A line longer than this in the head marks the file minified. */
+/** A line longer than this counts as a long line. */
 export const MINIFIED_LINE_CHARS = 2000;
+
+/**
+ * Share of the head's characters that long lines must fill to mark the file
+ * minified. A bundle is long almost everywhere, so one long line among
+ * hand-written code (an inline data URI, SVG or JSON blob) stays under half; a
+ * short licence banner before one huge line is still over it. Half leaves a
+ * wide margin on both sides.
+ */
+export const MINIFIED_LONG_LINE_SHARE = 0.5;
 
 /** Rules that decide minified files, for cache fingerprints. */
 export const MINIFIED_RULES = {
@@ -37,6 +46,7 @@ export const MINIFIED_RULES = {
   contentExtensions: [...MINIFIED_CONTENT_EXTENSIONS],
   headBytes: MINIFIED_HEAD_BYTES,
   lineChars: MINIFIED_LINE_CHARS,
+  longLineShare: MINIFIED_LONG_LINE_SHARE,
 } as const;
 
 /** True when the name marks `filePath` minified (`*.min.js`, `*-min.js`, `*.bundle.js`, a source map). */
@@ -49,24 +59,32 @@ export function checksMinifiedContent(filePath: string): boolean {
   return MINIFIED_CONTENT_EXTENSIONS.has(extname(filePath).toLowerCase());
 }
 
-/** True when `head` holds a line longer than {@link MINIFIED_LINE_CHARS} within its first {@link MINIFIED_HEAD_BYTES}. */
+/**
+ * True when lines longer than {@link MINIFIED_LINE_CHARS} fill at least
+ * {@link MINIFIED_LONG_LINE_SHARE} of the first {@link MINIFIED_HEAD_BYTES}.
+ */
 export function hasMinifiedLine(head: Buffer | string): boolean {
   const text = typeof head === "string"
     ? head.slice(0, MINIFIED_HEAD_BYTES)
     : head.subarray(0, MINIFIED_HEAD_BYTES).toString("latin1");
+  let longChars = 0;
   let start = 0;
   while (start < text.length) {
     const end = text.indexOf("\n", start);
     const lineEnd = end === -1 ? text.length : end;
-    if (lineEnd - start > MINIFIED_LINE_CHARS) return true;
-    if (end === -1) return false;
+    if (lineEnd - start > MINIFIED_LINE_CHARS) longChars += lineEnd - start;
+    if (end === -1) break;
     start = end + 1;
   }
-  return false;
+  return longChars > 0 && longChars >= text.length * MINIFIED_LONG_LINE_SHARE;
 }
 
-/** True when `filePath` is minified: by name, or, for JS/CSS, by a long line in `head`. */
+/** True when `filePath` is minified by content alone: the name does not say, long lines fill `head`. */
+export function isMinifiedByContent(filePath: string, head: Buffer | string): boolean {
+  return !isMinifiedName(filePath) && checksMinifiedContent(filePath) && hasMinifiedLine(head);
+}
+
+/** True when `filePath` is minified: by name, or, for JS/CSS, by long lines filling `head`. */
 export function isMinifiedFile(filePath: string, head?: Buffer | string): boolean {
-  if (isMinifiedName(filePath)) return true;
-  return head !== undefined && checksMinifiedContent(filePath) && hasMinifiedLine(head);
+  return isMinifiedName(filePath) || (head !== undefined && isMinifiedByContent(filePath, head));
 }
