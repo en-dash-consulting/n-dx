@@ -13,6 +13,8 @@
  * @see ./llm-gateway.ts — layout and spawning
  */
 export { DATA_FILES } from "@n-dx/sourcevision";
+// The prioritised next steps the Analysis page recommends, derived from the zones' findings.
+export { deriveNextSteps } from "@n-dx/sourcevision";
 // The isometric architecture map, written beside the snapshot for the face's Code map.
 export { loadFromSourcevision, buildIsoModel, renderIsoMap } from "@n-dx/sourcevision";
-export type { Zones, Zone, ZoneCrossing, Components, ComponentDefinition, Inventory, FileEntry } from "@n-dx/sourcevision";
+export type { Zones, Zone, ZoneCrossing, Components, ComponentDefinition, Inventory, FileEntry, NextStep } from "@n-dx/sourcevision";

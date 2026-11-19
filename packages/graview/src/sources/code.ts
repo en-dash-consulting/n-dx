@@ -6,7 +6,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DATA_FILES, type Components, type Inventory, type Zone, type Zones } from "../sourcevision-gateway.js";
+import { DATA_FILES, deriveNextSteps, type Components, type Inventory, type NextStep, type Zone, type Zones } from "../sourcevision-gateway.js";
 import { errorMessage } from "../error-message.js";
 import type { SnapshotEdge, SnapshotNode, SourceSlice, Warn } from "../types.js";
 
@@ -24,6 +24,46 @@ export interface ReadCodeOptions {
 
 export const COMPONENT_PREFIX = "component:";
 export const FILE_PREFIX = "file:";
+
+/**
+ * How many next steps the Analysis page recommends: its "Next steps" tile
+ * lists the first five sourcevision derives (`/api/sv/next-steps?limit=5`,
+ * the UI twin of the MCP `get_next_steps`). A zone one of them is scoped to
+ * needs work.
+ */
+export const RECOMMENDED_STEPS = 5;
+
+/**
+ * The Analysis page's other highlight, its "Zones needing attention" count
+ * (web's `zoneNeedsAttention`, over top-level zones only): a zone whose files
+ * barely hold together, or that leans hard on other zones.
+ */
+export const ATTENTION_COHESION = 0.4;
+export const ATTENTION_COUPLING = 0.5;
+
+export function needsAttention(zone: Pick<Zone, "cohesion" | "coupling">): boolean {
+  return zone.cohesion < ATTENTION_COHESION || zone.coupling > ATTENTION_COUPLING;
+}
+
+/**
+ * The zones the Analysis page recommends working on, each with the title of
+ * the first recommended step that names it: the scopes of sourcevision's top
+ * next steps. A step scoped `global` names no zone, so it marks nothing.
+ */
+export function recommendedZones(zones: Zones, warn: Warn): Map<string, string> {
+  const recommended = new Map<string, string>();
+  let steps: NextStep[];
+  try {
+    steps = deriveNextSteps(zones);
+  } catch (error) {
+    warn(`Could not derive sourcevision's next steps: ${errorMessage(error)}`);
+    return recommended;
+  }
+  for (const step of steps.slice(0, RECOMMENDED_STEPS)) {
+    if (!recommended.has(step.scope)) recommended.set(step.scope, step.title);
+  }
+  return recommended;
+}
 
 function readJson<T>(path: string, warn: Warn): T | undefined {
   if (!existsSync(path)) return undefined;
@@ -45,10 +85,13 @@ export function readCode(sourcevisionDir: string, options: ReadCodeOptions, warn
   const components = readJson<Components>(join(sourcevisionDir, DATA_FILES.components), warn);
   const inventory = options.files ? readJson<Inventory>(join(sourcevisionDir, DATA_FILES.inventory), warn) : undefined;
 
+  const recommended = zones ? recommendedZones(zones, warn) : new Map<string, string>();
+
   const walkZones = (list: readonly Zone[], parent?: Zone, depth = 0): void => {
     for (const zone of list) {
       if (zoneIds.has(zone.id)) continue;
       zoneIds.add(zone.id);
+      const needsWork = recommended.has(zone.id);
       nodes.push({
         id: zone.id,
         kind: "zone",
@@ -60,6 +103,11 @@ export function readCode(sourcevisionDir: string, options: ReadCodeOptions, warn
         depth: zone.depth ?? depth,
         // Sorted, so past Graview's 200 (the snapshot builder cuts to its caps) the first in path order stay.
         entryPoints: zone.entryPoints.length > 0 ? [...zone.entryPoints].sort() : undefined,
+        // The Analysis page's two treatments: recommended work, else flagged for
+        // attention. The page counts top-level zones only, so a sub-zone is never flagged.
+        needsWork,
+        highlighted: !needsWork && !parent && needsAttention(zone),
+        recommendation: recommended.get(zone.id),
       });
       if (parent) edges.push({ kind: "under", from: zone.id, to: parent.id });
       // Parents first, children after: the deepest zone a file is listed in wins.
