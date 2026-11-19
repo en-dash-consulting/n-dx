@@ -23,6 +23,11 @@ zone-level dependency inversion. Enforced by `boundary-check.test.ts`. New files
 to `viewer/messaging/` inherit this exemption — review them to ensure they are genuine
 messaging infrastructure, not general viewer code.
 
+## Styling
+
+Stylesheets follow `styles/STYLE.md`: emphasis is a background tone, never a
+coloured left border.
+
 ## UI composition governance
 
 The viewer's UI composition layer — the shell (top-nav, stage-links, bottom-bar,

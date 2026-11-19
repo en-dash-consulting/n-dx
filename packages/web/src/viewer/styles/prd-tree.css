@@ -302,7 +302,7 @@
 
 /* Failing status */
 .prd-failure-reason { color: var(--red); font-style: italic; }
-.task-failure-reason { border-left: 3px solid var(--red); padding-left: var(--space-2); }
+.task-failure-reason { background: color-mix(in srgb, var(--red) 8%, transparent); padding: var(--space-2); border-radius: var(--radius-sm); }
 .task-failure-text { color: var(--red); font-style: italic; }
 
 .task-failure-reason-header {
@@ -493,7 +493,6 @@
 /* Selected state */
 .prd-node-selected {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-left: 2px solid var(--accent);
 }
 
 .prd-node-selected:hover {
@@ -503,7 +502,7 @@
 /* Deep-link highlight state */
 .prd-node-highlighted {
   animation: prd-node-highlight-pulse 2s ease-out;
-  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 @keyframes prd-node-highlight-pulse {
@@ -988,8 +987,9 @@
 }
 
 .task-run-verdict {
-  border-left: 3px solid var(--red);
-  padding-left: var(--space-2);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
 }
 
 .task-run-verdict-header {

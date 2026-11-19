@@ -190,14 +190,12 @@
 .search-overlay-result {
   padding: var(--space-2) var(--space-4);
   cursor: pointer;
-  border-left: 3px solid transparent;
   transition: background var(--transition-fast);
 }
 
 .search-overlay-result:hover,
 .search-overlay-result.active {
   background: var(--bg-hover);
-  border-left-color: var(--accent);
 }
 
 .search-overlay-result.active {
