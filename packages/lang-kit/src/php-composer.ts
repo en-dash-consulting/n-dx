@@ -12,6 +12,7 @@
 
 import { join, posix } from "node:path";
 import { MAX_BUILD_FILE_BYTES, type OversizedBuildFile, oversizedNotice, readBuildFile } from "./build-file.js";
+import { trimTrailing } from "./text-trim.js";
 
 /** One namespace prefix (`App\\`, `Zend_`, or `""` for the fallback) and its directories. */
 export interface ComposerNamespaceMapping {
@@ -324,7 +325,7 @@ function dirOf(file: string): string {
 /** `path` (as written, relative to `base`) as a normalised POSIX path; `""` is `base` at the root. */
 function normalize(base: string, path: string): string {
   const joined = posix.normalize(posix.join(base, path.replace(/\\/g, "/")));
-  const trimmed = joined.replace(/\/+$/, "");
+  const trimmed = trimTrailing(joined, "/");
   return trimmed === "." || trimmed === "" ? "" : trimmed;
 }
 

@@ -28,6 +28,7 @@ import {
   requirementDependency,
 } from "./python-requirements.js";
 import { NON_LITERAL, type PyLiteral, type SetupArgument, readSetupCall } from "./python-setup-py.js";
+import { trimTrailing } from "./text-trim.js";
 import { type LocatedToml, type TomlTable, type TomlValue, TomlSyntaxError, parseTomlLocated } from "./toml-lite.js";
 
 /** A directory Python packages and modules are imported from. */
@@ -324,7 +325,7 @@ function readHatch(dir: string, file: string, wheel: TomlTable | undefined, line
       if (typeof to !== "string") continue;
       const root = within(dir, from, file, lineOf(["tool", "hatch", "build", "targets", "wheel", "sources", from]), c);
       if (root === undefined) continue;
-      const pkg = to.replace(/\/+$/, "").replace(/\//g, ".");
+      const pkg = trimTrailing(to, "/").replace(/\//g, ".");
       c.roots.push({ dir: root, ...(pkg !== "" && { package: pkg }), via });
     }
   }

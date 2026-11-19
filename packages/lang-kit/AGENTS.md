@@ -94,7 +94,9 @@ and stops at `MAX_PROPERTY_EXPANSION` (4096 characters) or
 unresolved. A property's value, or its reason for failing, does not depend on
 which reference reached it first; the exception is a cycle, whose reason names
 the member that closed it. Scans of repository content must stay linear: use
-`indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex. Test a
+`indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex, and
+`trimTrailing`/`trimLeading`/`trimChar` (`src/text-trim.ts`) for a repeated
+character at either end, not `/x+$/`. Test a
 scan's pathological input through `tests/helpers/call-within-budget.ts`, which
 runs the call in a worker and terminates it past a budget, so a regression
 fails the test by name instead of hanging the suite.

@@ -58,6 +58,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   readComposerProjects,
+  trimTrailing,
   type ComposerAutoload,
   type ComposerProject,
   type ExternalModule,
@@ -315,8 +316,7 @@ const autoloadsOf = (project: ComposerProject): ComposerAutoload[] => [project.a
 
 /** `exclude-from-classmap` patterns: `**` any path, `*` any name part; matched from the start of a path. */
 function excludePattern(pattern: string): RegExp {
-  const body = pattern
-    .replace(/\/+$/, "")
+  const body = trimTrailing(pattern, "/")
     .split(/(\*\*|\*)/)
     .map((part) => (part === "**" ? ".*" : part === "*" ? "[^/]*" : part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")))
     .join("");

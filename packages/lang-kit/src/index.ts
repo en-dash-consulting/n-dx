@@ -49,3 +49,6 @@ export * from "./toml-lite.js";
 export * from "./ini-lite.js";
 export * from "./xml-lite.js";
 export * from "./yaml-subset.js";
+
+// Linear trims of a repeated character
+export * from "./text-trim.js";
