@@ -95,7 +95,10 @@ items:
     lastModified: "2026-11-19T02:32:52.342Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c2d2a6aa-f957-4cd5-9395-d278659e514b":
-    lastModified: "2026-11-18T22:35:18.838Z"
+    startedAt: "2026-11-19T03:18:03.748Z"
+    activeIntervals: [{"end":"2026-11-19T03:22:22.031Z","start":"2026-11-19T03:18:03.748Z"}]
+    failureReason: "The agent's completion is held: the run did not finish its gates."
+    lastModified: "2026-11-19T03:22:28.746Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd616ada-a02b-450d-986d-3bad122ec522":
     status: "completed"
