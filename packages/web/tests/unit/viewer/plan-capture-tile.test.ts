@@ -94,6 +94,17 @@ async function mountPlan() {
   await until(() => !!root.querySelector('.stage-tile[data-tile="capture"] .smart-add-btn-attach'));
 }
 
+/** Pick a PNG through `container`'s hidden file input, as the "+" button's picker would. */
+async function attachPng(container: HTMLElement) {
+  const input = container.querySelector<HTMLInputElement>(".smart-add-attach-input")!;
+  Object.defineProperty(input, "files", { value: [new File([PNG_BYTES], "mock.png", { type: "image/png" })], configurable: true });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  await until(() => !!container.querySelector(".smart-add-attachment"));
+}
+
+const uploads = () => fetchSpy.mock.calls.filter((c) => String(c[0]).endsWith("/attachments"));
+const accepts = () => fetchSpy.mock.calls.filter((c) => c[0] === "/api/rex/smart-add-accept");
+
 async function openMore() {
   await click(more());
   await until(() => !!dialog()?.querySelector(".smart-add-btn-attach"));
@@ -198,10 +209,7 @@ describe("Plan's capture tile", () => {
     const modal = dialog()!;
     expect(modal.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.value).toBe("Redo the checkout header");
 
-    const input = modal.querySelector<HTMLInputElement>(".smart-add-attach-input")!;
-    Object.defineProperty(input, "files", { value: [new File([PNG_BYTES], "mock.png", { type: "image/png" })], configurable: true });
-    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
-    await until(() => !!modal.querySelector(".smart-add-attachment"));
+    await attachPng(modal);
 
     await click(modal.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!);
     await until(() => !!modal.querySelector(".smart-add-btn-accept"));
@@ -217,5 +225,26 @@ describe("Plan's capture tile", () => {
     ]);
     // One draft: the capture cleared the tile's row as well.
     expect(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.value).toBe("");
+  });
+
+  it("carries an image attached in the tile into the modal, uploads it on the modal's Add, and clears both", async () => {
+    await mountPlan();
+    await type(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!, "Redo the checkout header");
+    await attachPng(tile());
+    await openMore();
+    const modal = dialog()!;
+    expect(modal.querySelector<HTMLImageElement>(".smart-add-attachment-thumb")?.getAttribute("alt")).toBe("mock.png");
+
+    await click(modal.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!);
+    await until(() => !!modal.querySelector(".smart-add-btn-accept"));
+    await click(modal.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!);
+    await until(() => uploads().length > 0);
+    await settle();
+
+    expect(uploads()).toHaveLength(1);
+    expect(uploads()[0]![0]).toBe(`/api/rex/items/${CHANGE.id}/attachments`);
+    expect(JSON.parse(uploads()[0]![1].body).images.map((i: { name: string }) => i.name)).toEqual(["mock.png"]);
+    expect(modal.querySelector(".smart-add-attachment")).toBeNull();
+    expect(tile().querySelector(".smart-add-attachment")).toBeNull();
   });
 });

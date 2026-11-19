@@ -7,13 +7,15 @@
  *
  * On Plan it is the capture tile (`onMore` set): one Smart Add row whose
  * "More" opens the tile's modal, where the view renders whole. Both sit under
- * a {@link CaptureDraftProvider}, so text typed in the row is there in the
- * modal, and the other way round.
+ * a {@link CaptureDraftProvider}, so text typed and images attached in the
+ * row are there in the modal, and the other way round.
  */
 
 import { h, createContext } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useContext, useMemo } from "preact/hooks";
+import type { Dispatch, StateUpdater } from "preact/hooks";
+import type { PendingImage } from "../components/prd-tree/image-attachments.js";
 import { AnalyzePanel } from "../components/prd-tree/analyze-panel.js";
 import { SmartAddInput, BatchImportPanel } from "../components/prd-tree/index.js";
 import { BrandedHeader } from "../components/index.js";
@@ -36,14 +38,22 @@ type AnalysisTab = "smart-add" | "batch-import" | "scan";
 interface CaptureDraft {
   text: string;
   setText: (text: string) => void;
+  /** Images waiting to be attached; the capture that adds the change clears them. */
+  images: PendingImage[];
+  setImages: Dispatch<StateUpdater<PendingImage[]>>;
 }
 
 const CaptureDraftContext = createContext<CaptureDraft | null>(null);
 
-/** One description shared by every Analysis view beneath it: Plan's capture tile and its modal. */
+/**
+ * One draft — description and images — shared by every Analysis view beneath
+ * it: Plan's capture tile and its modal, so neither loses or keeps what the
+ * other was given.
+ */
 export function CaptureDraftProvider({ children }: { children?: ComponentChildren }) {
   const [text, setText] = useState("");
-  const value = useMemo(() => ({ text, setText }), [text]);
+  const [images, setImages] = useState<PendingImage[]>([]);
+  const value = useMemo(() => ({ text, setText, images, setImages }), [text, images]);
   return h(CaptureDraftContext.Provider, { value }, children);
 }
 
@@ -123,7 +133,7 @@ export function AnalysisView({ navigateTo, onMore }: AnalysisViewProps = {}) {
     barAction: bar ? moreButton(onMore!) : null,
     layout,
     onOpenChange: openChange,
-    ...(draft ? { draft: draft.text, onDraftChange: draft.setText } : {}),
+    ...(draft ? { draft: draft.text, onDraftChange: draft.setText, images: draft.images, onImagesChange: draft.setImages } : {}),
   });
 
   if (row) {

@@ -21,6 +21,7 @@
 import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
+import type { Dispatch, StateUpdater } from "preact/hooks";
 import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
@@ -68,6 +69,10 @@ export interface SmartAddInputProps {
   draft?: string;
   /** Called with the new description; required with `draft`. */
   onDraftChange?: (text: string) => void;
+  /** The images waiting to be attached, held by the caller like `draft`. */
+  images?: PendingImage[];
+  /** Updates `images`; required with it. Takes a value or an updater, like a state setter. */
+  onImagesChange?: Dispatch<StateUpdater<PendingImage[]>>;
 }
 
 /** The area a capture is limited to, as the area read gives it. */
@@ -291,7 +296,7 @@ function areaCopy(area: CaptureArea): PanelCopy {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area, draft, onDraftChange }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area, draft, onDraftChange, images: sharedImages, onImagesChange }: SmartAddInputProps) {
   const copy = area ? areaCopy(area) : layout === "v2" ? V2_COPY : V1_COPY;
   const [ownInput, setOwnInput] = useState("");
   const shared = draft !== undefined && onDraftChange !== undefined;
@@ -310,7 +315,10 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
 
   // v2 only: images attached to the change on Add, offered when the agent's model takes images.
   const imagesSupported = useImageInputSupport(layout === "v2");
-  const [images, setImages] = useState<PendingImage[]>([]);
+  const [ownImages, setOwnImages] = useState<PendingImage[]>([]);
+  const imagesShared = sharedImages !== undefined && onImagesChange !== undefined;
+  const images = imagesShared ? sharedImages : ownImages;
+  const setImages = imagesShared ? onImagesChange : setOwnImages;
   const imageCountRef = useRef(0);
   imageCountRef.current = images.length;
 
@@ -323,11 +331,11 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, []);
+  }, [setImages]);
 
   const removeImage = useCallback((key: string) => {
     setImages((prev) => prev.filter((image) => image.key !== key));
-  }, []);
+  }, [setImages]);
 
   // Context selection state
   const [scopeOptions, setScopeOptions] = useState<ScopeOption[]>([]);
@@ -609,7 +617,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } finally {
       setAccepting(false);
     }
-  }, [changes, choices, images, onPrdChanged, onOpenChange, refreshScopes, setInput]);
+  }, [changes, choices, images, onPrdChanged, onOpenChange, refreshScopes, setInput, setImages]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
