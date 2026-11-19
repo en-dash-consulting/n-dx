@@ -39,6 +39,7 @@ import {
   setProjectDir,
   getAuthMode,
   getLLMVendor,
+  getUsageScope,
   applyDecompositionPass,
   applyConsolidationGuard,
   pickLoEFields,
@@ -641,7 +642,7 @@ async function initLLMClients(
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
-  setProjectDir(dir);
+  setProjectDir(dir, "analyze");
 
   if (!noLlm) {
     const vendor = getLLMVendor();
@@ -946,6 +947,7 @@ async function logUsageAndCache(
         // summary reads as "not recorded" rather than as zero spend.
         detail: JSON.stringify({
           ...tokenUsage,
+          usageScope: getUsageScope(),
           vendor: metadata.vendor,
           model: metadata.model,
           costUsd: priceAnalyzeTokenUsage(tokenUsage, metadata.model),

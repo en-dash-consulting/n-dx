@@ -38,13 +38,17 @@ import {
   isLLMVendor,
   type BillableTokens,
 } from "@n-dx/llm-client";
-import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
+import { extractRexTokenEvents, estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)
 // ---------------------------------------------------------------------------
 
+type UsageStatus = NonNullable<CostEstimate["measurementStatus"]>;
+type MeasuredTokens = BillableTokens & { diagnosticStatus?: UsageStatus };
+
 interface PackageTokenUsage {
+  diagnosticStatus?: UsageStatus;
   inputTokens: number;
   outputTokens: number;
   cacheCreationTokens: number;
@@ -64,6 +68,7 @@ type TokenPackage = "rex" | "hench" | "sv" | "web" | "sidecar";
 const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web", "sidecar"];
 
 interface AggregateTokenUsage {
+  diagnosticStatus?: UsageStatus;
   packages: ToolBreakdown;
   totalInputTokens: number;
   totalOutputTokens: number;
@@ -76,10 +81,11 @@ interface AggregateTokenUsage {
    * estimation as the unattributed residual, priced at the labelled fallback —
    * never bucketed under a made-up key that would read as a real model.
    */
-  byModel?: Record<string, BillableTokens>;
+  byModel?: Record<string, MeasuredTokens>;
 }
 
 interface TokenEvent {
+  diagnosticStatus?: UsageStatus;
   timestamp: string;
   command: string;
   package: TokenPackage;
@@ -184,8 +190,17 @@ function emptyToolBreakdown(): ToolBreakdown {
   };
 }
 
+/** Preserve measurement gaps through each dashboard grouping. */
+function carryUsageStatus(target: { diagnosticStatus?: UsageStatus }, status?: UsageStatus): void {
+  const values = [target.diagnosticStatus, status];
+  const merged = values.includes("unavailable") ? "unavailable" : values.includes("malformed") ? "malformed"
+    : values.includes("partial") ? "partial" : values.includes("complete") ? "complete" : undefined;
+  if (merged) target.diagnosticStatus = merged;
+}
+
 /** Fold one event's counts into a package bucket. */
 function addEvent(target: PackageTokenUsage, ev: TokenEvent): void {
+  carryUsageStatus(target, ev.diagnosticStatus);
   target.inputTokens += ev.inputTokens;
   target.outputTokens += ev.outputTokens;
   target.cacheCreationTokens += ev.cacheCreationTokens;
@@ -203,7 +218,7 @@ function addEvent(target: PackageTokenUsage, ev: TokenEvent): void {
  * tokens count as attributed or their totals diverge.
  */
 function attributeToModel(
-  target: Record<string, BillableTokens>,
+  target: Record<string, MeasuredTokens>,
   ev: TokenEvent,
 ): void {
   const key = ev.model?.trim();
@@ -215,6 +230,7 @@ function attributeToModel(
     cacheCreationTokens: 0,
     cacheReadTokens: 0,
   });
+  carryUsageStatus(bucket, ev.diagnosticStatus);
   bucket.inputTokens += ev.inputTokens;
   bucket.outputTokens += ev.outputTokens;
   bucket.cacheCreationTokens += ev.cacheCreationTokens;
@@ -224,7 +240,7 @@ function attributeToModel(
 /** Sum one field across every package bucket. */
 function sumPackages(
   breakdown: ToolBreakdown,
-  field: keyof PackageTokenUsage,
+  field: Exclude<keyof PackageTokenUsage, "diagnosticStatus">,
 ): number {
   let total = 0;
   for (const pkg of TOKEN_PACKAGES) total += breakdown[pkg][field];
@@ -359,6 +375,7 @@ function estimateCost(usage: AggregateTokenUsage): CostEstimate {
       outputTokens: usage.totalOutputTokens,
       cacheCreationTokens: usage.totalCacheCreationTokens,
       cacheReadTokens: usage.totalCacheReadTokens,
+      diagnosticStatus: usage.diagnosticStatus,
     },
     usage.byModel,
   );
@@ -368,11 +385,7 @@ function estimateCost(usage: AggregateTokenUsage): CostEstimate {
 // Data extraction
 // ---------------------------------------------------------------------------
 
-interface LogEntry {
-  timestamp: string;
-  event: string;
-  detail?: string;
-}
+type LogEntry = Parameters<typeof extractRexTokenEvents>[0][number];
 
 function readLogEntries(rexDir: string): LogEntry[] {
   const logPath = join(rexDir, "execution-log.jsonl");
@@ -390,42 +403,6 @@ function readLogEntries(rexDir: string): LogEntry[] {
   } catch {
     return [];
   }
-}
-
-const EVENT_COMMAND_MAP: Record<string, string> = {
-  analyze_token_usage: "analyze",
-  smart_add_token_usage: "smart-add",
-};
-
-function extractRexEvents(logEntries: LogEntry[], since?: string, until?: string): TokenEvent[] {
-  const events: TokenEvent[] = [];
-  for (const entry of logEntries) {
-    const command = EVENT_COMMAND_MAP[entry.event];
-    if (!command || !entry.detail) continue;
-    if (!isInRange(entry.timestamp, since, until)) continue;
-    try {
-      const data = JSON.parse(entry.detail) as {
-        calls?: number;
-        inputTokens?: number;
-        outputTokens?: number;
-        vendor?: string;
-        model?: string;
-      };
-      events.push({
-        timestamp: entry.timestamp,
-        command,
-        package: "rex",
-        inputTokens: data.inputTokens ?? 0,
-        outputTokens: data.outputTokens ?? 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        calls: data.calls ?? 0,
-        vendor: normalizeEventMetadata(data.vendor),
-        model: normalizeEventMetadata(data.model),
-      });
-    } catch { /* skip */ }
-  }
-  return events;
 }
 
 interface HenchRunSummary {
@@ -591,7 +568,7 @@ function extractDashboardEvents(
 
 function collectAllEvents(ctx: ServerContext, since?: string, until?: string): TokenEvent[] {
   const logEntries = readLogEntries(ctx.rexDir);
-  const rexEvents = extractRexEvents(logEntries, since, until);
+  const rexEvents = extractRexTokenEvents(logEntries, { since, until });
   const henchEvents = extractHenchEvents(ctx.projectDir, since, until);
   const svEvents = extractSvEvents(ctx.projectDir, since, until);
   const dashboardEvents = extractDashboardEvents(ctx.projectDir, since, until);
@@ -625,14 +602,17 @@ function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
 
 function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
   const packages = emptyToolBreakdown();
-  const byModel: Record<string, BillableTokens> = {};
+  const byModel: Record<string, MeasuredTokens> = {};
+  const measurement: { diagnosticStatus?: UsageStatus } = {};
 
   for (const ev of events) {
+    carryUsageStatus(measurement, ev.diagnosticStatus);
     addEvent(packages[ev.package], ev);
     attributeToModel(byModel, ev);
   }
 
   return {
+    ...measurement,
     packages,
     totalInputTokens: sumPackages(packages, "inputTokens"),
     totalOutputTokens: sumPackages(packages, "outputTokens"),
@@ -657,11 +637,7 @@ function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
       entry = { command: ev.command, package: ev.package, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
       map.set(key, entry);
     }
-    entry.inputTokens += ev.inputTokens;
-    entry.outputTokens += ev.outputTokens;
-    entry.cacheCreationTokens += ev.cacheCreationTokens;
-    entry.cacheReadTokens += ev.cacheReadTokens;
-    entry.calls += ev.calls;
+    addEvent(entry, ev);
   }
   return Array.from(map.values()).sort(
     (a, b) => (b.inputTokens + b.outputTokens) - (a.inputTokens + a.outputTokens),
