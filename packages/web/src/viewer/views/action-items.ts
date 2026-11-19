@@ -162,6 +162,24 @@ function metricConcerns(text: string, zones: readonly string[], index: ZoneIndex
   return (["cohesion", "coupling"] as const).filter((c) => CONCERN_TEXT[c].test(text) || flagged.has(c));
 }
 
+const CONCERN_ORDER: readonly ActionConcern[] = ["cohesion", "coupling", "readiness", "boundaries"];
+
+/**
+ * A next step's, problem's or suggestion's concerns: the metrics it touches,
+ * and boundaries when its text describes a crossing, a coupling or a layering.
+ */
+function healthConcerns(text: string, zones: readonly string[], index: ZoneIndex): ActionConcern[] {
+  const boundary: ActionConcern[] = CONCERN_TEXT.boundaries.test(text) ? ["boundaries"] : [];
+  return [...metricConcerns(text, zones, index), ...boundary];
+}
+
+/** What a finding concerns, tagged as the item it would be listed as. */
+function findingConcerns(f: Finding, index: ZoneIndex): ActionConcern[] {
+  if (f.type === "relationship" || f.type === "move-file") return ["boundaries"];
+  if (f.type === "pattern") return CONCERN_TEXT.boundaries.test(f.text) ? ["boundaries"] : [];
+  return healthConcerns(f.text, zonesOf(f.text, f.scope, index), index);
+}
+
 function newFilesNote(text: string): string | undefined {
   return NEW_FILES.test(text) ? NEW_FILES_NOTE : undefined;
 }
@@ -176,7 +194,9 @@ function indexed(findings: readonly Finding[], keep: (f: Finding) => boolean): A
 /**
  * The health half of the recommendations: next steps, then the problems and suggestions no
  * listed step covers, each kind most severe first. Tagged with cohesion and
- * coupling, the two metrics its stat cards show.
+ * coupling, and with boundaries when the text describes a crossing. A step
+ * also carries the concerns of every finding it covers, since those findings
+ * are listed only as the step.
  */
 export function buildHealthActions(data: LoadedData, steps: readonly NextStep[] | null): ActionList {
   const findings: readonly Finding[] = data.zones?.findings ?? [];
@@ -188,13 +208,16 @@ export function buildHealthActions(data: LoadedData, steps: readonly NextStep[] 
   const items: ActionItem[] = listedSteps.map((s, i) => {
     const text = `${s.title} ${s.description}`;
     const zones = zonesOf(text, s.scope, index);
+    const own = healthConcerns(text, zones, index);
+    const fromCovered = (s.relatedFindings ?? []).flatMap((fi) => (findings[fi] ? findingConcerns(findings[fi]!, index) : []));
+    const concerns = new Set([...own, ...fromCovered]);
     return {
       key: `step-${i}`,
       kind: "step",
       level: s.priority,
       title: s.title,
       detail: s.description,
-      concerns: metricConcerns(text, zones, index),
+      concerns: CONCERN_ORDER.filter((c) => concerns.has(c)),
       zones,
       note: newFilesNote(text),
     };
@@ -214,7 +237,7 @@ export function buildHealthActions(data: LoadedData, steps: readonly NextStep[] 
         kind,
         level: f.severity ?? "info",
         title: f.text,
-        concerns: metricConcerns(f.text, zones, index),
+        concerns: healthConcerns(f.text, zones, index),
         zones,
         note: newFilesNote(f.text),
       });
@@ -265,13 +288,12 @@ export function buildInfraActions(
 
   const findingItem = (kind: ActionKind, f: Finding, i: number): ActionItem => {
     const zones = zonesOf(f.text, f.scope, index);
-    const boundary = kind !== "pattern" || CONCERN_TEXT.boundaries.test(f.text);
     return {
       key: `${kind}-${i}`,
       kind,
       level: f.severity ?? "info",
       title: f.text,
-      concerns: boundary ? ["boundaries"] : [],
+      concerns: findingConcerns(f, index),
       zones,
       note: newFilesNote(f.text),
     };

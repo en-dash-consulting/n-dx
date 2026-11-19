@@ -84,8 +84,24 @@ describe("buildHealthActions", () => {
     const { items } = buildHealthActions(data(), [STEP]);
     const concerns = Object.fromEntries(items.map((a) => [a.title, a.concerns]));
     expect(concerns["Split the god page"]).toEqual(["cohesion"]);
-    expect(concerns["Bidirectional imports between web and rex"]).toEqual(["coupling"]);
+    expect(concerns["Bidirectional imports between web and rex"]).toEqual(["coupling", "boundaries"]);
     expect(concerns["Extract a base handler"]).toEqual([]);
+  });
+
+  it("tags a step or problem whose text describes a layering or cross-zone import with boundaries", () => {
+    const layering: NextStep = {
+      priority: "high", title: "\"Rex CLI\" imports \"Rex Migrations\" on 16 edge(s)",
+      description: "This looks like a layering violation.", category: "fix", relatedFindings: [],
+    };
+    const { items } = buildHealthActions(data(), [layering]);
+    expect(items[0]!.concerns).toContain("boundaries");
+  });
+
+  it("gives a step the concerns of the findings it covers", () => {
+    // Plain text, healthy scope: its only concerns are the covered relationship's and move's.
+    const step: NextStep = { priority: "high", title: "Tidy the helpers", description: "Tidy them.", category: "fix", relatedFindings: [5, 7] };
+    const { items } = buildHealthActions(data(), [step]);
+    expect(items[0]!.concerns).toEqual(["boundaries"]);
   });
 
   it("names the zones an item touches, and notes a remedy that adds files", () => {
@@ -160,6 +176,13 @@ describe("buildRecommendations", () => {
     const kinds = buildRecommendations(data(), [step], null).items.map((a) => a.kind);
     expect(kinds).not.toContain("relationship");
     expect(kinds).not.toContain("move");
+  });
+
+  it("keeps a step that covers a relationship or a move under the boundaries filter", () => {
+    const step: NextStep = { priority: "high", title: "Tidy the helpers", description: "Tidy them.", category: "fix", relatedFindings: [5, 7] };
+    const items = buildRecommendations(data(), [step], null).items;
+    expect(filterRecommendations(items, { kind: "concern", concern: "boundaries" }).map((a) => a.title))
+      .toEqual(["Tidy the helpers", "Bidirectional imports between web and rex"]);
   });
 
   it("carries both sets of enrichment gates", () => {
@@ -281,6 +304,16 @@ describe("the Analyze top row", () => {
     act(() => card(left(el), "Avg cohesion").click());
     expect(card(left(el), "SDLC readiness").getAttribute("aria-pressed")).toBe("false");
     expect(titles(right(el))).toEqual(["Split the god page"]);
+  });
+
+  it("filters to every fix about crossings when Cross-zone imports is pressed, problems included", async () => {
+    const el = await show(topRow);
+    act(() => card(left(el), "Cross-zone imports").click());
+    expect(titles(right(el))).toEqual([
+      "Bidirectional imports between web and rex",
+      "web-viewer imports admin/a.ts across a boundary",
+      "Move admin/a.ts into web-viewer",
+    ]);
   });
 
   it("highlights the fixes a hovered element concerns", async () => {
