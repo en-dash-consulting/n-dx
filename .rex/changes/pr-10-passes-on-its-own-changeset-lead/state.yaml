@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-19T03:50:51.670Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bf473ad6-1dbd-4056-89b7-34536bfaf805":
-    lastModified: "2026-11-19T03:50:48.991Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:51:30.256Z"
+    completedAt: "2026-11-19T03:52:04.251Z"
+    endedAt: "2026-11-19T03:52:04.251Z"
+    activeIntervals: [{"end":"2026-11-19T03:52:04.251Z","start":"2026-11-19T03:51:30.256Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Split the 49-word lead of .changeset/php-dynamic-code.md into two sentences, as in 612011bd3; file now identical to 612011bd3's version. changeset-body-policy: 7 passed."
+    lastModified: "2026-11-19T03:52:04.251Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cc178a68-d106-4fd9-bd9f-c9a0ba69ac49":
     createdAt: "2026-11-19T03:50:44.078Z"
