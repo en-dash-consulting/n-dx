@@ -70,6 +70,9 @@ items:
     resolutionDetail: "Reproduced at this head on generated PHP (~900 KB class files, every method with a query, a fetch and call_user_func on a fetched row). Before: dynamicCode alone on 20 MB sampled 2.4 GB peak heap; every kind 2.3 GB; one 900 KB file holds 72 MB of captures, 42 MB of them dynamic. Fix 1 (release): lang-runtime FrameworkPack gains optional digest(file, kinds), called as each file is parsed, after which that framework's query captures are dropped from the file; read gets digests by path; a throwing digest fails only that framework (notice names the file). php-dynamic digests each file: sites (builtin resolution deferred via new callCandidates/builtinReached in php-namespaces, filtered against repo declarations at read), scope names (batched), include scopes, and the database flow compiled (compileFlow) into a capture-free expression IR, keeping only scopes with a site or a return; MAX_EXPRESSION_DEPTH enforced at compile with identical semantics. Digest per 900 KB file: ~5 MB vs 42 MB of dynamic captures. After: 20 MB dynamicCode fits a 768 MB heap (fails at 512; imports alone fit 512); every kind fits 1 GB (before 2.3 GB). 10 MB dynamicCode fits 448 MB (was ~1.1 GB). Facts identical: dynamic-code facts and notices over all 29 lang-php fixture dirs byte-identical before/after; generated 5 MB input hash identical. Fix 3 (contain): file with more than MAX_DYNAMIC_CAPTURES (500,000, ~2x a dense 1 MiB file) is skipped with [php-dynamic-skipped] naming it; other files still read. Fix 2 (narrow dynamic.scm) not done: after the release, dynamic captures live for one file at a time (bounded by the runner's 1 MiB limit, ~45 MB), so narrowing could only shave that transient while risking fact identity; the remaining peak is the language queries' captures held for all files (imports/calls/config), which is separate work. Test: php-dynamic-memory.test.ts runs 10 MB generated PHP in a child Node capped at 640 MB (verified it OOMs at 640 with digest disabled), plus cap notice, digest wiring and digest-failure containment. lang-php 211 tests, lang-runtime, sourcevision PHP integration, root-policy, changeset-body-policy pass. Patch changeset for lang-php and lang-runtime."
     lastModified: "2026-11-19T02:15:14.055Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "70795381-c8f5-49f5-bdd4-c90bb9b7dca9":
+    lastModified: "2026-11-19T16:12:09.632Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7969bba2-eb02-4f21-a637-6c0cb4f1f4bb":
     status: "completed"
     startedAt: "2026-11-19T02:15:25.328Z"
@@ -93,7 +96,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94add228-871f-4544-bcb3-6c25ff72ef4d":
     createdAt: "2026-11-18T22:33:39.769Z"
-    lastModified: "2026-11-19T03:43:43.308Z"
+    lastModified: "2026-11-19T16:12:09.632Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96c36dff-2ec0-445a-9319-91d3f350c83c":
     status: "completed"
