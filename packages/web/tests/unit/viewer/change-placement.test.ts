@@ -533,6 +533,14 @@ describe("placing", () => {
     await type($(".cp-amends .task-criterion-add-input"), "Gift cards refund");
     await click($(".cp-amends .task-criterion-add-confirm"));
     await type($(".cp-amends textarea.cp-input"), "Refund any tender");
+    // The preview counts the form's own edits: 2 criteria, one added, one reworded, one removed.
+    expect($$(".pp-before li").map((li) => li.textContent)).toContain("2 criteria");
+    expect($$(".pp-after li").map((li) => li.textContent)).toEqual([
+      "Statement: Refund any tender",
+      "2 criteria (+1 added, 1 reworded, −1 removed)",
+      "Amended by Change a when it is applied",
+    ]);
+    expect(posts).toEqual([]);
     await click(placeButton());
 
     expect(posts[0].body).toEqual({
@@ -822,6 +830,10 @@ describe("Draft with the model (rex.placementDraft)", () => {
     expect(note?.textContent).toContain("Picked by the model (claude-haiku): Home cap-2.");
     expect(note?.textContent).toContain("rules and model disagree");
     expect(placeButton()?.disabled).toBe(false);
+    // The preview says who suggested the target; picking another row by hand drops it.
+    expect($$(".pp-why li").map((li) => li.textContent)).toContain("Picked by the model");
+    await pick("cap-1");
+    expect($$(".pp-why li").map((li) => li.textContent)).not.toContain("Picked by the model");
   });
 
   it("opens the proposal form filled with the model's proposal", async () => {
