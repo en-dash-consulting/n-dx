@@ -1,5 +1,5 @@
-import { h } from "preact";
-import { useState, useCallback, useEffect, useMemo } from "preact/hooks";
+import { h, Fragment } from "preact";
+import { useState, useCallback, useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { ComponentChild } from "preact";
 import {
@@ -9,49 +9,16 @@ import {
   zoneNeedsAttention,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { errorMessage, formatSince } from "../utils/format.js";
+import { formatSince } from "../utils/format.js";
 import { narrationNotice } from "./narration-notice.js";
 import { IsoMapHero } from "./iso-map.js";
 import { DeliveryPanel, deliveryAnalysisStamp } from "./delivery.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { ActionIcon, AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
 import type { JobTray } from "../hooks/index.js";
-
-interface NextStep {
-  priority: string;
-  title: string;
-  description: string;
-  category: string;
-}
-
-/** Copy text to the clipboard with a legacy execCommand fallback. */
-function copyText(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-  return new Promise((resolve, reject) => {
-    try {
-      const input = document.createElement("textarea");
-      input.value = text;
-      input.style.position = "fixed";
-      input.style.opacity = "0";
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      document.body.removeChild(input);
-      resolve();
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-/** Format the full step list as a numbered markdown list. */
-function stepsToMarkdown(steps: NextStep[]): string {
-  return steps
-    .map((s, i) => `${i + 1}. **[${s.priority}]** ${s.title} — ${s.description}`)
-    .join("\n");
-}
+import { NextStepsCapture, copyText, stepsToMarkdown, useNextSteps, type NextStep } from "./next-steps.js";
+import { concernCardProps, type ActionItem, type RecommendationFocus } from "./action-items.js";
+import { useAnalyzeActions } from "./analyze-actions-context.js";
 
 const NEXT_STEPS_OPEN_KEY = "ndx.overview.next-steps-open";
 
@@ -97,30 +64,13 @@ function priorityCounts(steps: NextStep[]): [string, number][] {
  * top step's title — so the map above it stays the first thing on the page.
  * The open state is remembered per browser.
  *
- * `embedded`: inside a dashboard tile, which already names it — always open,
- * no caret or heading of its own, the counts and Copy all kept.
+ * The Analyze dashboard lists the same steps in its health tile, beside the
+ * problems and suggestions they do not cover (health-actions.ts).
  */
-export function NextStepsPanel({ embedded = false }: { embedded?: boolean } = {}) {
-  const [steps, setSteps] = useState<NextStep[] | null>(null);
+export function NextStepsPanel() {
+  const steps = useNextSteps(5);
   const [copied, setCopied] = useState<number | "all" | null>(null);
-  const [capture, setCapture] = useState<"idle" | "confirm" | "capturing" | "done" | "error">("idle");
-  const [captureMsg, setCaptureMsg] = useState<string | null>(null);
   const [open, setOpen] = useState<boolean>(() => readNextStepsOpen());
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/sv/next-steps?limit=5");
-        if (!res.ok) return;
-        const body = await res.json() as { steps?: NextStep[] };
-        if (!cancelled && body.steps && body.steps.length > 0) setSteps(body.steps);
-      } catch {
-        // Panel is best-effort — stay hidden on failure
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   const handleCopy = useCallback((text: string, which: number | "all") => {
     copyText(text).then(() => {
@@ -131,56 +81,28 @@ export function NextStepsPanel({ embedded = false }: { embedded?: boolean } = {}
     });
   }, []);
 
-  const handleCapture = useCallback(async () => {
-    if (!steps) return;
-    setCapture("capturing");
-    setCaptureMsg(null);
-    try {
-      const res = await fetch("/api/rex/capture-next-steps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ steps }),
-      });
-      const body = await res.json().catch(() => ({})) as { created?: number; skipped?: number; error?: string };
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      const created = body.created ?? 0;
-      const skipped = body.skipped ?? 0;
-      setCaptureMsg(
-        `✓ Captured ${created} to PRD` +
-        (skipped > 0 ? ` (${skipped} duplicate${skipped === 1 ? "" : "s"} skipped)` : ""),
-      );
-      setCapture("done");
-    } catch (err) {
-      setCaptureMsg(errorMessage(err));
-      setCapture("error");
-    }
-  }, [steps]);
-
   if (!steps) return null;
 
   const counts = priorityCounts(steps);
 
-  const shown = embedded || open;
-  return h(embedded ? "div" : "details", {
-    class: `overview-section overview-next-steps${embedded ? " overview-next-steps--embedded" : ""}`,
-    ...(embedded ? {} : {
-      open,
-      onToggle: (e: Event) => {
-        const next = (e.currentTarget as HTMLDetailsElement).open;
-        setOpen(next);
-        writeNextStepsOpen(next);
-      },
-    }),
+  return h("details", {
+    class: "overview-section overview-next-steps",
+    open,
+    onToggle: (e: Event) => {
+      const next = (e.currentTarget as HTMLDetailsElement).open;
+      setOpen(next);
+      writeNextStepsOpen(next);
+    },
   },
-    h(embedded ? "div" : "summary", { class: "section-header-row next-steps-summary" },
-      embedded ? null : h("span", { class: "next-steps-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
-      embedded ? null : h("h3", null, "Next Steps"),
+    h("summary", { class: "section-header-row next-steps-summary" },
+      h("span", { class: "next-steps-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
+      h("h3", null, "Next Steps"),
       h("span", { class: "next-steps-counts" },
         counts.map(([priority, n]) =>
           h("span", { key: priority, class: `next-step-priority next-step-priority-${priority}` }, `${n} ${priority}`),
         ),
       ),
-      !shown
+      !open
         ? h("span", { class: "next-steps-preview" }, steps[0]!.title)
         : null,
       h("button", {
@@ -213,48 +135,7 @@ export function NextStepsPanel({ embedded = false }: { embedded?: boolean } = {}
         ),
       ),
     ),
-    h("div", { class: "next-steps-footer" },
-      capture === "idle" || capture === "done" || capture === "error"
-        ? h("button", {
-            class: "cmd-inline-trigger next-steps-capture-btn",
-            onClick: () => { setCapture("confirm"); setCaptureMsg(null); },
-            title: "File these recommendations as PRD items so they can be worked on",
-            type: "button",
-          },
-            h("span", { "aria-hidden": "true" }, "\u{1F4CB}"),
-            "Capture to PRD",
-          )
-        : null,
-      capture === "confirm"
-        ? h("span", { class: "next-steps-confirm" },
-            `Capture ${steps.length} finding${steps.length === 1 ? "" : "s"} into the PRD?`,
-            h("button", {
-              class: "cmd-inline-trigger next-steps-confirm-btn",
-              onClick: handleCapture,
-              type: "button",
-            }, "Confirm"),
-            h("button", {
-              class: "cmd-inline-trigger next-steps-cancel-btn",
-              onClick: () => setCapture("idle"),
-              type: "button",
-            }, "Cancel"),
-          )
-        : null,
-      capture === "capturing"
-        ? h("span", { class: "next-steps-confirm", "aria-busy": "true" },
-            h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }),
-            "Capturing...",
-          )
-        : null,
-      h("span", { role: "status", "aria-live": "polite" },
-        capture === "done" && captureMsg
-          ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, captureMsg)
-          : null,
-      ),
-      capture === "error" && captureMsg
-        ? h("span", { class: "cmd-inline-result cmd-inline-result-err", role: "alert" }, captureMsg)
-        : null,
-    ),
+    h(NextStepsCapture, { steps }),
   );
 }
 
@@ -312,7 +193,7 @@ function healthColor(score: number): string {
   return score >= 0.7 ? "var(--green)" : score >= 0.4 ? "var(--orange)" : "var(--red)";
 }
 
-interface StatTileProps {
+export interface StatTileProps {
   glyph: string;
   label: string;
   value: string;
@@ -325,13 +206,36 @@ interface StatTileProps {
   info?: ComponentChild;
   /** Makes the whole card a control; the info tip stays its own button above it. */
   onOpen?: () => void;
+  /** A toggle rather than a link: its pressed state (the health list's filter). */
+  pressed?: boolean;
+  /** Pointer over the card, or focus on its control, and away again. */
+  onHover?: (over: boolean) => void;
+  /** What pressing does, read after the value ("show related items"). Default: "show". */
+  action?: string;
+  /** Tooltip for the card's control. */
+  hint?: string;
 }
 
-function StatTile({ glyph, label, value, sub, tone, meter, info, onOpen }: StatTileProps) {
+export function StatTile({ glyph, label, value, sub, tone, meter, info, onOpen, pressed, onHover, action = "show", hint }: StatTileProps) {
   const color = tone ?? "var(--accent)";
-  return h("div", { class: `overview-stat${onOpen ? " overview-stat--action" : ""}`, role: "listitem", style: `--stat-tone: ${color}` },
+  return h("div", {
+    class: `overview-stat${onOpen ? " overview-stat--action" : ""}${pressed ? " overview-stat--pressed" : ""}`,
+    role: "listitem",
+    style: `--stat-tone: ${color}`,
+    onMouseEnter: onHover ? () => onHover(true) : undefined,
+    onMouseLeave: onHover ? () => onHover(false) : undefined,
+  },
     onOpen
-      ? h("button", { type: "button", class: "overview-stat-open", onClick: onOpen, "aria-label": `${label}: ${value} — show` })
+      ? h("button", {
+          type: "button",
+          class: "overview-stat-open",
+          onClick: onOpen,
+          "aria-label": `${label}: ${value} — ${action}`,
+          "aria-pressed": pressed === undefined ? undefined : String(pressed),
+          title: hint,
+          onFocus: onHover ? () => onHover(true) : undefined,
+          onBlur: onHover ? () => onHover(false) : undefined,
+        })
       : null,
     h("span", { class: "overview-stat-glyph", "aria-hidden": "true" }, glyph),
     h("div", { class: "overview-stat-body" },
@@ -544,6 +448,11 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
  * The codebase map as the Analyze dashboard's hero tile. Its Expand opens the
  * map tile's modal (`onExpand`); inside the modal (`opened`) it fills the
  * space and leaves the title and Expand to the modal.
+ *
+ * Under the dashboard's provider the map carries the tiles' recommendations:
+ * a "!" on every zone with issues, and while the pointer is over a
+ * recommended fix, that fix's zones lit and a note beside the map naming them
+ * — or saying it is not on the map, or adds files the map cannot draw yet.
  */
 export function MapPanel({ data, navigateTo, opened = false, onExpand }: {
   data: LoadedData;
@@ -551,33 +460,99 @@ export function MapPanel({ data, navigateTo, opened = false, onExpand }: {
   opened?: boolean;
   onExpand?: () => void;
 }): ComponentChild {
+  const shared = useAnalyzeActions();
   const { zones } = data;
   if (!zones || zones.zones.length === 0) {
     return h("p", { class: "stage-tile-empty" }, "No zones yet — run an analysis to draw the map.");
   }
-  return h(IsoMapHero, {
-    analysisStamp: isoMapAnalysisStamp(data),
-    facts: isoMapFacts(data),
-    onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
-    onExpand: opened ? undefined : onExpand,
-    hosted: opened,
-  });
+  const hovered = shared?.hovered ?? null;
+  const flagged = shared ? Object.keys(shared.issues).length : 0;
+  const facts = isoMapFacts(data);
+  return h(Fragment, null,
+    h(IsoMapHero, {
+      analysisStamp: isoMapAnalysisStamp(data),
+      facts: flagged > 0 ? [...facts, `${flagged} with issues (!)`] : facts,
+      onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
+      onExpand: opened ? undefined : onExpand,
+      hosted: opened,
+      marks: shared ? { issues: shared.issues, lit: hovered && hovered.zones.length > 0 ? hovered.zones : null } : undefined,
+    }),
+    hovered ? h(MapNote, { zones: hovered.zones, note: hovered.note, names: zones.zones }) : null,
+  );
+}
+
+/** Beside the map while a recommendation is hovered: where it is, or why it is not drawn. */
+function MapNote({ zones, note, names }: {
+  zones: readonly string[];
+  note?: string;
+  names: ReadonlyArray<{ id: string; name: string }>;
+}): ComponentChild {
+  const name = (id: string) => names.find((z) => z.id === id)?.name ?? id;
+  return h("aside", { class: "map-note", role: "status", "aria-live": "polite" },
+    zones.length > 0
+      ? h("p", { class: "map-note-zones" }, h("strong", null, "Lit on the map: "), zones.map(name).join(", "))
+      : h("p", { class: "map-note-zones" }, h("strong", null, "Not on the map"), " — no zone it names is drawn."),
+    note ? h("p", { class: "map-note-new" }, h("span", { class: "map-note-mark", "aria-hidden": "true" }, "+"), note) : null,
+  );
+}
+
+interface PieSlice { label: string; value: number; color: string }
+
+/** Slices past the first `max` fold into one "Other" slice. */
+function foldSlices(slices: readonly PieSlice[], max: number): PieSlice[] {
+  if (slices.length <= max) return [...slices];
+  const rest = slices.slice(max - 1).reduce((n, s) => n + s.value, 0);
+  return [...slices.slice(0, max - 1), { label: "Other", value: rest, color: "var(--text-dim)" }];
 }
 
 /**
- * Source files by language. In the tile, the top languages as bars; opened,
- * every language with its files, lines and share, whether its imports are
- * analysed, and the extensions the inventory skipped.
+ * Files by language as a donut, with a legend of each slice's share. Each
+ * slice is a stroked arc of one circle, so the chart scales with no layout
+ * code and every slice can carry its own title.
+ */
+export function LanguagePie({ slices, label = "Files by language" }: { slices: readonly PieSlice[]; label?: string }): ComponentChild {
+  const total = slices.reduce((n, s) => n + s.value, 0);
+  const r = 15.9155; // circumference 100: an arc's length is its percentage
+  let offset = 0;
+  return h("div", { class: "lang-pie" },
+    h("svg", { class: "lang-pie-chart", viewBox: "0 0 42 42", role: "img", "aria-label": label },
+      h("circle", { cx: 21, cy: 21, r, fill: "none", stroke: "var(--bg-hover)", "stroke-width": 6 }),
+      slices.map((s) => {
+        const pct = total > 0 ? (s.value / total) * 100 : 0;
+        const arc = h("circle", {
+          key: s.label, cx: 21, cy: 21, r, fill: "none", stroke: s.color, "stroke-width": 6,
+          "stroke-dasharray": `${pct} ${100 - pct}`,
+          "stroke-dashoffset": String(25 - offset),
+        }, h("title", null, `${s.label}: ${s.value.toLocaleString()} files (${Math.round(pct)}%)`));
+        offset += pct;
+        return arc;
+      }),
+    ),
+    h("ul", { class: "lang-pie-legend", role: "list" },
+      slices.map((s) => h("li", { key: s.label },
+        h("span", { class: "languages-swatch", style: `background: ${s.color}`, "aria-hidden": "true" }),
+        h("span", { class: "lang-pie-label" }, s.label),
+        h("span", { class: "lang-pie-share" }, `${total > 0 ? Math.round((s.value / total) * 100) : 0}%`),
+      )),
+    ),
+  );
+}
+
+/**
+ * Source files by language. In the tile, a pie of the top languages; opened,
+ * the pie beside every language with its files, lines and share, whether its
+ * imports are analysed, and the extensions the inventory skipped.
  */
 export function LanguagesPanel({ data, opened = false }: { data: LoadedData; opened?: boolean }): ComponentChild {
-  const chart = useMemo(() => languageChartData(data), [data.inventory]);
   const rows = useMemo(() => languageRows(data), [data.inventory]);
-  if (chart.length === 0) return h("p", { class: "stage-tile-empty" }, "No inventory loaded.");
-  if (!opened) return h(BarChart, { data: chart.slice(0, 5) });
+  if (rows.length === 0) return h("p", { class: "stage-tile-empty" }, "No inventory loaded.");
+  // Every language counts toward the slices; past the first few they share "Other".
+  const slices = rows.map((r) => ({ label: r.language, value: r.files, color: r.color }));
+  if (!opened) return h(LanguagePie, { slices: foldSlices(slices, 6) });
 
   const skipped = Object.entries(data.inventory?.summary.skippedExtensions ?? {}).sort(([, a], [, b]) => b - a);
   return h("div", { class: "languages-breakdown" },
-    h(BarChart, { data: chart }),
+    h(LanguagePie, { slices: foldSlices(slices, 9) }),
     h("table", { class: "languages-table" },
       h("thead", null, h("tr", null,
         h("th", null, "Language"),
@@ -637,9 +612,24 @@ function languageChartData(data: LoadedData): Array<{ label: string; value: numb
 
 export type StatKey = "files" | "zones" | "cycles" | "cohesion" | "coupling";
 
-/** Headline numbers and architecture health: Overview's stats row, and the dashboard's health tile. */
-export function CodebaseStats({ data, onStat }: { data: LoadedData; onStat?: (stat: StatKey) => void }): ComponentChild {
+interface CodebaseStatsProps {
+  data: LoadedData;
+  onStat?: (stat: StatKey) => void;
+  /**
+   * Ties Avg cohesion and Avg coupling to the recommended fixes: hovering one
+   * highlights the fixes it concerns, pressing it filters the list to them.
+   * Takes over `onStat` for those two cards.
+   */
+  focus?: { focus: RecommendationFocus; items: readonly ActionItem[] };
+  /** Further cards after these, in the same list (the dashboard's infrastructure cards). */
+  extra?: ComponentChild[];
+}
+
+/** Headline numbers and architecture health: Overview's stats row, and the dashboard's visuals tile. */
+export function CodebaseStats({ data, onStat, focus, extra = [] }: CodebaseStatsProps): ComponentChild {
   const open = (stat: StatKey) => (onStat ? () => onStat(stat) : undefined);
+  const concernCard = (concern: "cohesion" | "coupling") =>
+    focus ? concernCardProps(focus.focus, focus.items, concern) : { onOpen: open(concern) };
   const { inventory, imports, zones } = data;
   const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
   const attentionCount = useMemo(
@@ -677,7 +667,7 @@ export function CodebaseStats({ data, onStat }: { data: LoadedData; onStat?: (st
       healthMetrics && zones
         ? h(StatTile, {
             glyph: "◉",
-            label: "Avg cohesion", onOpen: open("cohesion"),
+            label: "Avg cohesion", ...concernCard("cohesion"),
             value: healthMetrics.avgCohesion.toFixed(2),
             sub: "higher is better",
             tone: healthColor(healthMetrics.avgCohesion),
@@ -688,7 +678,7 @@ export function CodebaseStats({ data, onStat }: { data: LoadedData; onStat?: (st
       healthMetrics && zones
         ? h(StatTile, {
             glyph: "⇄",
-            label: "Avg coupling", onOpen: open("coupling"),
+            label: "Avg coupling", ...concernCard("coupling"),
             value: healthMetrics.avgCoupling.toFixed(2),
             sub: "lower is better",
             tone: healthColor(1 - healthMetrics.avgCoupling),
@@ -696,6 +686,7 @@ export function CodebaseStats({ data, onStat }: { data: LoadedData; onStat?: (st
             info: h(InfoTip, { term: "coupling" }),
           })
         : null,
+      ...extra,
       healthMetrics && (healthMetrics.patterns.length > 0 || healthMetrics.antipatterns.length > 0)
         ? h("div", { class: "overview-stat overview-stat--signals", role: "listitem" },
             h("span", { class: "overview-stat-label" }, "Signals"),
@@ -763,22 +754,24 @@ function computeHealthMetrics(zones: LoadedData["zones"], imports: LoadedData["i
     return { avgCohesion, avgCoupling, patterns, antipatterns };
 }
 
-// ── Codebase health, opened ──────────────────────────────────
+// ── Codebase at a glance, opened ─────────────────────────────
+
+/** Element ids the opened visuals tile's stat cards scroll to. */
+export const HEALTH_ATTENTION_ID = "health-attention";
+export const HEALTH_CYCLES_ID = "health-cycles";
 
 interface HealthDetailProps {
   data: LoadedData;
-  /** Switch the open tile to another of the stage's tiles. */
-  openTile: (key: string) => void;
   /** Show a zone or file in the detail panel beside the modal. */
   setDetail: (item: DetailItem) => void;
 }
 
 /**
- * The opened Codebase health tile: the stats, each leading to the tile that
- * explains it, then what they summarise — the zones needing attention, the
- * import cycles and the hub files — each zone and file opening its detail.
+ * What the opened visuals tile's health cards summarise: the zones needing
+ * attention, the hub files and the import cycles, each zone and file opening
+ * its detail.
  */
-export function HealthDetail({ data, openTile, setDetail }: HealthDetailProps): ComponentChild {
+export function HealthDetail({ data, setDetail }: HealthDetailProps): ComponentChild {
   const { zones, imports, inventory } = data;
   const files = useMemo(() => new Map((inventory?.files ?? []).map((f) => [f.path, f])), [inventory]);
   const attention = useMemo(
@@ -800,18 +793,10 @@ export function HealthDetail({ data, openTile, setDetail }: HealthDetailProps): 
   const fileButton = (path: string) =>
     h("button", { type: "button", class: "health-link health-file", onClick: () => showFile(path), title: path }, path);
 
-  return h("div", { class: "health-detail" },
-    h(CodebaseStats, {
-      data,
-      onStat: (stat) => {
-        if (stat === "files") openTile("files");
-        else if (stat === "cycles") document.getElementById("health-cycles")?.scrollIntoView({ block: "start", behavior: "smooth" });
-        else openTile("zones");
-      },
-    }),
+  return h(Fragment, null,
     h("div", { class: "health-columns" },
-      h("section", { class: "health-section", "aria-labelledby": "health-attention" },
-        h("h3", { id: "health-attention" }, `Zones needing attention`, h("span", { class: "health-count" }, String(attention.length))),
+      h("section", { class: "health-section", id: HEALTH_ATTENTION_ID, "aria-labelledby": "health-attention-title" },
+        h("h3", { id: "health-attention-title" }, `Zones needing attention`, h("span", { class: "health-count" }, String(attention.length))),
         attention.length === 0
           ? h("p", { class: "stage-tile-empty" }, "Every zone holds together and keeps to itself.")
           : h("table", { class: "languages-table health-table" },
@@ -842,7 +827,7 @@ export function HealthDetail({ data, openTile, setDetail }: HealthDetailProps): 
               h("li", { key: hub.path }, fileButton(hub.path), h("span", { class: "health-meta" }, `${hub.count} importers`)))),
       ),
     ),
-    h("section", { class: "health-section", id: "health-cycles", "aria-labelledby": "health-cycles-title" },
+    h("section", { class: "health-section", id: HEALTH_CYCLES_ID, "aria-labelledby": "health-cycles-title" },
       h("h3", { id: "health-cycles-title" }, "Import cycles", h("span", { class: "health-count" }, String(imports?.summary.circularCount ?? 0))),
       cycles.length === 0
         ? h("p", { class: "stage-tile-empty" }, "No import cycles.")

@@ -23,13 +23,7 @@ import type { JobTray } from "../hooks/index.js";
 import {
   Overview,
   AnalysisStatus,
-  CodebaseStats,
-  HealthDetail,
   MapPanel,
-  LanguagesPanel,
-  NextStepsPanel,
-  DeliveryPanel,
-  deliveryAnalysisStamp,
   Graph,
   IsoMapView,
   ZonesView,
@@ -76,7 +70,9 @@ import { PlanHealth } from "./plan-health.js";
 import { SpecGapsPanel } from "./spec-gaps.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
-import { analyzeTileSummary } from "./tile-summaries.js";
+import { GlancePanel } from "./glance.js";
+import { RecommendationsPanel } from "./recommendations-panel.js";
+import { AnalyzeActionsProvider } from "./analyze-actions-context.js";
 import { SpendSummary } from "./spend-summary.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
@@ -180,18 +176,19 @@ function stage(id: StageId): ViewRenderer {
         ? h("p", { class: "stage-lead" }, "How should this project's workflow change?")
         : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
-    renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data)
-      : id === "tune" ? tuneTileSummary
-      : undefined,
+    renderSummary: id === "tune" ? tuneTileSummary : undefined,
     detailOpen: ctx.detailOpen ?? false,
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
   });
-  // Plan's lifecycle strip and open-changes glance share one summary read.
-  // (Its capture draft is shared from main.ts, above the router.)
+  // Plan's lifecycle strip and open-changes glance share one summary read
+  // (its capture draft is shared from main.ts, above the router); Analyze's
+  // tiles and map share what to do, and the item hovered.
   return id === "plan"
     ? (ctx) => h(ChangesSummaryProvider, null, page(ctx))
-    : page;
+    : id === "analyze"
+      ? (ctx) => h(AnalyzeActionsProvider, { data: ctx.data }, page(ctx))
+      : page;
 }
 
 /** The parts of a stage page that are not views of their own. */
@@ -202,12 +199,8 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       ? h(AnalysisView, { navigateTo: ctx.navigateTo })
       : h(AnalysisView, { navigateTo: ctx.navigateTo, onMore: () => grid.openTile("capture") });
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
-    case "health": return opened
-      ? h(HealthDetail, { data: ctx.data, openTile: grid.openTile, setDetail: ctx.setDetail })
-      : h(CodebaseStats, { data: ctx.data });
-    case "next-steps": return h(NextStepsPanel, { embedded: true });
-    case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
-    case "delivery": return h(DeliveryPanel, { stamp: deliveryAnalysisStamp(ctx.data.manifest), opened });
+    case "glance": return h(GlancePanel, { data: ctx.data, opened, setDetail: ctx.setDetail });
+    case "recommendations": return h(RecommendationsPanel, { data: ctx.data, opened, navigateTo: ctx.navigateTo });
     case "process": return h(PlanProcess, { navigateTo: ctx.navigateTo });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });

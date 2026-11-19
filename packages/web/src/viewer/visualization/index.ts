@@ -31,7 +31,8 @@ export {
 } from "./colors.js";
 
 // ── Foundation: metric helpers ──────────────────────────────────────
-export { meterClass, zoneNeedsAttention } from "./metrics.js";
+export { meterClass, zoneNeedsAttention, zoneConcerns } from "./metrics.js";
+export type { ZoneConcern } from "./metrics.js";
 
 // ── Foundation: flow-diagram data builders ──────────────────────────
 export {

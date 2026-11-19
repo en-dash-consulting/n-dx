@@ -8,9 +8,9 @@
  */
 
 import { h } from "preact";
-import type { PlacementStrength } from "../views/product-model.js";
+import type { GuessStrength } from "../views/product-model.js";
 
-export type GuessStrength = PlacementStrength | "tied";
+export type { GuessStrength };
 
 export function StrengthChip({ strength }: { strength: GuessStrength }) {
   return h("span", { class: `inbox-strength inbox-strength-${strength}`, "data-strength": strength },

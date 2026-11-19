@@ -21,6 +21,8 @@ import { ActionIcon, GhostCardsContext } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo, useRef, useContext } from "preact/hooks";
 import { PRDTree, ALL_STATUSES } from "../components/prd-tree/index.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
+import { TaskDetail } from "../components/prd-tree/task-detail.js";
+import type { PRDDetailProps } from "../hooks/index.js";
 import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
@@ -71,6 +73,11 @@ export function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string>
 
 const NO_INBOX: ReadonlySet<string> = new Set();
 
+/** The detail panel for the selected item: rendered here so usePRDActions imports no component. */
+function renderDetail(props: PRDDetailProps) {
+  return h(TaskDetail, props);
+}
+
 export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo, onSelectedItemChange }: PRDViewProps) {
   // ── Toast notifications ────────────────────────────────────────
   const { toast, toastType, showToast } = useToast();
@@ -107,6 +114,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     taskUsageById, weeklyBudget,
     showTokenBudget,
     navigateTo,
+    renderDetail,
   });
 
   // ── Status filter (persists across view switches) ────────────

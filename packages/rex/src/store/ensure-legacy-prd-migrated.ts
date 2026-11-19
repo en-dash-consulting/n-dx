@@ -25,7 +25,7 @@ import { stat, readFile, copyFile, rename } from "node:fs/promises";
 import { withLock } from "./file-lock.js";
 import { treeMetaContents } from "./tree-meta.js";
 import { validateDocument, PRDDocumentSchema } from "../schema/validate.js";
-import { serializeFolderTree } from "./index.js";
+import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, resolveRexPaths } from "./paths.js";

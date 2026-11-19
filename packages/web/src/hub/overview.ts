@@ -17,7 +17,7 @@
  * @module web/hub/overview
  */
 
-import type { ProjectView } from "./hub.js";
+import type { ProjectView } from "./project-view.js";
 import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 /** One project as the home page shows it. */

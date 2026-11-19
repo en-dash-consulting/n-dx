@@ -259,10 +259,12 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
           for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
             openTile(tile.panel ?? tile.view);
             const tabs = [...root.querySelectorAll(".stage-tile-fullscreen [role=\"tab\"]")];
-            expect(tabs, `${tile.view} rendered no tabs`).toHaveLength(tile.tabs!.length + 1);
+            // A panel tab (`panelTab`) leads, named by the model; the views follow.
+            const panelTab = tile.panelTab ? [{ view: "@panel", label: tile.panelTab }] : [];
+            expect(tabs, `${tile.view} rendered no tabs`).toHaveLength(tile.tabs!.length + 1 + panelTab.length);
             for (const tab of tabs) {
               const view = tab.getAttribute("data-tab")!;
-              const named = [{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].find((t) => t.view === view);
+              const named = [...panelTab, { view: tile.view, label: tile.tabLabel }, ...tile.tabs!].find((t) => t.view === view);
               expect(accessibleName(tab, hidden)).toBe(named?.label ?? viewLabel(view as never));
             }
           }

@@ -87,10 +87,9 @@ describe("restored views: navigation entries", () => {
   // The Analysis stage is the only place SourceVision's views are arranged,
   // so it is where the "zones is reachable, and sits after the map" guard
   // belongs. On the dashboard zones is a tile of its own, after the map.
-  it("zones is a tile of the Analysis dashboard, after the codebase map", () => {
-    const keys = STAGES.analyze.tiles!.map((t) => t.panel ?? t.view);
-    expect(keys).toContain("zones");
-    expect(keys.indexOf("map")).toBeLessThan(keys.indexOf("zones"));
+  it("zones is the view the Analysis dashboard's visuals tile opens to", () => {
+    const glance = STAGES.analyze.tiles!.find((t) => t.panel === "glance");
+    expect(glance).toMatchObject({ view: "zones", embedsView: true });
   });
 
   it("zones is named by the navigation model", () => {

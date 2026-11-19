@@ -47,8 +47,10 @@ import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useCliName, useFeatureToggle, useProductRead } from "../../hooks/index.js";
 import type { SidecarPlacementCheck } from "../../hooks/sidecar.js";
 import { CHECK_DEBOUNCE_MS, checkPlacementRequest, dryRunLine } from "../sidecar-placement.js";
-import { isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
-import { Pending } from "../../views/product-pages.js";
+import { isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox-read.js";
+import { Pending } from "../../views/product-notices.js";
+import type { CriterionDraft, PlacementTarget } from "./placement-types.js";
+export type { CriterionDraft, PlacementTarget } from "./placement-types.js";
 import { StrengthChip } from "../strength-chip.js";
 import { PlaceWithSidecarButton, PlaceWithSidecarContext } from "../place-with-sidecar.js";
 import type {
@@ -61,7 +63,6 @@ import type {
   PlacementDraft,
   PlacementRefusalKind,
   PlacementRelation,
-  PlacementStrength,
   ProductMap,
   ProposeChangeRequest,
   ProposeChangeResult,
@@ -119,29 +120,6 @@ export function takePlacementRequest(changeId: string): PlacementRequest | null 
 }
 
 // ── Model ────────────────────────────────────────────────────────────
-
-/** A node a change can be placed on: a shortlist candidate, or a search pick. */
-export interface PlacementTarget {
-  target: string;
-  /** Absent on a Quick Add preview candidate whose node the server could not read. */
-  type?: "capability" | "constraint";
-  title: string;
-  area: string;
-  statement?: string;
-  /** Absent when not read yet (a search pick; read on choosing Amends). */
-  criteria?: Array<{ id: string; text: string }>;
-  strength?: PlacementStrength;
-  reasons?: string[];
-}
-
-/** A target criterion as the Amends form holds it while it is edited. */
-export interface CriterionDraft {
-  id: string;
-  text: string;
-  /** The target's text; absent on a criterion this amendment adds. */
-  original?: string;
-  removed?: boolean;
-}
 
 /** The criteria delta an amendment carries; undefined when nothing changed. */
 export function criteriaDelta(drafts: readonly CriterionDraft[]): PlacementCriteriaDelta | undefined {

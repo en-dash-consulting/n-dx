@@ -361,7 +361,10 @@ describe("rendered surfaces take their labels from the model", () => {
         const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(".stage-tile-fullscreen .stage-section-tab")];
         act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
         // A tab is named by its view unless the model gives it a label (Open changes: List, Tree).
-        const expectedNames = [{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].map((t) => t.label ?? viewLabel(t.view));
+        const expectedNames = [
+          ...(tile.panelTab ? [tile.panelTab] : []),
+          ...[{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].map((t) => t.label ?? viewLabel(t.view)),
+        ];
         // A tile that did not open renders no tabs, so this comparison also
         // fails loudly rather than passing having checked nothing.
         if (tabButtons.map((b) => b.textContent).join("|") !== expectedNames.join("|")) {
@@ -482,31 +485,36 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("leads with Overview and lays every SourceVision view out as tiles", () => {
     expect(STAGES.analyze.sections.map((s) => s.view)).toEqual(["overview"]);
-    expect(tiles.map((t) => t.panel ?? t.view)).toEqual([
-      "map", "health", "next-steps", "delivery", "problems", "suggestions", "zones",
-      "architecture", "files", "languages", "ask",
-    ]);
-    expect(placed).toEqual([
-      "iso-map", "problems", "suggestions", "zones",
-      "architecture", "routes", "files", "ask",
-    ]);
+    expect(tiles.map((t) => t.panel ?? t.view)).toEqual(["glance", "recommendations", "map", "ask"]);
+    expect(placed).toEqual(["zones", "files", "architecture", "routes", "iso-map", "ask"]);
   });
 
-  it("puts the codebase map in the top rows, two thirds wide, chromeless, dropped in a static export", () => {
-    const map = tiles[0]!;
-    expect(map).toMatchObject({ view: "iso-map", panel: "map", cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true });
-    // The column beside it holds health and next steps, three rows together.
-    expect(tiles.slice(1, 3).map((t) => [t.panel, t.cols ?? 4, t.rows ?? 1])).toEqual([["health", 4, 1], ["next-steps", 4, 2]]);
+  it("puts two tiles across the top row: visuals on the left, recommended fixes on the right", () => {
+    expect(tiles.slice(0, 2).map((t) => [t.panel, t.title, t.cols, t.rows])).toEqual([
+      ["glance", "Codebase at a glance", 6, 2],
+      ["recommendations", "Recommended fixes", 6, 2],
+    ]);
+    // Opened, the visuals tile leads with its own panel, then the views it holds.
+    expect(tiles[0]).toMatchObject({
+      view: "zones", panelTab: "Overview",
+      tabs: [{ view: "files" }, { view: "architecture" }, { view: "routes" }],
+    });
+    // The fixes tile links to Suggestions through "Open" but does not place it.
+    expect(tilePlacesView(tiles[1]!)).toBe(false);
+  });
+
+  it("puts the codebase map across the full row below, chromeless, dropped in a static export", () => {
+    expect(tiles[2]).toMatchObject({ view: "iso-map", panel: "map", cols: 12, rows: 3, chromeless: true, hiddenWhenDeployed: true });
   });
 
   it("drops the flat repository map from the page but keeps it in the stage", () => {
     expect(tiles.some((t) => t.view === "graph")).toBe(false);
-    expect(STAGES.analyze.alsoOwns).toEqual(["graph"]);
+    expect(STAGES.analyze.alsoOwns).toEqual(["graph", "problems", "suggestions"]);
     expect(stageForView("graph")).toBe("analyze");
   });
 
-  it("shows Routes as a tab of the Architecture tile", () => {
-    expect(tile("architecture").tabs?.map((t) => t.view)).toEqual(["routes"]);
+  it("shows Architecture and Routes as tabs of the visuals tile", () => {
+    expect(tiles[0]!.tabs?.map((t) => t.view)).toEqual(expect.arrayContaining(["architecture", "routes"]));
   });
 
   it("names the repository map and isometric map as the navigation model has them", () => {
@@ -520,9 +528,10 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("keeps thresholds for the enrichment-gated views", () => {
     // The views gate themselves on these constants (architecture.ts,
-    // problems.ts, suggestions.ts).
+    // problems.ts, suggestions.ts); the health tile's list keeps the same
+    // gates for the problems and suggestions it shows (health-actions.ts).
     for (const view of ["architecture", "problems", "suggestions"] as const) {
-      expect(placed, view).toContain(view);
+      expect(stageForView(view), view).toBe("analyze");
       expect(ENRICHMENT_THRESHOLDS[view], view).toBeGreaterThan(0);
     }
   });

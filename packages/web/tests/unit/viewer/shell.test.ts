@@ -460,8 +460,10 @@ describe("StagePage", () => {
     await mount(page("analyze"));
     expect(sectionViews()).toEqual(["overview"]);
     const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["map", "health", "next-steps", "delivery", "problems", "suggestions", "zones", "architecture", "files", "languages"]);
-    expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--c8 stage-tile--r3");
+    expect(tiles).toEqual(["glance", "recommendations", "map"]);
+    expect(root.querySelector('.stage-tile[data-tile="glance"]')?.className).toContain("stage-tile--c6 stage-tile--r2");
+    expect(root.querySelector('.stage-tile[data-tile="recommendations"]')?.className).toContain("stage-tile--c6 stage-tile--r2");
+    expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--c12 stage-tile--r3");
   });
 
   it("drops the codebase map tile in deployed mode", async () => {
@@ -469,24 +471,43 @@ describe("StagePage", () => {
     try {
       await mount(page("analyze"));
       expect(root.querySelector('.stage-tile[data-tile="map"]')).toBeNull();
-      expect(root.querySelector('.stage-tile[data-tile="zones"]')).not.toBeNull();
+      expect(root.querySelector('.stage-tile[data-tile="glance"]')).not.toBeNull();
     } finally {
       delete window.__NDX_DEPLOYED__;
     }
   });
 
-  it("opens a tile full-screen with its tabs: Architecture and Routes", async () => {
-    await mount(page("analyze"));
-    const arch = root.querySelector('.stage-tile[data-tile="architecture"]')!;
-    expect(arch.querySelector(".stage-tile-title")?.textContent).toBe("Architecture");
-    // The preview shows the tile's own view, without tabs.
-    expect(arch.querySelector('[role="tab"]')).toBeNull();
-    act(() => { arch.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
+  it("opens the visuals tile full-screen with its panel first, then Zones, Files, Architecture and Routes", async () => {
+    await mount(h(StagePage, {
+      stage: "analyze", validViews: ALL, navigateTo: vi.fn(), renderView,
+      renderPanel: (panel, opened) => h("div", { "data-panel": panel, "data-opened": String(opened) }),
+    }));
+    const tile = root.querySelector('.stage-tile[data-tile="glance"]')!;
+    expect(tile.querySelector(".stage-tile-title")?.textContent).toBe("Codebase at a glance");
+    // The preview shows the panel, without tabs.
+    expect(tile.querySelector('[role="tab"]')).toBeNull();
+    expect(tile.querySelector('[data-panel="glance"]')?.getAttribute("data-opened")).toBe("false");
+    act(() => { tile.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
     const full = root.querySelector(".stage-tile-fullscreen")!;
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(["Architecture", "Routes"]);
-    act(() => { tabs[1]!.click(); });
+    expect(tabs.map((t) => t.textContent)).toEqual(["Overview", "Zones", "Files", "Architecture", "Routes"]);
+    expect(full.querySelector('[data-panel="glance"]')?.getAttribute("data-opened")).toBe("true");
+    act(() => { tabs[4]!.click(); });
     expect(full.querySelector('[data-rendered="routes"]')).not.toBeNull();
+    expect(full.querySelector('[data-panel="glance"]')).toBeNull();
+  });
+
+  it("opens the Recommended fixes tile full-screen as its panel alone", async () => {
+    await mount(h(StagePage, {
+      stage: "analyze", validViews: ALL, navigateTo: vi.fn(), renderView,
+      renderPanel: (panel, opened) => h("div", { "data-panel": panel, "data-opened": String(opened) }),
+    }));
+    const tile = root.querySelector('.stage-tile[data-tile="recommendations"]')!;
+    expect(tile.querySelector(".stage-tile-title")?.textContent).toBe("Recommended fixes");
+    act(() => { tile.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
+    const full = root.querySelector(".stage-tile-fullscreen")!;
+    expect(full.querySelector('[role="tab"]')).toBeNull();
+    expect(full.querySelector('[data-panel="recommendations"]')?.getAttribute("data-opened")).toBe("true");
   });
 
   it("renders the map tile as its panel alone, with no tile header", async () => {

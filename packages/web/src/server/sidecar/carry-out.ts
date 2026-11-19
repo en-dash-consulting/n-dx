@@ -30,18 +30,10 @@ import type { QueuePlan, SidecarChangeSet, SidecarItemEdit, SidecarLink, Sidecar
 import type { BrokerToolName } from "./broker-policy.js";
 import { choiceResultText } from "./choice-card.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
+import type { CarryOutResult } from "./carry-out-result.js";
 
-/** One effect's result, as the tool result states it. */
-export interface CarryOutResult {
-  ok: boolean;
-  text: string;
-  /** The PRD items the effect wrote, in order. */
-  ids?: string[];
-  /** True when rex recorded the effect without writing it: a hench run applies it after its test gate. Never set with `ok: false`. */
-  held?: boolean;
-  /** A started run's end, for an effect that outlives its tool result: a failed end revises the card. */
-  ended?: Promise<CarryOutResult>;
-}
+/** One effect's result, as the tool result states it: in carry-out-result.ts, which the card handlers read. */
+export type { CarryOutResult } from "./carry-out-result.js";
 
 /** The effects an approved call can have, wired to the server's job model and execute route. */
 export interface SidecarActions {

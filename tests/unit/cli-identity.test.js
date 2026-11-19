@@ -7,6 +7,7 @@ import {
   detectCliName,
   recordCliName,
   getCliName,
+  standaloneCliName,
   DEFAULT_CLI_NAME,
 } from "../../packages/core/cli-identity.js";
 
@@ -37,6 +38,22 @@ describe("resolveCliName", () => {
   });
 });
 
+describe("standaloneCliName", () => {
+  it("is null outside a standalone executable", () => {
+    expect(standaloneCliName({})).toBeNull();
+  });
+
+  it("names the executable when it is ndx or n-dx", () => {
+    expect(standaloneCliName({ NDX_STANDALONE_EXE: "/usr/local/bin/ndx" })).toBe("ndx");
+    expect(standaloneCliName({ NDX_STANDALONE_EXE: "/opt/n-dx" })).toBe("n-dx");
+  });
+
+  it("ignores a renamed executable that runs one tool", () => {
+    // `rex` / `sv` copies run that tool, not the orchestrator.
+    expect(standaloneCliName({ NDX_STANDALONE_EXE: "/usr/local/bin/rex" })).toBeNull();
+  });
+});
+
 describe("detectCliName / recordCliName", () => {
   let dir;
 
@@ -51,6 +68,17 @@ describe("detectCliName / recordCliName", () => {
   it("detectCliName reads bin from package.json at the project root", () => {
     writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x", bin: { myapp: "./cli.js" } }));
     expect(detectCliName(dir)).toBe("myapp");
+  });
+
+  it("detectCliName falls back to the standalone executable's name", () => {
+    // A standalone executable is one file under one name; a .mcp.json naming
+    // `n-dx` would not start when only `ndx` is on PATH.
+    const env = { NDX_STANDALONE_EXE: join(tmpdir(), "tools", "ndx") };
+    expect(detectCliName(dir, env)).toBe("ndx");
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x" }));
+    expect(detectCliName(dir, env)).toBe("ndx");
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x", bin: { myapp: "./cli.js" } }));
+    expect(detectCliName(dir, env)).toBe("myapp");
   });
 
   it("detectCliName defaults to 'n-dx' when package.json is missing", () => {

@@ -74,11 +74,11 @@ import {
 } from "../components/index.js";
 import { savePlacementDraft, type PlacementDraftState } from "../components/prd-tree/placement-draft.js";
 import type { CriterionDraft } from "../components/prd-tree/change-placement.js";
-import { useInbox, type InboxRow } from "./inbox.js";
+import { useInbox, type InboxRow } from "./inbox-read.js";
 import { isTypingTarget, pressPanelShortcut, useShortcuts } from "./inbox-triage.js";
 import { AreaBlock, BlockLegend, areaBlock } from "./product-area-map.js";
 import { SpecMap, liveCapabilities } from "./area-spec-map.js";
-import { Pending } from "./product-pages.js";
+import { Pending } from "./product-notices.js";
 import type { AreaDetail, AreaSection, CapabilityRow, ChangePlacement, PlacementCandidate, ProductMap } from "./product-model.js";
 import { plural } from "../utils/format.js";
 

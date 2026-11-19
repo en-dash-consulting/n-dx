@@ -40,7 +40,6 @@ import { ClaudeClientError } from "./types.js";
 // Type-only, and therefore erased: `token-usage.ts` imports
 // `TokenDiagnosticStatus` from this module, so a value import here would be a
 // cycle. Both directions are `import type`, so neither survives compilation.
-import type { TokenCacheProvenance } from "./token-usage.js";
 
 // ── Prompt envelope ──────────────────────────────────────────────────────
 
@@ -298,6 +297,26 @@ export type FailureCategory =
  * - `unavailable` — vendor did not provide usage data; values are zero/synthetic
  */
 export type TokenDiagnosticStatus = "complete" | "partial" | "unavailable";
+
+/**
+ * Where a run's cache token counts came from.
+ *
+ * The distinction this exists to draw is between a vendor that accounted for
+ * caching and reported nothing cached, and a vendor that did not account for
+ * it at all. Both leave `cacheReadInput` absent, and reporting either as a
+ * plain `0` says "this run used no cache" — a claim only the first one
+ * supports. A Codex CLI run scraped from `Tokens used: N in, N out` has no
+ * cache accounting whatsoever, and for months read as a run that cached
+ * nothing while its JSONL was reporting 35k cached input tokens a turn.
+ *
+ * - `measured` — the vendor reported cache fields; the counts are its own.
+ * - `estimated` — the counts were derived rather than reported. No parser
+ *   produces this today; it exists so a future estimator cannot be mistaken
+ *   for a measurement.
+ * - `unavailable` — no cache accounting was present. Read the counts as
+ *   unknown, not as zero.
+ */
+export type TokenCacheProvenance = "measured" | "estimated" | "unavailable";
 
 /**
  * Vendor-neutral run diagnostics.

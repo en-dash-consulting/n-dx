@@ -16,7 +16,7 @@ import { refreshPRDCache } from "../prd-io.js";
 import { errorMessage } from "../response-utils.js";
 import { findItemByRef } from "../tracker/item-links.js";
 import type { SidecarItemEdit, SidecarItemEditFields } from "../../shared/index.js";
-import type { CarryOutResult } from "./carry-out.js";
+import type { CarryOutResult } from "./carry-out-result.js";
 
 /** The fields a card can change, in the order a card lists them. */
 export const ITEM_EDIT_FIELDS = ["title", "description", "acceptanceCriteria", "tags", "priority"] as const;

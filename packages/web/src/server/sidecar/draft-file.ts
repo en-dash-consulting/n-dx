@@ -18,7 +18,7 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { errorMessage } from "../response-utils.js";
-import type { CarryOutResult } from "./carry-out.js";
+import type { CarryOutResult } from "./carry-out-result.js";
 
 /** What a draft file is. */
 export const DRAFT_FILE_KINDS = ["prompt", "restack-plan", "release-checklist"] as const;

@@ -420,6 +420,12 @@ export function routeProposals(
     return handleCaptureNextSteps(req, res, ctx, broadcast);
   }
 
+  // POST /api/rex/capture-recommendations — add the Analyze dashboard's
+  // recommendations to the PRD (an Inbox change each on v2)
+  if (path === "capture-recommendations" && method === "POST") {
+    return handleCaptureRecommendations(req, res, ctx, broadcast);
+  }
+
   // POST /api/rex/capture-ask — capture a SourceVision Ask exchange as a PRD
   // task (Ask panel action)
   if (path === "capture-ask" && method === "POST") {
@@ -538,6 +544,247 @@ async function handleCaptureNextSteps(
     if (created > 0) broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, created, skipped, epicId: created > 0 ? epicId : undefined });
+  } catch (err) {
+    errorResponse(res, 400, errorMessage(err));
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Recommendation capture
+// ---------------------------------------------------------------------------
+
+/** A PRD priority, as the store's item type spells it. */
+type Priority = NonNullable<PRDItem["priority"]>;
+
+/** The v1 parent that collects captured recommendations; v2 has the Inbox instead. */
+const RECOMMENDATIONS_EPIC_TITLE = "SourceVision Recommendations";
+
+/** Longest title a recommendation is stored under; the full text goes to the description. */
+const RECOMMENDATION_TITLE_MAX_CHARS = 120;
+
+/** Most recommendations one request may add. */
+const RECOMMENDATIONS_MAX = 200;
+
+/** A recommendation as the dashboard sends it. */
+interface RecommendationInput {
+  title: string;
+  /** A step's description or a gap's remedy. */
+  detail?: string;
+  /** step, problem, suggestion, gap, relationship, pattern or move. */
+  kind?: string;
+  /** A step's priority or a finding's severity. */
+  level?: string;
+  /** Zones the recommendation touches. */
+  zones?: string[];
+  /** What acting on it adds that the map cannot draw yet. */
+  note?: string;
+  acceptanceCriteria?: string[];
+}
+
+/** One recommendation, ready to write: on v2 an Inbox change, on v1 an item under the parent. */
+interface CaptureEntry {
+  title: string;
+  description?: string;
+  priority?: Priority;
+  tags: string[];
+  acceptanceCriteria?: string[];
+}
+
+const KIND_NAMES: Record<string, string> = {
+  step: "next step",
+  problem: "problem",
+  suggestion: "suggestion",
+  gap: "readiness gap",
+  relationship: "boundary finding",
+  pattern: "pattern",
+  move: "file to move",
+};
+
+/** A finding's severity as a PRD priority; a step's priority is one already. */
+function recommendationPriority(level: string | undefined): Priority | undefined {
+  if (!level) return undefined;
+  const mapped = level === "warning" ? "medium" : level === "info" ? "low" : level;
+  return isPriority(mapped) ? mapped : undefined;
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string" && v.trim().length > 0).map((v) => v.trim())
+    : [];
+}
+
+/** Validate one recommendation from the request body; a message when it is not one. */
+function parseRecommendation(raw: unknown): RecommendationInput | string {
+  if (!raw || typeof raw !== "object") return "Every item must be an object";
+  const r = raw as Record<string, unknown>;
+  const title = typeof r.title === "string" ? r.title.trim() : "";
+  if (!title) return "Every item requires a title";
+  const text = (key: string): string | undefined => {
+    const v = r[key];
+    return typeof v === "string" && v.trim() ? v.trim() : undefined;
+  };
+  return {
+    title,
+    detail: text("detail"),
+    kind: text("kind"),
+    level: text("level"),
+    zones: stringList(r.zones),
+    note: text("note"),
+    acceptanceCriteria: stringList(r.acceptanceCriteria),
+  };
+}
+
+/**
+ * The PRD item a recommendation becomes: its title (shortened, with the whole
+ * text kept in the description), what found it, the zones it touches and what
+ * it would add, tagged so the Inbox can tell where it came from.
+ */
+function captureEntry(r: RecommendationInput): CaptureEntry {
+  const long = r.title.length > RECOMMENDATION_TITLE_MAX_CHARS;
+  const title = long ? `${r.title.slice(0, RECOMMENDATION_TITLE_MAX_CHARS - 1).trimEnd()}…` : r.title;
+  const kind = r.kind && KIND_NAMES[r.kind] ? r.kind : undefined;
+  const description = [
+    long ? r.title : null,
+    r.detail && r.detail !== r.title ? r.detail : null,
+    r.zones?.length ? `Zones: ${r.zones.join(", ")}` : null,
+    r.note ?? null,
+    `From the Analyze dashboard: a SourceVision ${kind ? KIND_NAMES[kind] : "recommendation"}${r.level ? ` (${r.level})` : ""}.`,
+  ].filter((line): line is string => !!line).join("\n\n");
+  const tags = ["sourcevision", "recommendation", ...(kind ? [kind] : []), ...(r.zones ?? []).map((z) => `zone:${z}`)];
+  const priority = recommendationPriority(r.level);
+  return {
+    title,
+    description,
+    ...(priority ? { priority } : {}),
+    tags,
+    ...(r.acceptanceCriteria?.length ? { acceptanceCriteria: r.acceptanceCriteria } : {}),
+  };
+}
+
+type TitledNode = { title?: string; children?: readonly unknown[] };
+
+/** Normalized titles of v2 nodes, at every depth. */
+function v2Titles(nodes: readonly TitledNode[], into: Set<string>): Set<string> {
+  for (const node of nodes) {
+    if (typeof node.title === "string") into.add(normalizeTitle(node.title));
+    if (node.children) v2Titles(node.children as readonly TitledNode[], into);
+  }
+  return into;
+}
+
+/**
+ * Handle POST /api/rex/capture-recommendations — add recommendations from the
+ * Analyze dashboard's health and infrastructure & architecture lists to the PRD.
+ *
+ * On v2 each becomes one change in the Inbox, where placement ranks what it
+ * amends — the door every sourcevision finding enters through. The adds run in
+ * one model transaction that also reads the titles they are checked against,
+ * so a concurrent writer cannot slip a duplicate past it. On v1 each becomes an
+ * item under a find-or-create "SourceVision Recommendations" parent, as next
+ * steps are captured. Either way a recommendation whose title the PRD already
+ * holds, or that an earlier item in the request repeats, is skipped, and
+ * `results` says which happened to each, in request order.
+ */
+async function handleCaptureRecommendations(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  try {
+    const body = await readBody(req, res);
+    const input = JSON.parse(body || "{}") as { items?: unknown };
+    if (!Array.isArray(input.items) || input.items.length === 0) {
+      errorResponse(res, 400, "Missing required field: items (non-empty array)");
+      return true;
+    }
+    if (input.items.length > RECOMMENDATIONS_MAX) {
+      errorResponse(res, 400, `At most ${RECOMMENDATIONS_MAX} items per request`);
+      return true;
+    }
+    const parsed = input.items.map(parseRecommendation);
+    const bad = parsed.find((p): p is string => typeof p === "string");
+    if (bad) {
+      errorResponse(res, 400, bad);
+      return true;
+    }
+    const entries = (parsed as RecommendationInput[]).map(captureEntry);
+
+    const store = await resolveStore(ctx.rexDir);
+    let results: Array<"created" | "exists">;
+    let destination: string;
+
+    if (isChangeLayerStore(store)) {
+      destination = "Inbox";
+      const out = await store.withModelTransaction((model) => {
+        const seen = v2Titles([...model.tree.changes, ...model.tree.product], new Set<string>());
+        const outcome: Array<"created" | "exists"> = [];
+        const work: ProposedWork[] = [];
+        for (const e of entries) {
+          const key = normalizeTitle(e.title);
+          if (seen.has(key)) { outcome.push("exists"); continue; }
+          seen.add(key);
+          outcome.push("created");
+          work.push({ ...e, source: "sv-recommendations" });
+        }
+        const added = addProposedChanges(model.tree, changeInputsFromProposals(work), { now: new Date() });
+        return { tree: added.tree, result: outcome };
+      });
+      results = out.result;
+    } else {
+      destination = RECOMMENDATIONS_EPIC_TITLE;
+      results = await store.withTransaction(async (doc) => {
+        const seen = collectNormalizedTitles(doc.items, new Set<string>());
+        let parent = doc.items.find((i) => isRootType(itemTypeOf(i)) && i.title === RECOMMENDATIONS_EPIC_TITLE);
+        const outcome: Array<"created" | "exists"> = [];
+        for (const e of entries) {
+          const key = normalizeTitle(e.title);
+          if (seen.has(key)) { outcome.push("exists"); continue; }
+          seen.add(key);
+          outcome.push("created");
+          if (!parent) {
+            parent = {
+              id: randomUUID(),
+              title: RECOMMENDATIONS_EPIC_TITLE,
+              level: CAPTURE_ROOT_LEVEL,
+              status: "pending",
+              source: "sv-recommendations",
+              description: "Recommendations captured from the Analyze dashboard.",
+              tags: ["sourcevision", "recommendation"],
+              children: [],
+            };
+            doc.items.push(parent);
+          }
+          const item: PRDItem = {
+            id: randomUUID(),
+            title: e.title,
+            level: CAPTURE_CHILD_LEVEL,
+            status: "pending",
+            source: "sv-recommendations",
+            tags: e.tags,
+          };
+          if (e.description) item.description = e.description;
+          if (e.priority) item.priority = e.priority;
+          if (e.acceptanceCriteria) item.acceptanceCriteria = e.acceptanceCriteria;
+          (parent.children ??= []).push(item);
+        }
+        return outcome;
+      });
+    }
+
+    const created = results.filter((r) => r === "created").length;
+    const skipped = results.length - created;
+    if (created > 0) refreshPRDCache(ctx.rexDir, await store.loadDocument());
+
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "sv_recommendations_capture",
+      detail: `Added ${created} recommendation${created === 1 ? "" : "s"} to ${destination === "Inbox" ? "the Inbox" : `"${destination}"`} (${skipped} already in the PRD) via web`,
+    });
+    if (created > 0) broadcastPrdChanged(broadcast);
+
+    jsonResponse(res, 200, { ok: true, created, skipped, destination, results });
   } catch (err) {
     errorResponse(res, 400, errorMessage(err));
   }

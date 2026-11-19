@@ -90,7 +90,8 @@ import {
   isRecord,
 } from "../shared/index.js";
 import type { RunMode, RunOptions, CredentialStore } from "../shared/index.js";
-import type { Hub, ProjectView } from "./hub.js";
+import type { HubHost } from "./hub-host.js";
+import type { ProjectView } from "./project-view.js";
 import { replayedRunFields } from "./admission.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { HOME_EXTENSIONS_WAIT_MS, renderHomePage } from "./home.js";
@@ -184,7 +185,7 @@ export type ProxyDecision =
  * @param upgrade true for a WebSocket upgrade — there is no page to serve, so
  *   the multi-project `/` case is a 409 rather than the project list.
  */
-export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecision {
+export function decideProxy(hub: HubHost, url: string, upgrade = false): ProxyDecision {
   const queryIdx = url.indexOf("?");
   const pathname = queryIdx === -1 ? url : url.slice(0, queryIdx);
   const query = queryIdx === -1 ? "" : url.slice(queryIdx);
@@ -286,7 +287,7 @@ function withoutTokenParam(query: string): string {
   return rest ? `?${rest}` : "";
 }
 
-function projectIds(hub: Hub): string[] {
+function projectIds(hub: HubHost): string[] {
   return hub.listProjects().map((p) => p.id);
 }
 
@@ -371,7 +372,7 @@ function readBody(req: IncomingMessage, limit: number, destroyOnLimit = true): P
  * with the body it already consumed. Returns false when this request is not
  * such a signal and the general routing should proceed.
  */
-async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
+async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub: HubHost): Promise<boolean> {
   const pathname = (req.url || "/").split("?")[0];
   if (pathname !== RELOAD_PATH || (req.method || "GET") !== "POST") return false;
   const projects = hub.listProjects();
@@ -702,7 +703,7 @@ function parseResponseHead(text: string): { status: number; headers: IncomingHtt
 const NO_HUB_SESSION_HOST = "No registered project server is healthy to host the hub session";
 
 /** The credential an authenticated request carries on to a project server: the per-user token. */
-function upstreamAuth(hub: Hub): OutgoingHttpHeaders {
+function upstreamAuth(hub: HubHost): OutgoingHttpHeaders {
   return hub.token ? { "x-ndx-token": hub.token } : {};
 }
 
@@ -714,7 +715,7 @@ const HUB_DRAWER_UPSTREAM = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.drawe
  * {@link proxyHubSession} (which moves past a host whose web.sidecar is off),
  * or a refusal when no project can host.
  */
-async function routeHubSession(req: IncomingMessage, res: ServerResponse, hub: Hub, path: string): Promise<void> {
+async function routeHubSession(req: IncomingMessage, res: ServerResponse, hub: HubHost, path: string): Promise<void> {
   const host = hub.sessionHosts.pick(hub.listProjects());
   if (!host) {
     if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
@@ -733,7 +734,7 @@ async function routeHubSession(req: IncomingMessage, res: ServerResponse, hub: H
  * (request-guard.ts) admits such a request, of any method and on an upgrade,
  * for that sidecar alone.
  */
-export function mountKeyAdmits(hub: Pick<Hub, "sidecars">, url: string): boolean {
+export function mountKeyAdmits(hub: Pick<HubHost, "sidecars">, url: string): boolean {
   const pathname = url.split("?")[0];
   const sidecar = SIDECAR_PATH.exec(pathname);
   if (!sidecar || sidecar[2] === undefined) return false;
@@ -795,7 +796,7 @@ function refusePublic(req: IncomingMessage, res: ServerResponse): void {
  * project path is proxied with no credential at all, so the project server
  * answers it with its own public shell or a 401.
  */
-export async function handlePublicHubRequest(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<void> {
+export async function handlePublicHubRequest(req: IncomingMessage, res: ServerResponse, hub: HubHost): Promise<void> {
   const path = hubRoutePath(req.url || "/");
   if (path === "/api/hub" || path.startsWith("/api/hub/")) {
     refusePublic(req, res);
@@ -851,7 +852,7 @@ function writeHtml(res: ServerResponse, status: number, html: string): void {
   res.end(html);
 }
 
-type SessionHost = NonNullable<ReturnType<Hub["sessionHosts"]["pick"]>>;
+type SessionHost = NonNullable<ReturnType<HubHost["sessionHosts"]["pick"]>>;
 
 function isSidecarRefusal(status: number, headers: IncomingHttpHeaders): boolean {
   return status === 403 && headers[FEATURE_DISABLED_HEADER] === HUB_SESSION_FEATURE;
@@ -872,7 +873,7 @@ function writeSidecarOffEverywhere(res: ServerResponse): void {
  * passed over and the same request replayed on the next healthy one: the client
  * sees only the answer of the host that served it, or the 403 when none is left.
  */
-async function proxyHubSession(req: IncomingMessage, res: ServerResponse, hub: Hub, path: string, first: SessionHost): Promise<void> {
+async function proxyHubSession(req: IncomingMessage, res: ServerResponse, hub: HubHost, path: string, first: SessionHost): Promise<void> {
   const tooLarge = { error: `Hub session request bodies are limited to ${MAX_HUB_SESSION_BODY_BYTES} bytes` };
   if (Number(req.headers["content-length"]) > MAX_HUB_SESSION_BODY_BYTES) {
     req.resume();
@@ -913,7 +914,7 @@ async function proxyHubSession(req: IncomingMessage, res: ServerResponse, hub: H
 }
 
 /** Forward a hub session WebSocket upgrade, retrying on the next healthy host while one refuses for web.sidecar. */
-async function upgradeHubSession(req: IncomingMessage, socket: Duplex, head: Buffer, hub: Hub, path: string): Promise<void> {
+async function upgradeHubSession(req: IncomingMessage, socket: Duplex, head: Buffer, hub: HubHost, path: string): Promise<void> {
   let host = hub.sessionHosts.pick(hub.listProjects());
   while (host) {
     const target: SessionHost = host;
@@ -939,7 +940,7 @@ async function upgradeHubSession(req: IncomingMessage, socket: Duplex, head: Buf
 }
 
 /** Handle any request that is not `/api/hub/*`. Always responds. */
-export async function handleProxyRequest(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<void> {
+export async function handleProxyRequest(req: IncomingMessage, res: ServerResponse, hub: HubHost): Promise<void> {
   if (await handleReloadSignal(req, res, hub)) return;
   const decision = decideProxy(hub, req.url || "/");
   // Every keyed answer — redirect, refusal or the sidecar's own — is sandboxed.
@@ -1013,7 +1014,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
  * answers. A hub that cannot list them (no `--ndx-cli`, a failing or slow CLI)
  * renders the page without the row — the projects are what the page is for.
  */
-async function homeExtensionViews(hub: Hub): Promise<ExtensionView[]> {
+async function homeExtensionViews(hub: HubHost): Promise<ExtensionView[]> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), HOME_EXTENSIONS_WAIT_MS); });
   try {
@@ -1038,7 +1039,7 @@ async function homeExtensionViews(hub: Hub): Promise<ExtensionView[]> {
  */
 async function admissionHeadersFor(
   req: IncomingMessage,
-  hub: Hub,
+  hub: HubHost,
   decision: Extract<ProxyDecision, { kind: "proxy" }>,
 ): Promise<OutgoingHttpHeaders> {
   if ((req.method || "GET") !== "GET") return {};
@@ -1136,7 +1137,7 @@ function parseExecuteBody(body: Buffer): ExecuteRequest {
 async function handleExecuteAdmission(
   req: IncomingMessage,
   res: ServerResponse,
-  hub: Hub,
+  hub: HubHost,
   decision: Extract<ProxyDecision, { kind: "proxy" }>,
 ): Promise<boolean> {
   if ((req.method || "GET") !== "POST") return false;
@@ -1200,7 +1201,7 @@ async function handleExecuteAdmission(
   return true;
 }
 
-function sidecarForward(hub: Hub, decision: Extract<ProxyDecision, { kind: "sidecar" }>): SidecarForward {
+function sidecarForward(hub: HubHost, decision: Extract<ProxyDecision, { kind: "sidecar" }>): SidecarForward {
   // A drawer tab's page keeps its frame-keyed mount, so the links it builds
   // stay under that key; it is never told the hub-lifetime mount key. Any
   // other request gets the keyed mount whenever there is one, whichever
@@ -1221,7 +1222,7 @@ function sidecarForward(hub: Hub, decision: Extract<ProxyDecision, { kind: "side
  * means nothing may be mounted at the name, so its frame keys go too —
  * which is how a revoked approval reaches a key no management command named.
  */
-function revokeOnRefusal(hub: Hub, name: string, result: Extract<EnsureResult, { ok: false }>): void {
+function revokeOnRefusal(hub: HubHost, name: string, result: Extract<EnsureResult, { ok: false }>): void {
   if (result.reason === "none" || result.reason === "refused") hub.frameKeys.revoke(name);
 }
 
@@ -1240,7 +1241,7 @@ async function upgradeSidecar(
   req: IncomingMessage,
   socket: Duplex,
   head: Buffer,
-  hub: Hub,
+  hub: HubHost,
   decision: Extract<ProxyDecision, { kind: "sidecar" }>,
 ): Promise<void> {
   // After 'upgrade' Node detaches the parser's end handler and the socket
@@ -1272,7 +1273,7 @@ async function upgradeSidecar(
 }
 
 /** Handle a WebSocket upgrade on the hub socket. */
-export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, hub: Hub): void {
+export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, hub: HubHost): void {
   const decision = decideProxy(hub, req.url || "/", true);
   if (decision.kind === "sidecar") {
     void upgradeSidecar(req, socket, head, hub, decision).catch(() => socket.destroy());

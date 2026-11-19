@@ -183,10 +183,29 @@ function dashboardTheme(): "light" | "dark" | null {
  * is mounted — so a rebuild that returns identical HTML still re-binds the
  * remounted frame (the loading state unmounts it).
  */
-export function useIsoFrameSync(frameRef: { current: HTMLIFrameElement | null }, wheelZoom: boolean, shownHtml: string | null): void {
+/**
+ * Marks the host puts on the map: a "!" on each zone with issues, and the
+ * zones a hovered recommendation touches lit (null: nothing lit).
+ */
+export interface IsoMapMarks {
+  issues: Readonly<Record<string, "warn" | "crit">>;
+  lit: readonly string[] | null;
+}
+
+export function useIsoFrameSync(
+  frameRef: { current: HTMLIFrameElement | null },
+  wheelZoom: boolean,
+  shownHtml: string | null,
+  marks?: IsoMapMarks,
+): void {
+  // Keyed by content, so a new object with the same marks sends nothing.
+  const marksKey = marks ? JSON.stringify(marks) : "";
   const send = useCallback(() => {
-    frameRef.current?.contentWindow?.postMessage({ type: "ndx-iso", wheelZoom, theme: dashboardTheme() }, "*");
-  }, [frameRef, wheelZoom]);
+    frameRef.current?.contentWindow?.postMessage({
+      type: "ndx-iso", wheelZoom, theme: dashboardTheme(),
+      ...(marksKey ? JSON.parse(marksKey) as IsoMapMarks : {}),
+    }, "*");
+  }, [frameRef, wheelZoom, marksKey]);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -414,6 +433,8 @@ export interface IsoMapHeroProps {
    * Expand, which the host provides.
    */
   hosted?: boolean;
+  /** Issue badges and lit zones, sent to the map whenever they change. */
+  marks?: IsoMapMarks;
 }
 
 /**
@@ -430,7 +451,7 @@ export interface IsoMapHeroProps {
  * Renders nothing in deployed mode — the Overview has plenty to show without
  * a card explaining why the map is absent.
  */
-export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [], onExpand, hosted = false }: IsoMapHeroProps) {
+export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [], onExpand, hosted = false, marks }: IsoMapHeroProps) {
   const deployed = isDeployedMode();
   const cliName = useCliName();
   const { state, html, error, applied, generate } = useIsoMapDocument(analysisStamp, deployed, true);
@@ -439,7 +460,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [], onEx
   const [expanded, setExpanded] = useState(false);
   // True when `expanded` is the CSS overlay rather than real full screen.
   const [overlay, setOverlay] = useState(false);
-  useIsoFrameSync(frameRef, expanded || hosted, state === "ready" ? html : null);
+  useIsoFrameSync(frameRef, expanded || hosted, state === "ready" ? html : null, marks);
 
   useEffect(() => {
     const sync = () => {

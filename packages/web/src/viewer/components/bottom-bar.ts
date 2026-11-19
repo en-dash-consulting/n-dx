@@ -6,8 +6,8 @@
 
 import { h } from "preact";
 import type { ViewId } from "../api.js";
+import { useProjectStatus, useLive, isAnalysisJob } from "../api.js";
 import {
-  useProjectStatus,
   SvFreshnessIndicator,
   RexCompletionIndicator,
   InboxIndicator,
@@ -15,9 +15,7 @@ import {
   HenchActivityIndicator,
   INDICATOR_VIEWS,
   LIVE_INDICATOR_VIEWS,
-  useLive,
-  isAnalysisJob,
-} from "../api.js";
+} from "./status-indicators.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { isCurrentWorktree } from "./live-tab.js";
 import { identityLine, identityTooltip, type ServerIdentity } from "./config-footer.js";

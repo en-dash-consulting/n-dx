@@ -89,10 +89,10 @@ export type StageSectionBadge = "inbox";
 
 /**
  * A part of the page that is not a view of its own — a panel the stage page
- * renders through the registry (`renderPanel`). Overview's Next steps and
- * Languages, split out so they can sit in tiles of their own.
+ * renders through the registry (`renderPanel`): the Analyze tiles' visuals
+ * and recommended fixes, Plan's strips and glances.
  */
-export type StagePanelId = "capture" | "map" | "health" | "next-steps" | "languages" | "delivery" | "process" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
+export type StagePanelId = "capture" | "map" | "glance" | "recommendations" | "process" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -149,6 +149,11 @@ export interface StageTile {
   tabs?: readonly StageTab[];
   /** The name of the tile's own view as the first of its `tabs`, like `StageTab.label`. */
   tabLabel?: string;
+  /**
+   * Opened, the panel is a tab of its own, named this, ahead of `view` and
+   * `tabs` (Codebase at a glance: its overview, then Zones, Files, Architecture and Routes).
+   */
+  panelTab?: string;
   /** A live count in the tile header, read from project status like a section's. */
   badge?: StageSectionBadge;
   /** Shown only on a v2 project; a v1 project draws the stage's `v1Tiles` in their place. */
@@ -188,7 +193,7 @@ export interface StageDef {
 /**
  * Whether a tile puts its view on the page. A view tile does, and so does a
  * chromeless panel, which is its view's embedded form (the map); a panel that
- * only links to its view through "Open" (Next steps, Languages) does not.
+ * only links to its view through "Open" (Recommended fixes) does not.
  */
 export function tilePlacesView(tile: StageTile): boolean {
   return !tile.panel || !!tile.chromeless || !!tile.embedsView;
@@ -214,22 +219,24 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     id: "analyze",
     // A dashboard: the analysis line and its controls, then tiles.
     sections: [{ view: "overview", plain: true }],
-    // The map takes the top-left two thirds across three rows; health and
-    // next steps fill the column beside it; the rest sit three to a row.
+    // Two tiles across the top — the visuals and basic numbers on the left,
+    // the recommended fixes on the right — then the codebase map across the
+    // full row below. Pressing a highlighted element on the left filters the
+    // fixes; hovering a fix lights its zones on the map, which marks every
+    // zone with issues "!".
     tiles: [
-      { view: "iso-map", panel: "map", title: "Codebase map", cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true },
-      { view: "overview", panel: "health", title: "Codebase health" },
-      { view: "suggestions", panel: "next-steps", title: "Next steps", rows: 2 },
-      { view: "overview", panel: "delivery", title: "Delivery & infrastructure", rows: 2 },
-      { view: "problems" },
-      { view: "suggestions" },
-      { view: "zones" },
-      { view: "architecture", tabs: [{ view: "routes" }] },
-      { view: "files" },
-      { view: "files", panel: "languages", title: "Languages" },
+      {
+        view: "zones", panel: "glance", title: "Codebase at a glance", cols: 6, rows: 2,
+        embedsView: true, panelTab: "Overview",
+        tabs: [{ view: "files" }, { view: "architecture" }, { view: "routes" }],
+      },
+      { view: "suggestions", panel: "recommendations", title: "Recommended fixes", cols: 6, rows: 2 },
+      { view: "iso-map", panel: "map", title: "Codebase map", cols: 12, rows: 3, chromeless: true, hiddenWhenDeployed: true },
       { view: "ask", cols: 6, featureGate: "sourcevision.ask", requiresServer: true },
     ],
-    alsoOwns: ["graph"],
+    // Problems and Suggestions are listed in the Recommended fixes tile, which
+    // links to them; the flat Graph gave way to the codebase map.
+    alsoOwns: ["graph", "problems", "suggestions"],
   },
   plan: {
     id: "plan",
