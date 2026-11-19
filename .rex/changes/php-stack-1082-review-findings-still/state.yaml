@@ -175,7 +175,14 @@ items:
     lastModified: "2026-11-19T01:45:25.893Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2a302a2-bb06-40b9-831a-3916923e0ee7":
-    lastModified: "2026-11-19T02:32:45.379Z"
+    status: "completed"
+    startedAt: "2026-11-19T16:17:14.756Z"
+    completedAt: "2026-11-19T16:22:42.718Z"
+    endedAt: "2026-11-19T16:22:42.718Z"
+    activeIntervals: [{"end":"2026-11-19T16:22:42.718Z","start":"2026-11-19T16:17:14.756Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Order-aware mod_access_compat and RequireAny reading in parseHtaccess, joined as Satisfy All; unit tests for each case; commit 7d32b4646."
+    lastModified: "2026-11-19T16:22:42.718Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "faa0c3c8-a8aa-4762-8e96-227138e9e179":
     status: "completed"

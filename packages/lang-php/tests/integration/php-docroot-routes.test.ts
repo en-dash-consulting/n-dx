@@ -27,7 +27,7 @@ describe("php docroot routes", () => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const { lines, notices } = await routes("php-docroot-flat");
     expect(lines).toEqual([
-      // admin/ is denied (`Deny from all`), its assets/ granted again (`Require all granted`).
+      // admin/ is denied (`Order allow,deny`, so `Deny from all` overrides its `Allow`), its assets/ granted again (`Require all granted`).
       "GET /about.php about.php (docroot .)",
       "GET /admin/assets/logo.php admin/assets/logo.php (docroot .)",
       "GET /contact.phtml contact.phtml (docroot .)",

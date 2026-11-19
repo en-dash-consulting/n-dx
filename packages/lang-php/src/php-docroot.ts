@@ -31,7 +31,9 @@
  * - `htaccess-access`: a directory's nearest `.htaccess` at or below the
  *   docroot setting directory access decides it; `<Files>`/`<FilesMatch>`
  *   denials and `RedirectMatch 403` in any `.htaccess` above the file apply too.
- *   `Require ip|host|local` (no grant beside it) keeps the files as routes,
+ *   A restriction (`Require ip|host|local`, or `Allow from <clients>` that
+ *   overrides `Deny from all` under `Order deny,allow`; rules in
+ *   `php-htaccess.ts`) keeps the files as routes,
  *   `source` unchanged, with one notice per `.htaccess` naming the directive
  *   and how many routes it restricts: the pages are still served, to the
  *   clients it names, so dropping them would lose real entry points.
@@ -67,7 +69,8 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   // defined() is true once define() or const has declared the name; exit and die end the script.
   "direct-access-guard": rule(["PHP 8"], "https://www.php.net/manual/en/function.defined.php"),
   // Require all denied (mod_authz_core), Deny from all (mod_access_compat), <Files>/<FilesMatch>, RedirectMatch 403 (mod_alias);
-  // Require ip|host|local (mod_authz_host) restricts, sibling Require lines join as <RequireAny>.
+  // Require ip|host|local (mod_authz_host) restricts, sibling Require lines join as <RequireAny>;
+  // Order decides whether Allow from <clients> overrides Deny from all (mod_access_compat.html#order).
   "htaccess-access": rule(["Apache HTTP Server 2.4"], apache("mod_authz_core.html#require")),
   // RewriteRule in per-directory context: the pattern matches the path below the directory; a relative substitution is under RewriteBase.
   "htaccess-rewrite": rule(["Apache HTTP Server 2.4"], apache("mod_rewrite.html#rewriterule")),
@@ -148,7 +151,8 @@ class DocrootAccess {
 
   /**
    * Whether a request for `path` (at `url`) is refused (`denied`), served only
-   * to the clients an `.htaccess`'s `Require ip|host|local` names (that file),
+   * to the clients an `.htaccess`'s `Require ip|host|local` or
+   * `Allow from <clients>` names (that file),
    * or served to anyone (undefined).
    */
   access(path: string, url: string): "denied" | Htaccess | undefined {
