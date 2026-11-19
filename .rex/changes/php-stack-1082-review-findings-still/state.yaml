@@ -50,7 +50,15 @@ items:
     lastModified: "2026-11-19T02:25:17.612Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8cdfc6e9-6a56-46ce-a44b-9e461dc45892":
-    lastModified: "2026-11-18T22:35:11.034Z"
+    status: "completed"
+    startedAt: "2026-11-19T02:58:05.946Z"
+    completedAt: "2026-11-19T03:02:01.578Z"
+    endedAt: "2026-11-19T03:02:01.578Z"
+    activeIntervals: [{"end":"2026-11-19T03:00:32.697Z","start":"2026-11-19T02:58:05.946Z"},{"end":"2026-11-19T03:02:01.578Z","start":"2026-11-19T03:02:01.578Z"}]
+    failureReason: "The completion was refused: the run left work uncommitted."
+    resolutionType: "code-change"
+    resolutionDetail: "prefixCovers matches PSR-0 and composer.lock prefixes only on a \\ or _ boundary; file lookup unchanged (664909b2b, from run 16ed9d71, committed by the operator after the lang-php suite with grammar, 222 tests, typecheck and changeset-body-policy passed). Review: 2 fixed, 1 dropped."
+    lastModified: "2026-11-19T03:02:01.578Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94add228-871f-4544-bcb3-6c25ff72ef4d":
     createdAt: "2026-11-18T22:33:39.769Z"
