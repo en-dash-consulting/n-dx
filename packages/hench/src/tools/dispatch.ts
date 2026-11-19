@@ -15,7 +15,7 @@
  * - **Guard+tools → agent core**: `tools/contracts.ts` exports `ToolGuard` (a
  *   minimal interface satisfied by GuardRails) and `ToolContext`, so tool
  *   implementations never import from agent-core directly.  `tools/git.ts` and
- *   `tools/shell.ts` call `process/exec-shell.ts` for subprocess execution.
+ *   `tools/shell.ts` call `tools/exec-shell.ts` for subprocess execution.
  *
  * The `ToolGuard` interface in `./contracts.ts` is the explicit shared boundary
  * that decouples tool implementations from concrete GuardRails internals,

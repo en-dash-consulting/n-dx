@@ -41,16 +41,6 @@ export function getManifest() {
   return _manifestCache;
 }
 
-/**
- * Load the skill registry (backward-compatible view of the manifest).
- *
- * @returns {{ skills: Record<string, { description: string, argumentHint?: string }> }}
- */
-export function getRegistry() {
-  const { skills } = getManifest();
-  return { skills };
-}
-
 // ── Skill enumeration ───────────────────────────────────────────────────────
 
 /**
@@ -78,19 +68,6 @@ export function getSkillBody(name) {
   return readFileSync(file, "utf-8");
 }
 
-/**
- * Read all skill bodies keyed by name.
- *
- * @returns {Map<string, string>}
- */
-export function getAllSkillBodies() {
-  const bodies = new Map();
-  for (const name of getSkillNames()) {
-    bodies.set(name, getSkillBody(name));
-  }
-  return bodies;
-}
-
 // ── MCP server descriptors ──────────────────────────────────────────────────
 
 /**
@@ -106,22 +83,6 @@ export function getAllSkillBodies() {
  */
 export function getMcpServers() {
   return getManifest().mcpServers;
-}
-
-/**
- * Return a single MCP server descriptor by name.
- *
- * @param {string} name
- * @returns {{ package: string, npmName: string, entrypoint: string,
- *             cliCommand: string, mcpCommand: string,
- *             tools: { read: string[], write: string[] } }}
- */
-export function getMcpServer(name) {
-  const servers = getMcpServers();
-  if (!servers[name]) {
-    throw new Error(`MCP server not in manifest: ${name}`);
-  }
-  return servers[name];
 }
 
 // ── Codex config rendering ───────────────────────────────────────────────────
@@ -313,23 +274,6 @@ export function writeVendorSkills(vendor, projectDir) {
   }
 
   return { written, dir: skillsDir };
-}
-
-// ── Claude-specific aliases (backward compatibility) ────────────────────────
-
-/**
- * @param {string} name
- * @returns {string}
- */
-export function renderClaudeSkill(name) {
-  return renderSkill(name, "claude");
-}
-
-/**
- * @returns {Record<string, string>}
- */
-export function renderAllClaudeSkills() {
-  return renderAllSkills("claude");
 }
 
 // ── Internal renderers ──────────────────────────────────────────────────────
