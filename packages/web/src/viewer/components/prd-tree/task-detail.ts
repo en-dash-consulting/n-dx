@@ -31,6 +31,8 @@ import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
 import { placementTab } from "../../route-state.js";
 import { ImpactDetail, itemName, nameTooltip, useItemImpacts } from "../impact-tags.js";
+import { AssigneePicker, saveAssignee, usePeople } from "../assignee.js";
+import { pickerChoices } from "../assignee-model.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1195,6 +1197,7 @@ function IndexMdSectionsRenderer({ itemId }: { itemId: string }) {
 
 export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, allItems, onUpdate, onNavigateToItem, onPrdChanged, onAddChild, onRemove, navigateTo }: TaskDetailProps) {
   const impacts = useItemImpacts();
+  const peopleRead = usePeople();
   const [saving, setSaving] = useState(false);
   const [pendingFailStatus, setPendingFailStatus] = useState(false);
   const [failureReason, setFailureReason] = useState("");
@@ -1424,6 +1427,27 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           )
         : null,
     ),
+
+    // Assignee: who the item belongs to, the field `ndx work --mine` selects by
+    onUpdate
+      ? h(TaskSection, { label: "Assignee", class: "task-assignee-section" },
+          h(AssigneePicker, {
+            key: `assignee:${item.id}`,
+            itemId: item.id,
+            assignee: item.assignee,
+            people: pickerChoices(peopleRead?.people ?? [], [item.assignee]),
+            me: peopleRead?.me ?? null,
+            // Its own PATCH, not onUpdate: onUpdate swallows a refused write, and
+            // the picker must show the server's reason and keep the old value.
+            onSave: async (assignee: string) => {
+              await saveAssignee(item.id, assignee);
+              onPrdChanged?.();
+            },
+          }),
+        )
+      : item.assignee
+        ? h(TaskSection, { label: "Assignee", class: "task-assignee-section" }, item.assignee)
+        : null,
 
     // Why the latest run did not complete: leads the panel, above the description
     h(RunVerdictBanner, { runs, enabled: verdictEnabled }),

@@ -126,3 +126,5 @@ export type { SidecarItemStatus, SidecarStatusChange } from "./sidecar-card.js";
 export type { SidecarChoice, SidecarChoiceAnswer, SidecarChoiceOption } from "./sidecar-card.js";
 export type { SidecarCriterion, SidecarPlacement, SidecarPlacementCheck, SidecarPlacementRequest } from "./sidecar-card.js";
 export type { SidecarCallProblem, SidecarExternalCall, SidecarFieldOption } from "./sidecar-card.js";
+export { identityKey, parseIdentity } from "./people.js";
+export type { KnownPerson, PersonSource } from "./people.js";

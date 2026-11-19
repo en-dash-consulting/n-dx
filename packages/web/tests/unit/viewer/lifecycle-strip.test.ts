@@ -12,6 +12,7 @@ vi.mock("../../../src/viewer/hooks/use-project-status.js", async (orig) => ({
 import { LifecycleStrip, inboxAlsoInStageNote, v1Cells, v2Cells } from "../../../src/viewer/views/lifecycle-strip.js";
 import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import { ChangesView } from "../../../src/viewer/views/changes.js";
+import { _primePeopleForTests, _resetPeopleForTests } from "../../../src/viewer/components/assignee.js";
 import type { ChangeRow, ChangeSummary } from "../../../src/viewer/views/product-model.js";
 
 const SUMMARY: ChangeSummary = {
@@ -50,6 +51,7 @@ afterEach(() => {
   render(null, root);
   root.remove();
   vi.unstubAllGlobals();
+  _resetPeopleForTests();
 });
 
 describe("v2Cells", () => {
@@ -185,6 +187,8 @@ describe("Changes stage filter", () => {
 
   it("shows only placed changes in the stage the strip opened it on", () => {
     localStorage.setItem("ndx.changes.filter", "stage:ready");
+    // Rendered synchronously, as a page that has read the people list already does.
+    _primePeopleForTests({ me: null, people: [] });
     act(() => {
       render(h(ChangesView, {
         changes: [row("a", "ready"), row("b", "proposed"), row("held", "ready", { awaitsPlacement: true })],

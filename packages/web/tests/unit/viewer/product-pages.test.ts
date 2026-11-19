@@ -12,6 +12,7 @@ import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-page
 import { STAGES, stageViews } from "../../../src/viewer/views/index.js";
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { isAppliedStage } from "../../../src/viewer/views/product-model.js";
+import { _primePeopleForTests, _resetPeopleForTests } from "../../../src/viewer/components/assignee.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache, getProjectMetadata } from "../../../src/viewer/hooks/use-project-metadata.js";
 import {
@@ -68,6 +69,9 @@ beforeEach(() => {
   // without this the second case reads the first case's answer and never
   // exercises the cold path.
   clearProjectMetadataCache();
+  // The Changes view holds its rows until the people list is read; here it
+  // has been read already (nobody assigned), so the page renders on load.
+  _primePeopleForTests({ me: null, people: [] });
   flushes.length = 0;
   root = document.createElement("div");
   document.body.appendChild(root);
@@ -77,6 +81,7 @@ afterEach(() => {
   act(() => { render(null, root); });
   root.remove();
   vi.unstubAllGlobals();
+  _resetPeopleForTests();
 });
 
 describe("routing", () => {

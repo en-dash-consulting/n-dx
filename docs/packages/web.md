@@ -169,6 +169,23 @@ count `get_prd_status` reports, with or without a capability to place it on;
 `awaitsPlacement` for the held subset (the ones `ndx work` refuses).
 `GET /api/rex/changes/placements` returns every awaiting change's shortlist in one request, keyed by change id; a change whose shortlist cannot be built gets `{ error }`.
 
+### Assignees
+
+Inbox rows, backlog rows on the Changes page and the change detail panel carry
+an assignee picker; it writes the item's `assignee` (the field `ndx work --mine`
+selects by) through `PATCH /api/rex/items/:id`, trimmed, with an empty value
+removing it. `GET /api/rex/people` answers `{ me, people }`: `me` is rex's
+`resolveActor` identity, and `people` are `me`, the git authors (`git shortlog
+-sne HEAD`) and product stewards, one entry per email, a git author's id being
+`Name <email>`. `me`'s spelling wins for its email, so picking yourself saves the
+exact string `ndx work --mine` compares; a row assigned to your email under
+another spelling is marked "not matched by ndx work --mine". The Inbox, its own page and the Changes page share an
+"Assigned to" filter — Mine, All or one person, matched by email — that opens on
+Mine when the current user has open work assigned there and on All otherwise. A
+change matches when it or any of its open tasks is assigned to the person (change
+rows carry `taskAssignees`, the open tasks' and subtasks' assignees), as
+`ndx work --mine` selects a task by its own assignee. It hides rows only.
+
 ## Tune tiles: Outcomes by tier and Your tooling
 
 Two read-only tiles on the Tune page. Neither writes anything.

@@ -10,6 +10,7 @@ import { h } from "preact";
 import { act } from "preact/test-utils";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 import { ChangesView, changesInArea } from "../../../src/viewer/views/changes.js";
+import { _primePeopleForTests, _resetPeopleForTests } from "../../../src/viewer/components/assignee.js";
 import { areaBlock } from "../../../src/viewer/views/product-area-map.js";
 import {
   CHANGE_STAGE_ORDER,
@@ -28,9 +29,14 @@ function mount(vnode: ReturnType<typeof h>): HTMLDivElement {
   return root;
 }
 
+// The view holds its rows until the people list is read; these cases render
+// synchronously, as a page that has read it already does. Nobody is assigned.
+beforeEach(() => { _primePeopleForTests({ me: null, people: [] }); });
+
 afterEach(() => {
   if (root) cleanupRenderedDiv(root);
   root = null;
+  _resetPeopleForTests();
 });
 
 function releaseHeadings(el: HTMLElement): string[] {

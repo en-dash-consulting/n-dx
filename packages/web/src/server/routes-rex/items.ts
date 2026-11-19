@@ -144,7 +144,7 @@ export function routeItems(
  */
 const PATCHABLE_FIELDS = new Set([
   "status", "failureReason", "priority", "prioritized", "tags", "title", "shortTitle",
-  "summary", "description", "acceptanceCriteria", "requirements",
+  "summary", "description", "acceptanceCriteria", "requirements", "assignee",
 ]);
 
 /** The types that carry `prioritized`, as rex's `canBePrioritized`: a v2 change, a v1 epic. */
@@ -173,7 +173,7 @@ function validateItemPatch(body: unknown): string | null {
     return `Invalid priority: ${String(patch.priority)}`;
   }
   if (patch.prioritized !== undefined && typeof patch.prioritized !== "boolean") return `"prioritized" must be a boolean`;
-  for (const key of ["title", "shortTitle", "summary", "description", "failureReason"] as const) {
+  for (const key of ["title", "shortTitle", "summary", "description", "failureReason", "assignee"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
   if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;
@@ -268,6 +268,9 @@ async function handleItemPatch(
     if (fieldUpdates.prioritized === false) fieldUpdates.prioritized = undefined;
     // A short title is kept trimmed, and a cleared one removed, as `rex update --short-title=` and edit_item do.
     if (typeof fieldUpdates.shortTitle === "string") fieldUpdates.shortTitle = fieldUpdates.shortTitle.trim() || undefined;
+    // An assignee is matched exactly by `ndx work --mine`: trimmed, and empty
+    // removes it, as `rex update --assignee=` and edit_item do.
+    if (typeof fieldUpdates.assignee === "string") fieldUpdates.assignee = fieldUpdates.assignee.trim() || undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
@@ -855,6 +858,8 @@ async function handleBulkUpdate(
     const completing = input.updates.status === "completed" && isChangeLayerStore(store);
     const fieldUpdates = { ...input.updates };
     if (completing) delete fieldUpdates.status;
+    // As the single PATCH: trimmed, and empty removes it.
+    if (typeof fieldUpdates.assignee === "string") fieldUpdates.assignee = fieldUpdates.assignee.trim() || undefined;
     const writeFields = !completing || Object.keys(fieldUpdates).length > 0;
     let updatedDoc: Awaited<ReturnType<typeof store.loadDocument>>;
     let autoCompleteError: string | undefined;

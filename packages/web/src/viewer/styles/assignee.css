@@ -1,0 +1,79 @@
+/* Assignee picker and filter (components/assignee.ts): Inbox rows, backlog rows, the change detail panel. */
+
+.assignee-picker {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  font-size: var(--font-sm);
+}
+
+.assignee-button {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.assignee-button:hover,
+.assignee-button:focus-visible {
+  border-color: var(--accent);
+}
+
+.assignee-unassigned {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.assignee-form {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.assignee-input {
+  min-width: 14em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  font: inherit;
+  color: var(--text);
+}
+
+.assignee-mismatch {
+  color: var(--orange);
+  font-size: var(--font-xs);
+}
+
+.assignee-error {
+  color: var(--red);
+  font-size: var(--font-xs);
+}
+
+.assignee-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+.assignee-filter-select {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  font: inherit;
+  color: var(--text);
+}
+
+.inbox-filters {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}

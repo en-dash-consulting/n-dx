@@ -205,13 +205,14 @@ function ProductMapPage({ onCapabilityChange, initialTab = "map", navigateTo }: 
  * the route's `?area=` slug, and clearing it navigates to the bare page.
  */
 export function ChangesPage({ navigateTo, area = null }: { navigateTo?: NavigateTo; area?: string | null }) {
-  const load = useProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
+  const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
   if (load.state === "v1") return h(NoProductLayer, { title: "Changes" });
   if (load.state !== "ready") return h(Pending, { load });
   return h("div", null,
     h(StaleNotice, { message: load.refreshError }),
     h(ChangesView, {
       changes: load.data,
+      onAssigned: refetch,
       onSelectChange: navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined,
       area,
       onClearArea: navigateTo ? () => navigateTo("changes") : undefined,

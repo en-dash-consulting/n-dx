@@ -132,6 +132,12 @@ export interface ChangeRowWire {
   loe?: number;
   spike?: boolean;
   assignee?: string;
+  /**
+   * Distinct assignees of the change's open tasks and subtasks, in tree order.
+   * `ndx work --mine` selects a task by its own assignee, so the assignee
+   * filter counts these as well as the change's. Absent when there are none.
+   */
+  taskAssignees?: string[];
   plannedRelease?: string;
   shippedIn?: string;
   /** When the change was applied; set on applied history. */
@@ -669,6 +675,16 @@ function gapOf(index: TreeIndex, change: ChangeRuleNode, tasks: RuleNode[]): { c
   };
 }
 
+/** The distinct assignees of a change's open tasks and subtasks (not completed, cancelled or deleted). */
+function openTaskAssignees(change: ChangeRuleNode): string[] {
+  const seen = new Set<string>();
+  for (const node of liveWorkUnder(change)) {
+    const assignee = typeof node.assignee === "string" ? node.assignee.trim() : "";
+    if (assignee && node.status !== "completed") seen.add(assignee);
+  }
+  return [...seen];
+}
+
 /** Every live, not cancelled change: open ones and applied ones. */
 export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
   const index = indexTree(tree);
@@ -680,6 +696,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
     .map((change) => {
       const tasks = tasksOf(change);
       const areas = areasOf.get(change.id);
+      const taskAssignees = openTaskAssignees(change);
       return {
         id: change.id,
         ...(change.displayId ? { displayId: change.displayId } : {}),
@@ -693,6 +710,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         ...(change.loe !== undefined ? { loe: change.loe } : {}),
         ...(change.spike ? { spike: true } : {}),
         ...(change.assignee ? { assignee: change.assignee } : {}),
+        ...(taskAssignees.length ? { taskAssignees } : {}),
         ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
         ...(change.shippedIn ? { shippedIn: change.shippedIn } : {}),
         ...(change.appliedAt ? { appliedAt: change.appliedAt } : {}),

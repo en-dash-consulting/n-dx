@@ -271,6 +271,35 @@ describe("Rex item routes on a v2 project", () => {
     expect((await (await resolveStore(rexDir)).getItem(TASK_ID))?.status).toBe("in_progress");
   });
 
+  it("PATCH assignee saves a free-form id, trimmed, and an empty one clears it", async () => {
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { assignee: "  new.person@shop.io " })).status).toBe(200);
+    // A fresh store reads what is on disk: the write survives a reload.
+    expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.assignee).toBe("new.person@shop.io");
+    expect(frames).toContainEqual(expect.objectContaining({ type: "rex:item-updated", itemId: CHANGE_ID }));
+
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { assignee: "" })).status).toBe(200);
+    expect(await (await resolveStore(rexDir)).getItem(CHANGE_ID)).not.toHaveProperty("assignee");
+  });
+
+  it("GET /changes carries the assignees of a change's open tasks, and drops a completed one's", async () => {
+    // Only the task is assigned: `ndx work --mine` would select it, so the row must say so.
+    expect((await send("PATCH", `items/${TASK_ID}`, { assignee: "Ann Lee <ann@shop.io>" })).status).toBe(200);
+    const rowOf = async () => ((await (await fetch(`${base}/changes`)).json()).changes as Array<{ id: string; assignee?: string; taskAssignees?: string[] }>)
+      .find((c) => c.id === CHANGE_ID)!;
+    const row = await rowOf();
+    expect(row.assignee).toBeUndefined();
+    expect(row.taskAssignees).toEqual(["Ann Lee <ann@shop.io>"]);
+
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "in_progress" })).status).toBe(200);
+    expect((await rowOf()).taskAssignees).toEqual(["Ann Lee <ann@shop.io>"]);
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
+    expect(await rowOf()).not.toHaveProperty("taskAssignees");
+  });
+
+  it("PATCH refuses an assignee that is not a string", async () => {
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { assignee: 7 })).status).toBe(400);
+  });
+
   it("PATCH status completed completes a task, then its change, through rex", async () => {
     expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
     const store = await resolveStore(rexDir);
