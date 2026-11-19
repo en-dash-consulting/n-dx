@@ -153,18 +153,18 @@ export function Rows({ children }: { children: ReactNode }) {
  * of its recommended next steps names it, a hollow ring when it is only
  * flagged for attention, nothing otherwise. The words are for a screen reader
  * and a hover; the shape is what tells the two apart at a glance.
+ * `decorative` is for a mark beside text that already says it (a badge): it
+ * is hidden from a screen reader, so the words are read once.
  */
-export function Mark({ node }: { node: Node }) {
+export function Mark({ node, decorative }: { node: Node; decorative?: boolean }) {
   const mark = markOf(node);
   if (!mark) return null;
-  if (mark === "highlighted") {
-    return <span className="ndx-mark highlighted" data-mark="highlighted" role="img" aria-label="Flagged for attention" title="Flagged for attention on the Analysis page" />;
-  }
   const why = (node as { readonly recommendation?: string }).recommendation;
-  const words = `Needs work${why ? `: ${why}` : ""}`;
+  const words = mark === "highlighted" ? "Flagged for attention" : `Needs work${why ? `: ${why}` : ""}`;
+  const named = decorative ? { "aria-hidden": true } : { role: "img", "aria-label": words, title: mark === "highlighted" ? "Flagged for attention on the Analysis page" : words };
   return (
-    <span className="ndx-mark needs-work" data-mark="needs-work" role="img" aria-label={words} title={words}>
-      !
+    <span className={`ndx-mark ${mark}`} data-mark={mark} {...named}>
+      {mark === "needs-work" ? "!" : null}
     </span>
   );
 }

@@ -34,12 +34,12 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
       <Hero eyebrow={<Under context={context} node={node} what={`Zone${parent ? "" : " · top level"}`} />} title={facts.label} lede={node.description}>
         {node.needsWork ? (
           <Badge tone="bad" plain>
-            <Mark node={node} />
+            <Mark node={node} decorative />
             needs work{node.recommendation ? `: ${node.recommendation}` : ""}
           </Badge>
         ) : node.highlighted ? (
           <Badge tone="warn" plain>
-            <Mark node={node} />
+            <Mark node={node} decorative />
             flagged for attention on the Analysis page
           </Badge>
         ) : null}

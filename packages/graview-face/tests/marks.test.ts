@@ -10,12 +10,13 @@ import type { Principal } from "@graview/core";
 import { compileDocumentFiles, type DocumentFiles } from "@graview/core/testing";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { App } from "../src/app.js";
 import { markOf } from "../src/model/code.js";
 import { nodesOf, type Node } from "../src/model/graph.js";
 import { Mark, RecordCard, RecordRow, type Ctx } from "../src/ui/kit.js";
+import { ZoneScreen } from "../src/ui/screens/zone.js";
 
 const DECLARATION = new URL("../../graview/n-dx.graview.json", import.meta.url);
 const SEED = new URL("./fixtures/snapshot.json", import.meta.url);
@@ -69,6 +70,52 @@ describe("the needs-work mark", () => {
   it("draws nothing on a plain zone", () => {
     expect(html(createElement(Mark, { node: zone("hench") }))).toBe("");
     expect(html(createElement(RecordRow, { context, node: zone("hench") }))).not.toContain("data-mark");
+  });
+});
+
+/**
+ * What a screen reader names an element: its text, with an `aria-hidden`
+ * subtree dropped and a labelled image read by its label. Enough for the
+ * flat spans the marks and badges are.
+ */
+function accessibleName(markup: string): string {
+  return markup
+    .replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, "")
+    .replace(/<span[^>]*aria-label="([^"]*)"[^>]*>[^<]*<\/span>/g, " $1 ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+describe("the mark inside a badge", () => {
+  it("is hidden from a screen reader and carries no name of its own", () => {
+    for (const id of ["llm-client/src-4", "tests-e2e"]) {
+      const out = html(createElement(Mark, { node: zone(id), decorative: true }));
+      expect(out, id).toContain('aria-hidden="true"');
+      expect(out, id).not.toContain("aria-label");
+      expect(out, id).not.toContain("role=");
+      expect(accessibleName(out), id).toBe("");
+    }
+  });
+
+  it("keeps its name on a row and a card", () => {
+    expect(html(createElement(Mark, { node: zone("llm-client/src-4") }))).toContain('aria-label="Needs work: Split the loosely related files out of this zone"');
+    expect(html(createElement(RecordRow, { context, node: zone("tests-e2e") }))).toContain('aria-label="Flagged for attention"');
+  });
+
+  it("lets the zone page's badge say the needs-work words once", () => {
+    const page = renderToStaticMarkup(
+      createElement(
+        MemoryRouter,
+        { initialEntries: [`/zones/${encodeURIComponent("llm-client/src-4")}`] },
+        createElement(Routes, null, createElement(Route, { path: "/zones/:id", element: createElement(ZoneScreen, { context, app }) })),
+      ),
+    );
+    const badge = page.match(/<span class="ndx-badge bad plain">(.*?)<\/span>(?=<span class="ndx-badge|<\/div>)/)?.[1];
+    expect(badge).toBeDefined();
+    const name = accessibleName(badge!);
+    expect(name.match(/Split the loosely related files out of this zone/g)).toHaveLength(1);
+    expect(name.match(/needs work/gi)).toHaveLength(1);
   });
 });
 
