@@ -236,11 +236,11 @@ describe("the Analyze top row", () => {
     vi.unstubAllGlobals();
   });
 
-  async function show(tree: (d: LoadedData) => ReturnType<typeof h>): Promise<HTMLElement> {
+  async function show(tree: (d: LoadedData) => ReturnType<typeof h>, d: LoadedData = data()): Promise<HTMLElement> {
     stubFetch();
     root = document.createElement("div");
     document.body.appendChild(root);
-    await act(async () => { render(tree(data()), root!); });
+    await act(async () => { render(tree(d), root!); });
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     return root;
   }
@@ -275,6 +275,20 @@ describe("the Analyze top row", () => {
     const el = await show(topRow);
     const zoneLabels = left(el).querySelectorAll('[aria-label="Largest zones"] .tile-sum-bar-label');
     expect([...zoneLabels].map((l) => l.textContent)).toEqual(["!CORE", "!ADMIN", "!WEB-VIEWER"]);
+  });
+
+  it("keeps the plain '!' on a zone no fix touches, so it cannot filter the list to nothing", async () => {
+    const d = data();
+    // Loosely held together, so it is marked; no finding or step names it.
+    d.zones!.zones.push(zone("legacy", 0.2, 0.1));
+    const el = await show(topRow, d);
+    const zoneLabels = [...left(el).querySelectorAll<HTMLElement>('[aria-label="Largest zones"] .tile-sum-bar-label')];
+    const legacy = zoneLabels.find((l) => l.textContent === "!LEGACY")!;
+    expect(legacy.querySelector(".summary-issue")).not.toBeNull();
+    expect(legacy.querySelector(".summary-zone-filter")).toBeNull();
+    // Zones a fix touches keep their control.
+    expect(zoneButton(el, "ADMIN")).toBeDefined();
+    expect(zoneButton(el, "CORE")).toBeDefined();
   });
 
   it("filters the fixes to a '!' zone when it is pressed, and clears the filter", async () => {

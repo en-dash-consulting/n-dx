@@ -53,8 +53,9 @@ function headline(data: LoadedData): ComponentChild {
 /**
  * A zone marked "!" as a control over the recommended fixes: hovering it
  * highlights the fixes that touch the zone, pressing it filters the list to
- * them. Only on the page — the opened tile and a panel outside the dashboard
- * keep the mark alone.
+ * them. Only on the page, and only for a zone at least one fix touches — the
+ * opened tile, a panel outside the dashboard and a zone no fix touches keep
+ * the mark alone.
  */
 function zoneFilter(shared: AnalyzeActions, z: { id: string; name: string }): ComponentChild {
   const control = filterControlProps(shared.focus, shared.recommendations.items, { kind: "zone", zone: z.id, label: z.name });
@@ -89,9 +90,11 @@ function zonesSummary(data: LoadedData, shared: AnalyzeActions | null): Componen
         const share = files > 0 ? z.files.length / files : 0;
         const tone = z.cohesion >= 0.7 ? "good" : z.cohesion >= 0.4 ? "fair" : "poor";
         const issue = flagged(z);
+        // A zone no fix touches yet (an early pass) keeps the plain mark: filtering by it would empty the list.
+        const filterable = issue && shared && shared.recommendations.items.some((a) => a.zones.includes(z.id));
         return h("li", { key: z.id, class: "tile-sum-bar" },
           h("span", { class: "tile-sum-bar-label" },
-            issue && shared
+            filterable
               ? zoneFilter(shared, z)
               : [issue ? h("span", { class: "summary-issue", title: "Has issues — marked ! on the map" }, "!") : null, z.name]),
           h("span", { class: "tile-sum-bar-track", "aria-hidden": "true" },
