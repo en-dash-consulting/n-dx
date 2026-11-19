@@ -210,6 +210,8 @@ export interface ChangeRow {
   intent?: string;
   stage: ChangeStage;
   priority?: string;
+  /** Marked to lead the Inbox and Open changes (`compareChangeOrder`). */
+  prioritized?: boolean;
   /** Level of effort in engineer-weeks. */
   loe?: number;
   spike?: boolean;
@@ -262,6 +264,7 @@ export interface GlanceChange {
   summary?: string;
   stage: OpenChangeStage;
   priority?: string;
+  prioritized?: boolean;
   plannedRelease?: string;
   taskCount: number;
   completedTaskCount: number;
@@ -647,6 +650,32 @@ export function editorialBlockedReason(capability: Pick<CapabilityRow, "status">
 
 // ── Grouping and ordering ────────────────────────────────────────────
 
+/** Priority levels, most important first; a missing or unknown priority reads as medium. */
+const PRIORITY_RANK: Readonly<Record<string, number>> = { critical: 0, high: 1, medium: 2, low: 3 };
+const DEFAULT_PRIORITY_RANK = PRIORITY_RANK.medium!;
+
+/** Tooltip on the Prioritized tag a flagged change's row shows. */
+export const PRIORITIZED_TITLE = "Prioritized: listed ahead of every unflagged change, whatever its priority";
+
+/** The fields {@link compareChangeOrder} reads. */
+export type ChangeOrderFields = Pick<ChangeRow, "prioritized" | "priority">;
+
+/**
+ * The order the Inbox and Open changes list changes in: prioritized first, then
+ * by priority critical, high, medium, low, with a missing priority read as
+ * medium. Zero for a tie, so a stable sort keeps each list's own order after it
+ * (the Inbox's placement guess, the read's order elsewhere).
+ */
+export function compareChangeOrder(a: ChangeOrderFields, b: ChangeOrderFields): number {
+  const rank = (c: ChangeOrderFields) => (c.priority ? PRIORITY_RANK[c.priority] : undefined) ?? DEFAULT_PRIORITY_RANK;
+  return Number(b.prioritized === true) - Number(a.prioritized === true) || rank(a) - rank(b);
+}
+
+/** `changes` in {@link compareChangeOrder}'s order, ties in their given order; the input is not modified. */
+export function orderChanges<T extends ChangeOrderFields>(changes: readonly T[]): T[] {
+  return [...changes].sort(compareChangeOrder);
+}
+
 /** Changes at one stage, within one release group. */
 export interface StageGroup {
   stage: ChangeStage;
@@ -739,7 +768,8 @@ function compareReleases(a: string, b: string): number {
  * placed — and drops to the bottom once everything in it is applied, as a
  * backlog of history. Stages keep `CHANGE_STAGE_ORDER`, so open stages lead
  * and applied ones trail, and empty stages are dropped, so a release heading
- * shows only the stages it actually has.
+ * shows only the stages it actually has. Within a stage, changes run in
+ * `compareChangeOrder`'s order: prioritized, then by priority.
  *
  * `plannedRelease` is free text the schema only requires to be a string, so a
  * blank or whitespace-only value is as unscheduled as a missing one — all
@@ -764,7 +794,7 @@ export function groupChangesByRelease(changes: readonly ChangeRow[]): ReleaseGro
 
   const toStages = (rows: ChangeRow[]): StageGroup[] =>
     CHANGE_STAGE_ORDER
-      .map((stage) => ({ stage, changes: rows.filter((c) => c.stage === stage) }))
+      .map((stage) => ({ stage, changes: orderChanges(rows.filter((c) => c.stage === stage)) }))
       .filter((group) => group.changes.length > 0);
 
   const appliedCount = (rows: ChangeRow[]) => rows.filter((c) => isAppliedStage(c.stage)).length;
@@ -804,7 +834,8 @@ export interface GlanceGroup {
  * (`compareReleases`, reversed), Unscheduled last. The glance reads like a
  * roadmap, so what is next leads and the backlog trails. A blank release is
  * unscheduled and surrounding whitespace is trimmed, as in
- * `groupChangesByRelease`. Changes keep the order given within a group.
+ * `groupChangesByRelease`. Within a group, changes run in `compareChangeOrder`'s
+ * order, ties in the order given.
  */
 export function groupGlanceByRelease(changes: readonly GlanceChange[]): GlanceGroup[] {
   const byRelease = new Map<string, GlanceChange[]>();
@@ -816,8 +847,8 @@ export function groupGlanceByRelease(changes: readonly GlanceChange[]): GlanceGr
   }
   const groups = [...byRelease.entries()]
     .sort(([a], [b]) => compareReleases(b, a))
-    .map(([label, rows]) => ({ label, changes: rows }));
-  if (unscheduled.length > 0) groups.push({ label: UNSCHEDULED_RELEASE_LABEL, changes: unscheduled });
+    .map(([label, rows]) => ({ label, changes: orderChanges(rows) }));
+  if (unscheduled.length > 0) groups.push({ label: UNSCHEDULED_RELEASE_LABEL, changes: orderChanges(unscheduled) });
   return groups;
 }
 

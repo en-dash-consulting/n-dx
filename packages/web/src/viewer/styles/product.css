@@ -325,6 +325,7 @@
 
 .ch-needs-placement { color: var(--orange); border-color: var(--orange); }
 .ch-spike { color: var(--purple); border-color: var(--purple); }
+.ch-prioritized { color: var(--red); border-color: var(--red); font-weight: 600; }
 
 /* ── Capability page ───────────────────────────────────────────── */
 

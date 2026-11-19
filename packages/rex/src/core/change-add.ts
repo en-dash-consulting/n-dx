@@ -51,6 +51,8 @@ export interface AddChangeNodeInput {
   blockedBy?: string[];
   /** Change and task only. */
   priority?: Priority;
+  /** Change only: leads the Inbox and Open changes (`core/prioritized.ts`). */
+  prioritized?: boolean;
   /** Change and task only. */
   run?: SavedRunSettings;
   /** Change only. */
@@ -93,8 +95,8 @@ export class AddChangeNodeError extends Error {
 /** Fields a type does not carry, so passing one is refused rather than dropped. */
 const UNCARRIED: Readonly<Record<ChangeNodeType, readonly (keyof AddChangeNodeInput)[]>> = {
   change: [],
-  task: ["amends", "touches", "discoveredFrom"],
-  subtask: ["amends", "touches", "discoveredFrom", "priority", "run"],
+  task: ["amends", "touches", "discoveredFrom", "prioritized"],
+  subtask: ["amends", "touches", "discoveredFrom", "priority", "prioritized", "run"],
 };
 
 /** The parent type each type takes, and whether it must have one. */
@@ -179,6 +181,7 @@ function fields(input: AddChangeNodeInput): Record<string, unknown> {
   if (input.assignee) out.assignee = input.assignee;
   if (input.blockedBy?.length) out.blockedBy = input.blockedBy;
   if (input.priority) out.priority = input.priority;
+  if (input.prioritized) out.prioritized = true;
   if (input.run) out.run = input.run;
   if (input.amends?.length) out.amends = input.amends;
   if (input.touches?.length) out.touches = input.touches;

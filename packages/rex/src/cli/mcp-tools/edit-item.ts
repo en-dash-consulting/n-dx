@@ -4,6 +4,7 @@ import { validateDAG } from "../../core/dag.js";
 import { validateRunSettings, RunSettingsSchema } from "../../schema/validate.js";
 import type { PRDItem, Priority } from "../../schema/index.js";
 import { changeLayerType } from "../../core/layer-projection.js";
+import { prioritizedRefusal, storedPrioritized } from "../../core/prioritized.js";
 import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -20,6 +21,8 @@ export async function handleEditItem(
     description?: string;
     acceptanceCriteria?: string[];
     priority?: string;
+    /** A change (a v1 epic) only; false removes it. */
+    prioritized?: boolean;
     level?: string;
     tags?: string[];
     source?: string;
@@ -48,6 +51,11 @@ export async function handleEditItem(
     if (args.description !== undefined) updates.description = args.description;
     if (args.acceptanceCriteria !== undefined) updates.acceptanceCriteria = args.acceptanceCriteria;
     if (args.priority !== undefined) updates.priority = args.priority as Priority;
+    if (args.prioritized !== undefined) {
+      const refusal = prioritizedRefusal(existing);
+      if (refusal) return textResult(refusal, true);
+      updates.prioritized = storedPrioritized(args.prioritized);
+    }
     const v2 = isChangeLayerStore(store);
     if (args.level !== undefined) {
       // A v2 node's type is fixed, and a level maps to no type.
@@ -99,7 +107,7 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, summary, description, acceptanceCriteria, priority, tags, source, assignee, blockedBy, run).",
+        "No fields to update. Provide at least one field (title, summary, description, acceptanceCriteria, priority, prioritized, tags, source, assignee, blockedBy, run).",
         true,
       );
     }
@@ -129,7 +137,7 @@ export async function handleEditItem(
 
 export const editItemTool = defineTool({
   name: "edit_item",
-  description: "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+  description: "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, prioritized, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
   schema: {
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
@@ -137,6 +145,7 @@ export const editItemTool = defineTool({
     description: z.string().optional().describe("New description"),
     acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),
+    prioritized: z.boolean().optional().describe("v2 change (v1 epic) only: true lists it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority; false removes the flag. Does not change task selection"),
     level: z.enum(["epic", "feature", "task", "subtask"]).optional().describe("New level (epic, feature, task, subtask)"),
     tags: z.array(z.string()).optional().describe("New tags"),
     source: z.string().optional().describe("New source"),

@@ -167,6 +167,56 @@ describe("sortInbox", () => {
     ];
     expect(sortInbox(rows).map((r) => r.change.id)).toEqual(["b", "a", "c"]);
   });
+
+  const ranked = (id: string, extra: Partial<ChangeRow>, strength: PlacementStrength | null = "possible"): InboxRow =>
+    ({ change: change(id, extra), shortlist: { placement: placement(id, strength) } });
+
+  it("puts prioritized changes first, then critical, high, medium, low, before the guess", () => {
+    const rows = [
+      ranked("low", { priority: "low" }, "strong"),
+      ranked("medium", { priority: "medium" }, "strong"),
+      ranked("high", { priority: "high" }, "weak"),
+      ranked("flagged-low", { priority: "low", prioritized: true }, "weak"),
+      ranked("critical", { priority: "critical" }, "weak"),
+      ranked("flagged-high", { priority: "high", prioritized: true }, "weak"),
+    ];
+    expect(sortInbox(rows).map((r) => r.change.id))
+      .toEqual(["flagged-high", "flagged-low", "critical", "high", "medium", "low"]);
+  });
+
+  it("reads a missing priority as medium", () => {
+    const rows = [
+      ranked("low", { priority: "low" }, "strong"),
+      ranked("none", {}, "weak"),
+      ranked("high", { priority: "high" }, "weak"),
+    ];
+    expect(sortInbox(rows).map((r) => r.change.id)).toEqual(["high", "none", "low"]);
+  });
+
+  it("breaks a tie on flag and priority by the guess, then by the read's order", () => {
+    const rows = [
+      ranked("weak", { prioritized: true }, "weak"),
+      ranked("a", { priority: "medium" }, "strong"),
+      ranked("b", {}, "strong"),
+      ranked("strong", { prioritized: true }, "strong"),
+    ];
+    expect(sortInbox(rows).map((r) => r.change.id)).toEqual(["strong", "weak", "a", "b"]);
+  });
+});
+
+describe("the Prioritized tag", () => {
+  it("marks a prioritized row and no other", async () => {
+    await mount(h(InboxView, {
+      rows: [
+        { change: change("flag", { prioritized: true }) },
+        { change: change("plain") },
+      ],
+      appliedUnplaced: 0,
+      onOpenChange: vi.fn(),
+    }));
+    const tags = [...root.querySelectorAll(".inbox-row")].map((row) => row.querySelector(".ch-prioritized")?.textContent ?? null);
+    expect(tags).toEqual(["Prioritized", null]);
+  });
 });
 
 // ── The page ─────────────────────────────────────────────────────────
@@ -174,7 +224,8 @@ describe("sortInbox", () => {
 describe("InboxPage on a v2 project", () => {
   it("lists only changes awaiting placement, strongest guess first, with guess and strength", async () => {
     serveInbox(
-      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined, inbox: undefined }), change("s")],
+      // Equal priority, so the guess decides the order.
+      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined, inbox: undefined }), change("s", { priority: "high" })],
       [placement("w", "weak", { tags: ["web"] }), placement("s", "strong")],
     );
     await mount(h(InboxPage, { navigateTo: vi.fn() }));

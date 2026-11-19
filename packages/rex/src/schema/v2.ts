@@ -34,7 +34,7 @@
  * |                                                  | links*                                       |
  * | change: summary, intent, acceptanceCriteria,     | assignee, ready, needsPlacement, createdAt   |
  * |   amends, touches, plannedRelease, spike, fix,   | lastModified, lastModifiedBy                 |
- * |   priority,                                      |                                              |
+ * |   priority, prioritized,                         |                                              |
  * |   requirements, loe, loeRationale,               |                                              |
  * |   loeConfidence, effort*,                        |                                              |
  * |   discoveredFrom { item?, run? }, run            |                                              |
@@ -377,6 +377,12 @@ export interface ChangeIntent extends BaseIntent, EffortIntent, SummaryIntent {
    */
   fix?: boolean;
   priority?: Priority;
+  /**
+   * Marks the change to lead the Inbox and the Open changes list, ahead of
+   * every unflagged change whatever its priority. Written only as `true`;
+   * clearing it removes the key. Ordering only: `get_next_task` does not read it.
+   */
+  prioritized?: boolean;
   requirements?: Requirement[];
   discoveredFrom?: DiscoveredFrom;
   /** A change with no tasks is itself the unit of work `ndx work` runs. */
@@ -456,6 +462,7 @@ export const ChangeIntentSchema = z
     spike: z.boolean().optional(),
     fix: z.boolean().optional(),
     priority: PrioritySchema.optional(),
+    prioritized: z.boolean().optional(),
     requirements: z.array(RequirementSchema).optional(),
     discoveredFrom: DiscoveredFromSchema.optional(),
     run: SavedRunSettingsSchema.optional(),

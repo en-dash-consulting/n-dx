@@ -73,7 +73,7 @@ commands and MCP tools also accept display ids and aliases.
 | `area` | product | `summary`, `stewards` |
 | `capability` | product | `statement`, `criteria`, `requirements`, `dependsOn` |
 | `constraint` | product | `statement`, `requirements`, `appliesTo` (`all` or product ids) |
-| `change` | changes | `intent`, `acceptanceCriteria`, `amends`, `touches`, `plannedRelease`, `spike`, `fix`, `priority`, `requirements`, `discoveredFrom`, `run`, effort fields |
+| `change` | changes | `intent`, `acceptanceCriteria`, `amends`, `touches`, `plannedRelease`, `spike`, `fix`, `priority`, `prioritized`, `requirements`, `discoveredFrom`, `run`, effort fields |
 | `task` | changes | `description`, `acceptanceCriteria`, `requirements`, `priority`, `run`, effort fields |
 | `subtask` | changes | `description`, `acceptanceCriteria` |
 

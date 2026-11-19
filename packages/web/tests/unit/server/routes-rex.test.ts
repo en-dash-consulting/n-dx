@@ -220,6 +220,32 @@ describe("Rex API routes", () => {
     expect("summary" in (await read())).toBe(false);
   });
 
+  describe("PATCH /api/rex/items/:id prioritized", () => {
+    const patch = (id: string, body: unknown, path = `items/${id}`) => fetch(`http://127.0.0.1:${port}/api/rex/${path}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const read = async (id: string) => (await (await fetch(`http://127.0.0.1:${port}/api/rex/items/${id}`)).json()) as Record<string, unknown>;
+
+    it("sets it on an epic, and false removes it", async () => {
+      expect((await patch("epic-1", { prioritized: true })).status).toBe(200);
+      expect((await read("epic-1")).prioritized).toBe(true);
+      expect((await patch("epic-1", { prioritized: false })).status).toBe(200);
+      expect("prioritized" in (await read("epic-1"))).toBe(false);
+    });
+
+    it("refuses a task, a non-boolean, and the bulk route, writing nothing", async () => {
+      const onTask = await patch("task-2", { prioritized: true });
+      expect(onTask.status).toBe(400);
+      expect((await onTask.json()).error).toMatch(/Only a change/);
+      expect("prioritized" in (await read("task-2"))).toBe(false);
+      expect((await patch("epic-1", { prioritized: "yes" })).status).toBe(400);
+      expect((await patch("", { ids: ["epic-1"], updates: { prioritized: true } }, "items/bulk")).status).toBe(400);
+      expect("prioritized" in (await read("epic-1"))).toBe(false);
+    });
+  });
+
   it("PATCH /api/rex/items/:id sets completedAt for completed status", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1`, {
       method: "PATCH",

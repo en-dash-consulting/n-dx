@@ -188,6 +188,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             "low"
           ]
         },
+        "prioritized": {
+          "description": "v2 change (v1 epic) only: list it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. Does not change task selection",
+          "type": "boolean"
+        },
         "acceptanceCriteria": {
           "description": "Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria",
           "type": "array",
@@ -445,7 +449,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "edit_item",
-    "description": "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    "description": "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, prioritized, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -481,6 +485,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             "medium",
             "low"
           ]
+        },
+        "prioritized": {
+          "description": "v2 change (v1 epic) only: true lists it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority; false removes the flag. Does not change task selection",
+          "type": "boolean"
         },
         "level": {
           "description": "New level (epic, feature, task, subtask)",

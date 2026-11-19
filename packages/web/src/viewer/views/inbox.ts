@@ -2,10 +2,11 @@
  * Inbox view — open changes with no place on the product map yet.
  *
  * `ndx work` skips an Inbox change's tasks until it is placed, so this lists
- * each one with rex's best guess for its home, strongest guesses first (IB7):
- * those are the quickest to confirm. A row opens the change's detail panel in
- * the Tasks tree; its Accept places it on that guess as a touches, and its
- * Place opens the Inbox page on it, where the shortlist and relation are.
+ * each one with rex's best guess for its home: prioritized changes first, then
+ * by priority, and within those the strongest guesses first (IB7), the
+ * quickest to confirm. A row opens the change's detail panel in the Tasks
+ * tree; its Accept places it on that guess as a touches, and its Place opens
+ * the Inbox page on it, where the shortlist and relation are.
  *
  * "Place best guesses" reviews every guess at once: each change with its best
  * guess and a checkbox, weak guesses left unticked, then one write
@@ -35,7 +36,7 @@ import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
-import { shortChangeId } from "./product-model.js";
+import { PRIORITIZED_TITLE, compareChangeOrder, shortChangeId } from "./product-model.js";
 import { errorMessage } from "../utils/format.js";
 
 /** Rows the Plan section shows before linking to the full page. */
@@ -80,13 +81,17 @@ function guessOf(row: InboxRow): Guess | null {
   return row.shortlist && "placement" in row.shortlist ? bestGuess(row.shortlist.placement) : null;
 }
 
-/** Strongest guess first; within a strength the higher score, then the read's order. */
+/**
+ * Prioritized changes first, then by priority (`compareChangeOrder`); within
+ * those, the strongest guess, then the higher score, then the read's order.
+ */
 export function sortInbox(rows: readonly InboxRow[]): InboxRow[] {
   const keyed = rows.map((row, index) => {
     const guess = guessOf(row);
     return { row, index, rank: guess ? STRENGTH_RANK[guess.strength] : NO_GUESS_RANK, score: guess?.candidate.score ?? 0 };
   });
-  keyed.sort((a, b) => a.rank - b.rank || b.score - a.score || a.index - b.index);
+  keyed.sort((a, b) =>
+    compareChangeOrder(a.row.change, b.row.change) || a.rank - b.rank || b.score - a.score || a.index - b.index);
   return keyed.map((k) => k.row);
 }
 
@@ -340,6 +345,7 @@ function Row({ row, onOpen, onPlace, onAccepted }: {
     h("div", { class: "inbox-row-head" },
       h("span", { class: "ch-display-id" }, shortChangeId(change)),
       h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
+      change.prioritized ? h("span", { class: "tag ch-prioritized", title: PRIORITIZED_TITLE }, "Prioritized") : null,
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),
       age ? h("span", { class: "inbox-age", title: "Time in the Inbox" }, age) : null,

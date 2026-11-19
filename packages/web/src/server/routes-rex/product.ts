@@ -121,6 +121,8 @@ export interface ChangeRowWire {
   intent?: string;
   stage: ChangeStageWire;
   priority?: string;
+  /** Leads the Inbox and Open changes, ahead of every unflagged change. */
+  prioritized?: boolean;
   loe?: number;
   spike?: boolean;
   assignee?: string;
@@ -169,6 +171,7 @@ export interface GlanceChangeWire {
   summary?: string;
   stage: OpenChangeStageWire;
   priority?: string;
+  prioritized?: boolean;
   plannedRelease?: string;
   taskCount: number;
   completedTaskCount: number;
@@ -591,6 +594,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       ...summaryField(change),
       stage,
       ...(change.priority ? { priority: change.priority } : {}),
+      ...(change.prioritized ? { prioritized: true } : {}),
       ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
       taskCount: tasks.length,
       completedTaskCount: tasks.filter((t) => t.status === "completed").length,
@@ -660,6 +664,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         ...(change.intent ? { intent: change.intent } : {}),
         stage: stageOf(change),
         ...(change.priority ? { priority: change.priority } : {}),
+        ...(change.prioritized ? { prioritized: true } : {}),
         ...(change.loe !== undefined ? { loe: change.loe } : {}),
         ...(change.spike ? { spike: true } : {}),
         ...(change.assignee ? { assignee: change.assignee } : {}),

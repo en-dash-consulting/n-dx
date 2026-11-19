@@ -10,6 +10,7 @@ import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { cascadeParentCompletion } from "../../core/parent-completion.js";
 import { validateDAG } from "../../core/dag.js";
+import { prioritizedRefusal, storedPrioritized } from "../../core/prioritized.js";
 import { findItem, resolveItem } from "../../core/tree.js";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { openClaimsStore, resolveClaimHolder } from "../../store/index.js";
@@ -151,6 +152,17 @@ export async function cmdUpdate(
     updates.priority = flags.priority;
   }
 
+  if (flags.prioritized !== undefined) {
+    // `--prioritized` sets it; `--prioritized=false` or `--prioritized=` removes it.
+    const raw = flags.prioritized.trim();
+    if (raw !== "true" && raw !== "false" && raw !== "") {
+      throw new CLIError(`Invalid --prioritized "${flags.prioritized}".`, "Use --prioritized to set it, --prioritized=false to clear it.");
+    }
+    const refusal = prioritizedRefusal(existing);
+    if (refusal) throw new CLIError(refusal, "Prioritize the change that holds it.");
+    updates.prioritized = storedPrioritized(raw === "true");
+  }
+
   if (flags.title) updates.title = flags.title;
   if (flags.description) updates.description = flags.description;
   // Empty removes it (undefined is not serialized).
@@ -224,7 +236,7 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
+      "Use --status, --priority, --prioritized, --title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
     );
   }
 

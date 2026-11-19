@@ -19,6 +19,7 @@ import { BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle, useIt
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
+  PRIORITIZED_TITLE,
   groupChangesByRelease,
   isAppliedStage,
   type ChangeRow,
@@ -125,6 +126,7 @@ function Change({ change, onSelect, impact }: {
             onClick: () => onSelect(change.id),
           }, displayTitle(change))
         : h("span", { class: "ch-change-title", title: change.summary ? change.title : undefined }, displayTitle(change)),
+      change.prioritized ? h("span", { class: "tag ch-prioritized", title: PRIORITIZED_TITLE }, "Prioritized") : null,
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       isAppliedStage(change.stage) ? null : h(DescribeInSidecarButton, { changeId: change.id }),

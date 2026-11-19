@@ -79,6 +79,7 @@ export async function cmdAddChange(
     ...(criteria.length ? { acceptanceCriteria: criteria } : {}),
     ...(flags.source ? { source: flags.source } : {}),
     ...(flags.priority ? { priority: flags.priority as Priority } : {}),
+    ...(flags.prioritized === "true" ? { prioritized: true } : {}),
     ...(flags.blockedBy ? { blockedBy: parseCsvList(flags.blockedBy) } : {}),
   };
   const [added] = await addChanges(dir, [input], flags.area?.trim() || undefined);

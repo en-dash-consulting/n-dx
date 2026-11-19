@@ -20,6 +20,13 @@ describe("glance model", () => {
     expect(groups[2]!.changes.map((c) => c.id)).toEqual(["a", "d"]);
   });
 
+  it("lists a group's changes prioritized first, then by priority, ties in the given order", () => {
+    const [group] = groupGlanceByRelease([
+      change("low", { priority: "low" }), change("none"), change("high", { priority: "high" }), change("flag", { prioritized: true, priority: "low" }),
+    ]);
+    expect(group!.changes.map((c) => c.id)).toEqual(["flag", "high", "none", "low"]);
+  });
+
   it("shows blocked before no criteria, and nothing when neither", () => {
     expect(glanceGap({ criteriaGap: true, openBlockers: 2 })).toBe("blocked");
     expect(glanceGap({ criteriaGap: true, openBlockers: 0 })).toBe("no-criteria");
