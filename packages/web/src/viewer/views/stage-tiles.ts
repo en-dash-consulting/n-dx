@@ -211,9 +211,9 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...con
 
 /** The fine grid's track (`--tile-unit`) and the gap each tile keeps below itself, in px. */
 export const TILE_UNIT_PX = 4;
-export const TILE_GAP_PX = 16;
+export const TILE_GAP_PX = 20;
 /** Tracks one configured row takes: 232px of tile plus the gap. */
-export const TRACKS_PER_ROW = 62;
+export const TRACKS_PER_ROW = 63;
 
 /**
  * Tracks a tile needs to show `contentPx` of body content under `chromePx` of
