@@ -86,7 +86,13 @@ describe("markThirdParty", () => {
   });
 
   it("leaves a first-party folder named like a library alone without the library's banner or entry file", async () => {
-    const files = [entry("src/ckeditor/plugins/MyPlugin.ts"), entry("src/ckeditor/index.ts"), entry("src/charts/highcharts/options.ts")];
+    // `src/ckeditor.js` beside the folder is the application's own build entry, not CKEditor's release file.
+    const files = [
+      entry("src/ckeditor.js"),
+      entry("src/ckeditor/plugins/MyPlugin.ts"),
+      entry("src/ckeditor/index.ts"),
+      entry("src/charts/highcharts/options.ts"),
+    ];
     const { files: marked, marks } = await markThirdParty("/x", files, {
       readHeader: headers({ "src/charts/highcharts/options.ts": "// Options for Highcharts JS v4.2.5 and later\nexport const options = {};\n" }),
     });
@@ -150,12 +156,14 @@ describe("markThirdParty", () => {
       "/*  Prototype JavaScript framework, version 1.7.1\n",
       "// script.aculo.us effects.js v1.9.0, Thu Dec 23 16:54:48 -0500 2010\n",
       "/*\n\tCopyright (c) 2004-2011, The Dojo Foundation All Rights Reserved.\n*/\n",
+      "/*  Prototype JavaScript framework, version 1.7\n *  (c) 2005-2010 Sam Stephenson\n",
+      "// Copyright (c) 2005-2010 Thomas Fuchs (http://script.aculo.us, http://mir.aculo.us)\n",
     ];
     const files = [...loose, ...real].map((_, i) => entry(`f${i}/a.js`));
     const { files: marked } = await markThirdParty("/x", files, {
       readHeader: headers(Object.fromEntries([...loose, ...real].map((h, i) => [`f${i}/a.js`, h]))),
     });
-    expect(Object.keys(reasons(marked)).sort()).toEqual(["f4/a.js", "f5/a.js", "f6/a.js", "f7/a.js"]);
+    expect(Object.keys(reasons(marked)).sort()).toEqual(["f4/a.js", "f5/a.js", "f6/a.js", "f7/a.js", "f8/a.js", "f9/a.js"]);
   });
 
   it("groups header marks per folder, collapsing one library spread over many folders", async () => {

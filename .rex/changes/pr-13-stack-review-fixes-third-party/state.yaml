@@ -8,8 +8,12 @@ items:
     lastModified: "2026-11-18T22:33:09.105Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e08596a6-1754-42e7-bee1-c830ed9c3810":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-18T23:59:20.590Z"
-    activeIntervals: [{"start":"2026-11-18T23:59:20.590Z"}]
-    lastModified: "2026-11-18T23:59:21.320Z"
+    completedAt: "2026-11-19T00:08:46.665Z"
+    endedAt: "2026-11-19T00:08:46.665Z"
+    activeIntervals: [{"end":"2026-11-19T00:08:46.665Z","start":"2026-11-18T23:59:20.590Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Library-named folders need banner or entry-file evidence (LIBRARY_ENTRY_FILES); jQuery/Highcharts/Prototype/script.aculo.us/Dojo banners anchored; analyze prints a [third-party] line per folder with library, reason and deny glob."
+    lastModified: "2026-11-19T00:08:46.665Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

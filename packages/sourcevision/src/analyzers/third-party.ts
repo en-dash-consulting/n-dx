@@ -66,10 +66,14 @@ export const LIBRARY_BANNERS: readonly LibraryBanner[] = [
   { name: "jQuery", pattern: /\/\*!?[ \t]*jQuery(?: UI -)? v\d+\.\d+\.\d+\b|^[ \t]*\*[ \t]*jQuery JavaScript Library v\d+\.\d+\.\d+\b/m },
   // `/*\n Highcharts JS v4.2.5 (2016-05-06)`, ` * @license Highstock JS v9.3.2 (2021-11-29)`.
   { name: "Highcharts", pattern: /^[ \t]*(?:\/\*+!?|\*)?[ \t]*(?:@license[ \t]+)?High(?:charts|stock) JS v\d+\.\d+\.\d+\b/m },
-  // `/*  Prototype JavaScript framework, version 1.7.1`.
-  { name: "Prototype", pattern: /^[ \t]*(?:\/\*+|\*)?[ \t]*Prototype JavaScript framework, version \d+\.\d+\.\d+/m },
-  // `// script.aculo.us effects.js v1.9.0, Thu Dec 23 2010`.
-  { name: "script.aculo.us", pattern: /^\/\/ script\.aculo\.us [\w.-]+\.js v\d+\.\d+\.\d+/m },
+  // `/*  Prototype JavaScript framework, version 1.7.1`; the 1.7 release prints `version 1.7`.
+  { name: "Prototype", pattern: /^[ \t]*(?:\/\*+|\*)?[ \t]*Prototype JavaScript framework, version \d+\.\d+/m },
+  // `// script.aculo.us effects.js v1.9.0, Thu Dec 23 2010`, or a file opening with its
+  // `// Copyright (c) 2005-2010 Thomas Fuchs (http://script.aculo.us, http://mir.aculo.us)` line.
+  {
+    name: "script.aculo.us",
+    pattern: /^\/\/ script\.aculo\.us [\w.-]+\.js v\d+\.\d+\.\d+|^\/\/ Copyright \(c\) \d{4}(?:-\d{4})?,? Thomas Fuchs \(http:\/\/script\.aculo\.us\b/m,
+  },
   // `Copyright (c) 2004-2011, The Dojo Foundation All Rights Reserved.`
   { name: "Dojo", pattern: /Copyright \(c\) \d{4}(?:-\d{4})?, The Dojo Foundation\s+All Rights Reserved/ },
   { name: "Bootstrap", pattern: /Bootstrap v\d+\.\d+\.\d+ \(https?:\/\/getbootstrap\.com/ },
@@ -100,9 +104,10 @@ export const LIBRARY_DIRECTORIES: ReadonlyMap<string, string> = new Map([
 /**
  * A folder named in {@link LIBRARY_DIRECTORIES} is that library only with the
  * library's own evidence: a file under it carrying the library's banner
- * ({@link LIBRARY_BANNERS}), or the library's entry file (any case) under it
- * or beside it (`Classes/PHPExcel.php` next to `Classes/PHPExcel/`). An
- * application's own `src/ckeditor/plugins/` has neither. Every library here
+ * ({@link LIBRARY_BANNERS}), or the library's entry file (any case) under it,
+ * or beside it for the libraries that ship it so
+ * ({@link ENTRY_BESIDE_FOLDER}). An application's own `src/ckeditor/plugins/`
+ * has neither, with or without a `src/ckeditor.js` beside it. Every library here
  * has an entry file, so no name marks a folder on its own. Each comment names
  * where the library's public distribution ships the file.
  */
@@ -122,6 +127,15 @@ export const LIBRARY_ENTRY_FILES: ReadonlyMap<string, readonly string[]> = new M
   ["YUI", ["yui-min.js", "yahoo-dom-event.js"]], // YUI 3: build/yui/yui-min.js; YUI 2: build/yahoo-dom-event/yahoo-dom-event.js
   ["Highcharts", ["highcharts.src.js"]], // Highcharts release: code/highcharts.src.js
 ]);
+
+/**
+ * Libraries whose distribution puts the entry file next to the folder of the
+ * same name (`Classes/PHPExcel.php` and `Classes/PHPExcel/`,
+ * `library/HTMLPurifier.php` and `library/HTMLPurifier/`, `library/SimplePie.php`
+ * and `library/SimplePie/`). For every other library a file beside the folder
+ * is no evidence: `src/ckeditor.js` next to `src/ckeditor/` is an application's own.
+ */
+const ENTRY_BESIDE_FOLDER: ReadonlySet<string> = new Set(["PHPExcel", "HTML Purifier", "SimplePie"]);
 
 /** A directory whose files at least this share carry one library's banner is that library's. */
 const DIRECTORY_SHARE = 0.8;
@@ -308,7 +322,7 @@ function libraryFolderEvidence(
     if (!seen.has(dir.root)) {
       seen.add(dir.root);
       const parent = posix.dirname(dir.root);
-      const beside = entries.some((name) => lowerPaths.has((parent === "." ? name : `${parent}/${name}`).toLowerCase()));
+      const beside = ENTRY_BESIDE_FOLDER.has(dir.library) && entries.some((name) => lowerPaths.has((parent === "." ? name : `${parent}/${name}`).toLowerCase()));
       if (beside) found.set(dir.root, "directory+entry");
     }
     if (bannerOf.get(file.path) === dir.library) found.set(dir.root, "directory+banner");
