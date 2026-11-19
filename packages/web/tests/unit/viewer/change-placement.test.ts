@@ -163,6 +163,8 @@ async function type(el: Element | null, value: string, event = "input"): Promise
 
 const pick = (target: string) => click($(`.cp-target[data-target="${target}"] input`));
 const button = (label: string) => $$<HTMLButtonElement>("button").find((b) => b.textContent === label) ?? null;
+/** The confirm button: "Place" until a target is chosen, then named by the action ("Touch Refunds"). */
+const placeButton = () => $<HTMLButtonElement>(".cp-place");
 
 beforeEach(() => {
   // A focus request is module state: no case may start with one pending.
@@ -232,7 +234,7 @@ describe("an Inbox change's panel", () => {
     expect($$<HTMLInputElement>('.cp-relation input[type="radio"]').map((r) => r.value)).toEqual(["touches", "amends"]);
     expect(["Place", "Place & next", "Place & add another", "Nothing fits"].map((l) => button(l) !== null)).toEqual([true, true, true, true]);
     // Nothing is chosen for the person: Place waits for a pick.
-    expect(button("Place")?.disabled).toBe(true);
+    expect(placeButton()?.disabled).toBe(true);
     expect(spies.onInboxState).toHaveBeenLastCalledWith(true);
   });
 
@@ -297,7 +299,49 @@ describe("an Inbox change's panel", () => {
     await click(button("Shipping labels"));
     expect($<HTMLInputElement>('.cp-target[data-target="cap-label"] input')?.checked).toBe(true);
     expect($(".cp-search-group")).toBeNull();
-    expect(button("Place")?.disabled).toBe(false);
+    expect(placeButton()?.disabled).toBe(false);
+  });
+
+  it("previews the pick, redraws it for another target or relation, and names the action, before anything is written", async () => {
+    serve([change("a")], [placement("a", [
+      candidate("cap-1", { statement: "Sell gift cards", criteria: [{ id: "c1", text: "x" }] }),
+      candidate("cap-2", { strength: "possible", reasons: ["path: src/pay"] }),
+    ])]);
+    await mountSection("a");
+    // No pick, no picture.
+    expect($(".pp")).toBeNull();
+    expect(placeButton()?.textContent).toBe("Place");
+
+    await pick("cap-1");
+    expect($(".pp-edge")?.getAttribute("data-relation")).toBe("touches");
+    expect($$(".pp-flow .pp-title").map((t) => t.textContent)).toEqual(["Change a", "Home cap-1"]);
+    expect($(".pp-why .inbox-strength")?.getAttribute("data-strength")).toBe("strong");
+    expect($(".pp-why")?.textContent).toContain("Shares the words gift, card");
+    expect($(".pp-why")?.textContent).toContain("Touches, by rex's rule: a rule");
+    expect($(".pp-after li.is-changed")?.textContent).toBe("Touched by Change a");
+    expect(placeButton()?.textContent).toBe("Touch Home cap-1");
+
+    await click($('.cp-relation input[value="amends"]'));
+    expect($(".pp-edge")?.getAttribute("data-relation")).toBe("amends");
+    expect(placeButton()?.textContent).toBe("Amend Home cap-1");
+    await type($(".cp-amends textarea.cp-input"), "Sell and refund gift cards");
+    expect($(".pp-after")?.textContent).toContain("Statement: Sell and refund gift cards");
+
+    await pick("cap-2");
+    expect($(".pp-why .inbox-strength")?.getAttribute("data-strength")).toBe("possible");
+    expect($(".pp-why")?.textContent).toContain("Names the path src/pay");
+    expect(placeButton()?.textContent).toBe("Amend Home cap-2");
+    expect(posts).toEqual([]);
+  });
+
+  it("says a search pick is the person's own", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    await type($(".cp-search-input"), "labels");
+    await click(button("Shipping labels"));
+    expect($(".pp-why .inbox-strength")).toBeNull();
+    expect($(".pp-why")?.textContent).toContain("Your pick: not on rex's shortlist");
+    expect(placeButton()?.textContent).toBe("Touch Shipping labels");
   });
 });
 
@@ -320,7 +364,7 @@ describe("when the product map read fails", () => {
     expect($(".cp-search")?.textContent).toContain("Could not load: PRD is locked by pid 7");
     expect(root.textContent).not.toContain("Loading the product map");
     expect($('.cp-target[data-target="cap-1"]')).not.toBeNull();
-    expect(button("Place")).not.toBeNull();
+    expect(placeButton()).not.toBeNull();
   });
 
   it("shows the error in the proposal form's area field, and a later good read restores both", async () => {
@@ -363,7 +407,7 @@ describe("an applied change's panel", () => {
     serve([applied("a")], [placement("a", [candidate("cap-1")])]);
     await mountSection("a");
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts).toEqual([{ url: "/api/rex/changes/a/place", body: { target: "cap-1", relation: "touches" } }]);
     expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
   });
@@ -388,7 +432,7 @@ describe("placing", () => {
     const spies = await mountSection("a");
     answer("a", "place", 200, { change: "a", target: "cap-1", relation: "touches", warnings: ["Another change removes Home cap-1"] });
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
 
     expect(posts).toEqual([{ url: "/api/rex/changes/a/place", body: { target: "cap-1", relation: "touches" } }]);
     expect(spies.onWritten).toHaveBeenCalledTimes(1);
@@ -436,7 +480,7 @@ describe("placing", () => {
     expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
 
     await pick("cap-2");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts.map((p) => p.body)).toEqual([
       { target: "cap-1", relation: "touches" },
       { target: "cap-2", relation: "touches" },
@@ -463,7 +507,7 @@ describe("placing", () => {
     await type($(".cp-amends .task-criterion-add-input"), "Gift cards refund");
     await click($(".cp-amends .task-criterion-add-confirm"));
     await type($(".cp-amends textarea.cp-input"), "Refund any tender");
-    await click(button("Place"));
+    await click(placeButton());
 
     expect(posts[0].body).toEqual({
       target: "cap-1",
@@ -514,20 +558,20 @@ describe("placing", () => {
     await click(button("Refunds"));
 
     expect($$(".cp-amends .task-criterion-text")).toEqual([]);
-    expect(button("Place")?.disabled).toBe(true);
-    await click(button("Place"));
+    expect(placeButton()?.disabled).toBe(true);
+    await click(placeButton());
     expect(posts).toEqual([]);
 
     release();
     await settle();
     expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
     // The new target's criteria are read but unedited: an amendment of nothing waits for an edit.
-    expect(button("Place")?.disabled).toBe(true);
+    expect(placeButton()?.disabled).toBe(true);
     await click(button("+ criterion"));
     await type($(".cp-amends .task-criterion-add-input"), "Refund in store credit");
     await click($(".cp-amends .task-criterion-add-confirm"));
-    expect(button("Place")?.disabled).toBe(false);
-    await click(button("Place"));
+    expect(placeButton()?.disabled).toBe(false);
+    await click(placeButton());
     const body = posts[0].body as { target: string; relation: string; criteria: { add: Array<{ text: string }> } };
     expect(body).toMatchObject({ target: "cap-refund", relation: "amends" });
     // Only this target's edit: the previous target's criterion never travels.
@@ -539,7 +583,7 @@ describe("placing", () => {
     await mountSection("a");
     expect($<HTMLInputElement>('.cp-relation input[value="touches"]')?.checked).toBe(true);
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts[0].body).toEqual({ target: "cap-1", relation: "touches" });
   });
 
@@ -548,14 +592,14 @@ describe("placing", () => {
     await mountSection("a");
     await pick("cap-1");
     await click($('.cp-relation input[value="amends"]'));
-    expect(button("Place")?.disabled).toBe(true);
+    expect(placeButton()?.disabled).toBe(true);
     expect($(".cp-amends-hint")?.textContent).toContain("choose Touches");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts).toEqual([]);
     // An edit is enough to place.
     await type($(".cp-amends textarea"), "A sharper statement");
     expect($(".cp-amends-hint")).toBeNull();
-    expect(button("Place")?.disabled).toBe(false);
+    expect(placeButton()?.disabled).toBe(false);
   });
 
   it("an amendment rex finds empty is refused inline in rex's words, pointing at the criteria", async () => {
@@ -567,7 +611,7 @@ describe("placing", () => {
     await click($('.cp-relation input[value="amends"]'));
     // Any edit gets past the viewer's hold; rex alone judges whether it modifies anything.
     await type($(".cp-amends textarea"), "   x");
-    await click(button("Place"));
+    await click(placeButton());
 
     expect(posts[0].body).toEqual({ target: "cap-1", relation: "amends", proposed: "x" });
     expect($('.cp-refusal[role="alert"] .cp-refusal-message')?.textContent).toBe(message);
@@ -584,7 +628,7 @@ describe("placing", () => {
     await mountSection("a");
     answer("a", "place", 422, { error: `rex says ${kind}`, kind });
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect($(".cp-refusal-message")?.textContent).toBe(`rex says ${kind}`);
     const hint = $(".cp-refusal-hint");
     expect(hint?.dataset.kind).toBe(kind);
@@ -596,7 +640,7 @@ describe("placing", () => {
     await mountSection("a");
     answer("a", "place", 409, { error: "Could not acquire PRD lock: held by PID 42" });
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect($(".cp-refusal-message")?.textContent).toBe("Could not acquire PRD lock: held by PID 42");
     expect($(".cp-refusal-hint")).toBeNull();
   });
@@ -751,7 +795,7 @@ describe("Draft with the model (rex.placementDraft)", () => {
     expect(note?.dataset.draftSource).toBe("model");
     expect(note?.textContent).toContain("Picked by the model (claude-haiku): Home cap-2.");
     expect(note?.textContent).toContain("rules and model disagree");
-    expect(button("Place")?.disabled).toBe(false);
+    expect(placeButton()?.disabled).toBe(false);
   });
 
   it("opens the proposal form filled with the model's proposal", async () => {
