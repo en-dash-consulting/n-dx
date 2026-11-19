@@ -20,10 +20,13 @@
  *   A relative target is under `RewriteBase`, else the directory.
  *
  * A line ending in `\` continues on the next; a line starting with `#` is a
- * comment. Directive and container names are case-insensitive.
+ * comment. Directive and container names are case-insensitive. A logical
+ * line longer than 64 KiB is skipped and counted in a notice.
  *
  * @module lang-php/php-htaccess
  */
+
+import { isOverlongLine, overlongLinesNotice } from "./php-line-cap.js";
 
 /** A `<Files>`/`<FilesMatch>` block's denial. */
 export interface HtaccessFileDenial {
@@ -62,11 +65,59 @@ export interface Htaccess {
   readonly notices: readonly string[];
 }
 
-/** One directive line's words; a double-quoted word keeps its spaces, quotes removed and only `\"` unescaped (regex backslashes stay). */
-function words(text: string): string[] {
+const isSpace = (c: string): boolean => /\s/.test(c);
+const isLineTerminator = (c: string): boolean => c === "\n" || c === "\r" || c === "\u2028" || c === "\u2029";
+
+/**
+ * Where the quoted word opening before `from` closes: `closed` with the
+ * closing quote's index, or not, with the index its scan stopped at (the end,
+ * or a `\` before a line terminator). A `\` escapes the next character.
+ */
+function closingQuote(text: string, from: number): { readonly closed: boolean; readonly at: number } {
+  let i = from;
+  while (i < text.length) {
+    const c = text[i]!;
+    if (c === '"') return { closed: true, at: i };
+    if (c === "\\") {
+      if (i + 1 >= text.length || isLineTerminator(text[i + 1]!)) return { closed: false, at: i };
+      i += 2;
+    } else i += 1;
+  }
+  return { closed: false, at: i };
+}
+
+/**
+ * One directive line's words; a double-quoted word keeps its spaces, quotes
+ * removed and only `\"` unescaped (regex backslashes stay). A `"` with no
+ * closing quote starts a plain word, a run of non-space as any other.
+ *
+ * A hand-written scan: the regex it replaces, `/"((?:[^"\\]|\\.)*)"|(\S+)/g`,
+ * rescans to the end from every unclosed quote, quadratic on repository input.
+ * Here no stretch is scanned for a closing quote twice: a quote that starts a
+ * word inside a stretch an earlier unclosed quote scanned would have closed it.
+ */
+export function htaccessWords(text: string): string[] {
   const out: string[] = [];
-  const re = /"((?:[^"\\]|\\.)*)"|(\S+)/g;
-  for (let m = re.exec(text); m !== null; m = re.exec(text)) out.push(m[1] !== undefined ? m[1].replace(/\\"/g, '"') : m[2]!);
+  let unclosedUntil = 0;
+  let i = 0;
+  while (i < text.length) {
+    if (isSpace(text[i]!)) {
+      i += 1;
+      continue;
+    }
+    if (text[i] === '"' && i >= unclosedUntil) {
+      const close = closingQuote(text, i + 1);
+      if (close.closed) {
+        out.push(text.slice(i + 1, close.at).replace(/\\"/g, '"'));
+        i = close.at + 1;
+        continue;
+      }
+      unclosedUntil = close.at;
+    }
+    const start = i;
+    while (i < text.length && !isSpace(text[i]!)) i += 1;
+    out.push(text.slice(start, i));
+  }
   return out;
 }
 
@@ -128,19 +179,24 @@ export function parseHtaccess(file: string, text: string): Htaccess {
    */
   const containers: Array<((name: string) => boolean) | null | "unreadable" | "other-methods"> = [];
 
+  let overlong = 0;
   for (const { text: lineText, line } of logicalLines(text)) {
+    if (isOverlongLine(lineText)) {
+      overlong += 1;
+      continue;
+    }
     const trimmed = lineText.trim();
     if (trimmed === "" || trimmed.startsWith("#")) continue;
     const open = /^<\s*([A-Za-z]+)\b(.*?)>$/.exec(trimmed);
     if (open) {
       const name = open[1]!.toLowerCase();
       if (name === "files" || name === "filesmatch") {
-        const matcher = filesMatcher(words(open[2]!), name === "filesmatch");
+        const matcher = filesMatcher(htaccessWords(open[2]!), name === "filesmatch");
         if (matcher === undefined) notices.push(`${file}:${line} <${open[1]}> has a pattern that could not be read; its access rules are not applied.`);
         containers.push(matcher ?? "unreadable");
       } else if (name === "limit" || name === "limitexcept") {
         // <Limit m…> applies to the methods listed, <LimitExcept m…> to all others.
-        const listed = new Set(words(open[2]!).map((m) => m.toUpperCase()));
+        const listed = new Set(htaccessWords(open[2]!).map((m) => m.toUpperCase()));
         const pages = name === "limit" ? listed.has("GET") || listed.has("POST") : !listed.has("GET") || !listed.has("POST");
         containers.push(pages ? null : "other-methods");
       } else {
@@ -152,7 +208,7 @@ export function parseHtaccess(file: string, text: string): Htaccess {
       containers.pop();
       continue;
     }
-    const raw = words(trimmed);
+    const raw = htaccessWords(trimmed);
     const w = raw.map((x) => x.toLowerCase());
     // Access rules for methods other than GET and POST say nothing about the pages.
     if (containers.includes("other-methods") && (isDenial(w) || isGrant(w))) continue;
@@ -195,7 +251,8 @@ export function parseHtaccess(file: string, text: string): Htaccess {
       }
     }
   }
-  const access = denied !== undefined ? { denied: true, line: denied } : granted !== undefined ? { denied: false, line: granted } : undefined;
+  if (overlong > 0) notices.push(overlongLinesNotice(file, overlong, "access and rewrite rules"));
+  const access = denied !== undefined ?{ denied: true, line: denied } : granted !== undefined ? { denied: false, line: granted } : undefined;
   return { file, ...(access && { access }), fileDenials, urlDenials, ...(rewriteBase !== undefined && { rewriteBase }), frontControllers, notices };
 }
 

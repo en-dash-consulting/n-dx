@@ -53,13 +53,29 @@ const SHEBANG = /^#![ \t]*\S*\/(?:env[ \t]+(?:-\S+[ \t]+)*)?php[\d.]*(?:[ \t]|\r
 
 const SAPI = /^\\?(?:PHP_SAPI|php_sapi_name\s*\(\s*\))$/i;
 const CLI_STRING = /^(['"])cli\1$/;
-const COMPARISON = /^([\s\S]*?)\s*(?:===|!==|==|!=|<>)\s*([\s\S]*)$/;
+/** Comparison operators, a longer one first where two start at the same place. */
+const COMPARISON_OPERATORS = ["===", "!==", "==", "!=", "<>"] as const;
+
+/**
+ * The operands either side of the first comparison operator, trimmed. Found
+ * with `indexOf`: a lazy `[\s\S]*?` split retries from every position and is
+ * quadratic on repository input.
+ */
+export function splitComparison(text: string): [string, string] | undefined {
+  let at = -1;
+  let operator = "";
+  for (const op of COMPARISON_OPERATORS) {
+    const i = text.indexOf(op);
+    if (i >= 0 && (at < 0 || i < at)) [at, operator] = [i, op];
+  }
+  return at < 0 ? undefined : [text.slice(0, at).trim(), text.slice(at + operator.length).trim()];
+}
 
 /** A `PHP_SAPI`/`php_sapi_name()` comparison whose other operand is `'cli'`. */
 export function isCliCheck(text: string): boolean {
-  const m = COMPARISON.exec(text.trim());
-  if (!m) return false;
-  const [left, right] = [m[1]!.trim(), m[2]!.trim()];
+  const operands = splitComparison(text);
+  if (!operands) return false;
+  const [left, right] = operands;
   return (SAPI.test(left) && CLI_STRING.test(right)) || (SAPI.test(right) && CLI_STRING.test(left));
 }
 

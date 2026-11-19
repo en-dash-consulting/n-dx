@@ -6,22 +6,51 @@
 
 import { describe, expect, it } from "vitest";
 import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../lang-kit/tests/helpers/call-within-budget.js";
-import { parsePhpIncludeConfig } from "../../src/index.js";
+import { htaccessWords, isCliCheck, parseHtaccess, parsePhpIncludeConfig, splitComparison } from "../../src/index.js";
 import { MAX_CONFIG_LINE_LENGTH } from "../../src/php-line-cap.js";
 
+const HTACCESS = new URL("../../src/php-htaccess.ts", import.meta.url);
 const INCLUDES = new URL("../../src/php-includes.ts", import.meta.url);
+const ENTRY_POINTS = new URL("../../src/php-entry-points.ts", import.meta.url);
 
 /**
  * Sizes at which each replaced regex overruns the call budget (5 s by default)
  * many times over, so restoring one fails its test. One configuration line
  * stays under the 64 KiB cap, where a regex took 2.6–4.4 s, inside the budget,
- * so the line tests repeat it {@link LINES} times.
+ * so the line tests repeat it {@link LINES} times; other input is {@link HUGE}
+ * long (the regexes took ~40 s at that size).
  */
 const LONG = 60_000;
 const LINES = 10;
+const HUGE = 300_000;
 
 /** `line` as {@link LINES} lines of one file. */
 const repeated = (line: string): string => Array.from({ length: LINES }, () => line).join("\n");
+
+describe("htaccessWords", () => {
+  it("splits on white space, keeps a quoted word whole and unescapes only \\\"", () => {
+    expect(htaccessWords('RewriteRule ^(.*)$ "a \\"b\\" \\d" [L]')).toEqual(["RewriteRule", "^(.*)$", 'a "b" \\d', "[L]"]);
+    expect(htaccessWords('<Files "*.ini">')).toEqual(["<Files", "*.ini", ">"]);
+    expect(htaccessWords('x"a b"y')).toEqual(['x"a', 'b"y']);
+  });
+
+  it("reads a quote with no closing quote as the start of a plain word", () => {
+    expect(htaccessWords('Deny "from all')).toEqual(["Deny", '"from', "all"]);
+    expect(htaccessWords('"a "b "c')).toEqual(["a ", "b", '"c']);
+  });
+
+  // #127, #128: CodeQL's input, a quote then a long `\"!` run with no closing quote; and many unclosed quotes.
+  it(
+    "runs in linear time on long unclosed quoted words",
+    async () => {
+      const escaped = `"${'\\"!'.repeat(LONG / 3)}`;
+      expect(await callWithinBudget<typeof htaccessWords>(HTACCESS, "htaccessWords", escaped)).toEqual([escaped]);
+      const unclosed = `${'"a\\\r '.repeat(LONG / 5)}`;
+      expect((await callWithinBudget<typeof htaccessWords>(HTACCESS, "htaccessWords", unclosed)).length).toBe(LONG / 5);
+    },
+    BOUNDED_TEST_TIMEOUT_MS,
+  );
+});
 
 describe("parsePhpIncludeConfig", () => {
   it("reads a blank .htaccess value as empty, and rejects a name with no value", () => {
@@ -76,4 +105,31 @@ describe("parsePhpIncludeConfig", () => {
     expect(out.settings.map((s) => s.value)).toEqual(["lib"]);
     expect(out.notices).toEqual(["conf/php.ini: skipped 2 lines longer than 64 KiB; any include_path settings there are not read."]);
   });
+});
+
+describe("parseHtaccess", () => {
+  it("skips a line longer than 64 KiB and counts it in a notice", () => {
+    const h = parseHtaccess("a/.htaccess", `Deny from all ${"x".repeat(MAX_CONFIG_LINE_LENGTH)}\nOptions -Indexes\n`);
+    expect(h.access).toBeUndefined();
+    expect(h.notices).toEqual(["a/.htaccess: skipped 1 line longer than 64 KiB; any access and rewrite rules there are not read."]);
+  });
+});
+
+describe("splitComparison", () => {
+  it("splits at the first operator, the longer one where two start together", () => {
+    expect(splitComparison("PHP_SAPI !== 'cli'")).toEqual(["PHP_SAPI", "'cli'"]);
+    expect(splitComparison("a == b === c")).toEqual(["a", "b === c"]);
+    expect(splitComparison("a <> b")).toEqual(["a", "b"]);
+    expect(splitComparison("a . b")).toBeUndefined();
+  });
+
+  // #129: a long run of white space between operands that never reaches an operator.
+  it(
+    "runs in linear time on a long run of white space",
+    async () => {
+      const text = `PHP_SAPI${" ".repeat(HUGE)}x=`;
+      expect(await callWithinBudget<typeof isCliCheck>(ENTRY_POINTS, "isCliCheck", text)).toBe(false);
+    },
+    BOUNDED_TEST_TIMEOUT_MS,
+  );
 });
