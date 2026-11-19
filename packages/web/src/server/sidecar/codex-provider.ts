@@ -149,7 +149,7 @@ export function readSidecarCodexProvider(
 
 /** Never echo a provider response body, URL, auth header or helper diagnostic. */
 export function sidecarProviderFailure(message: string): string {
-  if (/^(?:401|403)\b|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?: code)?)\s*[:=]?\s*(?:401|403)\b|unauthori[sz]ed|forbidden|authentication|invalid.api.key/i.test(message)) return "Codex Sidecar provider missing auth or rejected credentials: check the selected provider credentials and restart the server.";
+  if (/^(?:401|403)\b|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?: code)?)\s*[:=]?\s*(?:401|403)\b|unauthori[sz]ed|forbidden|authentication|invalid.api.key/i.test(message)) return "Codex Sidecar provider missing auth or rejected credentials: check the selected provider auth configuration and credential source, and confirm the provider server is available. No fallback was attempted.";
   if (/unknown field|unexpected argument|unsupported|unrecognized|invalid.*config/i.test(message)) return "Unsupported Codex Sidecar CLI/provider capability: check the selected binary and Responses provider settings.";
   return "Codex Sidecar provider connection failure: check the selected endpoint, network and model availability. No fallback was attempted.";
 }

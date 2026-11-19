@@ -177,6 +177,15 @@ it("distinguishes missing auth, explicit policy denial and connection failure", 
   expect(sidecarProviderFailure("ECONNREFUSED secret")).not.toContain("secret");
 });
 
+it.each(["401", "HTTP 403", "status code: 401", "authentication failed", "invalid API key"])("gives actionable, sanitized provider auth guidance for %s", (failure) => {
+  const message = sidecarProviderFailure(`${failure}: https://provider.invalid/v1 ${canary} ${header}`);
+  expect(message).toMatch(/missing auth or rejected credentials/);
+  expect(message).toContain("check the selected provider auth configuration and credential source");
+  expect(message).toContain("confirm the provider server is available");
+  expect(message).toContain("No fallback was attempted.");
+  expect(message).not.toMatch(/connection failure|restart|reload|provider\.invalid|disposable/);
+});
+
 it.each([undefined, "gpt-6.2-astra"])("retains binary/provider/effective model on fresh, live resume and restored resume (session %s)", async model => {
   fixture.model = "gpt-6-astra";
   const dir = join(root, "sessions"); mkdirSync(dir);
