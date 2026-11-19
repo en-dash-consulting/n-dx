@@ -42,7 +42,8 @@ import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
 import { Pending, StaleNotice } from "./product-notices.js";
 import type { ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
-import { PRIORITIZED_TITLE, changeAssignees, shortChangeId } from "./product-model.js";
+import { changeAssignees, shortChangeId } from "./product-model.js";
+import { PrioritizedTag } from "./prioritized-tag.js";
 import { bestGuess, guessOf, sortInbox, useInbox, type Guess, type InboxRow } from "./inbox-read.js";
 import { errorMessage } from "../utils/format.js";
 
@@ -323,7 +324,7 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted }: {
     h("div", { class: "inbox-row-head" },
       h("span", { class: "ch-display-id" }, shortChangeId(change)),
       h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
-      change.prioritized ? h("span", { class: "tag ch-prioritized", title: PRIORITIZED_TITLE }, "Prioritized") : null,
+      h(PrioritizedTag, { prioritized: change.prioritized }),
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),
       age ? h("span", { class: "inbox-age", title: "Time in the Inbox" }, age) : null,

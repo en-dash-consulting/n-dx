@@ -219,6 +219,18 @@ describe("the Inbox page", () => {
     expect($(".inbox-best-open")?.textContent).toMatch(/^Place best guesses \(\d+\)$/);
   });
 
+  it("marks a prioritized change in the queue with the Prioritized tag, and no other", async () => {
+    serve([change("flag", { prioritized: true }), change("plain")], [
+      placement("flag", [candidate("cap-f", { strength: "possible", score: 3 })]),
+      placement("plain", [candidate("cap-p", { strength: "possible", score: 3 })]),
+    ]);
+    await mountPage();
+    const tag = (id: string) => $(`.inbox-qitem[data-change-id="${id}"] .ch-prioritized`);
+    expect(tag("flag")?.textContent).toBe("Prioritized");
+    expect(tag("flag")?.getAttribute("title")).toMatch(/^Prioritized: listed ahead/);
+    expect(tag("plain")).toBeNull();
+  });
+
   it("selects a change by clicking it, and the breadcrumb returns to Plan", async () => {
     serveThree();
     const navigateTo = await mountPage();

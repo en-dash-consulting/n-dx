@@ -36,12 +36,12 @@ import { useChangesSummary } from "./changes-summary-context.js";
 import { ApplyAllBar } from "./apply-all.js";
 import {
   CHANGE_STAGE_LABELS,
-  PRIORITIZED_TITLE,
   glanceGap,
   groupGlanceByRelease,
   type GlanceChange,
   type GlanceGroup,
 } from "./product-model.js";
+import { PrioritizedTag } from "./prioritized-tag.js";
 
 /** Rows drawn before the rest are left to the full list: the next few, not the whole queue. */
 export const MAX_GLANCE_ROWS = 3;
@@ -100,7 +100,7 @@ function Row({ change, navigateTo, tracker, onTrackerChanged, impact }: { change
       h("button", { type: "button", class: "cg-open", title: titleTooltip(change), onClick: () => navigateTo("prd", { taskId: change.id }) },
         h("span", { class: "cg-title" }, displayTitle(change)),
       ),
-      change.prioritized ? h("span", { class: "tag ch-prioritized", title: PRIORITIZED_TITLE }, "Prioritized") : null,
+      h(PrioritizedTag, { prioritized: change.prioritized }),
       h(ImpactFlags, { impact }),
     ),
     h("td", { class: `cg-size${impact?.size ? ` cg-size-${impact.size}` : ""}`, title: size.title }, size.label),

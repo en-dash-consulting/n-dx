@@ -33,6 +33,7 @@ import { AppliedHistory, PlaceBestGuesses, assignableInboxRows, takeInboxSelecti
 import { bestGuess, useInbox, type InboxRow } from "./inbox-read.js";
 import { Pending, StaleNotice } from "./product-notices.js";
 import { changeAssignees, shortChangeId } from "./product-model.js";
+import { PrioritizedTag } from "./prioritized-tag.js";
 
 // ── Shortcuts ────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ function QueueItem({ row, selected, onSelect }: { row: InboxRow; selected: boole
   },
     h("div", { class: "inbox-qitem-title" }, change.title),
     h("div", { class: "inbox-qitem-meta" },
+      h(PrioritizedTag, { prioritized: change.prioritized }),
       guess ? h(StrengthChip, { strength: guess.strength }) : null,
       h("span", { class: "inbox-qitem-tasks" }, `${change.taskCount} task${change.taskCount === 1 ? "" : "s"}`),
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),

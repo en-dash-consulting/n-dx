@@ -114,6 +114,14 @@ describe("ChangesGlance", () => {
     expect(root.querySelector(".cg-more")!.textContent).toBe("Open the full list →");
   });
 
+  it("marks a prioritized change with the Prioritized tag, and no other", async () => {
+    await mount([change("flag", { prioritized: true }), change("plain")]);
+    const tag = (id: string) => root.querySelector(`.cg-row[data-change="${id}"] .ch-prioritized`);
+    expect(tag("flag")?.textContent).toBe("Prioritized");
+    expect(tag("flag")?.getAttribute("title")).toMatch(/^Prioritized: listed ahead/);
+    expect(tag("plain")).toBeNull();
+  });
+
   it("leads a row with the summary, the technical title as its tooltip", async () => {
     await mount([change("c1", { summary: "Faster checkout for returning shoppers" })]);
     const open = root.querySelector<HTMLButtonElement>(".cg-open")!;

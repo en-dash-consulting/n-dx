@@ -26,7 +26,6 @@ import {
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
-  PRIORITIZED_TITLE,
   changeAssignees,
   groupChangesByRelease,
   isAppliedStage,
@@ -35,6 +34,7 @@ import {
   type ReleaseGroup,
   type StageGroup,
 } from "./product-model.js";
+import { PrioritizedTag } from "./prioritized-tag.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -156,7 +156,7 @@ function Change({ change, onSelect, impact, assigning }: {
             onClick: () => onSelect(change.id),
           }, displayTitle(change))
         : h("span", { class: "ch-change-title", title: titleTooltip(change) }, displayTitle(change)),
-      change.prioritized ? h("span", { class: "tag ch-prioritized", title: PRIORITIZED_TITLE }, "Prioritized") : null,
+      h(PrioritizedTag, { prioritized: change.prioritized }),
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       isAppliedStage(change.stage) ? null : h(DescribeInSidecarButton, { changeId: change.id }),
