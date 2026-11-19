@@ -2501,6 +2501,8 @@ interface ErrorContext {
   taskId: string;
   retryConfig: RetryConfig;
   vendor: string;
+  /** A failed Codex continuation cannot resume again or replay the task cold. */
+  codexContinuation?: "retry" | "unfinished-work";
 }
 
 /**
@@ -2571,6 +2573,20 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
     run.summary = result.summary;
     run.error = `${diagnosis.message} ${diagnosis.suggestion}`;
     await handleRunFailure(store, taskId, "deferred", "auth_error", run.error);
+    return "break";
+  }
+
+  if (ctx.codexContinuation) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    const transient = isTransientError(result.error!);
+    run.status = transient ? "error_transient" : "failed";
+    run.summary = result.summary;
+    run.error =
+      `Codex ${ctx.codexContinuation} continuation failed during attempt ${attempt + 1}/${retryConfig.maxRetries + 1}. ` +
+      "Stopping recovery without another resume or cold replay. " +
+      `Last error: ${result.error}`;
+    info(`\n${run.error}`);
+    await handleRunFailure(store, taskId, transient ? "pending" : "deferred", "codex_continuation_failed", run.error);
     return "break";
   }
 
@@ -3227,8 +3243,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
    */
   let lastSessionId: string | undefined;
   /**
-   * Session to resume because it ended waiting on a background command with
-   * its work uncommitted. Set for exactly one spawn, then cleared.
+   * Session to resume because it ended unfinished with its work uncommitted.
+   * Set for exactly one spawn, then cleared.
    *
    * Once per task: a session that ends the same way after being told nothing
    * will notify it is not going to be talked out of it by a second message,
@@ -3247,7 +3263,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries - planRespawnsChargedToRetries; attempt++) {
       let result!: SpawnResult;
-      let codexRetryAttempt = false;
+      let codexContinuation: ErrorContext["codexContinuation"];
       let attemptAccumulator: EventAccumulator | undefined;
 
       // Inner re-spawn loop: handles plan-mode interceptions without
@@ -3369,7 +3385,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
 
         if (backgroundResumeSessionId) {
-          subsection("Resuming the session: it ended waiting on a background command");
+          subsection("Resuming the unfinished session");
         } else if (readOnlyRetryPending) {
           subsection("Re-spawn cold after a read-only refusal");
         } else if (attempt > 0 && planRespawns === 0) {
@@ -3403,7 +3419,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
         recordSpawn(spawnLedger, nextSpawnReason);
 
-        codexRetryAttempt = vendor === "codex" && (retryResumeSessionId !== undefined || backgroundResumeSessionId !== undefined);
+        codexContinuation = vendor === "codex"
+          ? backgroundResumeSessionId ? "unfinished-work" : retryResumeSessionId ? "retry" : undefined
+          : undefined;
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
         resetLiveSpawnProgress(liveProgress);
         result = await withHeartbeat(
@@ -3471,7 +3489,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
         if (vendor === "codex") {
           codexWorkSession = result.sessionId ? { id: result.sessionId, identity: codexSpawnIdentity } : undefined;
-          if (codexRetryAttempt && !result.error && result.sessionId !== expectedContinuationSession) {
+          if (codexContinuation && !result.error && result.sessionId !== expectedContinuationSession) {
             result.error = "Codex did not confirm the resumed work session id; refusing to replay this task";
           }
         }
@@ -3479,10 +3497,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
         accumulateResult(accumulated, result);
 
-        // Background wait: the session handed work to the background and then
-        // ended, and nothing will ever notify it. Only a session that left its
-        // work uncommitted needs anything — one that backgrounded a command
-        // but still committed has finished.
+        // An unfinished session may have backgrounded work or emitted a
+        // truncated stream. Only uncommitted work needs a continuation.
         if (
           result.backgroundWait && !result.error && !result.planModeIntercept &&
           (await hasUnfinishedWork({ projectDir, autoCommit: config.autoCommit === true }))
@@ -3498,13 +3514,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             nextSpawnReason = "background-resume";
             run.backgroundResume = { ...signal };
             info(
-              `\n⚠ The session ended waiting on a background command (${signal.tool}` +
+              `\n⚠ The session ended unfinished (${signal.tool}` +
                 `${signal.detail ? `: ${signal.detail}` : ""}) with its work uncommitted. ` +
                 "Resuming it once to finish in the foreground.",
             );
             await toolRexAppendLog(store, taskId, {
               event: "background_wait_resumed",
-              detail: `Session ${resumeId.slice(0, 8)} ended waiting on ${signal.tool}; resumed once.`,
+              detail: `Session ${resumeId.slice(0, 8)} ended unfinished (last: ${signal.tool}` +
+                `${signal.detail ? `: ${signal.detail}` : ""}); resumed once.`,
             });
             continue;
           }
@@ -3605,9 +3622,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         const action = await processErrorResult({
           run, result, accumulated, attempt,
           store, taskId, vendor,
-          // A failed Codex continuation is terminal, not another resume or a
-          // cold replay of work which may already have completed.
-          retryConfig: codexRetryAttempt ? { ...retryConfig, maxRetries: attempt } : retryConfig,
+          retryConfig, codexContinuation,
         });
         if (action === "break") break;
         // action === "retry" → continue loop.

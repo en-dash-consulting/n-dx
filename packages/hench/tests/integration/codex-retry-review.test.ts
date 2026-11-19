@@ -66,8 +66,10 @@ describe("Codex retry and self-review loop contract", () => {
   async function run(taskId: string, reviewModel?: string, abortSignal?: AbortSignal) {
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
-    return cliLoop({ config: await loadConfig(henchDir), store: createStore("file", rexDir),
+    const store = createStore("file", rexDir);
+    const outcome = await cliLoop({ config: await loadConfig(henchDir), store,
       projectDir, henchDir, taskId, abortSignal, spawnModel: "gpt-6-astra", autonomous: true, yes: true, reviewOptional: reviewModel === undefined, reviewPass: reviewModel !== undefined, reviewModel });
+    return { ...outcome, log: await store.readLog() };
   }
 
   const failed = (id?: string) => ({ code: 1, lines: [
@@ -93,6 +95,26 @@ describe("Codex retry and self-review loop contract", () => {
     expect(outcome.run.status).toBe("error_transient");
     expect(cli.invocations).toHaveLength(2);
     expect(cli.invocations[1].args.slice(0, 3)).toEqual(["exec", "resume", "work"]);
+    expect(outcome.run.retryAttempts).toBe(1);
+    expect(outcome.run.error).toContain("Codex retry continuation failed during attempt 2/3");
+    expect(outcome.run.error).toContain("ECONNRESET");
+    const failures = outcome.log.filter(entry => entry.event === "codex_continuation_failed");
+    expect(failures).toHaveLength(1);
+    expect(failures[0].detail).toBe(outcome.run.error);
+    expect(outcome.log.filter(entry => entry.event === "transient_error")).toHaveLength(1);
+    expect(outcome.log.some(entry => entry.event === "task_transient_exhausted")).toBe(false);
+    expect((await loadConfig(henchDir)).retry?.maxRetries).toBe(2);
+  });
+
+  it("still exhausts all configured attempts when cold retries have no reusable session", async () => {
+    cli.script(() => failed(), () => failed(), () => failed());
+    const outcome = await run("task-1");
+    expect(cli.invocations).toHaveLength(3);
+    expect(outcome.run.status).toBe("error_transient");
+    expect(outcome.run.retryAttempts).toBe(2);
+    expect(outcome.log.filter(entry => entry.event === "task_transient_exhausted"))
+      .toEqual([expect.objectContaining({ detail: expect.stringContaining("All 3 attempts failed") })]);
+    expect(outcome.log.some(entry => entry.event === "codex_continuation_failed")).toBe(false);
   });
 
   it("resumes the failed fork child, preserving its work and accounting", async () => {
@@ -169,6 +191,39 @@ describe("Codex retry and self-review loop contract", () => {
     return unfinished();
   }
 
+  it("describes a truncated open turn as unfinished in output and the PRD log", async () => {
+    cli.script(() => ({ lines: leavesWork().lines.slice(0, 2) }), works("done.ts", "work"));
+    const outcome = await run("task-1");
+    expect(outcome.run.status, outcome.run.error).toBe("completed");
+    expect(cli.invocations).toHaveLength(2);
+    expect(outcome.run.backgroundResume?.tool).toBe("turn.started");
+    const output = vi.mocked(console.log).mock.calls.flat().join("\n");
+    expect(output).toContain("Resuming the unfinished session");
+    expect(output).not.toContain("background command");
+    const resumed = outcome.log.filter(entry => entry.event === "background_wait_resumed");
+    expect(resumed).toHaveLength(1);
+    expect(resumed[0].detail).toContain("ended unfinished");
+    expect(resumed[0].detail).toContain("turn.started");
+    expect(resumed[0].detail).not.toContain("ended waiting");
+  });
+
+  it("records repeated truncated turns without claiming a background command", async () => {
+    const truncated = () => ({ lines: leavesWork().lines.slice(0, 2) });
+    cli.script(truncated, truncated);
+    const outcome = await run("task-1");
+    expect(cli.invocations).toHaveLength(2);
+    expect(outcome.run.status).toBe("failed");
+    expect(outcome.run.error).toContain("unfinished again after being resumed");
+    expect(outcome.run.error).toContain("turn.started");
+    expect(outcome.run.error).not.toContain("background command");
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).not.toContain("background command");
+    const failures = outcome.log.filter(entry => entry.event === "background_wait");
+    expect(failures).toHaveLength(1);
+    expect(failures[0].detail).toBe(outcome.run.error);
+    expect(outcome.log.filter(entry => entry.event === "background_wait_resumed")).toHaveLength(1);
+    expect(outcome.log.map(entry => entry.detail).join("\n")).not.toMatch(/background command|ended waiting/);
+  });
+
   it("continues unfinished structured work once without replaying the brief", async () => {
     cli.script(leavesWork, works("done.ts", "work"));
     const outcome = await run("task-1");
@@ -194,6 +249,43 @@ describe("Codex retry and self-review loop contract", () => {
     expect(cli.invocations).toHaveLength(2);
     if (kind === "wait") expect(outcome.run.error).toContain("again after being resumed");
     if (kind === "wrong-thread") expect(outcome.run.error).toContain("did not confirm");
+    if (kind === "error") {
+      expect(outcome.run.retryAttempts).toBeUndefined();
+      expect(outcome.run.error).toContain("Codex unfinished-work continuation failed during attempt 1/3");
+      expect(outcome.run.error).toContain("ECONNRESET");
+      expect(outcome.log.filter(entry => entry.event === "codex_continuation_failed"))
+        .toEqual([expect.objectContaining({ detail: outcome.run.error })]);
+      expect(outcome.log.some(entry => entry.event === "task_transient_exhausted")).toBe(false);
+    }
+  });
+
+  it.each(["retry", "unfinished-work"])("preserves cancellation of a %s continuation", async (kind) => {
+    const controller = new AbortController();
+    cli.script(kind === "retry" ? () => failed("work") : leavesWork, () => {
+      setTimeout(() => controller.abort(new Error("Interrupted by SIGINT")), 10);
+      return { lines: [{ type: "thread.started", thread_id: "work" }], hang: true };
+    });
+    const outcome = await run("task-1", undefined, controller.signal);
+    expect(cli.invocations).toHaveLength(2);
+    expect(outcome.run.status).toBe("cancelled");
+    expect(outcome.run.error).toBe("Interrupted by SIGINT");
+    expect(outcome.log.some(entry => entry.event === "codex_continuation_failed")).toBe(false);
+    expect(outcome.log.filter(entry => entry.event === "task_cancelled")).toHaveLength(1);
+  });
+
+  it.each(["retry", "unfinished-work"])("preserves the timeout of a %s continuation", async (kind) => {
+    const config = await loadConfig(henchDir);
+    await saveConfig(henchDir, { ...config, guard: { ...config.guard, sessionTimeout: 150 } });
+    execFileSync("git", ["add", ".hench/config.json"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "fixture session bound"], { cwd: projectDir, stdio: "ignore" });
+    cli.script(kind === "retry" ? () => failed("work") : leavesWork,
+      () => ({ lines: [{ type: "thread.started", thread_id: "work" }], hang: true }));
+    const outcome = await run("task-1");
+    expect(cli.invocations).toHaveLength(2);
+    expect(outcome.run.status).toBe("timeout");
+    expect(outcome.run.error).toContain("guard.sessionTimeout");
+    expect(outcome.log.some(entry => entry.event === "codex_continuation_failed")).toBe(false);
+    expect(outcome.log.filter(entry => entry.event === "task_timeout")).toHaveLength(1);
   });
 
   it.each(["unsupported", "identity", "branch", "missing-id"])("does not continue unfinished work with %s", async (change) => {

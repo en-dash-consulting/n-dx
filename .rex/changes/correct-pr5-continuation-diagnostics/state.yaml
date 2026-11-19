@@ -1,9 +1,13 @@
 schema: "rex/v2"
 items:
   "959270e5-f67a-47f2-8b47-6a8332638508":
+    status: "completed"
     startedAt: "2026-11-19T18:19:09.674Z"
-    activeIntervals: [{"end":"2026-11-19T19:14:28.462Z","start":"2026-11-19T18:19:09.674Z"}]
-    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED PATH=\"/Users/ryankeith/.nvm/versions/node/v22.22.2/bin:$PATH\" CODEX_HOME=/private/tmp/ndx-wave1-review-fixtures/test-codex-home VITEST_MAX_WORKERS=2 node scripts/run-all-test…\nFailing tests (7):\n- rolls back Git-escaped PRD paths in .ndx/rex: \"back\\\\slash.md\"\n- never spawns a resume for a chain rejected as unversioned\n- never spawns an untrusted repository's .hench/config.json claudePath\n- spawns the user's .n-dx.local.json claudePath in an untrusted repository\n- records the session's tool results on the run, redacted on disk\n- returns failed gate on non-zero exit code\n- escalates past a worker that ignores SIGTERM, within the kill's grace period"
+    completedAt: "2026-11-19T20:33:47.758Z"
+    endedAt: "2026-11-19T20:33:47.758Z"
+    activeIntervals: [{"end":"2026-11-19T19:14:28.462Z","start":"2026-11-19T18:19:09.674Z"},{"end":"2026-11-19T20:33:47.758Z","start":"2026-11-19T20:22:00.221Z"}]
+    appliedAt: "2026-11-19T20:33:47.758Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T16:55:28.386Z"
-    lastModified: "2026-11-19T20:20:05.890Z"
+    lastModified: "2026-11-19T20:33:50.884Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

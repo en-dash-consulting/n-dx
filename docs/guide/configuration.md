@@ -314,13 +314,21 @@ The escalated attempt runs on the vendor's CLI when it has one, else its API, an
 
 ### Review modes
 
-`hench.review.mode` sets how `ndx work` reviews a task's diff before it is committed.
+`hench.review.mode` sets how `n-dx work` reviews a task's diff before it is committed.
 
 | Mode | What it does |
 |------|--------------|
 | `off` (default) | No review. |
-| `self` | The executing vendor reviews its own work in a fresh session, as `--review` does. |
+| `self` | The executing vendor reviews its own work, as `--review` does. The CLI resumes the work session when eligible; otherwise the reviewer starts fresh with task context. |
 | `pair` | The other vendor's CLI reviews the diff in a fresh session and reports findings without editing any file. |
+
+**Self-review sessions.** Claude CLI resumes the captured work-session ID when
+available, including when the review model differs from the work model. Codex
+CLI resumes only when the selected binary supports resume and the explicit model,
+worktree, branch and execution identity still match; a different review model,
+missing ID or unavailable identity starts a fresh reviewer. Vendors without
+resume support also start fresh. Pair mode always gives the reviewer a fresh
+session independent of the executor's transcript.
 
 ```sh
 ndx config hench.review.mode pair .       # off, self or pair
