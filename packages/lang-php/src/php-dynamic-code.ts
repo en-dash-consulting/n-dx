@@ -48,16 +48,29 @@
  * `[php-db-exec]` and `[php-db-dispatch]` for the database-driven ones, with
  * the tables they read.
  *
+ * Memory: the query captures most expressions, so each file's captures are
+ * digested as it is parsed ({@link digestDynamicCode}: its sites, scopes and
+ * compiled flow) and then released. A file with more than
+ * {@link MAX_DYNAMIC_CAPTURES} is skipped, noticed as `[php-dynamic-skipped]`.
+ *
  * @module lang-php/php-dynamic-code
  */
 
 import { join } from "node:path";
 import type { DynamicCodeFact, FactKind, FileFacts, SourcePosition } from "@n-dx/lang-kit";
-import { innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
+import {
+  innermostEach,
+  type Capture,
+  type FrameworkContext,
+  type FrameworkFacts,
+  type FrameworkPack,
+  type PackSourceFile,
+  type RuleProvenance,
+} from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
-import { databaseFeeds, nodeKey, type FlowSite } from "./php-database-flow.js";
+import { compileFlow, databaseFeeds, nodeKey, type CompiledFlow, type FlowSite } from "./php-database-flow.js";
 import { readWrittenImports } from "./php-imports.js";
-import { builtinCallResolver, declaredFunctions } from "./php-namespaces.js";
+import { builtinReached, callCandidates, declaredFunctions } from "./php-namespaces.js";
 import { hostReader, noticeLocations } from "./php-include-notices.js";
 import { isDynamicIncludePath, isInclude, repositoryConstants, type ConstantLookup } from "./php-includes.js";
 
@@ -242,6 +255,12 @@ interface Site extends FlowSite {
   readonly construct: string;
   readonly expression: string;
   readonly literal?: true;
+  /**
+   * A named call's {@link callCandidates}, lower-cased: it is a site only
+   * when none is a function the repository declares, known once every file
+   * is read.
+   */
+  readonly candidates?: readonly string[];
 }
 
 /** The exec or dispatch site a call of global function `name` is, if any. */
@@ -267,17 +286,24 @@ function namedCallSite(name: string, call: Capture, captures: FileCaptures): Sit
   return captures.isStaticCallable(args[index]) ? undefined : { kind: "dispatch", ...at, operands: [args[index]] };
 }
 
-/** Every exec and dispatch site in a file. `builtin` names the built-in a callee reaches (`php-namespaces.ts`). */
-function codeSites(captures: FileCaptures, builtin: (callee: Capture) => string | undefined): Site[] {
+const NOTHING_DECLARED: ReadonlySet<string> = new Set();
+
+/**
+ * Every exec and dispatch site in a file. `candidatesOf` names the functions
+ * a callee may reach (`php-namespaces.ts`); a named call stays a candidate
+ * until the repository's declarations are known.
+ */
+function codeSites(captures: FileCaptures, candidatesOf: (callee: Capture) => string[] | undefined): Site[] {
   const sites: Site[] = [];
   for (const call of captures.get("call")) {
     const callee = captures.callee(call);
     if (callee === undefined) continue;
     if (NAME_TYPES.has(callee.nodeType)) {
-      const name = builtin(callee)?.toLowerCase();
+      const candidates = candidatesOf(callee);
+      const name = builtinReached(candidates, NOTHING_DECLARED)?.toLowerCase();
       if (name === undefined || (!EXEC_FUNCTIONS.has(name) && !CALLERS.has(name) && !CALLBACK_ARGUMENT.has(name))) continue;
       const site = namedCallSite(name, call, captures);
-      if (site !== undefined) sites.push(site);
+      if (site !== undefined) sites.push({ ...site, candidates: candidates!.map((c) => c.toLowerCase()) });
     } else if (!captures.isStaticCallable(callee)) {
       sites.push({ kind: "dispatch", construct: "variable-function", expression: call.text, position: call.start, operands: [callee] });
     }
@@ -313,8 +339,8 @@ function codeSites(captures: FileCaptures, builtin: (callee: Capture) => string 
   return sites;
 }
 
-/** Names each site's enclosing scope. */
-function scopeNamer(captures: FileCaptures): (at: SourcePosition) => string | undefined {
+/** The enclosing scope of each position, named; undefined at a file's top level. */
+function scopeNames(captures: FileCaptures, positions: readonly SourcePosition[]): (string | undefined)[] {
   const functions = captures.get("function");
   const methods = captures.get("method-decl");
   const closures = captures.get("closure");
@@ -346,15 +372,12 @@ function scopeNamer(captures: FileCaptures): (at: SourcePosition) => string | un
     }
     return names.get(scope)!;
   };
-  return (at) => {
-    const point: Capture = { name: "", nodeType: "", text: "", start: at, end: at };
-    const [scope] = innermostEach(scopes, [point]);
-    return scope === undefined ? undefined : nameOf(scope);
-  };
+  const points = positions.map((at): Capture => ({ name: "", nodeType: "", text: "", start: at, end: at }));
+  return innermostEach(scopes, points).map((scope) => (scope === undefined ? undefined : nameOf(scope)));
 }
 
 /** Each include in `file` whose path is not computable; counted only, so the database flow reads no operand of theirs. */
-function includeSites(file: PackSourceFile, constant: ConstantLookup): Site[] {
+function includeSites(file: PackSourceFile, constant: ConstantLookup, scopes: ReadonlyMap<string, string>): DigestSite[] {
   const dynamic = readWrittenImports(file).filter((w) => isInclude(w) && isDynamicIncludePath(w.specifier, file.path, constant));
   if (dynamic.length === 0) return [];
   const readsHost = hostReader(file);
@@ -363,34 +386,90 @@ function includeSites(file: PackSourceFile, constant: ConstantLookup): Site[] {
     construct: readsHost(w.specifier, w.position) ? "host-include" : "dynamic-include",
     expression: w.specifier,
     position: w.position,
-    operands: [],
+    scope: scopes.get(key(w.position)),
   }));
 }
 
 const before = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
 
-/** Every dynamic-code site of each file, in document order, database-driven ones marked; files without one are left out. */
-export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, DynamicCodeFact[]> {
+/**
+ * Dynamic-code captures a file may have before its dynamic code is skipped:
+ * about twice what 1 MB of dense code yields (the runner's size limit), so a
+ * file this large is generated data (a lookup table thousands of elements
+ * long) rather than code, and reading it would cost more than the whole rest
+ * of the repository.
+ */
+export const MAX_DYNAMIC_CAPTURES = 500_000;
+
+/** The notice code of files whose dynamic code was not read: over {@link MAX_DYNAMIC_CAPTURES}. */
+export const PHP_DYNAMIC_SKIPPED = "php-dynamic-skipped";
+
+/** A site of a digest: its scope named, its operands compiled into the flow. */
+type DigestSite = Omit<Site, "operands"> & { readonly scope?: string };
+
+/**
+ * What {@link readDynamicCode} needs from one file's `dynamic` captures, read
+ * as the file is parsed (`FrameworkPack.digest`), so those captures need not
+ * outlive it: the sites, the scope of each include, and the compiled flow.
+ * `skipped` counts the captures of a file over {@link MAX_DYNAMIC_CAPTURES}.
+ */
+export type DynamicCodeDigest =
+  | { readonly skipped: number }
+  | { readonly sites: readonly DigestSite[]; readonly includeScopes: ReadonlyMap<string, string>; readonly flow: CompiledFlow };
+
+/** One file's {@link DynamicCodeDigest}, from its captures alone. */
+export function digestDynamicCode(file: PackSourceFile): DynamicCodeDigest {
+  const count = file.captures[QUERY]?.length ?? 0;
+  if (count > MAX_DYNAMIC_CAPTURES) return { skipped: count };
+  const captures = new FileCaptures(file);
+  const sites = codeSites(captures, callCandidates(file));
+  const includes = readWrittenImports(file).filter(isInclude).map((w) => w.position);
+  const names = scopeNames(captures, [...sites.map((s) => s.position), ...includes]);
+  const includeScopes = new Map<string, string>();
+  includes.forEach((at, i) => {
+    const name = names[sites.length + i];
+    if (name !== undefined) includeScopes.set(key(at), name);
+  });
+  return {
+    sites: sites.map(({ operands: _, ...site }, i) => ({ ...site, scope: names[i] })),
+    includeScopes,
+    flow: compileFlow(file.path, captures, sites),
+  };
+}
+
+/**
+ * Every dynamic-code site of each file, in document order, database-driven
+ * ones marked; files without one are left out. `digests` are each file's
+ * {@link digestDynamicCode}, taken from `files` when absent. `skipped` names
+ * each file over {@link MAX_DYNAMIC_CAPTURES}.
+ */
+export function readDynamicCode(
+  files: readonly PackSourceFile[],
+  digests: ReadonlyMap<string, DynamicCodeDigest> = new Map(files.map((f) => [f.path, digestDynamicCode(f)])),
+): { readonly facts: Map<string, DynamicCodeFact[]>; readonly skipped: readonly { readonly path: string; readonly captures: number }[] } {
   const declared = declaredFunctions(files);
   const constant = repositoryConstants(files);
-  const read = files.map((file) => {
-    const captures = new FileCaptures(file);
-    return { file, captures, sites: codeSites(captures, builtinCallResolver(file, declared)) };
-  });
-  const feeds = databaseFeeds(read, constant);
+  const skipped: { path: string; captures: number }[] = [];
+  const read: { file: PackSourceFile; digest: Extract<DynamicCodeDigest, { flow: CompiledFlow }> }[] = [];
+  for (const file of files) {
+    const digest = digests.get(file.path);
+    if (digest === undefined) continue;
+    if ("skipped" in digest) skipped.push({ path: file.path, captures: digest.skipped });
+    else read.push({ file, digest });
+  }
+  const feeds = databaseFeeds(read.map(({ file, digest }) => ({ file, flow: digest.flow })), constant);
   const out = new Map<string, DynamicCodeFact[]>();
-  for (const { file, captures, sites: code } of read) {
-    const sites = [...code, ...includeSites(file, constant)];
+  for (const { file, digest } of read) {
+    const fed = feeds.get(file.path);
+    const code = digest.sites.flatMap((site, i) => (site.candidates?.some((c) => declared.has(c)) ? [] : [{ site, database: fed?.get(i) }]));
+    const sites = [...code, ...includeSites(file, constant, digest.includeScopes).map((site) => ({ site, database: undefined }))];
     if (sites.length === 0) continue;
-    const scopeAt = scopeNamer(captures);
     out.set(
       file.path,
       sites
-        .sort((a, b) => before(a.position, b.position))
-        .map((site): DynamicCodeFact => {
-          const { kind, construct, expression, position, literal } = site;
-          const scope = scopeAt(position);
-          const database = feeds.get(site);
+        .sort((a, b) => before(a.site.position, b.site.position))
+        .map(({ site, database }): DynamicCodeFact => {
+          const { kind, construct, expression, position, literal, scope } = site;
           return {
             kind,
             construct,
@@ -403,7 +482,21 @@ export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, D
         }),
     );
   }
-  return out;
+  return { facts: out, skipped };
+}
+
+/** How many files the skipped-files notice names before it counts the rest. */
+const NOTICE_SKIPPED_FILES = 5;
+
+/** The `[php-dynamic-skipped]` notice; empty when no file was skipped. */
+export function dynamicCodeSkippedNotices(skipped: readonly { readonly path: string; readonly captures: number }[]): string[] {
+  if (skipped.length === 0) return [];
+  const named = skipped.slice(0, NOTICE_SKIPPED_FILES).map((s) => `${s.path} (${s.captures})`).join(", ");
+  const more = skipped.length > NOTICE_SKIPPED_FILES ? `, and ${skipped.length - NOTICE_SKIPPED_FILES} more` : "";
+  const one = skipped.length === 1;
+  return [
+    `PHP: [${PHP_DYNAMIC_SKIPPED}] ${skipped.length} file${one ? " has" : "s have"} more than ${MAX_DYNAMIC_CAPTURES} syntax nodes to read for dynamic code, so ${one ? "its" : "their"} dynamic code was not read: ${named}${more}.`,
+  ];
 }
 
 /** The `[php-dynamic-exec]` and `[php-dynamic-dispatch]` notices; empty when there are none. */
@@ -480,7 +573,7 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   "codeigniter-results": { verifiedAgainst: ["CodeIgniter 3 user guide"], verifiedOn: "2026-11-16", source: "https://codeigniter.com/userguide3/database/results.html" },
 };
 
-export const phpDynamicCode: FrameworkPack = {
+export const phpDynamicCode: FrameworkPack<DynamicCodeDigest> = {
   id: "php-dynamic",
   produces: ["dynamicCode"],
   // A getter, so the path is computed on first use rather than at import.
@@ -488,10 +581,12 @@ export const phpDynamicCode: FrameworkPack = {
     return [{ name: QUERY, path: join(PHP_PACKAGE.queryDir("php-dynamic"), `${QUERY}.scm`) }];
   },
   provenance: PROVENANCE,
-  read(files: readonly PackSourceFile[], kinds: readonly FactKind[]): FrameworkFacts {
+  // Each file's captures are read as it is parsed and then released: every file's at once ran out of memory.
+  digest: digestDynamicCode,
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], _context?: FrameworkContext, digests?: ReadonlyMap<string, DynamicCodeDigest>): FrameworkFacts {
     if (!kinds.includes("dynamicCode")) return { facts: new Map(), notices: [] };
-    const found = readDynamicCode(files);
+    const { facts: found, skipped } = readDynamicCode(files, digests);
     const facts = new Map<string, Omit<FileFacts, "path">>([...found].map(([path, dynamicCode]) => [path, { dynamicCode }]));
-    return { facts, notices: dynamicCodeNotices(found) };
+    return { facts, notices: [...dynamicCodeSkippedNotices(skipped), ...dynamicCodeNotices(found)] };
   },
 };

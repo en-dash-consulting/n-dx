@@ -103,21 +103,33 @@ const importsFunctions = (file: PackSourceFile): boolean =>
  * ({@link declaredFunctions}) or to a namespaced one.
  */
 export function builtinCallResolver(file: PackSourceFile, declared: ReadonlySet<string>): (callee: Capture) => string | undefined {
+  const candidatesOf = callCandidates(file);
+  return (callee) => builtinReached(candidatesOf(callee), declared);
+}
+
+/**
+ * For each function call's callee in `file`, the functions it may name, in
+ * the order PHP tries them (a namespaced name, then the global fallback);
+ * undefined for a qualified name, which never reaches a built-in. Reads one
+ * file only, so it can run before every file's declarations are known.
+ */
+export function callCandidates(file: PackSourceFile): (callee: Capture) => string[] | undefined {
   const regions = regionsOf(file);
   const aliases = importsFunctions(file) ? useAliases(regions, readWrittenImports(file), "use function") : new Map<Region | undefined, Map<string, string>>();
   return (callee) => {
     const name = tidy(callee.text);
     const region = regionAt(regions, callee.start);
-    let candidates: string[];
-    if (name.startsWith("\\")) candidates = [name.slice(1)];
-    else if (/^namespace\\/i.test(name)) candidates = [inNamespace(region, name.slice("namespace\\".length))];
-    else if (name.includes("\\")) return undefined;
-    else {
-      const imported = aliases.get(region)?.get(name.toLowerCase());
-      candidates = imported !== undefined ? [imported] : region === undefined ? [name] : [inNamespace(region, name), name];
-    }
-    if (candidates.some((c) => declared.has(c.toLowerCase()))) return undefined;
-    const reached = candidates[candidates.length - 1]!;
-    return reached.includes("\\") ? undefined : reached;
+    if (name.startsWith("\\")) return [name.slice(1)];
+    if (/^namespace\\/i.test(name)) return [inNamespace(region, name.slice("namespace\\".length))];
+    if (name.includes("\\")) return undefined;
+    const imported = aliases.get(region)?.get(name.toLowerCase());
+    return imported !== undefined ? [imported] : region === undefined ? [name] : [inNamespace(region, name), name];
   };
+}
+
+/** The built-in {@link callCandidates} reach: the global function, unless one of them is in `declared` ({@link declaredFunctions}). */
+export function builtinReached(candidates: readonly string[] | undefined, declared: ReadonlySet<string>): string | undefined {
+  if (candidates === undefined || candidates.some((c) => declared.has(c.toLowerCase()))) return undefined;
+  const reached = candidates[candidates.length - 1]!;
+  return reached.includes("\\") ? undefined : reached;
 }

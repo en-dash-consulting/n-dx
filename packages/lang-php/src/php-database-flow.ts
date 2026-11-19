@@ -48,6 +48,12 @@
  * SELECT columns (`selectColumns`) and the query or fetch calls it comes
  * from become its `DynamicCodeFact.database`.
  *
+ * **Memory.** Each file's flow is compiled ({@link compileFlow}) while its
+ * captures are held, into what the pass reads: the events of the scopes that
+ * hold a site or return a value, each expression reduced to the reads above.
+ * The captures can then be released, so a repository's flow costs its
+ * compiled events rather than every file's captures at once.
+ *
  * @module lang-php/php-database-flow
  */
 
@@ -86,6 +92,7 @@ const CLIENT_FUNCTIONS: ReadonlySet<string> = new Set(["mysqli_connect", "mysqli
 const WPDB = "wpdb";
 
 const SQL_FUNCTIONS: ReadonlySet<string> = new Set(PHP_SQL_FUNCTIONS);
+const NAME_TYPES = new Set(["name", "qualified_name", "relative_name"]);
 
 /** One query or fetch call a value comes from. */
 interface Source {
@@ -115,74 +122,130 @@ export interface FlowSite {
   readonly operands: readonly (Capture | undefined)[];
 }
 
+// ── Compiled form ───────────────────────────────────────────────────────────
+
+/**
+ * What an expression reads, as {@link RepositoryFlow.evaluate} reads it;
+ * `undefined` reads nothing. Calls carry what their reading needs (`call`,
+ * the node's key for the query it makes), resolved where they are written.
+ */
+type Expr =
+  | { readonly t: "variable"; readonly name: string }
+  | { readonly t: "path"; readonly root: string; readonly path: string }
+  /** Every operand's sources: `.` and interpolation. */
+  | { readonly t: "all"; readonly parts: readonly Expr[] }
+  | { readonly t: "fetch"; readonly at: SourcePosition; readonly result?: Expr }
+  | { readonly t: "query"; readonly at: SourcePosition; readonly call: string }
+  | { readonly t: "function"; readonly keys: readonly string[] }
+  | {
+      readonly t: "method";
+      readonly at: SourcePosition;
+      readonly call: string;
+      readonly method: string;
+      readonly receiver?: Expr;
+      readonly receiverName?: string;
+      /** For `$this->m()`: the qualified class holding the call, if any. */
+      readonly owner?: string;
+    }
+  | { readonly t: "static"; readonly at: SourcePosition; readonly call: string; readonly summary?: string };
+
+/** Where an assignment writes. */
+type Target =
+  | { readonly t: "variable"; readonly name: string; readonly from?: string; readonly client: boolean }
+  | { readonly t: "list"; readonly names: readonly string[] }
+  | { readonly t: "path"; readonly root: string; readonly path: string; readonly whole: boolean };
+
 type Event =
+  | { readonly kind: "assign"; readonly target: Target; readonly value?: Expr; readonly append: boolean }
+  | { readonly kind: "foreach"; readonly variable: string; readonly subject?: Expr }
+  | { readonly kind: "global"; readonly variable: string }
+  | { readonly kind: "return"; readonly value?: Expr }
+  /** `site` indexes the sites the flow was compiled with. */
+  | { readonly kind: "site"; readonly site: number; readonly operands: readonly (Expr | undefined)[] };
+
+/** A function or method declared in a file: its repository key, and its events when it returns a value. */
+interface Declaration {
+  readonly key: string;
+  readonly method?: string;
+  readonly events?: readonly Event[];
+}
+
+/** One file's flow, without its captures: see the module comment's Memory. */
+export interface CompiledFlow {
+  readonly path: string;
+  readonly declarations: readonly Declaration[];
+  /** The events of each scope that holds a site. */
+  readonly siteScopes: readonly (readonly Event[])[];
+}
+
+/** An event before compilation, at the position it takes effect. */
+type RawEvent =
   | { readonly kind: "assign"; readonly at: SourcePosition; readonly start: SourcePosition; readonly left: Capture; readonly right: Capture; readonly append: boolean }
   | { readonly kind: "foreach"; readonly at: SourcePosition; readonly variable: string; readonly subject: Capture }
   | { readonly kind: "global"; readonly at: SourcePosition; readonly variable: string }
   | { readonly kind: "return"; readonly at: SourcePosition; readonly value: Capture }
-  | { readonly kind: "site"; readonly at: SourcePosition; readonly site: FlowSite };
-
-/** A scope's variables while its events are read. */
-interface State {
-  /** Each variable's own value, as last assigned whole. */
-  readonly vars: Map<string, Sources>;
-  /** Each variable's elements and properties written since (`['k']`, `->p`, {@link ANY_ELEMENT}); a cleared one is kept, empty. */
-  readonly paths: Map<string, Map<string, Sources>>;
-  readonly clients: Set<string>;
-}
+  | { readonly kind: "site"; readonly at: SourcePosition; readonly site: number };
 
 /** The path of elements written or read by a key that is not a literal (`$a[$k]`, `$a[]`, `$o->$p`). */
 const ANY_ELEMENT = "*";
 
 const variable = (c: Capture): string | undefined => (c.nodeType === "variable_name" ? c.text.slice(1) : undefined);
 
-/** One file's flow: its events by scope, and what its expressions read. */
-class FileFlow {
-  /** Each scope's events in the order they take effect; `undefined` is the file's top level. */
-  readonly events = new Map<Capture | undefined, Event[]>();
-  /** Functions and methods declared here: the repository key and the scope. */
-  readonly declarations: { readonly key: string; readonly method?: string; readonly scope: Capture }[] = [];
-  private readonly statements = new Map<string, { tables: string[]; columns: string[] }>();
+/** Compiles one file's flow from its captures. */
+class FlowCompiler {
   private readonly scopes: Capture[];
   private readonly namespaces: Capture[];
   private readonly namespaceName = new Map<Capture, string>();
   private readonly classOf = new Map<Capture, string | undefined>();
   private readonly types: Capture[];
 
-  constructor(
-    readonly path: string,
-    readonly captures: FileCaptures,
-    file: PackSourceFile,
-    constant: ConstantLookup,
-    sites: readonly FlowSite[],
-  ) {
-    for (const s of readSqlStatements(file, constant)) {
-      const key = nodeKey(s.call);
-      const into = this.statements.get(key) ?? { tables: [], columns: [] };
-      for (const t of s.tables) into.tables.push(t.schema === undefined ? t.name : `${t.schema}.${t.name}`);
-      into.columns.push(...s.columns);
-      this.statements.set(key, into);
-    }
-    this.scopes = [...captures.get("function"), ...captures.get("method-decl"), ...captures.get("closure")];
-    this.namespaces = captures.get("namespace");
-    captures.partsOf("namespace", "namespace-name").forEach((names, key) => {
+  constructor(private readonly c: FileCaptures) {
+    this.scopes = [...c.get("function"), ...c.get("method-decl"), ...c.get("closure")];
+    this.namespaces = c.get("namespace");
+    c.partsOf("namespace", "namespace-name").forEach((names, key) => {
       const ns = this.namespaces.find((n) => nodeKey(n) === key);
       if (ns !== undefined) this.namespaceName.set(ns, names[0]!.text.toLowerCase());
     });
     // An anonymous class's methods belong to no class a call can name.
-    this.types = [...captures.get("type"), ...captures.get("anonymous-class")];
-    const typeNames = captures.partsOf("type", "type-name");
-    for (const type of captures.get("type")) {
+    this.types = [...c.get("type"), ...c.get("anonymous-class")];
+    const typeNames = c.partsOf("type", "type-name");
+    for (const type of c.get("type")) {
       const name = typeNames.get(nodeKey(type))?.[0]?.text;
       const ns = this.namespaceAt(type.start);
       this.classOf.set(type, name === undefined ? undefined : (ns === "" ? name : `${ns}\\${name}`).toLowerCase());
     }
-    this.readDeclarations();
-    this.readEvents(sites);
+  }
+
+  compile(path: string, sites: readonly FlowSite[]): CompiledFlow {
+    const byScope = this.events(sites);
+    const compiled = new Map<Capture | undefined, readonly Event[]>();
+    const eventsOf = (scope: Capture | undefined): readonly Event[] => {
+      let events = compiled.get(scope);
+      if (events === undefined) compiled.set(scope, (events = (byScope.get(scope) ?? []).flatMap((e) => this.event(e, sites))));
+      return events;
+    };
+    const returns = (scope: Capture): boolean => (byScope.get(scope) ?? []).some((e) => e.kind === "return");
+    const declarations: Declaration[] = [];
+    const declare = (key: string, scope: Capture, method?: string) => declarations.push({ key, method, events: returns(scope) ? eventsOf(scope) : undefined });
+    const functionNames = this.c.partsOf("function", "function-name");
+    for (const fn of this.c.get("function")) {
+      const name = functionNames.get(nodeKey(fn))?.[0]?.text;
+      if (name === undefined) continue;
+      const ns = this.namespaceAt(fn.start);
+      declare((ns === "" ? name : `${ns}\\${name}`).toLowerCase(), fn);
+    }
+    const methodNames = this.c.partsOf("method-decl", "method-decl-name");
+    for (const m of this.c.get("method-decl")) {
+      const name = methodNames.get(nodeKey(m))?.[0]?.text.toLowerCase();
+      const owner = this.classAt(m.start);
+      if (name !== undefined && owner !== undefined) declare(`${owner}::${name}`, m, name);
+    }
+    const siteScopes = [...byScope].filter(([, events]) => events.some((e) => e.kind === "site")).map(([scope]) => eventsOf(scope));
+    return { path, declarations, siteScopes };
   }
 
   /** The lower-cased namespace in force at `at`; "" for the global one. */
-  namespaceAt(at: SourcePosition): string {
+  private namespaceAt(at: SourcePosition): string {
     let found = "";
     for (const ns of this.namespaces) {
       if (order(ns.start, at) > 0) break;
@@ -195,40 +258,15 @@ class FileFlow {
   }
 
   /** The lower-cased qualified class whose method holds `at`, if any. */
-  classAt(at: SourcePosition): string | undefined {
+  private classAt(at: SourcePosition): string | undefined {
     const [type] = innermostEach(this.types, [point(at)]);
     return type === undefined ? undefined : this.classOf.get(type);
   }
 
-  /** The query a call makes, as a source; undefined when the call is no query the `sql` query read. */
-  statementAt(call: Capture): Source | undefined {
-    const statement = this.statements.get(nodeKey(call));
-    return statement === undefined ? undefined : this.source(call, statement.tables, statement.columns);
-  }
-
-  source(call: Capture, tables: readonly string[] = [], columns: readonly string[] = []): Source {
-    return { path: this.path, position: call.start, tables, columns };
-  }
-
-  private readDeclarations(): void {
-    const functionNames = this.captures.partsOf("function", "function-name");
-    for (const fn of this.captures.get("function")) {
-      const name = functionNames.get(nodeKey(fn))?.[0]?.text;
-      if (name === undefined) continue;
-      const ns = this.namespaceAt(fn.start);
-      this.declarations.push({ key: (ns === "" ? name : `${ns}\\${name}`).toLowerCase(), scope: fn });
-    }
-    const methodNames = this.captures.partsOf("method-decl", "method-decl-name");
-    for (const m of this.captures.get("method-decl")) {
-      const name = methodNames.get(nodeKey(m))?.[0]?.text.toLowerCase();
-      const owner = this.classAt(m.start);
-      if (name !== undefined && owner !== undefined) this.declarations.push({ key: `${owner}::${name}`, method: name, scope: m });
-    }
-  }
-
-  private readEvents(sites: readonly FlowSite[]): void {
-    const all: Event[] = [];
-    const c = this.captures;
+  /** Each scope's events in the order they take effect; `undefined` is the file's top level. */
+  private events(sites: readonly FlowSite[]): Map<Capture | undefined, RawEvent[]> {
+    const all: RawEvent[] = [];
+    const c = this.c;
     const lefts = c.partsOf("assign", "assign-left");
     const rights = c.partsOf("assign", "assign-right");
     for (const a of c.get("assign")) {
@@ -260,154 +298,73 @@ class FileFlow {
       const value = returned.get(nodeKey(r))?.[0];
       if (value !== undefined) all.push({ kind: "return", at: r.start, value });
     }
-    for (const site of sites) all.push({ kind: "site", at: site.position, site });
+    sites.forEach((site, i) => all.push({ kind: "site", at: site.position, site: i }));
     all.sort((a, b) => order(a.at, b.at));
     // The scope is where an event starts: an assignment takes effect at its end, which for
     // `$f = function () { … }` is the closure's own end, inside the closure.
     const owners = innermostEach(this.scopes, all.map((e) => point(e.kind === "assign" ? e.start : e.at)));
+    const byScope = new Map<Capture | undefined, RawEvent[]>();
     all.forEach((event, i) => {
       const scope = owners[i];
-      const list = this.events.get(scope);
-      if (list === undefined) this.events.set(scope, [event]);
+      const list = byScope.get(scope);
+      if (list === undefined) byScope.set(scope, [event]);
       else list.push(event);
     });
+    return byScope;
   }
-}
 
-/** Repository-wide flow: return summaries and resolution. */
-class RepositoryFlow {
-  private readonly summaries = new Map<string, Sources>();
-  /** Each method name's one declaring `class::method` key; null when several classes declare it. */
-  private readonly methodOwners = new Map<string, string | null>();
-
-  constructor(private readonly files: readonly FileFlow[]) {
-    for (const file of files) {
-      for (const d of file.declarations) {
-        if (d.method === undefined) continue;
-        const known = this.methodOwners.get(d.method);
-        this.methodOwners.set(d.method, known === undefined || known === d.key ? d.key : null);
+  /** One event compiled; none for an assignment that writes nothing the flow follows. */
+  private event(e: RawEvent, sites: readonly FlowSite[]): Event[] {
+    switch (e.kind) {
+      case "foreach":
+        return [{ kind: "foreach", variable: e.variable, subject: this.expr(e.subject, 0) }];
+      case "global":
+        return [{ kind: "global", variable: e.variable }];
+      case "return":
+        return [{ kind: "return", value: this.expr(e.value, 0) }];
+      case "site":
+        return [{ kind: "site", site: e.site, operands: sites[e.site]!.operands.map((o) => (o === undefined ? undefined : this.expr(o, 0))) }];
+      case "assign": {
+        const target = this.target(e.left, e.right);
+        return target === undefined ? [] : [{ kind: "assign", target, append: e.append, value: this.expr(e.right, 0) }];
       }
     }
   }
 
-  /** Computes every declaration's return summary, to a fixed point or {@link MAX_SUMMARY_ROUNDS}. */
-  summarize(): void {
-    for (let round = 0; round < MAX_SUMMARY_ROUNDS; round++) {
-      let changed = false;
-      for (const file of this.files) {
-        for (const d of file.declarations) {
-          if (!(file.events.get(d.scope) ?? []).some((e) => e.kind === "return")) continue;
-          let returned: Sources = NONE;
-          this.run(file, d.scope, (event, state) => {
-            if (event.kind === "return") returned = union(returned, this.evaluate(file, event.value, state));
-          });
-          const known = this.summaries.get(d.key) ?? NONE;
-          const next = union(known, returned);
-          if (next.size !== known.size) {
-            this.summaries.set(d.key, next);
-            changed = true;
-          }
-        }
-      }
-      if (!changed) return;
-    }
-  }
-
-  /** The database data each site of `file` runs on; sites with none are left out. */
-  feeds(file: FileFlow): Map<FlowSite, DynamicCodeDatabase> {
-    const out = new Map<FlowSite, DynamicCodeDatabase>();
-    for (const [scope, events] of file.events) {
-      if (!events.some((e) => e.kind === "site")) continue;
-      this.run(file, scope, (event, state) => {
-        if (event.kind !== "site") return;
-        let sources: Sources = NONE;
-        for (const operand of event.site.operands) if (operand !== undefined) sources = union(sources, this.evaluate(file, operand, state));
-        if (sources.size > 0) out.set(event.site, database(sources));
-      });
-    }
-    return out;
-  }
-
-  /** Reads one scope's events in order, calling `visit` on each with the state before it takes effect. */
-  private run(file: FileFlow, scope: Capture | undefined, visit: (event: Event, state: State) => void): void {
-    const state: State = { vars: new Map(), paths: new Map(), clients: new Set() };
-    for (const event of file.events.get(scope) ?? []) {
-      visit(event, state);
-      if (event.kind === "assign") this.assign(file, event.left, event.right, event.append, state);
-      else if (event.kind === "foreach") replace(state, event.variable, this.evaluate(file, event.subject, state));
-      else if (event.kind === "global") {
-        replace(state, event.variable, NONE);
-        state.clients.delete(event.variable);
-      }
-    }
-  }
-
-  private assign(file: FileFlow, left: Capture, right: Capture, append: boolean, state: State): void {
-    const value = this.evaluate(file, right, state);
+  private target(left: Capture, right: Capture): Target | undefined {
     const name = variable(left);
-    if (name !== undefined) {
-      if (append) set(state, name, union(state.vars.get(name) ?? NONE, value));
-      else {
-        // A copy of a variable keeps what each of its elements and properties holds.
-        const from = variable(right);
-        const paths = from === undefined ? undefined : state.paths.get(from);
-        replace(state, name, from === undefined ? value : (state.vars.get(from) ?? NONE));
-        if (paths !== undefined) state.paths.set(name, new Map(paths));
-        if (isClient(file, right)) state.clients.add(name);
-        else state.clients.delete(name);
-      }
-      return;
-    }
+    if (name !== undefined) return { t: "variable", name, from: variable(right), client: this.isClient(right) };
     if (left.nodeType === "list_literal") {
-      for (const v of file.captures.partsOf("list", "list-variable").get(nodeKey(left)) ?? []) replace(state, variable(v)!, value);
-      return;
+      return { t: "list", names: (this.c.partsOf("list", "list-variable").get(nodeKey(left)) ?? []).map((v) => variable(v)!) };
     }
-    const written = writtenPath(file, left);
-    if (written === undefined || written.root === "this") return;
-    const { root, path, whole } = written;
-    let paths = state.paths.get(root);
-    if (paths === undefined) state.paths.set(root, (paths = new Map()));
-    // Only a literal path written whole is replaced; any other write may leave what was there.
-    if (whole && !append && path !== ANY_ELEMENT) paths.set(path, value);
-    else if (value.size > 0) paths.set(path, union(path === ANY_ELEMENT ? (paths.get(path) ?? NONE) : readPath(state, root, path), value));
+    const written = this.writtenPath(left);
+    return written === undefined || written.root === "this" ? undefined : { t: "path", ...written };
   }
-
-  /** How deep {@link evaluate} is nested now. */
-  private depth = 0;
 
   /**
-   * The sources of what `node` evaluates to. Past {@link MAX_EXPRESSION_DEPTH}
-   * nested reads (a generated `$a . $b . …` chain thousands of operands long)
-   * a value is missed rather than overflowing the stack and losing every
-   * dynamic-code fact in the repository.
+   * What `node` reads. Past {@link MAX_EXPRESSION_DEPTH} nested reads (a
+   * generated `$a . $b . …` chain thousands of operands long) a value is
+   * missed rather than overflowing the stack and losing every dynamic-code
+   * fact in the repository.
    */
-  private evaluate(file: FileFlow, node: Capture, state: State): Sources {
-    if (this.depth >= MAX_EXPRESSION_DEPTH) return NONE;
-    this.depth++;
-    try {
-      return this.evaluateNode(file, node, state);
-    } finally {
-      this.depth--;
-    }
-  }
-
-  private evaluateNode(file: FileFlow, node: Capture, state: State): Sources {
-    const c = file.captures;
+  private expr(node: Capture, depth: number): Expr | undefined {
+    if (depth >= MAX_EXPRESSION_DEPTH) return undefined;
+    const c = this.c;
+    const next = depth + 1;
     const part = (owner: string, name: string): Capture | undefined => c.partsOf(owner, name).get(nodeKey(node))?.[0];
-    const each = (owner: string, name: string): Sources => {
-      let out: Sources = NONE;
-      for (const p of c.partsOf(owner, name).get(nodeKey(node)) ?? []) out = union(out, this.evaluate(file, p, state));
-      return out;
+    const of = (child: Capture | undefined): Expr | undefined => (child === undefined ? undefined : this.expr(child, next));
+    const each = (owner: string, name: string): Expr | undefined => {
+      const parts = (c.partsOf(owner, name).get(nodeKey(node)) ?? []).flatMap((p) => this.expr(p, next) ?? []);
+      return parts.length <= 1 ? parts[0] : { t: "all", parts };
     };
-    const of = (next: Capture | undefined): Sources => (next === undefined ? NONE : this.evaluate(file, next, state));
     switch (node.nodeType) {
       case "variable_name":
-        return readWhole(state, node.text.slice(1));
+        return { t: "variable", name: node.text.slice(1) };
       case "subscript_expression":
       case "member_access_expression":
       case "nullsafe_member_access_expression": {
-        const read = readPathOf(file, node);
-        if (read !== undefined) return read.root === "this" ? NONE : readPath(state, read.root, read.path);
+        const read = this.readPathOf(node);
+        if (read !== undefined) return read.root === "this" ? undefined : { t: "path", ...read };
         return of(node.nodeType === "subscript_expression" ? part("subscript", "subscript-base") : part("member", "member-object"));
       }
       case "parenthesized_expression":
@@ -421,80 +378,315 @@ class RepositoryFlow {
       case "reference_assignment_expression":
         return of(part("assign", "assign-right"));
       case "function_call_expression":
-        return this.functionCall(file, node, state);
+        return this.functionCall(node, next);
       case "member_call_expression":
       case "nullsafe_member_call_expression":
-        return this.methodCall(file, node, state);
+        return this.methodCall(node, next);
       case "scoped_call_expression":
-        return this.staticCall(file, node);
+        return this.staticCall(node);
       default:
-        return NONE;
+        return undefined;
     }
   }
 
-  private functionCall(file: FileFlow, call: Capture, state: State): Sources {
-    const callee = file.captures.callee(call);
-    if (callee === undefined || !NAME_TYPES.has(callee.nodeType)) return NONE;
+  private functionCall(call: Capture, next: number): Expr | undefined {
+    const callee = this.c.callee(call);
+    if (callee === undefined || !NAME_TYPES.has(callee.nodeType)) return undefined;
     const written = callee.text.replace(/^\\/, "");
     const name = written.toLowerCase();
     if (!written.includes("\\")) {
       if (FETCH_FUNCTION.test(name)) {
-        const result = file.captures.argumentValues(call)[0];
-        const from = result === undefined ? NONE : this.evaluate(file, result, state);
-        return from.size > 0 ? from : single(file.source(call));
+        const result = this.c.argumentValues(call)[0];
+        return { t: "fetch", at: call.start, result: result === undefined ? undefined : this.expr(result, next) };
       }
-      if (SQL_FUNCTIONS.has(name)) return single(file.statementAt(call) ?? file.source(call));
+      if (SQL_FUNCTIONS.has(name)) return { t: "query", at: call.start, call: nodeKey(call) };
     }
-    const ns = file.namespaceAt(call.start);
+    const ns = this.namespaceAt(call.start);
     const keys = callee.text.startsWith("\\") || ns === "" ? [name] : [`${ns}\\${name}`, ...(written.includes("\\") ? [] : [name])];
-    for (const key of keys) {
-      const summary = this.summaries.get(key);
-      if (summary !== undefined) return summary;
-    }
-    return NONE;
+    return { t: "function", keys };
   }
 
-  private methodCall(file: FileFlow, call: Capture, state: State): Sources {
-    const c = file.captures;
-    const name = c.partsOf("method-call", "method-name").get(nodeKey(call))?.[0];
-    const object = c.partsOf("method-call", "method-object").get(nodeKey(call))?.[0];
-    if (name === undefined || object === undefined || name.nodeType !== "name") return NONE;
-    const method = name.text.toLowerCase();
-    const receiver = this.evaluate(file, object, state);
-    if (receiver.size > 0 && (method.startsWith("fetch") || CODEIGNITER_RESULT_METHODS.has(method))) return receiver;
-    if (MYSQLI_RESULT_METHODS.has(method)) return single(file.source(call));
-    const statement = file.statementAt(call);
-    if (statement !== undefined) return single(statement);
+  private methodCall(call: Capture, next: number): Expr | undefined {
+    const name = this.c.partsOf("method-call", "method-name").get(nodeKey(call))?.[0];
+    const object = this.c.partsOf("method-call", "method-object").get(nodeKey(call))?.[0];
+    if (name === undefined || object === undefined || name.nodeType !== "name") return undefined;
     const receiverName = variable(object);
-    if (receiverName !== undefined && CLIENT_METHODS.has(method) && (receiverName === WPDB || state.clients.has(receiverName))) return single(file.source(call));
-    if (receiverName === "this") {
-      const owner = file.classAt(call.start);
-      return owner === undefined ? NONE : (this.summaries.get(`${owner}::${method}`) ?? NONE);
-    }
-    const only = this.methodOwners.get(method);
-    return only ? (this.summaries.get(only) ?? NONE) : NONE;
+    return {
+      t: "method",
+      at: call.start,
+      call: nodeKey(call),
+      method: name.text.toLowerCase(),
+      receiver: this.expr(object, next),
+      receiverName,
+      owner: receiverName === "this" ? this.classAt(call.start) : undefined,
+    };
   }
 
-  private staticCall(file: FileFlow, call: Capture): Sources {
-    const c = file.captures;
-    const name = c.partsOf("static-call", "static-name").get(nodeKey(call))?.[0];
-    const scope = c.partsOf("static-call", "static-scope").get(nodeKey(call))?.[0];
-    if (name === undefined || scope === undefined || name.nodeType !== "name") return NONE;
-    const statement = file.statementAt(call);
-    if (statement !== undefined) return single(statement);
+  private staticCall(call: Capture): Expr | undefined {
+    const name = this.c.partsOf("static-call", "static-name").get(nodeKey(call))?.[0];
+    const scope = this.c.partsOf("static-call", "static-scope").get(nodeKey(call))?.[0];
+    if (name === undefined || scope === undefined || name.nodeType !== "name") return undefined;
     const method = name.text.toLowerCase();
     const written = scope.text.toLowerCase();
     let owner: string | undefined;
-    if (scope.nodeType === "relative_scope") owner = written === "parent" ? undefined : file.classAt(call.start);
+    if (scope.nodeType === "relative_scope") owner = written === "parent" ? undefined : this.classAt(call.start);
     else if (NAME_TYPES.has(scope.nodeType)) {
-      const ns = file.namespaceAt(call.start);
+      const ns = this.namespaceAt(call.start);
       owner = written.startsWith("\\") || ns === "" ? written.replace(/^\\/, "") : `${ns}\\${written}`;
     }
-    return owner === undefined ? NONE : (this.summaries.get(`${owner}::${method}`) ?? NONE);
+    return { t: "static", at: call.start, call: nodeKey(call), summary: owner === undefined ? undefined : `${owner}::${method}` };
+  }
+
+  /** `$a['k']`, `$a[0]` and `$o->p` as `['k']`, `[0]` and `->p`; {@link ANY_ELEMENT} for any other key; undefined unless `node`'s base is a variable. */
+  private readPathOf(node: Capture): VariablePath | undefined {
+    const c = this.c;
+    if (node.nodeType === "subscript_expression") {
+      const base = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
+      const root = base === undefined ? undefined : variable(base);
+      if (root === undefined) return undefined;
+      const key = literalKey(c.partsOf("indexed", "subscript-index").get(nodeKey(node))?.[0]);
+      return { root, path: key === undefined ? ANY_ELEMENT : `[${key}]` };
+    }
+    if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") {
+      const object = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
+      const root = object === undefined ? undefined : variable(object);
+      if (root === undefined) return undefined;
+      const name = c.partsOf("named-member", "member-name").get(nodeKey(node))?.[0];
+      return { root, path: name?.nodeType === "name" ? `->${name.text}` : ANY_ELEMENT };
+    }
+    return undefined;
+  }
+
+  /**
+   * The path an element or property assignment writes: the outermost access on
+   * the variable (`['a']` of `$v['a'][$k]`, `->p` of `$o->p->q`), and whether
+   * that path is written whole rather than into.
+   */
+  private writtenPath(left: Capture): (VariablePath & { readonly whole: boolean }) | undefined {
+    const c = this.c;
+    let node: Capture | undefined = left;
+    for (let depth = 0; node !== undefined && depth < 64; depth++) {
+      const path = this.readPathOf(node);
+      if (path !== undefined) return { ...path, whole: node === left };
+      if (node.nodeType === "subscript_expression") node = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
+      else if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") node = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
+      else return undefined;
+    }
+    return undefined;
+  }
+
+  /** Whether `value` makes a database client: `new PDO`, `new mysqli`, `new wpdb`, `mysqli_connect(…)`, `mysqli_init()`. */
+  private isClient(value: Capture): boolean {
+    const c = this.c;
+    if (value.nodeType === "object_creation_expression") {
+      const created = c.partsOf("new-named", "new-name").get(nodeKey(value))?.[0];
+      return created !== undefined && CLIENT_CLASSES.has(created.text.replace(/^\\/, "").toLowerCase());
+    }
+    if (value.nodeType === "function_call_expression") {
+      const callee = c.callee(value);
+      return callee !== undefined && callee.nodeType === "name" && CLIENT_FUNCTIONS.has(callee.text.toLowerCase());
+    }
+    return false;
   }
 }
 
-const NAME_TYPES = new Set(["name", "qualified_name", "relative_name"]);
+/**
+ * One file's flow, compiled from its captures with its exec and dispatch
+ * sites; a site event names its site by index in `sites`. The result holds
+ * no capture, so the file's captures can be released.
+ */
+export function compileFlow(path: string, captures: FileCaptures, sites: readonly FlowSite[]): CompiledFlow {
+  return new FlowCompiler(captures).compile(path, sites);
+}
+
+// ── Reading ─────────────────────────────────────────────────────────────────
+
+/** A scope's variables while its events are read. */
+interface State {
+  /** Each variable's own value, as last assigned whole. */
+  readonly vars: Map<string, Sources>;
+  /** Each variable's elements and properties written since (`['k']`, `->p`, {@link ANY_ELEMENT}); a cleared one is kept, empty. */
+  readonly paths: Map<string, Map<string, Sources>>;
+  readonly clients: Set<string>;
+}
+
+/** A compiled flow and the queries its file makes, read on first use. */
+class FileFlow {
+  private statements: Map<string, { tables: string[]; columns: string[] }> | undefined;
+
+  constructor(
+    readonly flow: CompiledFlow,
+    private readonly file: PackSourceFile,
+    private readonly constant: ConstantLookup,
+  ) {}
+
+  /** The query a call makes, as a source; undefined when the call is no query the `sql` query read. */
+  statementAt(call: string, at: SourcePosition): Source | undefined {
+    const statement = this.readStatements().get(call);
+    return statement === undefined ? undefined : this.source(at, statement.tables, statement.columns);
+  }
+
+  source(at: SourcePosition, tables: readonly string[] = [], columns: readonly string[] = []): Source {
+    return { path: this.flow.path, position: at, tables, columns };
+  }
+
+  private readStatements(): Map<string, { tables: string[]; columns: string[] }> {
+    if (this.statements !== undefined) return this.statements;
+    const statements = new Map<string, { tables: string[]; columns: string[] }>();
+    for (const s of readSqlStatements(this.file, this.constant)) {
+      const key = nodeKey(s.call);
+      const into = statements.get(key) ?? { tables: [], columns: [] };
+      for (const t of s.tables) into.tables.push(t.schema === undefined ? t.name : `${t.schema}.${t.name}`);
+      into.columns.push(...s.columns);
+      statements.set(key, into);
+    }
+    return (this.statements = statements);
+  }
+}
+
+/** Repository-wide flow: return summaries and resolution. */
+class RepositoryFlow {
+  private readonly summaries = new Map<string, Sources>();
+  /** Each method name's one declaring `class::method` key; null when several classes declare it. */
+  private readonly methodOwners = new Map<string, string | null>();
+
+  constructor(private readonly files: readonly FileFlow[]) {
+    for (const file of files) {
+      for (const d of file.flow.declarations) {
+        if (d.method === undefined) continue;
+        const known = this.methodOwners.get(d.method);
+        this.methodOwners.set(d.method, known === undefined || known === d.key ? d.key : null);
+      }
+    }
+  }
+
+  /** Computes every declaration's return summary, to a fixed point or {@link MAX_SUMMARY_ROUNDS}. */
+  summarize(): void {
+    for (let round = 0; round < MAX_SUMMARY_ROUNDS; round++) {
+      let changed = false;
+      for (const file of this.files) {
+        for (const d of file.flow.declarations) {
+          if (d.events === undefined) continue;
+          let returned: Sources = NONE;
+          this.run(file, d.events, (event, state) => {
+            if (event.kind === "return" && event.value !== undefined) returned = union(returned, this.evaluate(file, event.value, state));
+          });
+          const known = this.summaries.get(d.key) ?? NONE;
+          const next = union(known, returned);
+          if (next.size !== known.size) {
+            this.summaries.set(d.key, next);
+            changed = true;
+          }
+        }
+      }
+      if (!changed) return;
+    }
+  }
+
+  /** The database data each site of `file` runs on, by site index; sites with none are left out. */
+  feeds(file: FileFlow): Map<number, DynamicCodeDatabase> {
+    const out = new Map<number, DynamicCodeDatabase>();
+    for (const events of file.flow.siteScopes) {
+      this.run(file, events, (event, state) => {
+        if (event.kind !== "site") return;
+        let sources: Sources = NONE;
+        for (const operand of event.operands) if (operand !== undefined) sources = union(sources, this.evaluate(file, operand, state));
+        if (sources.size > 0) out.set(event.site, database(sources));
+      });
+    }
+    return out;
+  }
+
+  /** Reads one scope's events in order, calling `visit` on each with the state before it takes effect. */
+  private run(file: FileFlow, events: readonly Event[], visit: (event: Event, state: State) => void): void {
+    const state: State = { vars: new Map(), paths: new Map(), clients: new Set() };
+    for (const event of events) {
+      visit(event, state);
+      if (event.kind === "assign") this.assign(file, event, state);
+      else if (event.kind === "foreach") replace(state, event.variable, this.evaluate(file, event.subject, state));
+      else if (event.kind === "global") {
+        replace(state, event.variable, NONE);
+        state.clients.delete(event.variable);
+      }
+    }
+  }
+
+  private assign(file: FileFlow, { target, value: expr, append }: Extract<Event, { kind: "assign" }>, state: State): void {
+    const value = this.evaluate(file, expr, state);
+    if (target.t === "variable") {
+      const name = target.name;
+      if (append) set(state, name, union(state.vars.get(name) ?? NONE, value));
+      else {
+        // A copy of a variable keeps what each of its elements and properties holds.
+        const from = target.from;
+        const paths = from === undefined ? undefined : state.paths.get(from);
+        replace(state, name, from === undefined ? value : (state.vars.get(from) ?? NONE));
+        if (paths !== undefined) state.paths.set(name, new Map(paths));
+        if (target.client) state.clients.add(name);
+        else state.clients.delete(name);
+      }
+      return;
+    }
+    if (target.t === "list") {
+      for (const name of target.names) replace(state, name, value);
+      return;
+    }
+    const { root, path, whole } = target;
+    let paths = state.paths.get(root);
+    if (paths === undefined) state.paths.set(root, (paths = new Map()));
+    // Only a literal path written whole is replaced; any other write may leave what was there.
+    if (whole && !append && path !== ANY_ELEMENT) paths.set(path, value);
+    else if (value.size > 0) paths.set(path, union(path === ANY_ELEMENT ? (paths.get(path) ?? NONE) : readPath(state, root, path), value));
+  }
+
+  /** The sources of what `expr` evaluates to. */
+  private evaluate(file: FileFlow, expr: Expr | undefined, state: State): Sources {
+    if (expr === undefined) return NONE;
+    switch (expr.t) {
+      case "variable":
+        return readWhole(state, expr.name);
+      case "path":
+        return readPath(state, expr.root, expr.path);
+      case "all": {
+        let out: Sources = NONE;
+        for (const p of expr.parts) out = union(out, this.evaluate(file, p, state));
+        return out;
+      }
+      case "fetch": {
+        const from = this.evaluate(file, expr.result, state);
+        return from.size > 0 ? from : single(file.source(expr.at));
+      }
+      case "query":
+        return single(file.statementAt(expr.call, expr.at) ?? file.source(expr.at));
+      case "function":
+        for (const key of expr.keys) {
+          const summary = this.summaries.get(key);
+          if (summary !== undefined) return summary;
+        }
+        return NONE;
+      case "method":
+        return this.methodCall(file, expr, state);
+      case "static": {
+        const statement = file.statementAt(expr.call, expr.at);
+        if (statement !== undefined) return single(statement);
+        return expr.summary === undefined ? NONE : (this.summaries.get(expr.summary) ?? NONE);
+      }
+    }
+  }
+
+  private methodCall(file: FileFlow, call: Extract<Expr, { t: "method" }>, state: State): Sources {
+    const { method, receiverName } = call;
+    const receiver = this.evaluate(file, call.receiver, state);
+    if (receiver.size > 0 && (method.startsWith("fetch") || CODEIGNITER_RESULT_METHODS.has(method))) return receiver;
+    if (MYSQLI_RESULT_METHODS.has(method)) return single(file.source(call.at));
+    const statement = file.statementAt(call.call, call.at);
+    if (statement !== undefined) return single(statement);
+    if (receiverName !== undefined && CLIENT_METHODS.has(method) && (receiverName === WPDB || state.clients.has(receiverName))) return single(file.source(call.at));
+    if (receiverName === "this") return call.owner === undefined ? NONE : (this.summaries.get(`${call.owner}::${method}`) ?? NONE);
+    const only = this.methodOwners.get(method);
+    return only ? (this.summaries.get(only) ?? NONE) : NONE;
+  }
+}
 
 /** Sets a variable's own value, keeping what its elements and properties hold (`.=`). */
 function set(state: State, name: string, value: Sources): void {
@@ -534,64 +726,12 @@ interface VariablePath {
   readonly path: string;
 }
 
-/** `$a['k']`, `$a[0]` and `$o->p` as `['k']`, `[0]` and `->p`; {@link ANY_ELEMENT} for any other key; undefined unless `node`'s base is a variable. */
-function readPathOf(file: FileFlow, node: Capture): VariablePath | undefined {
-  const c = file.captures;
-  if (node.nodeType === "subscript_expression") {
-    const base = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
-    const root = base === undefined ? undefined : variable(base);
-    if (root === undefined) return undefined;
-    const key = literalKey(c.partsOf("indexed", "subscript-index").get(nodeKey(node))?.[0]);
-    return { root, path: key === undefined ? ANY_ELEMENT : `[${key}]` };
-  }
-  if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") {
-    const object = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
-    const root = object === undefined ? undefined : variable(object);
-    if (root === undefined) return undefined;
-    const name = c.partsOf("named-member", "member-name").get(nodeKey(node))?.[0];
-    return { root, path: name?.nodeType === "name" ? `->${name.text}` : ANY_ELEMENT };
-  }
-  return undefined;
-}
-
 /** An array key written as a literal, as PHP compares it (`'1'` and `1` alike); undefined when it is not one. */
 function literalKey(index: Capture | undefined): string | undefined {
   if (index === undefined) return undefined;
   if (index.nodeType === "integer") return index.text;
   const quoted = index.nodeType === "string" || (index.nodeType === "encapsed_string" && !index.text.includes("$"));
   return quoted && !index.text.includes("\\") ? index.text.slice(1, -1) : undefined;
-}
-
-/**
- * The path an element or property assignment writes: the outermost access on
- * the variable (`['a']` of `$v['a'][$k]`, `->p` of `$o->p->q`), and whether
- * that path is written whole rather than into.
- */
-function writtenPath(file: FileFlow, left: Capture): (VariablePath & { readonly whole: boolean }) | undefined {
-  const c = file.captures;
-  let node: Capture | undefined = left;
-  for (let depth = 0; node !== undefined && depth < 64; depth++) {
-    const path = readPathOf(file, node);
-    if (path !== undefined) return { ...path, whole: node === left };
-    if (node.nodeType === "subscript_expression") node = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
-    else if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") node = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
-    else return undefined;
-  }
-  return undefined;
-}
-
-/** Whether `value` makes a database client: `new PDO`, `new mysqli`, `new wpdb`, `mysqli_connect(…)`, `mysqli_init()`. */
-function isClient(file: FileFlow, value: Capture): boolean {
-  const c = file.captures;
-  if (value.nodeType === "object_creation_expression") {
-    const created = c.partsOf("new-named", "new-name").get(nodeKey(value))?.[0];
-    return created !== undefined && CLIENT_CLASSES.has(created.text.replace(/^\\/, "").toLowerCase());
-  }
-  if (value.nodeType === "function_call_expression") {
-    const callee = c.callee(value);
-    return callee !== undefined && callee.nodeType === "name" && CLIENT_FUNCTIONS.has(callee.text.toLowerCase());
-  }
-  return false;
 }
 
 const sorted = (values: Iterable<string>): string[] => [...new Set(values)].sort((a, b) => a.localeCompare(b));
@@ -605,19 +745,16 @@ function database(sources: Sources): DynamicCodeDatabase {
   };
 }
 
-/** One file to read: its captures and its exec and dispatch sites. */
+/** One file to read: its compiled flow, and the file for the queries it makes (`sql` captures). */
 export interface FlowFile {
   readonly file: PackSourceFile;
-  readonly captures: FileCaptures;
-  readonly sites: readonly FlowSite[];
+  readonly flow: CompiledFlow;
 }
 
-/** The database data each site runs on, across the repository; sites fed by none are left out. */
-export function databaseFeeds(files: readonly FlowFile[], constant: ConstantLookup): Map<FlowSite, DynamicCodeDatabase> {
-  const flows = files.map(({ file, captures, sites }) => new FileFlow(file.path, captures, file, constant, sites));
+/** The database data each site runs on, by file path and site index, across the repository; sites fed by none are left out. */
+export function databaseFeeds(files: readonly FlowFile[], constant: ConstantLookup): Map<string, Map<number, DynamicCodeDatabase>> {
+  const flows = files.map(({ file, flow }) => new FileFlow(flow, file, constant));
   const repository = new RepositoryFlow(flows);
   repository.summarize();
-  const out = new Map<FlowSite, DynamicCodeDatabase>();
-  for (const flow of flows) for (const [site, db] of repository.feeds(flow)) out.set(site, db);
-  return out;
+  return new Map(flows.map((flow) => [flow.flow.path, repository.feeds(flow)]));
 }

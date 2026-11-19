@@ -6,7 +6,9 @@
  * resolver to the project's build files, parses every requested file and
  * reads the captures into lang-kit facts: per file, then the pack's project
  * facts reader (if any) and each wanted framework over every parsed file at
- * once, with the pack's resolver as its context; frameworks' skips and the
+ * once, with the pack's resolver as its context (a framework with a `digest`
+ * reads its own captures as each file is parsed, and they are dropped from
+ * the file then, so they are never all held at once); frameworks' skips and the
  * pack's `projectNotices` come back as `notices`, and the resolver's own
  * notices only when imports are wanted. Each step that can fail for the
  * whole language — a grammar not built or not loadable, a query the grammar
@@ -157,6 +159,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     const fallbackNotices: string[] = [];
     const issues = { syntaxErrors: [] as string[], oversized: [] as string[], unreadable: [] as string[], notUtf8: [] as string[] };
     const legacySyntax: PackLegacySyntaxFile[] = [];
+    const digests = frameworkDigests(frameworks, kinds);
     for (const path of request.files) {
       let bytes: Buffer;
       try {
@@ -205,8 +208,10 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       // A file whose imports came from its declaration prefix is still oversized: its structure was not parsed.
       if (result.status === "skipped" || importsOnly.has(path)) issues.oversized.push(path);
       else if (result.hasErrorNodes || result.hasMissingNodes) issues.syntaxErrors.push(path);
-      if (result.status === "parsed") parsed.push(rewrites === undefined ? { path, captures: result.captures } : { path, captures: result.captures, rewrites });
-      else unparsed.push(path);
+      if (result.status === "parsed") {
+        const file: PackSourceFile = rewrites === undefined ? { path, captures: result.captures } : { path, captures: result.captures, rewrites };
+        parsed.push(importsOnly.has(path) ? file : digests.take(file));
+      } else unparsed.push(path);
     }
     const parse: PackParseReport | undefined =
       Object.values(issues).every((paths) => paths.length === 0) && legacySyntax.length === 0
@@ -229,7 +234,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     };
     const structural = parsed.filter((file) => !importsOnly.has(file.path));
     const project = options.projectFacts && readProjectFacts(options.projectFacts, pack, structural, kinds);
-    const framed = frameworks.map((f) => readFramework(f, structural, kinds, context));
+    const framed = frameworks.map((f) => digests.failure(f) ?? readFramework(f, structural, kinds, context, digests.of(f)));
     const refined = containRefine(pack, symbolRules);
     const facts: FileFacts[] = parsed.map((file) =>
       framed.reduce(
@@ -262,6 +267,12 @@ function countConstructs(rewrites: readonly SourceRewrite[]): Record<string, num
   return counts;
 }
 
+/** A framework that failed: no facts, and a notice naming it and what it would have produced. */
+function frameworkFailed(framework: FrameworkPack, kinds: readonly FactKind[], reason: string): FrameworkFacts {
+  const lost = framework.produces.filter((kind) => kinds.includes(kind));
+  return { facts: new Map(), notices: [`framework ${framework.id} failed (${reason}); its ${lost.join(" and ")} were not recorded.`] };
+}
+
 /**
  * One framework's facts. A framework that throws loses only its own facts, as
  * a notice naming it: the language's imports, symbols and other frameworks'
@@ -273,16 +284,44 @@ function readFramework(
   files: readonly PackSourceFile[],
   kinds: readonly FactKind[],
   context: FrameworkContext | undefined,
+  digests: ReadonlyMap<string, unknown> | undefined,
 ): FrameworkFacts {
   try {
-    return framework.read(files, kinds, context);
+    return digests === undefined ? framework.read(files, kinds, context) : framework.read(files, kinds, context, digests);
   } catch (error) {
-    const lost = framework.produces.filter((kind) => kinds.includes(kind));
-    return {
-      facts: new Map(),
-      notices: [`framework ${framework.id} failed (${errorText(error)}); its ${lost.join(" and ")} were not recorded.`],
-    };
+    return frameworkFailed(framework, kinds, errorText(error));
   }
+}
+
+/**
+ * Each digesting framework's digests (`FrameworkPack.digest`). `take` digests
+ * one parsed file and returns it without those frameworks' captures, so a
+ * file's framework captures are released as soon as the next file is parsed.
+ * A digest that throws fails its framework, which digests no further file.
+ */
+function frameworkDigests(frameworks: readonly FrameworkPack[], kinds: readonly FactKind[]) {
+  const digesting = frameworks.filter((f) => f.digest !== undefined);
+  const dropped = new Set(digesting.flatMap((f) => f.queries.map((q) => q.name)));
+  const byFramework = new Map(digesting.map((f) => [f, new Map<string, unknown>()]));
+  const failed = new Map<FrameworkPack, FrameworkFacts>();
+  return {
+    take(file: PackSourceFile): PackSourceFile {
+      if (digesting.length === 0) return file;
+      for (const framework of digesting) {
+        if (failed.has(framework)) continue;
+        try {
+          byFramework.get(framework)!.set(file.path, framework.digest!(file, kinds));
+        } catch (error) {
+          failed.set(framework, frameworkFailed(framework, kinds, `${file.path}: ${errorText(error)}`));
+          byFramework.get(framework)!.clear();
+        }
+      }
+      const captures = Object.fromEntries(Object.entries(file.captures).filter(([name]) => !dropped.has(name)));
+      return { ...file, captures };
+    },
+    of: (framework: FrameworkPack): ReadonlyMap<string, unknown> | undefined => byFramework.get(framework),
+    failure: (framework: FrameworkPack): FrameworkFacts | undefined => failed.get(framework),
+  };
 }
 
 /**
