@@ -15,6 +15,8 @@
     "typecheck": "node scripts/check-dependency-drift.mjs && pnpm -r run typecheck",
     "deps:check": "node scripts/check-dependency-drift.mjs",
     "test": "node scripts/run-all-tests.mjs",
+    "test:coverage": "node scripts/run-all-tests.mjs packages --coverage",
+    "coverage:lines": "node scripts/coverage-lines.mjs",
     "validate": "pnpm -r run validate",
     "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/cli.js ci .",
     "security:obfuscation": "node scripts/check-obfuscated-code.mjs",

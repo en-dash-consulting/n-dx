@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { JSDOM } from "jsdom";
+import { ISO_MAP_URL } from "../../helpers/iso-map-url.js";
 import { buildIsoModel, wrapTallColumns } from "../../../src/export/iso-model.js";
 import type { IsoFileInput, IsoModelInput, IsoNode } from "../../../src/export/iso-model.js";
 import { renderIsoMap } from "../../../src/export/iso-map.js";
@@ -60,11 +61,11 @@ describe("buildIsoModel with areas", () => {
 describe("rendered map with areas", () => {
   it("opens an area's scene from the URL hash and shows a breadcrumb back", () => {
     const html = renderIsoMap(buildIsoModel(input()));
-    const top = new JSDOM(html, { runScripts: "dangerously", url: "file:///map.html" });
+    const top = new JSDOM(html, { runScripts: "dangerously", url: ISO_MAP_URL });
     expect(top.window.document.getElementById("crumbs")!.hidden).toBe(true);
     expect(top.window.document.querySelectorAll("polygon.tile").length).toBe(4);
 
-    const scene = new JSDOM(html, { runScripts: "dangerously", url: "file:///map.html#alpha" });
+    const scene = new JSDOM(html, { runScripts: "dangerously", url: `${ISO_MAP_URL}#alpha` });
     const crumbs = scene.window.document.getElementById("crumbs")!;
     expect(crumbs.hidden).toBe(false);
     expect(crumbs.textContent).toContain("All areas");
@@ -75,7 +76,7 @@ describe("rendered map with areas", () => {
   });
 
   it("offers an Open button for an area in the details panel", () => {
-    const dom = new JSDOM(renderIsoMap(buildIsoModel(input())), { runScripts: "dangerously", url: "file:///map.html" });
+    const dom = new JSDOM(renderIsoMap(buildIsoModel(input())), { runScripts: "dangerously", url: ISO_MAP_URL });
     const block = dom.window.document.querySelector('#iso g.node[role="button"]')!;
     block.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
     const open = dom.window.document.querySelector("[data-open]");
