@@ -108,7 +108,8 @@ interface Options {
   parseUsage: (raw: unknown) => Accounting;
 }
 
-function responseError(status: number, retryAfterMs?: number): ClaudeClientError {
+/** Shared HTTP classification for text completions and agent turns. */
+export function responseError(status: number, retryAfterMs?: number): ClaudeClientError {
   // Never echo an upstream body, URL, fetch error or header: any may contain credentials.
   if (status === 401 || status === 403) return new AuthFailureError("OpenAI authentication failed", "codex", status, "Credentials rejected");
   if (status === 404) return new ClaudeClientError("OpenAI model or endpoint unavailable", "not-found", true);

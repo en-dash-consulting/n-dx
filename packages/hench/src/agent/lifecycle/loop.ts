@@ -24,7 +24,7 @@ import {
   resolveLLMVendor,
   withVendorOverride,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, createOpenAiApiProvider, resolveTaskModel, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, createOpenAiApiProvider, supportsOpenAiTurns, resolveTaskModel, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -2136,12 +2136,17 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     anthropicPruneShape(),
     createContextSummarizer({
       provider: openAi ? {
-        info: provider.info,
-        complete: request => provider.completeTurn!({
-          model: request.model ?? model,
-          messages: [{ role: "user", content: request.prompt }], tools: [],
-          effort: request.effort, taskClass: "context.summarize", signal,
-        }),
+        complete: request => {
+          const summaryModel = request.model ?? model;
+          // Preserve Responses-only deployments for previously supported pins.
+          if (supportsOpenAiTurns(summaryModel)) {
+            return provider.completeTurn!({
+              model: summaryModel, messages: [{ role: "user", content: request.prompt }],
+              tools: [], effort: request.effort, taskClass: request.taskClass, signal,
+            });
+          }
+          return provider.complete({ ...request, signal });
+        },
       } : provider,
       llmConfig,
       vendor,
