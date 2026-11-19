@@ -1,0 +1,4 @@
+# Only the office network and this host may open the admin pages.
+<IfModule mod_authz_core.c>
+  Require ip 127.0.0.1 10.0.0.0/8
+</IfModule>

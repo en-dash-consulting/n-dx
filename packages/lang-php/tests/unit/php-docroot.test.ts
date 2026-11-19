@@ -35,6 +35,22 @@ describe("parseHtaccess", () => {
     expect(parseHtaccess("a/.htaccess", "Options -Indexes\n").access).toBeUndefined();
   });
 
+  it("reads Require ip, host and local as a restriction, which a grant or denial in the same file overrides", () => {
+    expect(parseHtaccess("a/.htaccess", "Require ip 127.0.0.1 ::1\nRequire host example.org\n").access).toEqual({
+      denied: false,
+      line: 1,
+      restriction: "Require ip 127.0.0.1 ::1",
+    });
+    expect(parseHtaccess("a/.htaccess", "Require local\n").access).toEqual({ denied: false, line: 1, restriction: "Require local" });
+    expect(parseHtaccess("a/.htaccess", "Require ip 10.0.0.0/8\nRequire all granted\n").access).toEqual({ denied: false, line: 2 });
+    expect(parseHtaccess("a/.htaccess", "Require ip 10.0.0.0/8\nRequire all denied\n").access).toEqual({ denied: true, line: 2 });
+    // `Require not` only narrows inside <RequireAll>; a bare `Require ip` with no address names no client.
+    expect(parseHtaccess("a/.htaccess", "Require not ip 10.0.0.1\nRequire ip\n").access).toBeUndefined();
+    // Not read inside <Files>, nor for methods other than GET and POST.
+    expect(parseHtaccess("a/.htaccess", "<Files admin.php>\nRequire ip 10.0.0.1\n</Files>\n").access).toBeUndefined();
+    expect(parseHtaccess("a/.htaccess", "<LimitExcept GET POST>\nRequire local\n</LimitExcept>\n").access).toBeUndefined();
+  });
+
   it("applies a <Limit>/<LimitExcept> rule only when the block covers GET or POST", () => {
     expect(parseHtaccess(".htaccess", "<LimitExcept GET POST>\n  Deny from all\n</LimitExcept>\n").access).toBeUndefined();
     expect(parseHtaccess(".htaccess", "<Limit PUT DELETE>\n  Require all denied\n</Limit>\n").access).toBeUndefined();

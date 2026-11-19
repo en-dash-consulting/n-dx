@@ -69,6 +69,29 @@ describe("php docroot routes", () => {
     ]);
   });
 
+  it("leaves guarded declaration files out, keeps guarded pages, and keeps Require ip pages with a notice", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const { lines, notices } = await routes("php-docroot-guarded");
+    const files = [...new Set(lines.map((l) => l.split(" ")[2]))];
+    // Left out, each guard followed only by declarations, use and require lines:
+    // system/Model.php (`defined('BASEPATH') OR exit(...)`), components/com_shop/ShopController.php
+    // (`\defined('_JEXEC') or die`), plugins/acme/acme.php and notice.php (`if (!defined('ABSPATH')) exit`).
+    expect(files).toEqual([
+      "admin/index.php",
+      "admin/status/ping.php",
+      "admin/users.php",
+      "index.php",
+      "lib/not-a-guard.php", // `or define(...)` is no guard
+      "plugins/acme/settings.php", // guarded, then output
+      "views/welcome.php", // guarded, then inline HTML
+    ]);
+    expect(lines).toContain("GET /admin/users.php admin/users.php (docroot .)");
+    // admin/status/ grants everyone again, so only admin/'s two pages are restricted.
+    expect(notices).toEqual([
+      "PHP: admin/.htaccess:3 Require ip 127.0.0.1 10.0.0.0/8 serves admin/ only to the clients it names; its 2 files stay routes.",
+    ]);
+  });
+
   it("gives no routes when routes are not wanted", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     expect((await routes("php-docroot-public", ["imports"])).lines).toEqual([]);

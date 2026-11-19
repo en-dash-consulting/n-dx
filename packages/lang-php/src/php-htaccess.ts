@@ -7,12 +7,15 @@
  *   or `Require all denied` (2.4's mod_authz_core) outside a `<Files>`
  *   block denies the directory and everything below it; `Allow from all` or
  *   `Require all granted` with no denial grants it again below a denied
- *   parent. A rule inside `<Limit>`/`<LimitExcept>` counts only when the
+ *   parent. `Require ip`, `Require host` or `Require local` with no
+ *   `Require all granted` restricts the directory to the clients it names:
+ *   its files are still served, to those clients, so they stay routes. A
+ *   rule inside `<Limit>`/`<LimitExcept>` counts only when the
  *   block covers GET or POST (`<LimitExcept GET POST>` covers neither);
  *   other containers (`<IfModule>`) are read through.
  * - **File access**: the same denials inside `<Files name>`,
  *   `<Files ~ "regex">` or `<FilesMatch "regex">` deny the files whose name
- *   matches, in the directory and below.
+ *   matches, in the directory and below. A restriction inside them is not read.
  * - **`RedirectMatch 403 regex`**: denies every URL path the regex matches.
  * - **Front controllers**: `RewriteRule pattern target [flags]` whose target,
  *   less its query string, is a literal `.php` path (`index.php?q=$1`), not
@@ -54,8 +57,14 @@ export interface HtaccessFrontController {
 export interface Htaccess {
   /** Project-relative path of the file. */
   readonly file: string;
-  /** Directory-wide access: `denied` wins over `granted` in one file; absent when it sets none. */
-  readonly access?: { readonly denied: boolean; readonly line: number };
+  /**
+   * Directory-wide access, absent when the file sets none. In one file a
+   * denial wins over a grant, and a grant over a restriction (Apache 2.4 joins
+   * sibling `Require` lines as `<RequireAny>`). `restriction` is the
+   * restricting directive as written (`Require ip 10.0.0.0/8`), set when
+   * neither a denial nor a grant was found.
+   */
+  readonly access?: { readonly denied: boolean; readonly line: number; readonly restriction?: string };
   readonly fileDenials: readonly HtaccessFileDenial[];
   readonly urlDenials: readonly HtaccessUrlDenial[];
   /** `RewriteBase` as written. */
@@ -143,6 +152,10 @@ const isDenial = (w: readonly string[]): boolean =>
 const isGrant = (w: readonly string[]): boolean =>
   (w[0] === "allow" && w[1] === "from" && w[2] === "all") || (w[0] === "require" && w[1] === "all" && w[2] === "granted");
 
+/** `Require ip|host|local` (mod_authz_host): only the clients it names are served. */
+const isRestriction = (w: readonly string[]): boolean =>
+  w[0] === "require" && (((w[1] === "ip" || w[1] === "host") && w[2] !== undefined) || w[1] === "local");
+
 /** Flags that make a rule something other than an internal rewrite: redirect, forbidden, gone, proxy. */
 const NOT_INTERNAL = /^(r|redirect|f|forbidden|g|gone|p|proxy)(=|$)/i;
 
@@ -168,6 +181,7 @@ function filesMatcher(args: readonly string[], regex: boolean): ((name: string) 
 export function parseHtaccess(file: string, text: string): Htaccess {
   let denied: number | undefined;
   let granted: number | undefined;
+  let restricted: { line: number; directive: string } | undefined;
   const fileDenials: HtaccessFileDenial[] = [];
   const urlDenials: HtaccessUrlDenial[] = [];
   const frontControllers: HtaccessFrontController[] = [];
@@ -211,7 +225,7 @@ export function parseHtaccess(file: string, text: string): Htaccess {
     const raw = htaccessWords(trimmed);
     const w = raw.map((x) => x.toLowerCase());
     // Access rules for methods other than GET and POST say nothing about the pages.
-    if (containers.includes("other-methods") && (isDenial(w) || isGrant(w))) continue;
+    if (containers.includes("other-methods") && (isDenial(w) || isGrant(w) || isRestriction(w))) continue;
     const files = containers.find((c) => c !== null && c !== "other-methods");
     if (isDenial(w)) {
       if (files === undefined) denied ??= line;
@@ -220,6 +234,10 @@ export function parseHtaccess(file: string, text: string): Htaccess {
     }
     if (isGrant(w)) {
       if (files === undefined) granted ??= line;
+      continue;
+    }
+    if (isRestriction(w)) {
+      if (files === undefined) restricted ??= { line, directive: raw.join(" ") };
       continue;
     }
     if (files !== undefined) continue;
@@ -252,7 +270,14 @@ export function parseHtaccess(file: string, text: string): Htaccess {
     }
   }
   if (overlong > 0) notices.push(overlongLinesNotice(file, overlong, "access and rewrite rules"));
-  const access = denied !== undefined ?{ denied: true, line: denied } : granted !== undefined ? { denied: false, line: granted } : undefined;
+  const access =
+    denied !== undefined
+      ? { denied: true, line: denied }
+      : granted !== undefined
+        ? { denied: false, line: granted }
+        : restricted !== undefined
+          ? { denied: false, line: restricted.line, restriction: restricted.directive }
+          : undefined;
   return { file, ...(access && { access }), fileDenials, urlDenials, ...(rewriteBase !== undefined && { rewriteBase }), frontControllers, notices };
 }
 

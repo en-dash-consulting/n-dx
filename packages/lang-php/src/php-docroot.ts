@@ -19,10 +19,22 @@
  *   Left out: a file named `*.inc.php`, a file whose top-level statements are
  *   all declarations (function, class, interface, trait, enum, namespace,
  *   `use`, `const`, `declare`, comments; blank inline text), which is an
- *   included fragment, and a file `.htaccess` denies (`php-htaccess.ts`).
+ *   included fragment, a fragment behind a direct-access guard (below), and
+ *   a file `.htaccess` denies (`php-htaccess.ts`).
+ * - `direct-access-guard`: a file whose first statement after `namespace`
+ *   and `declare` exits when a constant is not defined (`defined('BASEPATH')
+ *   OR exit;`, `defined('_JEXEC') or die;`, `if (!defined('ABSPATH')) exit;`,
+ *   a block that exits) and whose other statements are declarations or
+ *   include/require statements is a fragment: requested directly, it ends
+ *   before declaring anything. One with any other top-level statement (output,
+ *   a call) is a page and stays a route.
  * - `htaccess-access`: a directory's nearest `.htaccess` at or below the
  *   docroot setting directory access decides it; `<Files>`/`<FilesMatch>`
  *   denials and `RedirectMatch 403` in any `.htaccess` above the file apply too.
+ *   `Require ip|host|local` (no grant beside it) keeps the files as routes,
+ *   `source` unchanged, with one notice per `.htaccess` naming the directive
+ *   and how many routes it restricts: the pages are still served, to the
+ *   clients it names, so dropping them would lose real entry points.
  * - `htaccess-rewrite`, `fallback-resource`: a `RewriteRule` or
  *   `FallbackResource` front controller in an `.htaccess` under a docroot is
  *   a catch-all `GET` and `POST` route handled by its target file: the
@@ -37,7 +49,7 @@
 
 import { join } from "node:path";
 import type { FactKind, FileFacts, RouteFact } from "@n-dx/lang-kit";
-import type { FrameworkContext, FrameworkFacts, FrameworkPack, PackSourceFile, RuleProvenance } from "@n-dx/lang-runtime";
+import type { Capture, FrameworkContext, FrameworkFacts, FrameworkPack, PackSourceFile, RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
 import { dirOf, isWithin, phpDocroots } from "./php-docroots.js";
 import { parseHtaccess, type Htaccess } from "./php-htaccess.js";
@@ -52,7 +64,10 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   // The server maps a URL path to the file at that path under DocumentRoot.
   docroots: rule(["Apache HTTP Server 2.4"], apache("core.html#documentroot")),
   "docroot-files": rule(["Apache HTTP Server 2.4"], "https://httpd.apache.org/docs/2.4/urlmapping.html"),
-  // Require all denied (mod_authz_core), Deny from all (mod_access_compat), <Files>/<FilesMatch>, RedirectMatch 403 (mod_alias).
+  // defined() is true once define() or const has declared the name; exit and die end the script.
+  "direct-access-guard": rule(["PHP 8"], "https://www.php.net/manual/en/function.defined.php"),
+  // Require all denied (mod_authz_core), Deny from all (mod_access_compat), <Files>/<FilesMatch>, RedirectMatch 403 (mod_alias);
+  // Require ip|host|local (mod_authz_host) restricts, sibling Require lines join as <RequireAny>.
   "htaccess-access": rule(["Apache HTTP Server 2.4"], apache("mod_authz_core.html#require")),
   // RewriteRule in per-directory context: the pattern matches the path below the directory; a relative substitution is under RewriteBase.
   "htaccess-rewrite": rule(["Apache HTTP Server 2.4"], apache("mod_rewrite.html#rewriterule")),
@@ -79,11 +94,33 @@ const DECLARATIONS: ReadonlySet<string> = new Set([
 /** Inline text outside `<?php … ?>` that outputs nothing visible: whitespace, around the tags. */
 const isBlankText = (text: string): boolean => text.replace(/\?>|<\?(php)?/gi, "").trim() === "";
 
-/** A file whose every top-level statement only declares: an included fragment. */
+/** Statements that may come before a direct-access guard: PHP requires `declare` first, and a namespace may precede it. */
+const BEFORE_GUARD: ReadonlySet<string> = new Set(["namespace_definition", "declare_statement"]);
+
+const at = (c: Capture): string => `${c.start.line}:${c.start.column}`;
+
+/**
+ * An included fragment, never a page: a file whose every top-level statement
+ * only declares, or one whose first statement (after `namespace` and
+ * `declare`) is a direct-access guard (`defined('X') or exit;`,
+ * `if (!defined('X')) exit;`) followed only by declarations and include or
+ * require statements. A guarded file with any other top-level statement is a page.
+ */
 function isFragment(file: PackSourceFile): boolean {
-  return (file.captures[DOCROOT_QUERY] ?? []).every(
-    (c) => DECLARATIONS.has(c.nodeType) || ((c.nodeType === "text" || c.nodeType === "text_interpolation") && isBlankText(c.text)),
+  const captures = file.captures[DOCROOT_QUERY] ?? [];
+  const guards = new Set(captures.filter((c) => c.name === "docroot.guard").map(at));
+  const includes = new Set(captures.filter((c) => c.name === "docroot.include").map(at));
+  const statements = captures.filter(
+    (c) =>
+      c.name === "docroot.top" &&
+      c.nodeType !== "php_tag" &&
+      c.nodeType !== "comment" &&
+      !((c.nodeType === "text" || c.nodeType === "text_interpolation") && isBlankText(c.text)),
   );
+  if (statements.every((c) => DECLARATIONS.has(c.nodeType))) return true;
+  const first = statements.findIndex((c) => !BEFORE_GUARD.has(c.nodeType));
+  if (!guards.has(at(statements[first]!))) return false;
+  return statements.slice(first + 1).every((c) => DECLARATIONS.has(c.nodeType) || includes.has(at(c)));
 }
 
 const isPage = (path: string): boolean => /\.(php|phtml)$/i.test(path) && !/\.inc\.php$/i.test(path);
@@ -111,13 +148,18 @@ class DocrootAccess {
     return out;
   }
 
-  /** Whether a request for `path` (at `url`) is refused. */
-  denied(path: string, url: string): boolean {
+  /**
+   * Whether a request for `path` (at `url`) is refused (`denied`), served only
+   * to the clients an `.htaccess`'s `Require ip|host|local` names (that file),
+   * or served to anyone (undefined).
+   */
+  access(path: string, url: string): "denied" | Htaccess | undefined {
     const chain = this.chain(dirOf(path));
     const name = path.slice(path.lastIndexOf("/") + 1);
     const nearest = [...chain].reverse().find((h) => h.access !== undefined);
-    if (nearest?.access?.denied) return true;
-    return chain.some((h) => h.fileDenials.some((d) => d.matches(name)) || h.urlDenials.some((d) => d.pattern.test(url)));
+    if (nearest?.access?.denied) return "denied";
+    if (chain.some((h) => h.fileDenials.some((d) => d.matches(name)) || h.urlDenials.some((d) => d.pattern.test(url)))) return "denied";
+    return nearest?.access?.restriction === undefined ? undefined : nearest;
   }
 }
 
@@ -148,10 +190,20 @@ export function readDocrootRoutes(files: readonly PackSourceFile[], htaccessText
     }
     const access = new DocrootAccess(docroot, byDir);
     const source = `docroot ${docroot === "" ? "." : docroot}`;
+    const restricted = new Map<Htaccess, number>();
     for (const file of files) {
       if (!isWithin(file.path, docroot) || !isPage(file.path) || isFragment(file)) continue;
       const url = urlOf(file.path, docroot);
-      if (!access.denied(file.path, url)) add(file.path, url, source);
+      const verdict = access.access(file.path, url);
+      if (verdict === "denied") continue;
+      add(file.path, url, source);
+      if (verdict !== undefined) restricted.set(verdict, (restricted.get(verdict) ?? 0) + 1);
+    }
+    for (const [htaccess, count] of [...restricted].sort(([a], [b]) => (a.file < b.file ? -1 : 1))) {
+      const dir = dirOf(htaccess.file);
+      notices.push(
+        `${htaccess.file}:${htaccess.access!.line} ${htaccess.access!.restriction} serves ${dir === "" ? "the repository root" : `${dir}/`} only to the clients it names; its ${count} ${count === 1 ? "file stays a route" : "files stay routes"}.`,
+      );
     }
     for (const [dir, htaccess] of byDir) {
       const dirUrl = dir === docroot ? "/" : `${urlOf(dir, docroot)}/`;

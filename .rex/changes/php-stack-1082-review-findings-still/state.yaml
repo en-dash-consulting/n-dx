@@ -47,7 +47,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94add228-871f-4544-bcb3-6c25ff72ef4d":
     createdAt: "2026-11-18T22:33:39.769Z"
-    lastModified: "2026-11-19T02:13:41.817Z"
+    lastModified: "2026-11-19T02:32:52.342Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96c36dff-2ec0-445a-9319-91d3f350c83c":
     lastModified: "2026-11-18T22:35:12.587Z"
@@ -55,11 +55,21 @@ items:
   "a739a401-b0e9-4203-9156-16e8431a584f":
     lastModified: "2026-11-18T22:35:20.403Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bd91778d-ccce-4732-a205-581368648413":
+    lastModified: "2026-11-19T02:32:52.342Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c2d2a6aa-f957-4cd5-9395-d278659e514b":
     lastModified: "2026-11-18T22:35:18.838Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd616ada-a02b-450d-986d-3bad122ec522":
-    lastModified: "2026-11-18T22:35:14.137Z"
+    status: "completed"
+    startedAt: "2026-11-19T02:25:26.791Z"
+    completedAt: "2026-11-19T02:33:20.765Z"
+    endedAt: "2026-11-19T02:33:20.765Z"
+    activeIntervals: [{"end":"2026-11-19T02:33:20.765Z","start":"2026-11-19T02:25:26.791Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "docroot.scm captures direct-access guards (defined() or exit/die; if (!defined()) exit/die or a block that exits) and include/require statements; isFragment treats guard-first files with only declarations/includes after as fragments. php-htaccess reads Require ip|host|local (no grant) as a restriction: routes kept, source unchanged, one notice per .htaccess. Fixture php-docroot-guarded."
+    lastModified: "2026-11-19T02:33:20.765Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dcd473b7-2b77-42f1-8720-e1cd223a4562":
     lastModified: "2026-11-18T22:35:03.126Z"
@@ -69,6 +79,9 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ec5c180b-a937-4585-afe2-b61c8ad83564":
     lastModified: "2026-11-19T01:45:25.893Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f2a302a2-bb06-40b9-831a-3916923e0ee7":
+    lastModified: "2026-11-19T02:32:45.379Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "faa0c3c8-a8aa-4762-8e96-227138e9e179":
     status: "completed"
