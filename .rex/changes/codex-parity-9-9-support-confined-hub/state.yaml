@@ -1,22 +1,20 @@
 schema: "rex/v2"
 items:
   "5d47b98c-517a-46c6-90be-2f4ed5d3434a":
-    status: "completed"
+    status: "failing"
     startedAt: "2026-11-19T00:02:55.223Z"
-    completedAt: "2026-11-19T00:44:11.654Z"
-    endedAt: "2026-11-19T00:44:11.654Z"
     activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:02:55.223Z"},{"end":"2026-11-19T00:44:11.654Z","start":"2026-11-19T00:38:09.671Z"}]
-    lastModified: "2026-11-19T00:44:14.476Z"
+    lastModified: "2026-11-19T00:46:23.571Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a85b9cf9-c01a-48ec-bdec-bfbedea973f1":
-    status: "failing"
+    status: "in_progress"
     startedAt: "2026-11-19T00:27:25.939Z"
-    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:27:25.939Z"}]
+    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:27:25.939Z"},{"start":"2026-11-19T00:46:26.784Z"}]
     failureReason: "Provider candidate committed in d0139660 with freshreview10findingsfixed; actual selectedCLI/localprovider host acceptance and three listener-dependent tests still outstanding. Preserve raw completion; no claim of completed acceptance."
     appliedAt: "2026-11-19T00:27:25.939Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-11T21:06:47.523Z"
-    lastModified: "2026-11-19T00:29:11.824Z"
+    lastModified: "2026-11-19T00:46:27.585Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b42b3957-511c-42f7-aed8-37980dfe6d13":
     status: "completed"
