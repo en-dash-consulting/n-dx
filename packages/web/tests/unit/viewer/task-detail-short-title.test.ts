@@ -67,6 +67,27 @@ describe("TaskDetail short title", () => {
     expect(mount({ item: item() }).querySelector(".task-short-title-section")).toBeNull();
   });
 
+  it("names a child and a dependency with a summary but no short title by their title, never the summary", () => {
+    const child = item({ id: "sub-1", level: "subtask", title: "Render the button only on Safari", summary: "Only Safari shoppers see it." });
+    const dep = item({ id: "dep-1", title: "Load the Apple Pay SDK", summary: "Gets the payment library onto the page." });
+    const parent = item({ children: [child], blockedBy: ["dep-1"] });
+    const root = mount({ item: parent, allItems: [parent, dep] });
+    const childName = root.querySelector(".task-child-title");
+    expect(childName?.textContent).toBe("Render the button only on Safari");
+    expect(childName?.getAttribute("title")).toBeNull();
+    const depName = root.querySelector(".task-dep-title");
+    expect(depName?.textContent).toBe("Load the Apple Pay SDK");
+    expect(depName?.getAttribute("title")).toBeNull();
+  });
+
+  it("names a dependency by its short title, with the full title as the tooltip", () => {
+    const dep = item({ id: "dep-1", title: "Load the Apple Pay SDK", shortTitle: "SDK", summary: "Gets the payment library onto the page." });
+    const parent = item({ blockedBy: ["dep-1"] });
+    const name = mount({ item: parent, allItems: [parent, dep] }).querySelector(".task-dep-title");
+    expect(name?.textContent).toBe("SDK");
+    expect(name?.getAttribute("title")).toBe("Load the Apple Pay SDK");
+  });
+
   it("names children by their short title, with the full title as the tooltip", () => {
     const child = item({ id: "sub-1", level: "subtask", title: "Render the button only on Safari", shortTitle: "Safari only" });
     const parent = item({ children: [child] });

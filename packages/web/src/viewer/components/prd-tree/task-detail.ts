@@ -30,7 +30,7 @@ import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
 import { placementTab } from "../../route-state.js";
-import { ImpactDetail, displayTitle, titleTooltip, useItemImpacts } from "../impact-tags.js";
+import { ImpactDetail, itemName, nameTooltip, useItemImpacts } from "../impact-tags.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -253,7 +253,7 @@ function DependencyList({
             { class: `task-dep-status${isResolved ? " prd-status-completed" : " prd-status-blocked"}` },
             isResolved ? "●" : "⊘",
           ),
-          h("span", { class: "task-dep-title", title: dep ? titleTooltip(dep) : undefined }, dep ? displayTitle(dep) : depId),
+          h("span", { class: "task-dep-title", title: dep ? nameTooltip(dep) : undefined }, dep ? itemName(dep) : depId),
           dep
             ? h("span", { class: `prd-level-badge prd-level-${itemTypeOf(dep)}` }, itemTypeLabel(itemTypeOf(dep)))
             : null,
@@ -505,7 +505,7 @@ function ChildrenSummary({
           },
           h("span", { class: `prd-status-icon prd-status-${child.status}` }, statusIcons[child.status] || "○"),
           h("span", { class: `prd-level-badge prd-level-${itemTypeOf(child)}` }, itemTypeLabel(itemTypeOf(child))),
-          h("span", { class: "task-child-title", title: titleTooltip(child) }, displayTitle(child)),
+          h("span", { class: "task-child-title", title: nameTooltip(child) }, itemName(child)),
         ),
       ),
     ),

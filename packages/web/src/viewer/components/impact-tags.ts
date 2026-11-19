@@ -188,6 +188,20 @@ export function titleTooltip(item: TitledItem): string | undefined {
   return displayTitle(item) === item.title ? undefined : item.title;
 }
 
+/**
+ * An item's name: its short title, else its title — never the summary. Rex's
+ * `shownName`, the name short titles are unique by; for compact lists that
+ * name items, such as the detail panel's dependencies and children.
+ */
+export function itemName(item: Pick<TitledItem, "title" | "shortTitle">): string {
+  return item.shortTitle?.trim() || item.title;
+}
+
+/** The full title, as a tooltip, wherever {@link itemName} shows the short title. */
+export function nameTooltip(item: Pick<TitledItem, "title" | "shortTitle">): string | undefined {
+  return itemName(item) === item.title ? undefined : item.title;
+}
+
 const plural = (n: number, [one, many]: readonly [string, string]) => `${n} ${n === 1 ? one : many}`;
 
 function fileList(files: readonly string[], total: number): string {

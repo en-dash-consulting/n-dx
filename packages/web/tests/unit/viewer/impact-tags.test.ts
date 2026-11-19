@@ -12,7 +12,9 @@ import {
   ImpactDetail,
   ImpactTags,
   displayTitle,
+  itemName,
   kindsText,
+  nameTooltip,
   titleTooltip,
   resetImpactCacheForTests,
   sizeText,
@@ -62,6 +64,15 @@ describe("displayTitle", () => {
     expect(displayTitle({ title: "Refactor x.ts", shortTitle: " Checkout ", summary: "Faster checkout" })).toBe("Checkout");
     expect(displayTitle({ title: "Refactor x.ts", shortTitle: "  ", summary: "Faster checkout" })).toBe("Faster checkout");
     expect(displayTitle({ title: "Refactor x.ts", shortTitle: null })).toBe("Refactor x.ts");
+  });
+});
+
+describe("itemName", () => {
+  it("is the short title, else the title, never the summary", () => {
+    expect(itemName({ title: "Refactor x.ts", shortTitle: " Checkout " })).toBe("Checkout");
+    expect(itemName({ title: "Refactor x.ts", summary: "Faster checkout" } as { title: string })).toBe("Refactor x.ts");
+    expect(nameTooltip({ title: "Refactor x.ts", shortTitle: "Checkout" })).toBe("Refactor x.ts");
+    expect(nameTooltip({ title: "Refactor x.ts" })).toBeUndefined();
   });
 });
 
