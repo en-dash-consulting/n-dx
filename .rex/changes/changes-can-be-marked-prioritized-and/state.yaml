@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "23ef1cc4-adcf-4046-be95-da22807badcb":
+    lastModified: "2026-11-19T23:48:25.152Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "58ec1ea9-b04c-48df-83f0-3bade3a0f47c":
     lastModified: "2026-11-19T19:46:46.765Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
@@ -15,5 +18,5 @@ items:
     appliedAt: "2026-11-19T19:00:26.791Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T18:16:00.659Z"
-    lastModified: "2026-11-19T19:46:46.765Z"
+    lastModified: "2026-11-19T23:48:25.152Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
