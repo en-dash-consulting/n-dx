@@ -35,8 +35,8 @@ export const RECOMMENDED_STEPS = 5;
 
 /**
  * The Analysis page's other highlight, its "Zones needing attention" count
- * (web's `zoneNeedsAttention`): a zone whose files barely hold together, or
- * that leans hard on other zones.
+ * (web's `zoneNeedsAttention`, over top-level zones only): a zone whose files
+ * barely hold together, or that leans hard on other zones.
  */
 export const ATTENTION_COHESION = 0.4;
 export const ATTENTION_COUPLING = 0.5;
@@ -103,9 +103,10 @@ export function readCode(sourcevisionDir: string, options: ReadCodeOptions, warn
         depth: zone.depth ?? depth,
         // Sorted, so past Graview's 200 (the snapshot builder cuts to its caps) the first in path order stay.
         entryPoints: zone.entryPoints.length > 0 ? [...zone.entryPoints].sort() : undefined,
-        // The Analysis page's two treatments: recommended work, else flagged for attention.
+        // The Analysis page's two treatments: recommended work, else flagged for
+        // attention. The page counts top-level zones only, so a sub-zone is never flagged.
         needsWork,
-        highlighted: !needsWork && needsAttention(zone),
+        highlighted: !needsWork && !parent && needsAttention(zone),
         recommendation: recommended.get(zone.id),
       });
       if (parent) edges.push({ kind: "under", from: zone.id, to: parent.id });

@@ -959,7 +959,7 @@
         "highlighted": {
           "type": "boolean",
           "label": "Flagged for attention",
-          "description": "Not recommended work, but the Analysis page counts it among the zones needing attention: cohesion under 40% or coupling over 50%"
+          "description": "Not recommended work, but the Analysis page counts it among the zones needing attention: a top-level zone with cohesion under 40% or coupling over 50%"
         },
         "recommendation": {
           "type": "string",

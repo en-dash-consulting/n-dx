@@ -154,7 +154,7 @@ export interface Zone {
   readonly entryPoints?: readonly string[];
   /** One of the next steps the Analysis page recommends is scoped to this zone. Shown as "Needs work". */
   readonly needsWork?: boolean;
-  /** Not recommended work, but the Analysis page counts it among the zones needing attention: cohesion under 40% or coupling over 50%. Shown as "Flagged for attention". */
+  /** Not recommended work, but the Analysis page counts it among the zones needing attention: a top-level zone with cohesion under 40% or coupling over 50%. Shown as "Flagged for attention". */
   readonly highlighted?: boolean;
   /** The first next step the Analysis page recommends for this zone. Shown as "Recommended". */
   readonly recommendation?: string;

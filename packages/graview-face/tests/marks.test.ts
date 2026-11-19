@@ -39,8 +39,10 @@ const html = (element: ReactElement): string => renderToStaticMarkup(createEleme
 describe("the needs-work mark", () => {
   it("reads the projection's flags, needs-work first", () => {
     expect(markOf(zone("llm-client/src-4"))).toBe("needs-work");
-    expect(markOf(zone("hench/quota"))).toBe("highlighted");
+    expect(markOf(zone("tests-e2e"))).toBe("highlighted");
     expect(markOf(zone("hench"))).toBeUndefined();
+    // A sub-zone past the thresholds is not flagged: the Analysis page counts top-level zones only.
+    expect(markOf(zone("hench/quota"))).toBeUndefined();
     expect(markOf({ kind: "change" })).toBeUndefined();
   });
 
@@ -55,7 +57,7 @@ describe("the needs-work mark", () => {
   });
 
   it("draws a ring, not a '!', on a zone only flagged for attention", () => {
-    for (const element of [createElement(RecordRow, { context, node: zone("hench/quota") }), createElement(RecordCard, { context, node: zone("hench/quota") })]) {
+    for (const element of [createElement(RecordRow, { context, node: zone("tests-e2e") }), createElement(RecordCard, { context, node: zone("tests-e2e") })]) {
       const out = html(element);
       expect(out).toContain('data-mark="highlighted"');
       expect(out).toContain('aria-label="Flagged for attention"');
@@ -77,7 +79,7 @@ describe("the declared treatments every face resolves", () => {
 
   it("puts a '!' badge on a needs-work zone's page and a distinct badge on a flagged one", () => {
     expect(badges(zone("llm-client/src-4")).some((b) => b.includes('"text":"!"'))).toBe(true);
-    const flagged = badges(zone("hench/quota"));
+    const flagged = badges(zone("tests-e2e"));
     expect(flagged.some((b) => b.includes('"text":"needs attention"'))).toBe(true);
     expect(flagged.some((b) => b.includes('"text":"!"'))).toBe(false);
     expect(badges(zone("hench")).some((b) => b.includes('"text":"!"') || b.includes("needs attention"))).toBe(false);

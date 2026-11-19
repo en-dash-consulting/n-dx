@@ -70,6 +70,17 @@ describe("readCode: the Analysis page's treatments", () => {
     expect(read(zones).nodes.find((n) => n.id === "both")).toMatchObject({ needsWork: true, highlighted: false, recommendation: "Broken" });
   });
 
+  it("highlights a top-level zone needing attention but never a sub-zone, as the Analysis page counts top-level zones only", () => {
+    const zones = {
+      ...ZONES,
+      zones: [{ ...zone("parent", 0.1, 0.1), subZones: [zone("child", 0.1, 0.1)] }],
+      findings: [],
+    };
+    const byId = new Map(read(zones).nodes.map((n) => [n.id, n]));
+    expect(byId.get("parent")).toMatchObject({ needsWork: false, highlighted: true });
+    expect(byId.get("child")).toMatchObject({ needsWork: false, highlighted: false });
+  });
+
   it("lets a step scoped global mark no zone", () => {
     const zones = { ...ZONES, findings: [ZONES.findings[0]] };
     expect(read(zones).nodes.filter((n) => n.needsWork)).toEqual([]);
