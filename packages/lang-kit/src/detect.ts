@@ -19,8 +19,9 @@
  *    such as `catalog/`) → PHP
  *    A PHP marker one level down (step 2's or step 5's) adds PHP beside the
  *    TypeScript fallback when a direct child directory holds `package.json`
- *    or the repository has source of a language with no config; the two are
- *    ordered by source count (see `phpOneDownLanguages`)
+ *    or the repository has source of a language with no config, and beside
+ *    any language whose source outside the marker's folders outnumbers PHP's;
+ *    all ordered by source count (see `phpOneDownLanguages`)
  * 6. No marker at the root or one level down → the language with the most
  *    source files (PHP included), unless that is TypeScript or Terraform
  *    files match or outnumber it
@@ -234,22 +235,53 @@ async function hasChildPhpEntry(rootDir: string): Promise<boolean> {
   return childHolds(rootDir, "index.php");
 }
 
+/** The direct child directories holding PHP's marker one folder down (`composer.json` or `index.php`). */
+async function phpMarkerDirectories(rootDir: string): Promise<Set<string>> {
+  const dirs = new Set<string>();
+  for (const dir of await childDirectories(rootDir)) {
+    if ((await fileExists(join(dir, "composer.json"))) || (await fileExists(join(dir, "index.php")))) dirs.add(dir);
+  }
+  return dirs;
+}
+
 /**
  * The languages of a repository whose only marker is PHP's one folder down
  * (`composer.json` or `index.php` in a direct child directory). That marker
- * says PHP is there, not that nothing else is: with a `package.json` in a
- * direct child directory, or source of a language with no config here
- * (`.rs`, `.rb`, …), the TypeScript fallback the repository would otherwise
- * get is kept beside PHP, so its skip directories and test and generated
- * patterns still apply. The two are ordered by source count, ties to the
- * fallback. Otherwise PHP alone: a site whose app sits one folder down, its
- * `.js` files included. Only PHP's marker is read one level down, so a
+ * vouches for its own folder, not for the rest of the repository, so source
+ * outside the folders holding it is weighed against the repository's PHP:
+ * - the TypeScript fallback (JS/TS and languages with no config here) is kept
+ *   when a direct child holds `package.json`, when there is source of a
+ *   language with no config (`.rs`, `.rb`, …), or when its source outnumbers
+ *   PHP's;
+ * - Python, Go, C# or Swift is kept when its source outnumbers PHP's.
+ * What is kept sits beside PHP, ordered by source count with ties ahead of
+ * PHP, so its skip directories and test and generated patterns still apply.
+ * Otherwise PHP alone: a site whose app sits one folder down, the `.js` files
+ * in that folder included. Only PHP's marker is read one level down, so a
  * child `package.json` never changes a repository that has no PHP marker.
  */
 async function phpOneDownLanguages(rootDir: string): Promise<LanguageConfig[]> {
-  const [childPackageJson, counts] = await Promise.all([childHolds(rootDir, "package.json"), countSourceFiles(rootDir)]);
-  if (!childPackageJson && counts.other === 0) return [phpConfig];
-  return counts.ts + counts.other >= counts.php ? [typescriptConfig, phpConfig] : [phpConfig, typescriptConfig];
+  const markerDirs = await phpMarkerDirectories(rootDir);
+  const [childPackageJson, all, outside] = await Promise.all([
+    childHolds(rootDir, "package.json"),
+    countSourceFiles(rootDir),
+    countSourceFiles(rootDir, markerDirs),
+  ]);
+  const php = all.php;
+  const fallback = outside.ts + outside.other;
+  const beside: Array<[number, LanguageConfig]> = [];
+  if (childPackageJson || outside.other > 0 || fallback > php) beside.push([fallback, typescriptConfig]);
+  const configured: Array<[number, LanguageConfig]> = [
+    [outside.swift, swiftConfig],
+    [outside.go, goConfig],
+    [outside.cs, csharpConfig],
+    [outside.py, pythonConfig],
+  ];
+  for (const entry of configured) if (entry[0] > php) beside.push(entry);
+  beside.sort((a, b) => b[0] - a[0] || tiebreakRank(a[1]) - tiebreakRank(b[1]));
+  const ahead = beside.filter(([count]) => count >= php).map(([, config]) => config);
+  const after = beside.filter(([count]) => count < php).map(([, config]) => config);
+  return [...ahead, phpConfig, ...after];
 }
 
 /**
@@ -310,10 +342,15 @@ const COUNT_MAX_DIRS = 2000;
 /**
  * Breadth-first walk of the files under `rootDir`, down to
  * {@link COUNT_MAX_DEPTH} levels and at most {@link COUNT_MAX_DIRS}
- * directories, skipping dot-directories and {@link COUNT_SKIP_DIRS}. `visit`
- * gets each file name and returns true to stop the walk.
+ * directories, skipping dot-directories, {@link COUNT_SKIP_DIRS} and the
+ * `excluded` directory paths (as `join` builds them). `visit` gets each file
+ * name and returns true to stop the walk.
  */
-async function walkBounded(rootDir: string, visit: (fileName: string) => boolean): Promise<void> {
+async function walkBounded(
+  rootDir: string,
+  visit: (fileName: string) => boolean,
+  excluded: ReadonlySet<string> = new Set(),
+): Promise<void> {
   let queue: string[] = [rootDir];
   let read = 0;
   for (let depth = 0; depth <= COUNT_MAX_DEPTH && queue.length > 0; depth++) {
@@ -328,7 +365,8 @@ async function walkBounded(rootDir: string, visit: (fileName: string) => boolean
       }
       for (const entry of entries) {
         if (entry.isDirectory()) {
-          if (!entry.name.startsWith(".") && !COUNT_SKIP_DIRS.has(entry.name)) next.push(join(dir, entry.name));
+          const path = join(dir, entry.name);
+          if (!entry.name.startsWith(".") && !COUNT_SKIP_DIRS.has(entry.name) && !excluded.has(path)) next.push(path);
         } else if (entry.isFile() && visit(entry.name)) {
           return;
         }
@@ -344,10 +382,12 @@ async function walkBounded(rootDir: string, visit: (fileName: string) => boolean
  * `src/<Project>/<Folder>/` is weighed by that code, not by the root's
  * tooling scripts; bounded so detection stays cheap on a large tree.
  * Minified JavaScript is library code, not authored code, and is not counted.
- * `other` is source of a language with no config here.
+ * `other` is source of a language with no config here. Directories in
+ * `excluded` (paths as `join` builds them) are not counted.
  */
 async function countSourceFiles(
   rootDir: string,
+  excluded: ReadonlySet<string> = new Set(),
 ): Promise<{ go: number; ts: number; swift: number; py: number; cs: number; php: number; other: number }> {
   const counts = { go: 0, ts: 0, swift: 0, py: 0, cs: 0, php: 0, other: 0 };
   // Extensions other ecosystems share are PHP only once the repository is PHP.
@@ -366,7 +406,7 @@ async function countSourceFiles(
     const ext = extname(name);
     for (const [family, exts] of families) if (exts.has(ext)) counts[family]++;
     return false;
-  });
+  }, excluded);
   return counts;
 }
 

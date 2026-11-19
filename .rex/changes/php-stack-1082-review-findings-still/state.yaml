@@ -51,7 +51,14 @@ items:
     lastModified: "2026-11-19T01:41:22.849Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "30758b33-8939-42e9-bbce-5730d622e190":
-    lastModified: "2026-11-19T01:40:56.749Z"
+    status: "completed"
+    startedAt: "2026-11-19T16:07:50.759Z"
+    completedAt: "2026-11-19T16:11:31.140Z"
+    endedAt: "2026-11-19T16:11:31.140Z"
+    activeIntervals: [{"end":"2026-11-19T16:11:31.140Z","start":"2026-11-19T16:07:50.759Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "phpOneDownLanguages weighs source outside the PHP marker folders against PHP (commit 6ac9f1e40); tests not run in-session, gate must run them."
+    lastModified: "2026-11-19T16:11:31.140Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5ebf7eba-b5c3-4c21-b09b-80eed9399acb":
     status: "completed"

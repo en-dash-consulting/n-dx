@@ -18,6 +18,7 @@ import {
   javaSecondaryConfig,
   mergeLanguageConfigs,
   phpConfig,
+  pythonConfig,
   terraformConfig,
   typescriptConfig,
   VALID_LANGUAGE_IDS,
@@ -341,6 +342,37 @@ describe("PHP detection", () => {
     const all = recordingSearch(2);
     expect(await detectLanguages(dir, all)).toEqual([typescriptConfig, phpConfig, terraformConfig]);
     expect(all.calls).toEqual([{ others: [typescriptConfig, phpConfig], count: false }]);
+  });
+
+  it("keeps a markerless Python majority ahead of tools/composer.json", async () => {
+    await files("src", ".py", 50);
+    await files("tools", ".php", 1);
+    await writeFile(join(dir, "tools", "composer.json"), "{}\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(pythonConfig);
+    const configs = await detectLanguages(dir, recordingSearch(0));
+    expect(configs).toEqual([pythonConfig, phpConfig]);
+    const merged = mergeLanguageConfigs(configs);
+    expect(merged.skipDirectories.has("__pycache__")).toBe(true);
+    expect(merged.skipDirectories.has("venv")).toBe(true);
+    expect(merged.testFilePatterns.some((p) => p.test("tests/test_app.py"))).toBe(true);
+  });
+
+  it("keeps a markerless JavaScript majority with no package.json ahead of tools/composer.json", async () => {
+    await files("src", ".js", 40);
+    await files("tools", ".php", 1);
+    await writeFile(join(dir, "tools", "composer.json"), "{}\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+    const configs = await detectLanguages(dir, recordingSearch(0));
+    expect(configs).toEqual([typescriptConfig, phpConfig]);
+    expectTypeScriptRules(configs);
+  });
+
+  it("keeps PHP alone when the source outside its folder is fewer than its PHP files", async () => {
+    await files("scripts", ".py", 2);
+    await files("app", ".php", 3);
+    await writeFile(join(dir, "app", "index.php"), "<?php\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(phpConfig);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([phpConfig]);
   });
 
   it("lets a Java root outrank a composer.json one level down", async () => {
