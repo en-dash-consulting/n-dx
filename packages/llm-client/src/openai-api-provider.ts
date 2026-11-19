@@ -27,8 +27,10 @@
  * @see {@link createCodexCliClient} in `codex-cli-provider.ts` for the CLI alternative
  */
 
-import { createOpenAiTurns, supportsOpenAiTurns } from "./openai-responses.js";
+import { setTimeout as delay } from "node:timers/promises";
+import { createOpenAiTurns, responseError, supportsOpenAiTurns } from "./openai-responses.js";
 import { resolveOpenAiEffort } from "./codex-effort.js";
+import { parseRetryAfterHeader, DEFAULT_AUTO_RETRY_THRESHOLD_MS } from "./rate-limit.js";
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
@@ -223,84 +225,65 @@ export function createOpenAiApiProvider(
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       const model = request.model || defaultModel;
       const effort = resolveOpenAiEffort(model, request.effort, request.taskClass);
-      let lastError: Error | undefined;
+      const signal = AbortSignal.any([
+        ...(request.signal ? [request.signal] : []),
+        ...(request.timeoutMs === undefined ? [] : [AbortSignal.timeout(request.timeoutMs)]),
+      ]);
+      const abortError = (): Error => request.signal?.aborted
+        ? new DOMException("OpenAI request cancelled", "AbortError")
+        : new ClaudeClientError("OpenAI request timed out", "timeout", true);
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      for (let attempt = 0; ; attempt++) {
+        if (signal.aborted) throw abortError();
+        let failure: ClaudeClientError;
         try {
           const response = await fetch(`${baseUrl}/chat/completions`, {
             method: "POST",
             headers,
+            signal,
+            redirect: "error",
             body: JSON.stringify({
               model,
-              max_tokens: maxTokens,
+              max_completion_tokens: maxTokens,
               ...(effort !== undefined ? { reasoning_effort: effort } : {}),
               messages: [{ role: "user", content: request.prompt }],
             }),
           });
 
           if (!response.ok) {
-            const body = await response.text();
-            const message = `OpenAI API error ${response.status}: ${body}`;
-
-            // Auth errors are not retryable
-            if (response.status === 401 || response.status === 403) {
-              throw new ClaudeClientError(message, "auth", false);
-            }
-
-            // Timeout-like errors
-            if (response.status === 408) {
-              throw new ClaudeClientError(message, "timeout", true);
-            }
-
-            // Retryable errors
-            if (RETRY_STATUS_CODES.has(response.status) && attempt < maxRetries) {
-              const delay = baseDelayMs * 2 ** attempt;
-              await new Promise((r) => setTimeout(r, delay));
-              continue;
-            }
-
-            // Exhausted retries for retryable errors
-            if (RETRY_STATUS_CODES.has(response.status)) {
-              throw new ClaudeClientError(message, "rate-limit", true);
-            }
-
-            throw new ClaudeClientError(message, "unknown", false);
+            const error = responseError(response.status, parseRetryAfterHeader(response.headers.get("retry-after")));
+            await response.body?.cancel();
+            throw error;
           }
 
           const data = await response.json() as Record<string, unknown>;
+          if (signal.aborted) throw abortError();
           const choices = data.choices as Array<Record<string, unknown>> | undefined;
           let text = "";
 
           if (choices && choices.length > 0) {
-            const message = choices[0].message as Record<string, unknown> | undefined;
-            if (message && typeof message.content === "string") {
+            const choice = choices[0];
+            const message = choice.message as Record<string, unknown> | undefined;
+            // A truncated or filtered fragment cannot stand in for the dropped history.
+            const incompleteSummary = request.taskClass === "context.summarize" &&
+              (choice.finish_reason === "length" || choice.finish_reason === "content_filter");
+            if (!incompleteSummary && message && typeof message.content === "string") {
               text = message.content;
             }
           }
 
           return { text, ...parseUsage(data.usage) };
         } catch (err) {
-          if (err instanceof ClaudeClientError) {
-            throw err;
-          }
-          lastError = err as Error;
-
-          // Network/fetch errors may be transient
-          if (attempt < maxRetries) {
-            const delay = baseDelayMs * 2 ** attempt;
-            await new Promise((r) => setTimeout(r, delay));
-            continue;
-          }
-
-          throw new ClaudeClientError(
-            (err as Error).message ?? "Unknown error",
-            "unknown",
-            false,
-          );
+          if (signal.aborted) throw abortError();
+          failure = err instanceof ClaudeClientError ? err
+            : err instanceof SyntaxError ? new ClaudeClientError("Invalid OpenAI text completion payload", "unknown", false)
+            : new ClaudeClientError("OpenAI connection failed", "network", true);
         }
+        if (!failure.retryable || attempt >= maxRetries ||
+            (failure.retryAfterMs ?? 0) > DEFAULT_AUTO_RETRY_THRESHOLD_MS) throw failure;
+        try { await delay(failure.retryAfterMs ?? baseDelayMs * 2 ** attempt, undefined, { signal }); }
+        catch { throw abortError(); }
       }
-
-      throw lastError ?? new ClaudeClientError("Exhausted retries", "unknown", false);
     },
 
     async *stream(request: CompletionRequest): AsyncIterable<StreamChunk> {

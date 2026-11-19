@@ -66,10 +66,25 @@ describe("direct OpenAI agent execution", () => {
   function script(turns: unknown[][]) {
     let index = 0;
     vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-      expect(url).toBe("https://api.openai.com/v1/responses");
       const body = JSON.parse(init.body as string);
       requests.push(body);
-      if (body.tools.length === 0) return response([{ type: "message", role: "assistant", content: [{ type: "output_text", text: "Earlier turns read target.ts; the output file is still to be written." }] }]);
+      const summary = "Earlier turns read target.ts: export const initial = true;";
+      if (url === "https://api.openai.com/v1/chat/completions") {
+        // This pinned deployment exposes Sol only through Responses.
+        if (body.model === "gpt-6.1-sol") return new Response(null, { status: 403 });
+        return Response.json({
+          choices: [{ message: { content: summary } }],
+          usage: { prompt_tokens: 60, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 15 } },
+        });
+      }
+      expect(url).toBe("https://api.openai.com/v1/responses");
+      if (body.tools.length === 0) {
+        return Response.json({
+          status: "completed", model: body.model,
+          output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: summary }] }],
+          usage: { input_tokens: 60, output_tokens: 10, input_tokens_details: { cached_tokens: 15 } },
+        });
+      }
       return response(turns[index++] ?? [done]);
     }));
   }
@@ -221,8 +236,16 @@ describe("direct OpenAI agent execution", () => {
     expect(record.tokenUsage.input).toBe(300);
   });
 
-  it("compacts through Responses and keeps retained tool continuations valid", async () => {
-    await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: { tiers: { codex: { light: "gpt-6.1-sol" } } } }));
+  it.each([
+    { name: "default Codex tiers", llm: {}, summaryModel: "gpt-6-luna", effort: undefined },
+    { name: "a light-tier pin", llm: { tiers: { codex: { light: "gpt-6.1-sol" } } }, summaryModel: "gpt-6.1-sol", effort: undefined },
+    { name: "a legacy light-model pin", llm: { codex: { lightModel: "gpt-6-sol" } }, summaryModel: "gpt-6-sol", effort: undefined },
+    { name: "a summary route and effort pin", llm: {
+      routes: { "context.summarize": "heavy" }, tiers: { codex: { heavy: "gpt-6.1-sol" } },
+      effort: { "context.summarize": "high" },
+    }, summaryModel: "gpt-6.1-sol", effort: "high" },
+  ])("compacts with $name and keeps summaries alongside retained tool continuations", async ({ llm, summaryModel, effort }) => {
+    if (Object.keys(llm).length) await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm }));
     config.prune = { triggerPairs: 3, retainPairs: 2 };
     script([
       ...Array.from({ length: 4 }, (_, i) => [call(`read-${i}`, "read_file", { path: "target.ts" })]),
@@ -230,9 +253,82 @@ describe("direct OpenAI agent execution", () => {
     ]);
     const { run: record } = await run();
     expect(record.status).toBe("completed");
-    expect(requests.some(request => request.tools.length === 0 && request.model === "gpt-6.1-sol")).toBe(true);
-    expect(record.tokenUsage.input).toBeGreaterThan(8 * 75);
+    const summaries = requests.filter(request => !request.tools?.length);
+    expect(summaries).toHaveLength(2);
+    for (const request of summaries) {
+      expect(request.model).toBe(summaryModel);
+      if (summaryModel === "gpt-6.1-sol") {
+        expect(request.tools).toEqual([]);
+        expect(request.reasoning?.effort).toBe(effort);
+        expect(request.max_output_tokens).toBe(config.maxTokens);
+      } else {
+        expect(request.tools).toBeUndefined();
+        expect(request.reasoning_effort).toBe(effort);
+        expect(request.max_completion_tokens).toBe(config.maxTokens);
+      }
+      expect(request).not.toHaveProperty("max_tokens");
+    }
+    expect((summaries[0].messages ?? summaries[0].input)[0].content).toContain("export const initial = true;");
+    const turns = requests.filter(request => request.tools?.length);
+    expect(turns[4].input).toContainEqual(expect.objectContaining({
+      role: "user", content: expect.stringContaining("Earlier turns read target.ts: export const initial = true;"),
+    }));
+    expect(turns[4].input.filter((item: any) => item.type === "function_call").map((item: any) => item.call_id)).toEqual(["read-2", "read-3"]);
+    expect(turns[4].input.filter((item: any) => item.type === "function_call_output").map((item: any) => item.call_id)).toEqual(["read-2", "read-3"]);
+    expect(turns[6].input).toContainEqual({ type: "reasoning", id: "rs_fixture", summary: [], encrypted_content: "opaque-fixture" });
+    expect(turns[6].input).toContainEqual(expect.objectContaining({ type: "function_call_output", call_id: "write" }));
+    expect(record.tokenUsage).toMatchObject({ input: 8 * 75 + 2 * 45, output: 8 * 20 + 2 * 10, cacheReadInput: 8 * 25 + 2 * 15 });
+    expect(record.turnTokenUsage?.filter(turn => turn.model === summaryModel)).toEqual([
+      expect.objectContaining({ vendor: "codex", input: 45, output: 10, cacheReadInput: 15 }),
+      expect.objectContaining({ vendor: "codex", input: 45, output: 10, cacheReadInput: 15 }),
+    ]);
+    expect(record.turnTokenUsage?.filter(turn => turn.model === "gpt-6-astra")).toHaveLength(8);
+    expect(JSON.stringify(record)).not.toContain("opaque-fixture");
     expect(record.toolCalls).toHaveLength(7);
+  });
+
+  it("cancels a default summary request before sending another agent turn", async () => {
+    config.prune = { triggerPairs: 3, retainPairs: 2 };
+    const controller = new AbortController();
+    script([
+      ...Array.from({ length: 4 }, (_, i) => [call(`read-${i}`, "read_file", { path: "target.ts" })]),
+      ...scriptFor("too-late.ts"),
+    ]);
+    const success = globalThis.fetch;
+    const fetch = vi.fn(async (url, init) => {
+      if (String(url).endsWith("/chat/completions")) {
+        controller.abort();
+        init.signal.throwIfAborted();
+      }
+      return success(url, init);
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { run: record } = await run("task-1", controller.signal);
+    expect(record.status).toBe("cancelled");
+    expect(record.toolCalls).toHaveLength(4);
+    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(record.turnTokenUsage).toHaveLength(4);
+    await expect(readFile(join(projectDir, "too-late.ts"))).rejects.toMatchObject({ code: "ENOENT" });
+    expect((await store.getItem("task-1"))?.status).toBe("pending");
+  });
+
+  it("degrades safely when the text summary fails without charging nonexistent summary usage", async () => {
+    config.prune = { triggerPairs: 3, retainPairs: 2 };
+    script([
+      ...Array.from({ length: 4 }, (_, i) => [call(`read-${i}`, "read_file", { path: "target.ts" })]),
+      ...scriptFor("after-summary-error.ts"),
+    ]);
+    const success = globalThis.fetch;
+    const fetch = vi.fn(async (url, init) => String(url).endsWith("/chat/completions")
+      ? new Response("private summary error", { status: 401 }) : success(url, init));
+    vi.stubGlobal("fetch", fetch);
+    const { run: record } = await run();
+    expect(record.status).toBe("completed");
+    expect(record.tokenUsage).toMatchObject({ input: 8 * 75, output: 8 * 20, cacheReadInput: 8 * 25 });
+    expect(record.turnTokenUsage).toHaveLength(8);
+    expect(record.toolCalls).toHaveLength(7);
+    expect(fetch).toHaveBeenCalledTimes(10);
+    expect(JSON.stringify(record)).not.toContain("private summary error");
   });
 
   it("re-prompts after a read-only plan so the task can still execute", async () => {
@@ -312,10 +408,10 @@ describe("direct OpenAI agent execution", () => {
     expect(record.diagnostics?.notes).toContain("openai_effort:high");
   });
 
-  it("refuses an unsupported pinned model before changing task status or sending requests", async () => {
+  it.each(["gpt-unverified", "gpt-6-luna"])("refuses unsupported agent model %s before changing task status or sending requests", async model => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
-    await expect(agentLoop({ config, store, projectDir, henchDir, taskId: "task-1", model: "gpt-unverified" })).rejects.toThrow("no verified agent-turn support");
+    await expect(agentLoop({ config, store, projectDir, henchDir, taskId: "task-1", model })).rejects.toThrow("no verified agent-turn support");
     expect(fetch).not.toHaveBeenCalled();
     expect((await store.getItem("task-1"))?.status).toBe("pending");
   });
