@@ -127,6 +127,7 @@ import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
 import {
   createCodexScratch,
+  assertCodexScratchEnvironment,
   codexSessionDriver,
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -919,6 +920,8 @@ export async function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<S
     if (scratch) {
       const spawnConfig = opts.spawnConfig.withScratchDir!(scratch.dir);
       opts = { ...opts, spawnConfig, cliEnv: { ...opts.cliEnv, ...spawnConfig.env } };
+      await assertCodexScratchEnvironment({ binary: opts.cliBinary, args: spawnConfig.args,
+        cwd: opts.cwd, env: opts.cliEnv, scratchDir: scratch.dir, signal: opts.abortSignal });
     }
     return await spawnVendorProcess(opts);
   } finally {

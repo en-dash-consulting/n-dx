@@ -14,6 +14,7 @@
  */
 
 import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { spawn as nodeSpawn } from "node:child_process";
@@ -129,6 +130,28 @@ function emptyChild(): EventEmitter {
   return proc;
 }
 
+/** config/read never consumes a model turn. The native protocol is covered by
+ * the dedicated scratch tests; loop fixtures retain the compiler's temp set.
+ */
+function configReadChild(args: string[]): EventEmitter {
+  const proc = Object.assign(new EventEmitter(), {
+    pid: undefined, exitCode: null, signalCode: null,
+    stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), kill: () => true,
+  });
+  const set: Record<string, string> = {};
+  for (const arg of args) {
+    const match = /^shell_environment_policy\.set\.(TMPDIR|TMP|TEMP)=(.*)$/.exec(arg);
+    if (match) set[match[1]] = JSON.parse(match[2]);
+  }
+  proc.stdin.on("data", chunk => {
+    const message = JSON.parse(String(chunk));
+    if (message.id) queueMicrotask(() => proc.stdout.write(JSON.stringify({ id: message.id,
+      result: message.method === "initialize" ? {} : { config: { shell_environment_policy: { set } } },
+    }) + "\n"));
+  });
+  return proc;
+}
+
 export interface ScriptedClaudeCli {
   /** Drop-in for `child_process.spawn`. */
   spawn: (command: string, args?: string[], opts?: unknown) => unknown;
@@ -215,6 +238,7 @@ export function createScriptedClaudeCli(actualSpawn: typeof nodeSpawn): Scripted
         return (actualSpawn as (c: string, a: string[], o: unknown) => unknown)(command, args, opts);
       }
       if (vendor.args.length === 1 && vendor.args[0] === "--version") return emptyChild();
+      if (vendor.args.includes("app-server")) return configReadChild(vendor.args);
       return cliChild(vendor.args);
     },
   };

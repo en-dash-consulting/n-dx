@@ -31,6 +31,41 @@ The coordinator still owns the fresh mandatory review and any new host probe,
 then the original PR8 parent's supported Rex status correction. No task or
 parent completion is asserted by this executor.
 
+### Scratch retry — 2026-11-19
+
+The coordinator's `host-scratch.json` records successful installed-CLI
+fresh/resume/fork temp APIs and cleanup on 0.167.0-alpha.3.2, bounded writes,
+credential masking and denied network access. Its separate core kernel check
+denied workspace/temp writes using production reviewer flags. These establish
+neither a core model review nor browser/native-Windows confinement.
+`host-filter.json` records the counterexample: a native PATH-only `include_only`
+removes the temp overrides, leaving Node's temp API at `/tmp` with EPERM.
+
+The retry reproduces populated 0555 cleanup failures with real children under
+non-root UID 501, then verifies success, failure and abort results survive
+cleanup. Directory-only permission repair skips symlinks and never chmods files;
+external directory contents and permissions remain unchanged. Replaced roots
+are refused. Irrecoverable cleanup warns once without replacing the child result.
+
+Execution and completion now read `app-server config/read` with the same cwd,
+environment and config-loading flags before model work. All three exact private
+temp overrides must appear in that effective configuration. A nonempty
+`include_only` must explicitly admit TMPDIR/TMP/TEMP (or already contain `*`);
+ambiguous filter dialects or unavailable strict configuration support fail
+closed. No filter is cleared or widened. The protocol follows the native
+[config/read contract](https://github.com/openai/codex/blob/main/codex-rs/app-server/src/config_manager_service.rs)
+and sends no thread or inference request.
+
+The review exercised the configuration protocol on the installed macOS
+0.167.0-alpha.3.2 CLI with an isolated home. Default and temp-compatible
+allowlists passed. A PATH-only allowlist produced the expected refusal.
+That binary accepts `--ignore-user-config` on `exec` and rejects it on
+`app-server`. Workspace-write calls using that selector stop before execution
+and identify the incompatible option. This includes the invocation in the
+coordinator's earlier host record. Hench's read-only orientation skips the
+scratch preflight. Fresh, resumed and forked model execution with the final
+build still requires host verification before the original Rex status correction.
+
 ## Same-task correction — 2026-11-18
 
 The earlier run explicitly reported incomplete criteria, but the outer runner

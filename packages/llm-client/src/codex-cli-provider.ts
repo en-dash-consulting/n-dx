@@ -21,10 +21,11 @@
  */
 
 import { codexEffortFlags, resolveCodexCliEffort } from "./codex-effort.js";
+import { assertCodexScratchEnvironment } from "./codex-scratch-env.js";
 
 import { CodexCliUsage } from "./codex-cli-usage.js";
 import { mkdir, readFile } from "node:fs/promises";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdtempSync, openSync, readdirSync, realpathSync, rmdirSync, rmSync, type BigIntStats } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type {
@@ -276,9 +277,34 @@ function scratchEnv(dir: string): Record<string, string> {
 }
 
 function disposeActiveScratch(): void {
-  for (const scratch of activeScratch) {
-    try { scratch.dispose(); }
-    catch (error) { process.emitWarning(`Could not remove Codex scratch: ${String(error)}`); }
+  for (const scratch of activeScratch) scratch.dispose();
+}
+
+/** Pin each parent while addressing its immediate entries. A surviving writer
+ * can rename a nested directory after open; its old pathname is no longer a
+ * safe base for either permission changes or recursive removal.
+ */
+function removeScratchEntry(path: string, stat: BigIntStats): void {
+  if (!stat.isDirectory()) {
+    rmSync(path, { force: true });
+    return;
+  }
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_DIRECTORY);
+  try {
+    const opened = fstatSync(fd, { bigint: true });
+    if (opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("Scratch directory changed during cleanup");
+    // Darwin's file-ID path names the open vnode. On Linux, procfs names the
+    // open descriptor directly. Keep it open through removal to pin its ID.
+    const anchor = process.platform === "darwin" ? `/.vol/${opened.dev}/${opened.ino}`
+      : process.platform === "linux" ? `/proc/self/fd/${fd}` : `/dev/fd/${fd}`;
+    if ((opened.mode & 0o700n) !== 0o700n) fchmodSync(fd, Number(opened.mode & 0o7777n) | 0o700);
+    for (const name of readdirSync(anchor)) {
+      const entry = join(anchor, name);
+      removeScratchEntry(entry, lstatSync(entry, { bigint: true }));
+    }
+    rmdirSync(path);
+  } finally {
+    closeSync(fd);
   }
 }
 
@@ -288,16 +314,32 @@ function disposeActiveScratch(): void {
  */
 export function createCodexScratch(): { dir: string; env: Record<string, string>; dispose(): void } {
   const dir = mkdtempSync(join(realpathSync(tmpdir()), "ndx-codex-scratch-"));
+  const owner = lstatSync(dir, { bigint: true });
   let disposed = false;
   const scratch = {
     dir,
     env: scratchEnv(dir),
     dispose(): void {
       if (disposed) return;
-      rmSync(dir, { recursive: true, force: true });
       disposed = true;
       activeScratch.delete(scratch);
       if (activeScratch.size === 0) process.removeListener("exit", disposeActiveScratch);
+      try {
+        const current = lstatSync(dir, { bigint: true, throwIfNoEntry: false });
+        if (!current) return;
+        if (!current.isDirectory() || current.dev !== owner.dev || current.ino !== owner.ino) {
+          throw new Error("Scratch root was replaced");
+        }
+        // Windows rm handles read-only attributes itself; POSIX needs directory
+        // write permission even when force:true is specified.
+        if (process.platform === "win32") rmSync(dir, { recursive: true, force: true });
+        else removeScratchEntry(dir, owner);
+      } catch {
+        // Cleanup must not replace a successful result, a child failure or abort.
+        // Report once, without publishing untrusted filenames or error payloads.
+        process.emitWarning(`Could not remove private Codex scratch ${dir}; remove this directory after checking its ownership.`,
+          { code: "NDX_CODEX_SCRATCH_CLEANUP" });
+      }
     },
   };
   if (activeScratch.size === 0) process.once("exit", disposeActiveScratch);
@@ -428,6 +470,9 @@ async function spawnOnce(
       ...codexEffortFlags(effort),
       "-",
     ];
+    if (scratchDir) {
+      await assertCodexScratchEnvironment({ binary: cliBinary, args, cwd: process.cwd(), env, scratchDir });
+    }
     debugLog(`spawn start cli="${cliBinary}" model="${request.model || resolveCodexModel(codexConfig)}" promptChars=${request.prompt.length}`);
     debugLog(`spawn args: ${JSON.stringify(args)}`);
 

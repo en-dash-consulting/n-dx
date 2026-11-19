@@ -24,6 +24,14 @@ describe("Codex effort at completion boundaries", () => {
           for await (const line of readline.createInterface({ input: process.stdin })) {
             const msg = JSON.parse(line);
             if (msg.method === 'initialize') console.log(JSON.stringify({ id: msg.id, result: {} }));
+            if (msg.method === 'config/read') {
+              const set = {};
+              for (const arg of args) {
+                const match = /^shell_environment_policy\\.set\\.(TMPDIR|TMP|TEMP)=(.*)$/.exec(arg);
+                if (match) set[match[1]] = JSON.parse(match[2]);
+              }
+              console.log(JSON.stringify({id:msg.id,result:{config:{shell_environment_policy:{set}}}}));
+            }
             if (msg.method === 'model/list') console.log(JSON.stringify({ id: msg.id, result: {
               data: [{ model: 'custom-model', supportedReasoningEfforts: [{reasoningEffort:'high'}, {reasoningEffort:'ultra'}] }], nextCursor: null
             } }));

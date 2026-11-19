@@ -36,7 +36,7 @@ describe("Codex exec accounting", () => {
   it.each([false, true])("retains spend across fake-binary retries (terminal failure: %s)", async (fail) => {
     const dir = await mkdtemp(join(tmpdir(), "codex-usage-test-"));
     try {
-      const cli = await writeFakeCli(dir, { name: "codex", script: `
+      const cli = await writeFakeCli(dir, { name: "codex", codexConfigRead: {}, script: `
         import fs from 'node:fs';
         const args = process.argv.slice(2);
         if (!args.includes('--json')) process.exit(99);
@@ -65,7 +65,7 @@ describe("Codex exec accounting", () => {
   ])("retries a structured stdout failure: $type", async (event) => {
     const dir = await mkdtemp(join(tmpdir(), "codex-json-error-"));
     try {
-      const cli = writeFakeCli(dir, { name: "codex", script: `
+      const cli = writeFakeCli(dir, { name: "codex", codexConfigRead: {}, script: `
         import fs from 'node:fs';
         for await (const chunk of process.stdin) { /* drain prompt */ }
         const marker = ${JSON.stringify(join(dir, "attempt"))};

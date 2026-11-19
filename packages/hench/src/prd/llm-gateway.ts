@@ -291,6 +291,7 @@ export type { PromptSectionCost } from "@n-dx/llm-client";
 export {
   compileCodexPolicyFlags,
   createCodexScratch,
+  assertCodexScratchEnvironment,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
 } from "@n-dx/llm-client";
