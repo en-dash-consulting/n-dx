@@ -18,8 +18,10 @@
  *   matches, in the directory and below. A restriction inside them is not read.
  * - **`RedirectMatch 403 regex`**: denies every URL path the regex matches.
  * - **Front controllers**: `RewriteRule pattern target [flags]` whose target,
- *   less its query string, is a literal `.php` path (`index.php?q=$1`), not
- *   a redirect, proxy, forbidden or gone rule; `FallbackResource /index.php`.
+ *   less its query string and any path info after `.php`, is a literal `.php`
+ *   path (`index.php?q=$1`, `index.php/$1`), not a redirect, proxy, forbidden
+ *   or gone rule; `FallbackResource /index.php`. A `.php` file chosen by a
+ *   back-reference or variable (`$1.php`) is a notice.
  *   A relative target is under `RewriteBase`, else the directory.
  *
  * A line ending in `\` continues on the next; a line starting with `#` is a
@@ -49,7 +51,7 @@ export interface HtaccessFrontController {
   readonly directive: "RewriteRule" | "FallbackResource";
   /** The rule's pattern as written; absent for `FallbackResource`. */
   readonly pattern?: string;
-  /** The target as written, query string removed. */
+  /** The target's file as written: query string, fragment and path info after `.php` removed. */
   readonly target: string;
   readonly line: number;
 }
@@ -258,15 +260,12 @@ export function parseHtaccess(file: string, text: string): Htaccess {
         const [, pattern, target, flags] = raw;
         if (pattern === undefined || target === undefined) break;
         if (flags !== undefined && flags.replace(/^\[|\]$/g, "").split(",").some((f) => NOT_INTERNAL.test(f.trim()))) break;
-        const path = phpTarget(target);
-        if (path !== undefined) frontControllers.push({ directive: "RewriteRule", pattern, target: path, line });
+        addFrontController(frontControllers, notices, file, { directive: "RewriteRule", pattern, target, line });
         break;
       }
-      case "fallbackresource": {
-        const path = raw[1] === undefined ? undefined : phpTarget(raw[1]);
-        if (path !== undefined) frontControllers.push({ directive: "FallbackResource", target: path, line });
+      case "fallbackresource":
+        if (raw[1] !== undefined) addFrontController(frontControllers, notices, file, { directive: "FallbackResource", target: raw[1], line });
         break;
-      }
     }
   }
   if (overlong > 0) notices.push(overlongLinesNotice(file, overlong, "access and rewrite rules"));
@@ -281,9 +280,35 @@ export function parseHtaccess(file: string, text: string): Htaccess {
   return { file, ...(access && { access }), fileDenials, urlDenials, ...(rewriteBase !== undefined && { rewriteBase }), frontControllers, notices };
 }
 
-/** A rewrite target's path when it is a literal local `.php` file: query string dropped, no back-reference or variable. */
-function phpTarget(target: string): string | undefined {
-  const path = target.split("?")[0]!;
-  if (/[$%]/.test(path) || /^[a-z][a-z0-9+.-]*:/i.test(path)) return undefined;
-  return path.toLowerCase().endsWith(".php") ? path : undefined;
+/**
+ * A rewrite target's file part: the text before its query string or fragment,
+ * cut after a `.php` followed by `/` (path info, `index.php/$1`).
+ */
+function targetFile(target: string): string {
+  const file = target.split(/[?#]/)[0]!;
+  const pathInfo = /\.php(?=\/)/i.exec(file);
+  return pathInfo === null ? file : file.slice(0, pathInfo.index + 4);
+}
+
+/**
+ * A rewrite target's local `.php` file: `{ path }` when literal, `"dynamic"`
+ * when a back-reference or variable chooses it (`$1.php`), else undefined.
+ */
+function phpTarget(target: string): { readonly path: string } | "dynamic" | undefined {
+  const file = targetFile(target);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(file) || !file.toLowerCase().endsWith(".php")) return undefined;
+  return /[$%]/.test(file) ? "dynamic" : { path: file };
+}
+
+/** Records `target`'s front controller, or a notice when the request chooses its file. */
+function addFrontController(
+  frontControllers: HtaccessFrontController[],
+  notices: string[],
+  file: string,
+  rule: HtaccessFrontController,
+): void {
+  const target = phpTarget(rule.target);
+  if (target === undefined) return;
+  if (target === "dynamic") notices.push(`${file}:${rule.line} ${rule.directive} target ${rule.target} takes its PHP file from the request; no route recorded.`);
+  else frontControllers.push({ ...rule, target: target.path });
 }

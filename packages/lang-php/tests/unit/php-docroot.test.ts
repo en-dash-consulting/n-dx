@@ -94,6 +94,19 @@ describe("parseHtaccess", () => {
       { directive: "RewriteRule", pattern: "^feed$", target: "/feed.php", line: 8 },
       { directive: "FallbackResource", target: "/front.php", line: 11 },
     ]);
+    expect(h.notices).toEqual([".htaccess:6 RewriteRule target $1.php takes its PHP file from the request; no route recorded."]);
+  });
+
+  it("reads a CodeIgniter-style front controller with path info or a query-string path, and notices a back-reference in the file", () => {
+    const h = parseHtaccess(
+      "web/.htaccess",
+      ["RewriteRule ^(.*)$ index.php/$1 [L]", "RewriteRule ^(.*)$ index.php?/$1 [L]", "RewriteRule ^p/(\\w+)$ pages/$1.php/x [L]"].join("\n"),
+    );
+    expect(h.frontControllers).toEqual([
+      { directive: "RewriteRule", pattern: "^(.*)$", target: "index.php", line: 1 },
+      { directive: "RewriteRule", pattern: "^(.*)$", target: "index.php", line: 2 },
+    ]);
+    expect(h.notices).toEqual(["web/.htaccess:3 RewriteRule target pages/$1.php/x takes its PHP file from the request; no route recorded."]);
   });
 });
 

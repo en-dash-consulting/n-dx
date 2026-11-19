@@ -65,7 +65,14 @@ items:
     lastModified: "2026-11-19T02:32:52.342Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96c36dff-2ec0-445a-9319-91d3f350c83c":
-    lastModified: "2026-11-18T22:35:12.587Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:02:24.421Z"
+    completedAt: "2026-11-19T03:06:10.342Z"
+    endedAt: "2026-11-19T03:06:10.342Z"
+    activeIntervals: [{"end":"2026-11-19T03:06:10.342Z","start":"2026-11-19T03:02:24.421Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "215f7c2fd: rewrite target file part (before ?, #, or / after .php) checked for $/%; index.php/$1 is a catch-all on index.php; $1.php is noticed."
+    lastModified: "2026-11-19T03:06:10.342Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a739a401-b0e9-4203-9156-16e8431a584f":
     lastModified: "2026-11-18T22:35:20.403Z"
