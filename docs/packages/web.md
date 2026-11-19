@@ -187,7 +187,7 @@ With `web.sidecar` on, Plan and Tune offer the Sidecar drawer as a second way to
 
 | Where | Control | Opens |
 |---|---|---|
-| Capture bar, beside Preview | **Plan with Sidecar** | The Plan lens with the typed text, which goes as the session's first turn. Scoped to the area when the capture was. If the open session cannot take the turn, a new one starts or the drawer says why. |
+| Plan's capture tile and its More… dialog, beside Preview | **Plan with Sidecar** | The Plan lens with the typed text, which goes as the session's first turn. Scoped to the area when the capture was. If the open session cannot take the turn, a new one starts or the drawer says why. |
 | Area view | (attaches itself) | An `area` page item, with Explain by default. **Plan in this area** switches to the Plan lens aimed at that area. Closing the view or opening another area drops the Plan lens. |
 | Inbox change | **Place with Sidecar** (replaces **Draft with the model**) | The Place lens on that change, with its placement card. |
 | Specs to tighten | **Tighten with Sidecar** | The Describe lens on the change. |

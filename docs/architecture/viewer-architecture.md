@@ -29,7 +29,7 @@ The dashboard is a loop of four stages, `STAGE_ORDER = ["analyze", "plan", "work
 
 | Field | Effect |
 |-------|--------|
-| `plain` | Lead section, rendered in the page with no header and never collapsible. One per stage, first |
+| `plain` | Lead section, rendered in the page with no header and never collapsible. At most one per stage, first (Plan has none) |
 | `open` | Expanded when the page first opens; the open state is remembered after that |
 | `scroll`, `fill` | Bounded scroll region with an Expand control; full-height body for views that size themselves |
 | `featureGate` | Hidden when the toggle is off (same keys as `useFeatureToggle`) |
@@ -51,7 +51,7 @@ The grid has twelve columns and fixed-height rows; a tile spans `cols` × `rows`
 Current composition:
 
 - **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line and controls); tiles `map` (8 × 3, chromeless, `iso-map`, dropped in static exports), `health` (the stats), `next-steps` (4 × 2), then `problems`, `suggestions`, `zones`, `architecture` (tab `routes`), `files`, `languages`, `ask` (6 wide, gate `sourcevision.ask`, requires server). Owns `graph` off-page.
-- **Plan (tiles):** no lead section. The lifecycle band, then a `capture` tile (`analysis`, 4 wide, `grow`, requires server): one input row whose More, like the tile header, opens the tile's modal with the whole Add Items form; the row and the modal share one draft (`CaptureDraftProvider`). Then Open changes (8 × 2, tabs `prd`, `product`), `inbox` (4 × 2) beneath capture, Plan health and Specs to tighten. Owns `requirements` off-page: it is a tab of Product, and its route still opens that tab.
+- **Plan (tiles):** no lead section. The lifecycle band, then a `capture` tile (`analysis`, 4 wide, `grow`, requires server): one input row whose More, like the tile header, opens the tile's modal with the whole Add Items form; the row, the modal and the Add Items page share one draft, text and images (`CaptureDraftProvider`, mounted in `main.ts` above the router); a capture from one drops the others' preview. Then Open changes (8 × 2, tabs `prd`, `product`), `inbox` (4 × 2) beneath capture, Plan health and Specs to tighten. Owns `requirements` off-page: it is a tab of Product, and its route still opens that tab.
 - **Work:** `rex-dashboard` (plain); `hench-audit`; `workspaces` (requires server).
 - **Tune (tiles):** lead `tune` (the stage's question, "how should this project's workflow change?": fit the workflow to the project and the tools it has); tiles `hench-runs` (Runs, 8 × 2, tab `activity` = Execution Log), `token-usage` (titled Spend), `hench-optimization` (titled Suggestions, tab `hench-adaptive`; never "Tuning", so the page does not read Tune › Tuning) and `merge-graph` (titled Shipped). Tile titles override view labels because labels are unique.
 

@@ -9,8 +9,10 @@
  * Proposals can be sent to the ProposalEditor for review or accepted directly.
  *
  * The `bar` layout is a single input row (no header, scope or examples) for
- * a stage page's lead section, where the full form crowded out the PRD.
- * Switching `bar` on an already-mounted instance keeps what has been typed.
+ * Plan's capture tile, whose More… opens the full form in the tile's modal.
+ * The two are separate instances sharing one draft (`draft`, `images`,
+ * `captureCount`). Switching `bar` on an already-mounted instance keeps what
+ * has been typed.
  *
  * On a v2 PRD (`layout: "v2"`) there is no LLM breakdown: `rex add` makes one
  * change per text, titled from its first line, with the full text as its
