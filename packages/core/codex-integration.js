@@ -41,6 +41,10 @@ function mergeCodexConfig(source, generated, file) {
   let i = 0;
   let table = [];
   const sections = [];
+  const edits = [];
+  // Only these launch fields belong to n-dx. Everything else is operator text.
+  const definitions = new Map([...generated.matchAll(/\[mcp_servers\.([^\]]+)\]\ncommand = ([^\n]+)\nargs = ([^\n]+)/g)]
+    .map(([, name, command, args]) => [name, { command, args }]));
   const tables = new Set();
   const values = new Set();
   const owned = new Set(Object.keys(getMcpServers()));
@@ -114,7 +118,7 @@ function mergeCodexConfig(source, generated, file) {
     blank();
     if (i === source.length) break;
     if (source[i] === "[") {
-      const start = i++;
+      i++;
       table = [key()];
       inline();
       while (source[i] === ".") { i++; table.push(key()); inline(); }
@@ -122,8 +126,13 @@ function mergeCodexConfig(source, generated, file) {
       end();
       if (tables.has(pathKey(table)) || hasValueParent(table)) fail();
       tables.add(pathKey(table));
-      sections.push({ start, owned: table[0] === "mcp_servers" && owned.has(table[1]) });
+      if (table[0] === "mcp_servers" && owned.has(table[1])) {
+        // A table occupying a generated scalar field cannot be safely replaced.
+        if (["command", "args", "url"].includes(table[2])) fail();
+        if (table.length === 2) sections.push({ name: table[1], headerEnd: i, fields: new Set() });
+      }
     } else {
+      const start = i;
       const path = [...table, key()];
       inline();
       if (source[i++] !== "=" || path[0] === "mcp_servers" && path.length < 3) fail();
@@ -133,21 +142,43 @@ function mergeCodexConfig(source, generated, file) {
         const child = JSON.parse(t);
         return child.length > path.length && path.every((p, n) => child[n] === p);
       })) fail();
+      inline();
+      const valueStart = i;
       value();
+      const valueEnd = i;
       end();
       values.add(pathKey(path));
+      if (path[0] === "mcp_servers" && owned.has(path[1]) && path.length === 3) {
+        const field = path[2];
+        if (field === "command" || field === "args") {
+          sections.find((s) => s.name === path[1]).fields.add(field);
+          edits.push({ start: valueStart, end: valueEnd, text: definitions.get(path[1])[field] });
+        } else if (field === "url") {
+          // Switching the generated transport to stdio removes the old URL,
+          // leaving its inline comment and all following comments untouched.
+          edits.push({ start, end: valueEnd, text: "" });
+        }
+      }
     }
   }
-  let kept = "";
-  let cursor = 0;
-  for (let n = 0; n < sections.length; n++) {
-    if (!sections[n].owned) continue;
-    kept += source.slice(cursor, sections[n].start);
-    cursor = sections[n + 1]?.start ?? source.length;
+  for (const section of sections) {
+    const missing = Object.entries(definitions.get(section.name))
+      .filter(([field]) => !section.fields.has(field))
+      .map(([field, value]) => `${field} = ${value}\n`).join("");
+    if (missing) edits.push({ start: section.headerEnd, end: section.headerEnd,
+      text: (source[section.headerEnd - 1] === "\n" ? "" : "\n") + missing });
   }
-  kept += source.slice(cursor);
-  const definitions = generated.slice(generated.indexOf("[mcp_servers."));
-  return kept + (kept && !kept.endsWith("\n") ? "\n" : "") + definitions;
+  // Apply from right to left so offsets always refer to the original bytes.
+  let merged = source;
+  for (const edit of edits.sort((a, b) => b.start - a.start)) {
+    merged = merged.slice(0, edit.start) + edit.text + merged.slice(edit.end);
+  }
+  for (const [name, fields] of definitions) {
+    if (sections.some((s) => s.name === name)) continue;
+    merged += (merged && !merged.endsWith("\n") ? "\n" : "")
+      + `[mcp_servers.${name}]\ncommand = ${fields.command}\nargs = ${fields.args}\n`;
+  }
+  return merged;
 }
 
 /**
@@ -246,7 +277,14 @@ function writeSkills(dir) {
 export function setupCodexIntegration(dir) {
   const absDir = resolve(dir);
 
-  const config = writeCodexConfig(absDir);
+  let config;
+  try {
+    config = writeCodexConfig(absDir);
+  } catch (error) {
+    // A config-only refusal must not prevent independent generated surfaces
+    // from refreshing. Keep the error visible in every init report format.
+    config = { written: false, path: join(absDir, ".codex/config.toml"), error: error.message || String(error) };
+  }
   const skills = writeSkills(absDir);
   const agents = writeAgentsMd(absDir);
 
@@ -273,6 +311,8 @@ export function printCodexSetupSummary(result) {
   if (result.config.written) {
     console.log(`  Config: wrote .codex/config.toml (${result.config.serverCount} MCP servers, stdio transport)`);
   }
+
+  if (result.config.error) console.log(`  Config: skipped — ${result.config.error}`);
 
   // Skills
   const skillList = getSkillNames().map((n) => `/${n}`).join(", ");

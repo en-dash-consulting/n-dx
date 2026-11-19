@@ -3544,47 +3544,19 @@ async function handleSetProjectSection(
     current[storagePkg] = {};
   }
 
-  // Vendor-change model reset: capture old values before setting new vendor
-  let warningMessages = [];
-  let oldVendor, oldClaudeModel, oldCodexModel;
-  if (pkg === "llm" && settingPath === "vendor") {
-    // Capture old values before overwriting
-    oldVendor = current[storagePkg].vendor;
-    oldClaudeModel = current[storagePkg].claude?.model;
-    oldCodexModel = current[storagePkg].codex?.model;
-  }
-
+  const oldVendor = current[storagePkg].vendor;
+  const warningMessages = [];
   setByPath(current[storagePkg], storageSettingPath, coerced, storagePkg);
 
-  // Now perform vendor-change model reset if needed
-  if (pkg === "llm" && settingPath === "vendor") {
-    const { resetStaleModel, formatVendorChangeWarning, NEWEST_MODELS } =
-      await import("@n-dx/llm-client");
-
-    // Check if Claude model needs to be reset
-    const claudeReset = resetStaleModel(oldVendor, oldClaudeModel, coerced);
-    if (claudeReset.changed) {
-      if (current[storagePkg].claude) {
-        delete current[storagePkg].claude.model;
+  if (pkg === "llm" && settingPath === "vendor" && oldVendor !== coerced) {
+    const { isModelCompatibleWithVendor } = await import("@n-dx/llm-client");
+    // Namespaced pins belong to their own vendor, including when inactive.
+    for (const vendor of ["claude", "codex"]) {
+      const model = current[storagePkg][vendor]?.model;
+      if (model !== undefined && (typeof model !== "string" || !isModelCompatibleWithVendor(vendor, model))) {
+        delete current[storagePkg][vendor].model;
+        warningMessages.push(`Cleared llm.${vendor}.model: "${model}" is not compatible with ${vendor}.`);
       }
-      const warning = formatVendorChangeWarning(
-        claudeReset,
-        NEWEST_MODELS.claude,
-      );
-      if (warning) warningMessages.push(warning);
-    }
-
-    // Check if Codex model needs to be reset
-    const codexReset = resetStaleModel(oldVendor, oldCodexModel, coerced);
-    if (codexReset.changed) {
-      if (current[storagePkg].codex) {
-        delete current[storagePkg].codex.model;
-      }
-      const warning = formatVendorChangeWarning(
-        codexReset,
-        NEWEST_MODELS.codex,
-      );
-      if (warning) warningMessages.push(warning);
     }
   }
 
@@ -3643,7 +3615,7 @@ async function handleSetProjectSection(
 
   // Print warnings for cleared models
   for (const warning of warningMessages) {
-    console.log(`  ⚠ ${warning.split("\n").join("\n  ")}`);
+    console.warn(`  ⚠ ${warning.split("\n").join("\n  ")}`);
   }
 
   // Cascade: local and google vendors require API mode — no CLI binary exists.
