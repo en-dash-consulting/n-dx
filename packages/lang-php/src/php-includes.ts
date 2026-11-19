@@ -34,9 +34,11 @@
  *
  * **Include-path roots**, in this order, without duplicates:
  * 1. literal `set_include_path(…)` and `ini_set('include_path', …)` anywhere
- *    in the repository (a `get_include_path()` part stands for the roots
- *    already known and is dropped; `PATH_SEPARATOR`, `:` and `;` separate
- *    roots), by file path then position;
+ *    in the repository, by file path then position, for every file (which
+ *    entry script runs a setting is unknown). `PATH_SEPARATOR`, `:` and `;`
+ *    separate roots; a `get_include_path()` part stands for the configured
+ *    path in force for the including file (2 and 3, else PHP's default `.`),
+ *    so appending keeps `.` and replacing drops it;
  * 2. `include_path` of a `.user.ini` and `php_value include_path` of a
  *    `.htaccess` in the including file's directory or above, nearest first
  *    (https://www.php.net/manual/en/configuration.file.per-user.php,
@@ -729,23 +731,38 @@ export async function readPhpIncludeConfigs(
 /** One include-path root: a repository directory, or a directory relative to the working directory. */
 type Root = { readonly kind: "repo" | "relative"; readonly path: string };
 
-/** An include path's roots; a part outside the repository is reported to `outside`. */
-function rootsOf(value: string, outside: (part: string) => void): Root[] {
+/** A part of an include path set in code: a root, or `get_include_path()` standing alone between separators. */
+type SetterPart = Root | typeof CURRENT_INCLUDE_PATH;
+
+/**
+ * An include path's parts in order; a part outside the repository is
+ * reported to `outside`. `get_include_path()` joined to other text in one
+ * part is not computable and is dropped.
+ */
+function partsOf(value: string, outside: (part: string) => void): SetterPart[] {
   const parts = value.split(new RegExp(`[${PATH_SEPARATOR}:;]`));
   // `C:\php\pear` was split at its drive colon: join it back.
   for (let i = 0; i + 1 < parts.length; i += 1) {
     if (/^[A-Za-z]$/.test(parts[i]!) && /^[\\/]/.test(parts[i + 1]!)) parts.splice(i, 2, `${parts[i]}:${parts[i + 1]}`);
   }
-  const roots: Root[] = [];
+  const out: SetterPart[] = [];
   for (const part of parts) {
+    if (part === CURRENT_INCLUDE_PATH) out.push(part);
     if (part === "" || part.includes(CURRENT_INCLUDE_PATH)) continue;
     const located = locate(part);
     if (located === undefined) continue;
     if (located.kind === "outside") outside(part.replace(REPO, "<repository>").replace(OUTSIDE, "<above the repository>"));
-    else roots.push(located);
+    else out.push(located);
   }
-  return roots;
+  return out;
 }
+
+/** An include path's roots, without its `get_include_path()` parts. */
+const rootsOf = (value: string, outside: (part: string) => void): Root[] =>
+  partsOf(value, outside).filter((p): p is Root => p !== CURRENT_INCLUDE_PATH);
+
+/** PHP's default include path, as far as the repository goes: `.` (`/usr/share/php` lies outside it). */
+const DEFAULT_ROOTS: readonly Root[] = [{ kind: "relative", path: "." }];
 
 const sameRoot = (a: Root, b: Root): boolean => a.kind === b.kind && a.path === b.path;
 
@@ -777,9 +794,11 @@ export class PhpIncludes {
   private readonly workingDirectoryCache = new Map<string, readonly string[]>();
   /** A constant's value when every definition in the repository computes to the same one. */
   private readonly constant: ConstantLookup;
-  private readonly setterRoots: Root[] = [];
+  /** Each literal include-path setting in code, by file path then position. */
+  private readonly setters: SetterPart[][] = [];
   private readonly configs: readonly PhpIncludeConfig[];
   private readonly configRoots = new Map<PhpIncludeConfig, Root[]>();
+  private readonly rootsCache = new Map<string, readonly Root[]>();
   private readonly outsideRoots = new Set<string>();
 
   constructor(sources: readonly PackSourceFile[], files: ReadonlySet<string>, configs: readonly PhpIncludeConfig[]) {
@@ -792,7 +811,7 @@ export class PhpIncludes {
       for (const value of this.includePathSettings(file)) {
         const computed = evaluatePath(value, file.path, this.constant);
         if (computed === undefined) continue;
-        for (const root of rootsOf(computed, (part) => this.outsideRoots.add(`"${part}" (set in ${file.path})`))) this.addRoot(this.setterRoots, root);
+        this.setters.push(partsOf(computed, (part) => this.outsideRoots.add(`"${part}" (set in ${file.path})`)));
       }
     }
     this.configs = configs;
@@ -820,15 +839,32 @@ export class PhpIncludes {
     if (!roots.some((r) => sameRoot(r, root))) roots.push(root);
   }
 
-  /** Include-path roots for a file, in search order; PHP's default `.` when nothing sets one. */
-  private rootsFor(file: string): Root[] {
-    const roots: Root[] = [...this.setterRoots];
+  /**
+   * Include-path roots for a file, in search order: each setting in code,
+   * its `get_include_path()` standing for the configured path in force (the
+   * file's `.user.ini`/`.htaccess` and any `php.ini`, else PHP's default
+   * `.`), then the configured path; PHP's default `.` when nothing sets one.
+   * A setting applies to every file: which entry script runs it is unknown.
+   */
+  private rootsFor(file: string): readonly Root[] {
+    const dir = dirOf(file);
+    const cached = this.rootsCache.get(dir);
+    if (cached !== undefined) return cached;
     const scoped = this.configs
-      .filter((c) => c.kind !== "php.ini" && (dirOf(c.file) === "" || file.startsWith(`${dirOf(c.file)}/`)))
+      .filter((c) => c.kind !== "php.ini" && (dirOf(c.file) === "" || dir === dirOf(c.file) || dir.startsWith(`${dirOf(c.file)}/`)))
       .sort((a, b) => b.file.split("/").length - a.file.split("/").length || compare(a.file, b.file));
-    const global = this.configs.filter((c) => c.kind === "php.ini");
-    for (const config of [...scoped, ...global]) for (const root of this.configRoots.get(config) ?? []) this.addRoot(roots, root);
-    return roots.length > 0 ? roots : [{ kind: "relative", path: "." }];
+    const inForce = [...scoped, ...this.configs.filter((c) => c.kind === "php.ini")];
+    const configured: Root[] = [];
+    for (const config of inForce) for (const root of this.configRoots.get(config) ?? []) this.addRoot(configured, root);
+    const current = inForce.length > 0 ? configured : DEFAULT_ROOTS;
+    const roots: Root[] = [];
+    for (const setter of this.setters) {
+      for (const part of setter) for (const root of part === CURRENT_INCLUDE_PATH ? current : [part]) this.addRoot(roots, root);
+    }
+    for (const root of configured) this.addRoot(roots, root);
+    const out = roots.length > 0 ? roots : DEFAULT_ROOTS;
+    this.rootsCache.set(dir, out);
+    return out;
   }
 
   /**

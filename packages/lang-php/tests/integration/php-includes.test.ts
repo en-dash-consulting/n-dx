@@ -95,6 +95,29 @@ describe("php include resolver", () => {
     ]);
   });
 
+  it("keeps PHP's default . root when an unrelated file appends to get_include_path()", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const append = join(import.meta.dirname, "..", "fixtures", "php-include-path-append");
+    expect(await includeOutcomes("catalog/includes/application_top.php", append)).toEqual([
+      "'includes/configure.php' catalog/includes/configure.php (include-path)",
+    ]);
+    expect(await includeOutcomes("catalog/index.php", append)).toEqual([
+      "'includes/application_top.php' catalog/includes/application_top.php (include-path)",
+      "'Mail.php' lib/Mail.php (include-path)",
+    ]);
+  });
+
+  it("searches only the new roots when set_include_path() replaces the path", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const replace = join(import.meta.dirname, "..", "fixtures", "php-include-path-replace");
+    expect(await includeOutcomes("catalog/includes/application_top.php", replace)).toEqual(["'includes/configure.php' not-found"]);
+    expect(await includeOutcomes("catalog/index.php", replace)).toEqual([
+      // Not under `lib`: found in the including file's directory, PHP's last resort.
+      "'includes/application_top.php' catalog/includes/application_top.php (including-directory)",
+      "'Mail.php' lib/Mail.php (include-path)",
+    ]);
+  });
+
   it("adds include edges beside class edges, keeps the conditional guard and reports roots outside the repository", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const { facts, notices } = await analyze();
