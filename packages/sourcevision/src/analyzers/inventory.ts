@@ -21,7 +21,7 @@ import {
   MINIFIED_HEAD_BYTES,
   MINIFIED_RULES,
 } from "./minified.js";
-import { markThirdParty } from "./third-party.js";
+import { markThirdParty, type ThirdPartyMark } from "./third-party.js";
 import { markMirrors, type MirrorPair } from "./mirrors.js";
 import {
   csharpConfig,
@@ -496,6 +496,8 @@ export interface InventoryResult extends Inventory {
   minifiedByContent?: string[];
   /** Mirrored folder pairs found this run (mirrors.ts), for the analyze log; never written. */
   mirrors?: MirrorPair[];
+  /** Third-party marks per folder and reason (third-party.ts), for the analyze log; never written. */
+  thirdPartyMarks?: ThirdPartyMark[];
 }
 
 /**
@@ -660,7 +662,7 @@ export async function analyzeInventory(
 
   // Third-party marks are recomputed every run (a cached entry may carry an old one). A file whose
   // mark changed is changed for downstream phases: it joins or leaves zones, classification and the call graph.
-  const marked = await markThirdParty(absDir, files, {
+  const { files: marked, marks: thirdPartyMarks } = await markThirdParty(absDir, files, {
     globs: [
       ...(inventoryConfig.thirdParty ?? []).map((glob) => ({ glob, source: "config" as const })),
       ...(options?.thirdPartyGlobs ?? []).map((glob) => ({ glob, source: "cli" as const })),
@@ -722,6 +724,7 @@ export async function analyzeInventory(
   }
   if (byContent.length > 0) result.minifiedByContent = byContent.sort();
   if (mirrored.pairs.length > 0) result.mirrors = mirrored.pairs;
+  if (thirdPartyMarks.length > 0) result.thirdPartyMarks = thirdPartyMarks;
 
   return result;
 }

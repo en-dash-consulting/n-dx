@@ -58,6 +58,7 @@ import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers
 import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
 import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers/inventory.js";
 import { mergeTokenUsage } from "../../analyzers/token-usage.js";
+import { describeThirdPartyMark } from "../../analyzers/third-party.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
 import { KNOWN_PACKS } from "../../language/pack-loader.js";
 import { packEntryPointSignals, type PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
@@ -218,6 +219,7 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
     );
     const excludedLine = describeExcluded(ctx.inventoryResult.summary);
     if (excludedLine) info(excludedLine);
+    for (const mark of ctx.inventoryResult.thirdPartyMarks ?? []) info(`  ${describeThirdPartyMark(mark)}`);
     for (const pair of ctx.inventoryResult.mirrors ?? []) {
       const share = pair.files === 0 ? 0 : Math.round((pair.matched / pair.files) * 100);
       info(`  [mirror] ${pair.mirror}/ mirrors ${pair.source}/: ${pair.matched} of ${pair.files} files identical (${share}%)${pair.configured ? ", set in sourcevision.mirrors" : ""}; counted once`);

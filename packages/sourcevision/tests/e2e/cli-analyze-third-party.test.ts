@@ -33,6 +33,8 @@ const FILES: Record<string, string> = {
   "js/widgets/grid.js": "export function grid() { return 4; }\n",
   "js/widgets/tree.js": "export function tree() { return 5; }\n",
   "js/charts/line.js": "export function line() { return 6; }\n",
+  // The application's own integration code in a folder named like a library: no banner, no entry file.
+  "app/ckeditor/plugin.js": "// requires jQuery v1.7 or later\nexport function plugin() { return 7; }\n",
 };
 
 describe("sv analyze --fast leaves copied-in third-party code out of the map", { timeout: 120_000 }, () => {
@@ -69,6 +71,10 @@ describe("sv analyze --fast leaves copied-in third-party code out of the map", {
     });
     expect(inventory.summary.thirdParty).toEqual({ files: 7, byReason: { "cli js/charts/**": 1, "config js/widgets/**": 2, "library YUI": 4 } });
     expect(output).toContain("7 files marked third-party (library YUI 4, config js/widgets/** 2, cli js/charts/** 1)");
+    expect(output).toContain('[third-party] js/build/node/: YUI (header), 1 file; undo with "!js/build/node/**" in sourcevision.thirdParty or --third-party');
+    expect(output).toContain("[third-party] js/widgets/** (config): 2 files");
+    expect(output).toContain("[third-party] js/charts/** (flag): 1 file");
+    expect(output).not.toContain("[third-party] app/");
   });
 
   it("keeps the application's import of the framework but leaves the framework out of zones", () => {

@@ -370,9 +370,13 @@ A library copied into the repository by hand (a spreadsheet library in `lib/`, a
 
 - a glob in `sourcevision.thirdParty` (project config), reason `config <glob>`;
 - a glob passed as `--third-party=<glob>` or listed in `--third-party-file=<path>` (one per line, or a JSON array), reason `cli <glob>`; a caller with its own library catalogue passes it this way;
-- a built-in fingerprint, reason `library <Name>`: a library's own header in the file's first 2 KiB (a `@package PHPExcel` docblock, a YUI or Highcharts version banner), a directory named as a well-known library (EditArea in a folder named edit_area, TinyMCE in tinymce, PHPExcel in PHPExcel), or a directory where at least 80% of the files carry one library's header.
+- a built-in fingerprint, reason `library <Name>`: a library's own header in the file's first 2 KiB (a `@package PHPExcel` docblock, a version banner where the library puts it, such as `/*! jQuery v3.6.0 |`; a comment like `// requires jQuery v1.7 or later` is not one), a directory named as a well-known library that also holds that library's evidence, or a directory where at least 80% of the files carry one library's header.
+
+A folder named as a library (EditArea in edit_area, TinyMCE in tinymce, CKEditor in ckeditor, PHPExcel in PHPExcel) counts only when a file under it carries that library's header, or the library's entry file (`ckeditor.js`, `tinymce.min.js`, `PHPExcel.php`, …; `LIBRARY_ENTRY_FILES` in `third-party.ts`) sits under it or beside it. An application's own `src/ckeditor/plugins/` stays first-party. No library name marks a folder on its own.
 
 Globs use `**`, `*` and `?`; a trailing `/` means the whole directory, and a name without `/` matches at any depth. A glob starting with `!` denies, overriding every rule, so a wrong fingerprint is undone with `"!lib/our-tinymce-plugin/**"`.
+
+After the count line, analyze prints one `[third-party]` line per marked folder with the library and the reason: `directory+banner`, `directory+entry`, `header`, `config` or `flag` (a library's header marks spread over more than five folders share one line). A built-in mark's line names its deny glob, e.g. `[third-party] js/ckeditor/: CKEditor (directory+entry), 212 files; undo with "!js/ckeditor/**" in sourcevision.thirdParty or --third-party`. `vendor/` and other package-manager folders are skipped before marking, so they get no line.
 
 A third-party file stays in the inventory, and imports to it still resolve. It is left out of zones (so never a zone entry point), classification and the model escalation pass, primary-language detection, readiness evidence and the call graph (`--include-third-party` maps it). Pack totals in `sdlc-profile.json` `ecosystem.<language>` count it apart, under `thirdParty`. An `outbound.json` call in it is kept, since a copied-in SDK's calls are still the repository's integrations, and marked `thirdParty`.
 
