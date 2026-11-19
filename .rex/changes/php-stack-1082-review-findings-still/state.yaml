@@ -33,7 +33,14 @@ items:
     lastModified: "2026-11-19T02:15:14.055Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7969bba2-eb02-4f21-a637-6c0cb4f1f4bb":
-    lastModified: "2026-11-18T22:35:09.459Z"
+    status: "completed"
+    startedAt: "2026-11-19T02:15:25.328Z"
+    completedAt: "2026-11-19T02:25:17.612Z"
+    endedAt: "2026-11-19T02:25:17.612Z"
+    activeIntervals: [{"end":"2026-11-19T02:25:17.612Z","start":"2026-11-19T02:15:25.328Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "evaluatePath caps nesting at MAX_PATH_NESTING (32); repositoryConstants caps chains at MAX_CONSTANT_CHAIN (32), chain length memoized so order-independent; both counted in [php-too-deep]. scopeNames iterative, cut at MAX_SCOPE_CLOSURES (32) with [php-deep-scope]. createPackEntry contains a throwing prepare as a notice (no imports, frameworks resolve nothing), not degraded."
+    lastModified: "2026-11-19T02:25:17.612Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8cdfc6e9-6a56-46ce-a44b-9e461dc45892":
     lastModified: "2026-11-18T22:35:11.034Z"

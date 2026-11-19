@@ -224,9 +224,22 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
           };
 
     // Prepared for imports, or on a framework's first lookup: a framework that never follows a reference costs nothing.
+    // A resolver that throws while preparing loses the imports alone, as a notice; a reinstall would not help.
     let preparedOnce: PreparedResolver | undefined;
-    const prepare = (bound: PackResolver): PreparedResolver => (preparedOnce ??= bound.prepare(parsed, unparsed));
-    const prepared: PreparedResolver | undefined = wantsImports && resolver ? prepare(resolver) : undefined;
+    let prepareFailure: string | undefined;
+    const prepare = (bound: PackResolver): PreparedResolver => {
+      if (preparedOnce === undefined) {
+        try {
+          preparedOnce = bound.prepare(parsed, unparsed);
+        } catch (error) {
+          prepareFailure = errorText(error);
+          preparedOnce = UNRESOLVED;
+        }
+      }
+      return preparedOnce;
+    };
+    const preparedForImports = wantsImports && resolver ? prepare(resolver) : undefined;
+    const prepared: PreparedResolver | undefined = preparedForImports === UNRESOLVED ? undefined : preparedForImports;
     const context: FrameworkContext | undefined = resolver && {
       resolve: (fromFile) => prepare(resolver).resolve(fromFile),
       module: (fromFile, specifier) => prepare(resolver).module?.(fromFile, specifier),
@@ -253,11 +266,21 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       ...refined.notices(),
       ...(options.projectNotices ? readProjectNotices(options.projectNotices, pack, structural, kinds) : []),
       ...(prepared?.notices?.() ?? []),
+      ...(prepareFailure === undefined ? [] : [prepareFailedNotice(pack, prepareFailure, wantsImports)]),
     ];
     return { facts, unparsed, ...(notices.length === 0 ? {} : { notices }), ...(parse ? { parse } : {}) };
   } finally {
     runner.dispose();
   }
+}
+
+/** What a resolver that failed to prepare resolves: nothing, so a framework following a reference finds no file. */
+const UNRESOLVED: PreparedResolver = { resolve: () => ({ files: [], external: [] }), module: () => undefined };
+
+/** The notice for a resolver whose `prepare` threw: what was lost, and the error. */
+function prepareFailedNotice(pack: LanguagePack, failure: string, wantsImports: boolean): string {
+  const lost = wantsImports ? "no imports were recorded, and frameworks followed no reference" : "frameworks followed no reference";
+  return `${pack.config.displayName}: import resolution failed while preparing the project (${failure}); ${lost}.`;
 }
 
 /** Rewrites by construct, keys in first-seen order. */

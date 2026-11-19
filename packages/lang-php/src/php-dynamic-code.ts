@@ -38,6 +38,8 @@
  * polyfill). The scope is the innermost function (`name`), method
  * (`Class::name`, `class@anonymous::name`) or closure (`{closure:<outer>}`,
  * `{closure}` at the top level) holding the site; absent at a file's top level.
+ * Past {@link MAX_SCOPE_CLOSURES} nested closures the name is cut, and the
+ * sites are counted in a `[php-deep-scope]` notice.
  *
  * An `exec` or `dispatch` site whose code or callable is read from a database
  * query result carries `database`: the tables and literal SELECT columns it
@@ -82,6 +84,16 @@ export const PHP_DYNAMIC_DISPATCH = "php-dynamic-dispatch";
 export const PHP_DB_EXEC = "php-db-exec";
 /** The notice code of dispatch sites that choose what to run from database data. */
 export const PHP_DB_DISPATCH = "php-db-dispatch";
+/** The notice code of sites whose scope is cut at {@link MAX_SCOPE_CLOSURES} nested closures. */
+export const PHP_DEEP_SCOPE = "php-deep-scope";
+
+/**
+ * Nested closures a scope name spells out; a site deeper in has a scope of
+ * that many `{closure:` around {@link CUT_SCOPE}. Real code nests a few.
+ */
+export const MAX_SCOPE_CLOSURES = 32;
+/** The scope of a site past {@link MAX_SCOPE_CLOSURES} nested closures: `…` stands for the rest. */
+const CUT_SCOPE = `${"{closure:".repeat(MAX_SCOPE_CLOSURES)}…${"}".repeat(MAX_SCOPE_CLOSURES)}`;
 
 const QUERY = "dynamic";
 const PREFIX = "dynamic.";
@@ -360,11 +372,22 @@ function scopeNames(captures: FileCaptures, positions: readonly SourcePosition[]
   innermostEach(scopes, closures, true).forEach((p, i) => parentOf.set(closures[i]!, p));
   const methodSet = new Set(methods);
   const closureSet = new Set(closures);
+  // Iterative, and cut at MAX_SCOPE_CLOSURES: thousands of nested closures overflowed the stack, and a name holding
+  // each would grow with the square of the nesting.
   const nameOf = (scope: Capture): string => {
-    if (closureSet.has(scope)) {
-      const parent = parentOf.get(scope);
-      return parent === undefined ? "{closure}" : `{closure:${nameOf(parent)}}`;
+    let closures = 0;
+    let at: Capture | undefined = scope;
+    while (at !== undefined && closureSet.has(at) && closures <= MAX_SCOPE_CLOSURES) {
+      closures += 1;
+      at = parentOf.get(at);
     }
+    if (closures > MAX_SCOPE_CLOSURES) return CUT_SCOPE;
+    if (closures === 0) return declaredName(scope);
+    // A closure at the top level is `{closure}`; one inside another scope is `{closure:<that scope>}`.
+    const inner = at === undefined ? "{closure}" : `{closure:${declaredName(at)}}`;
+    return `${"{closure:".repeat(closures - 1)}${inner}${"}".repeat(closures - 1)}`;
+  };
+  const declaredName = (scope: Capture): string => {
     if (methodSet.has(scope)) {
       const type = typeOf.get(scope);
       const owner = type === undefined ? undefined : (names.get(type) ?? "class@anonymous");
@@ -526,6 +549,13 @@ export function dynamicCodeNotices(facts: ReadonlyMap<string, readonly DynamicCo
   if (dbDispatch.length > 0) {
     const one = dbDispatch.length === 1;
     notices.push(`PHP: [${PHP_DB_DISPATCH}] ${dbDispatch.length} site${one ? " chooses" : "s choose"} what to run from database data: ${noticeLocations(dbDispatch)}${tablesRead(dbDispatch)}.`);
+  }
+  const deep = [...facts].flatMap(([path, list]) => list.filter((f) => f.scope === CUT_SCOPE).map((f) => ({ path, ...f })));
+  if (deep.length > 0) {
+    const one = deep.length === 1;
+    notices.push(
+      `PHP: [${PHP_DEEP_SCOPE}] ${deep.length} site${one ? " sits" : "s sit"} in closures nested more than ${MAX_SCOPE_CLOSURES} deep; ${one ? "its" : "their"} scope is named to that depth: ${noticeLocations(deep)}.`,
+    );
   }
   return notices;
 }
