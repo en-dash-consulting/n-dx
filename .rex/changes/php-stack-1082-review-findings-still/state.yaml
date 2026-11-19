@@ -79,7 +79,15 @@ items:
     lastModified: "2026-11-19T02:33:20.765Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dcd473b7-2b77-42f1-8720-e1cd223a4562":
-    lastModified: "2026-11-18T22:35:03.126Z"
+    status: "completed"
+    startedAt: "2026-11-19T02:53:03.813Z"
+    completedAt: "2026-11-19T02:57:36.624Z"
+    endedAt: "2026-11-19T02:57:36.624Z"
+    activeIntervals: [{"end":"2026-11-19T02:55:36.678Z","start":"2026-11-19T02:53:03.813Z"},{"end":"2026-11-19T02:57:36.624Z","start":"2026-11-19T02:57:36.624Z"}]
+    failureReason: "The completion was refused: the run left work uncommitted."
+    resolutionType: "code-change"
+    resolutionDetail: "phpConfig reuses TYPESCRIPT_SKIP_DIRECTORIES and TYPESCRIPT_GENERATED_FILE_PATTERNS (9ddab919a, from run ba81723e, committed by the operator after lang-kit 355 tests, typecheck, sourcevision language/inventory tests and changeset-body-policy passed). Review: changeset added; merged-config build/dist override captured as b392e0e8."
+    lastModified: "2026-11-19T02:57:36.624Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ec36a246-db57-4541-a4d4-28895bc10caf":
     lastModified: "2026-11-19T02:13:41.817Z"
