@@ -304,3 +304,13 @@ export function summaryField(item: object): { summary?: string } {
   const summary = (item as { summary?: unknown }).summary;
   return typeof summary === "string" && summary.trim() ? { summary: summary.trim() } : {};
 }
+
+/**
+ * `{ shortTitle }` when a PRD item or v2 node carries a non-empty short title,
+ * else nothing — for spreading into a wire row. Rows show it in place of the
+ * title, which stays the tooltip.
+ */
+export function shortTitleField(item: object): { shortTitle?: string } {
+  const shortTitle = (item as { shortTitle?: unknown }).shortTitle;
+  return typeof shortTitle === "string" && shortTitle.trim() ? { shortTitle: shortTitle.trim() } : {};
+}

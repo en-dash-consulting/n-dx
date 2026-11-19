@@ -13,6 +13,13 @@ items:
     lastModified: "2026-11-19T19:44:45.584Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "87627ce2-d130-493b-9ad7-515cd65fc86a":
+    status: "completed"
+    startedAt: "2026-11-19T18:43:33.544Z"
+    completedAt: "2026-11-19T19:08:32.874Z"
+    endedAt: "2026-11-19T19:08:32.874Z"
+    activeIntervals: [{"end":"2026-11-19T19:08:32.874Z","start":"2026-11-19T18:43:33.544Z"}]
+    appliedAt: "2026-11-19T19:08:32.874Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T18:16:23.775Z"
     lastModified: "2026-11-19T19:46:37.784Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

@@ -574,6 +574,8 @@ describe("web → rex gateway contract", () => {
     // Quick Add's image attachments, stored in the new change's folder
     "attachImages",
     "AttachmentError",
+    // The detail panel's short-title edit, refused by rex's name rule
+    "assertShortTitleAvailable",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -1069,6 +1071,8 @@ describe("gateway export auto-detection", () => {
         "findDuplicateItem",
         // Quick Add's image attachments, stored in the new change's folder.
         "attachImages", "AttachmentError",
+        // The detail panel's short-title edit, refused by rex's name rule.
+        "assertShortTitleAvailable",
         // Ready to run shows a change with no tasks as one task.
         "changeWorkShape"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",

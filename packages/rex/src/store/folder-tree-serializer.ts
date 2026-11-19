@@ -875,7 +875,7 @@ export function renderItemIndexMd(
  * `children` is always omitted (handled structurally).
  */
 const ORDERED_FIELDS: ReadonlyArray<string> = [
-  "id", "level", "title", "status", "priority", "tags", "blockedBy", "ready", "source",
+  "id", "level", "title", "shortTitle", "status", "priority", "tags", "blockedBy", "ready", "source",
   "startedAt", "completedAt", "endedAt",
   "resolutionType", "resolutionDetail", "failureReason",
   "acceptanceCriteria", "loe", "loeRationale", "loeConfidence", "run", "description",

@@ -47,7 +47,7 @@ import { loadHenchConfig } from "./hench-config-fields.js";
 import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { PAIR_REVIEW_SUPPORTED } from "./llm-review.js";
-import { isV2Tree, loadPRDSync, summaryField } from "./prd-io.js";
+import { isV2Tree, loadPRDSync, shortTitleField, summaryField } from "./prd-io.js";
 import { checkSavedRun, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
 import { indexedUnitRefusal, unitRefusal } from "./runnable-units.js";
 import { isRecord, itemTypeOf } from "../shared/index.js";
@@ -121,6 +121,8 @@ export interface PrepWorkspace {
 export interface ReadyTask {
   id: string;
   title: string;
+  /** Short name the row shows in place of the title when present. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders; the row shows it in place of the title when present. */
   summary?: string;
   /**
@@ -644,6 +646,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
     return {
       id: item.id,
       title: item.title,
+      ...shortTitleField(item),
       ...summaryField(item),
       ...descriptionField(item),
       status: item.status,

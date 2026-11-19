@@ -153,6 +153,15 @@ export interface WriteOptions {
    * Implementations may fall back to their own local project root.
    */
   projectDir?: string;
+
+  /**
+   * A precondition run inside the write's transaction, under the PRD lock,
+   * against the items as they stand just before the write; throwing refuses
+   * the write and nothing is saved. For a rule over the whole tree that a
+   * check made before the transaction would race, such as short-title
+   * uniqueness (`core/short-title.ts`). Honoured by `addItem` and `updateItem`.
+   */
+  assertBeforeWrite?: (items: readonly PRDItem[]) => void;
 }
 
 // ---------------------------------------------------------------------------

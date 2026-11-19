@@ -140,8 +140,9 @@ export class ChangeLayerStore implements PRDStore {
     return findItem((await this.loadDocument()).items, id)?.item ?? null;
   }
 
-  async addItem(item: PRDItem, parentId?: string): Promise<void> {
+  async addItem(item: PRDItem, parentId?: string, options?: WriteOptions): Promise<void> {
     await this.withTransaction(async (doc) => {
+      options?.assertBeforeWrite?.(doc.items);
       if (parentId === undefined) doc.items.push(item);
       else if (!insertChild(doc.items, parentId, item)) throw new Error(`Cannot add "${item.title}" under ${parentId}`);
     });
@@ -151,6 +152,7 @@ export class ChangeLayerStore implements PRDStore {
   async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     await this.changeLayerTransaction(
       async (doc) => {
+        options?.assertBeforeWrite?.(doc.items);
         if (!updateInTree(doc.items, id, updates)) throw new Error(`Item not found: ${id}`);
       },
       options?.preserveModifiedBy ? new Set([id]) : undefined,

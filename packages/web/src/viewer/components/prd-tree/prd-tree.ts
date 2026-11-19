@@ -504,7 +504,7 @@ class NodeRow extends Component<NodeRowProps> {
         ? h(BranchBadge, { branch: item.branch, sourceFile: item.sourceFile })
         : null,
       // Title (with search highlighting when query is active)
-      // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
+      // The short title or plain-language summary leads; the full title is the tooltip and the detail panel's heading.
       h("span", { class: "prd-node-title", title: item.title },
         ...(searchQuery ? highlightSearchText(displayTitle(item), searchQuery) : [displayTitle(item)]),
       ),

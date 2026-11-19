@@ -16,7 +16,7 @@ import {
   appendLog, API_SETTABLE_STATUSES, loadPRDOr404, broadcastPrdChanged,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
-import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError, assertShortTitleAvailable } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -143,7 +143,7 @@ export function routeItems(
  * added and changed by `move_item`, never by an edit.
  */
 const PATCHABLE_FIELDS = new Set([
-  "status", "failureReason", "priority", "prioritized", "tags", "title",
+  "status", "failureReason", "priority", "prioritized", "tags", "title", "shortTitle",
   "summary", "description", "acceptanceCriteria", "requirements",
 ]);
 
@@ -173,7 +173,7 @@ function validateItemPatch(body: unknown): string | null {
     return `Invalid priority: ${String(patch.priority)}`;
   }
   if (patch.prioritized !== undefined && typeof patch.prioritized !== "boolean") return `"prioritized" must be a boolean`;
-  for (const key of ["title", "summary", "description", "failureReason"] as const) {
+  for (const key of ["title", "shortTitle", "summary", "description", "failureReason"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
   if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;
@@ -266,6 +266,8 @@ async function handleItemPatch(
     if (typeof fieldUpdates.summary === "string" && !fieldUpdates.summary.trim()) fieldUpdates.summary = undefined;
     // Stored only as true; false removes it, as `rex update --prioritized=false` does.
     if (fieldUpdates.prioritized === false) fieldUpdates.prioritized = undefined;
+    // A short title is kept trimmed, and a cleared one removed, as `rex update --short-title=` and edit_item do.
+    if (typeof fieldUpdates.shortTitle === "string") fieldUpdates.shortTitle = fieldUpdates.shortTitle.trim() || undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
@@ -275,6 +277,11 @@ async function handleItemPatch(
           const target = "prioritized" in fieldUpdates ? findItemById(doc.items, itemId) : null;
           if (target && !PRIORITIZABLE_TYPES.has(itemTypeOf(target))) {
             throw new Error(`Only a change (an epic on a v1 PRD) can be prioritized; "${target.title}" is a ${itemTypeOf(target)}`);
+          }
+          if (typeof fieldUpdates.shortTitle === "string") {
+            const self = findItemById(doc.items, itemId);
+            // Refused naming the open item that already shows the name; checked under the lock the write holds.
+            if (self) assertShortTitleAvailable(doc.items, fieldUpdates.shortTitle, { id: itemId, status: (updates.status as string | undefined) ?? self.status });
           }
           if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
             throw new ItemNotFoundError(`Item "${itemId}" not found`);
@@ -826,6 +833,12 @@ async function handleBulkUpdate(
       ?? ("prioritized" in input.updates ? `"prioritized" is set per change, through PATCH /api/rex/items/:id` : null);
     if (problem) {
       errorResponse(res, 400, problem);
+      return true;
+    }
+    // A short title is unique among open items, so one value set on several
+    // ids always collides: it has no valid bulk use.
+    if ("shortTitle" in input.updates) {
+      errorResponse(res, 400, `Field "shortTitle" cannot be changed through the bulk route: a short title is unique among open items, so edit it per item (PATCH /api/rex/items/:id).`);
       return true;
     }
 

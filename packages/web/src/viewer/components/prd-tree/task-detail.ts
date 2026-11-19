@@ -30,7 +30,7 @@ import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
 import { placementTab } from "../../route-state.js";
-import { ImpactDetail, useItemImpacts } from "../impact-tags.js";
+import { ImpactDetail, itemName, nameTooltip, useItemImpacts } from "../impact-tags.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -267,7 +267,7 @@ function DependencyList({
             { class: `task-dep-status${isResolved ? " prd-status-completed" : " prd-status-blocked"}` },
             isResolved ? "●" : "⊘",
           ),
-          h("span", { class: "task-dep-title" }, dep ? dep.title : depId),
+          h("span", { class: "task-dep-title", title: dep ? nameTooltip(dep) : undefined }, dep ? itemName(dep) : depId),
           dep
             ? h("span", { class: `prd-level-badge prd-level-${itemTypeOf(dep)}` }, itemTypeLabel(itemTypeOf(dep)))
             : null,
@@ -330,6 +330,66 @@ function EditableTitle({
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDraft(title); setEditing(true); }
     },
   }, title, h("span", { class: "task-edit-icon" }, "\u270e"));
+}
+
+/**
+ * Editable short title: the name rows show in place of the full title. Click
+ * to edit; saving an empty value removes it. The server refuses one an open
+ * item already shows, and the dashboard's update toast names that item.
+ */
+function EditableShortTitle({
+  shortTitle,
+  onUpdate,
+}: {
+  shortTitle?: string;
+  onUpdate?: (shortTitle: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(shortTitle ?? "");
+
+  useEffect(() => { setDraft(shortTitle ?? ""); }, [shortTitle]);
+
+  const handleSave = useCallback(() => {
+    const trimmed = draft.trim();
+    if (trimmed !== (shortTitle ?? "") && onUpdate) onUpdate(trimmed);
+    setEditing(false);
+  }, [draft, shortTitle, onUpdate]);
+
+  if (!onUpdate) return shortTitle ? h("div", { class: "task-short-title" }, shortTitle) : null;
+
+  if (editing) {
+    return h("div", { class: "task-title-edit" },
+      h("input", {
+        class: "task-title-input task-short-title-input",
+        type: "text",
+        value: draft,
+        placeholder: "Short title (empty removes it)",
+        "aria-label": "Short title",
+        onInput: (e: Event) => setDraft((e.target as HTMLInputElement).value),
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === "Enter") { e.preventDefault(); handleSave(); }
+          if (e.key === "Escape") { setDraft(shortTitle ?? ""); setEditing(false); }
+        },
+        onBlur: handleSave,
+        ref: (el: HTMLInputElement | null) => el?.focus(),
+      }),
+    );
+  }
+
+  if (!shortTitle) {
+    return h("button", { class: "task-add-short-title-btn", onClick: () => { setDraft(""); setEditing(true); } }, "+ Add short title");
+  }
+
+  return h("div", {
+    class: "task-short-title editable",
+    onClick: () => { setDraft(shortTitle); setEditing(true); },
+    title: "Click to edit short title",
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDraft(shortTitle); setEditing(true); }
+    },
+  }, shortTitle, h("span", { class: "task-edit-icon" }, "\u270e"));
 }
 
 /** Editable description — click to edit with textarea. `noun` names it in the add button and tooltip. */
@@ -459,7 +519,7 @@ function ChildrenSummary({
           },
           h("span", { class: `prd-status-icon prd-status-${child.status}` }, statusIcons[child.status] || "○"),
           h("span", { class: `prd-level-badge prd-level-${itemTypeOf(child)}` }, itemTypeLabel(itemTypeOf(child))),
-          h("span", { class: "task-child-title" }, child.title),
+          h("span", { class: "task-child-title", title: nameTooltip(child) }, itemName(child)),
         ),
       ),
     ),
@@ -1250,7 +1310,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       isWorkItemType(itemType) ? h(AskInSidecarButton, { kind: "task", itemId: item.id }) : null,
     ),
 
-    // Editable title
+    // Editable title: the full title, whatever the rows show in its place
     h(
       "div",
       { class: "task-section", ref: titleRef },
@@ -1277,6 +1337,18 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Apply…: a change awaiting apply, previewed before it writes
     isChange ? h(ChangeApplySection, { key: `apply:${item.id}`, item, onWritten: onPrdChanged }) : null,
+
+    // Short title: the name rows show in place of the full title
+    item.shortTitle || onUpdate
+      ? h(TaskSection, { label: "Short title", class: "task-short-title-section" },
+          h(EditableShortTitle, {
+            shortTitle: item.shortTitle,
+            onUpdate: onUpdate
+              ? (shortTitle: string) => onUpdate(item.id, { shortTitle })
+              : undefined,
+          }),
+        )
+      : null,
 
     // In plain terms: what the item does and why it matters, for readers who do not read code.
     item.summary || onUpdate

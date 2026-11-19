@@ -11,6 +11,7 @@ import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { cascadeParentCompletion } from "../../core/parent-completion.js";
 import { validateDAG } from "../../core/dag.js";
 import { prioritizedRefusal, storedPrioritized } from "../../core/prioritized.js";
+import { assertShortTitleAvailable } from "../../core/short-title.js";
 import { findItem, resolveItem } from "../../core/tree.js";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { openClaimsStore, resolveClaimHolder } from "../../store/index.js";
@@ -167,6 +168,7 @@ export async function cmdUpdate(
   if (flags.description) updates.description = flags.description;
   // Empty removes it (undefined is not serialized).
   if (flags.summary !== undefined) updates.summary = flags.summary.trim() || undefined;
+  if (flags["short-title"] !== undefined) updates.shortTitle = flags["short-title"].trim() || undefined;
 
   if (flags.blockedBy !== undefined) {
     const raw = flags.blockedBy.trim();
@@ -236,9 +238,18 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --prioritized, --title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
+      "Use --status, --priority, --prioritized, --title, --short-title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
     );
   }
+
+  // Before any write, completion included, so a refused short title writes
+  // nothing; checked again under the lock the field write holds, so two
+  // writers cannot both take a name.
+  const shortTitleSelf = { id: resolvedId, status: updates.status ?? existing.status };
+  if (updates.shortTitle) assertShortTitleAvailable((await store.loadDocument()).items, updates.shortTitle, shortTitleSelf);
+  const assertBeforeWrite = updates.shortTitle
+    ? (items: readonly PRDItem[]) => assertShortTitleAvailable(items, updates.shortTitle, shortTitleSelf)
+    : undefined;
 
   // Validate dependencies before persisting
   if (updates.blockedBy && updates.blockedBy.length > 0) {
@@ -274,7 +285,7 @@ export async function cmdUpdate(
     for (const key of V2_COMPLETION_FIELDS) delete fieldUpdates[key];
   }
   if (Object.keys(fieldUpdates).length > 0) {
-    await store.updateItem(resolvedId, fieldUpdates, { applyAttribution: true, projectDir: dir });
+    await store.updateItem(resolvedId, fieldUpdates, { applyAttribution: true, projectDir: dir, assertBeforeWrite });
   }
 
   // Log the update
