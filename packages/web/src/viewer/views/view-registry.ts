@@ -44,7 +44,6 @@ import {
 import {
   PRDView,
   AnalysisView,
-  CaptureDraftProvider,
   RexDashboard,
   TokenUsageView,
   ValidationView,
@@ -187,10 +186,10 @@ function stage(id: StageId): ViewRenderer {
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
   });
-  // Plan's lifecycle strip and open-changes glance share one summary read;
-  // its capture tile and that tile's modal share one draft.
+  // Plan's lifecycle strip and open-changes glance share one summary read.
+  // (Its capture draft is shared from main.ts, above the router.)
   return id === "plan"
-    ? (ctx) => h(ChangesSummaryProvider, null, h(CaptureDraftProvider, null, page(ctx)))
+    ? (ctx) => h(ChangesSummaryProvider, null, page(ctx))
     : page;
 }
 

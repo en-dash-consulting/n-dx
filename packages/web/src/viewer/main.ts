@@ -65,6 +65,7 @@ import { waitForSession } from "./session.js";
 import { renderActiveView, renderViewContent, buildValidViews } from "./views/view-registry.js";
 import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
 import { LiveBar } from "./views/domain-live.js";
+import { CaptureDraftProvider } from "./views/domain-rex.js";
 import { captureSignInReturn } from "./views/connections.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
@@ -407,7 +408,9 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, setOpenZone, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(AskInSidecarContext.Provider, { value: askInSidecar }, h(Fragment, null,
+  // The capture draft sits above the router, so Plan's capture tile, its modal
+  // and the Add Items page (the modal's Open ↗) keep one text and one set of images.
+  return h(CaptureDraftProvider, null, h(GhostCardsContext.Provider, { value: proposals }, h(PlanWithSidecarContext.Provider, { value: planWithSidecar }, h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(SidecarPlacementContext.Provider, { value: placementShare }, h(DescribeInSidecarContext.Provider, { value: describeInSidecar }, h(DiagnoseInSidecarContext.Provider, { value: diagnoseInSidecar }, h(AskInSidecarContext.Provider, { value: askInSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -486,7 +489,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  ))))))));
+  )))))))));
 }
 
 const root = document.getElementById("app");

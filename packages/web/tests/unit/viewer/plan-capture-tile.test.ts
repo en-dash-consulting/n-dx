@@ -2,14 +2,19 @@
 /**
  * Plan's capture: a tile of its own, not a bar across the top of the page,
  * whose More opens the tile's modal with the whole Add Items form. Rendered
- * through the real registry, so the tile, its modal and the shared draft are
+ * through the real registry under the draft provider main.ts mounts above its
+ * router, so the tile, its modal, the Add Items page and the shared draft are
  * wired the way the dashboard wires them.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "preact";
+import { h, render } from "preact";
+import { useState } from "preact/hooks";
 import { act } from "preact/test-utils";
-import type { LoadedData } from "../../../src/viewer/types.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import type { LoadedData, ViewId } from "../../../src/viewer/types.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
+import { CaptureDraftProvider } from "../../../src/viewer/views/analysis.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { emptyJobTray } from "../../helpers/job-tray.js";
@@ -86,10 +91,25 @@ const tile = () => root.querySelector<HTMLElement>('.stage-tile[data-tile="captu
 const more = () => tile().querySelector<HTMLButtonElement>(".rex-analysis-more")!;
 const dialog = () => root.querySelector<HTMLElement>('.stage-tile-fullscreen [role="dialog"]');
 
+/** Navigates the harness, as the dashboard's router would. */
+let go: (view: ViewId) => void = () => {};
+
+/** main.ts in miniature: the capture draft above a router that renders one view. */
+function App() {
+  const [view, setView] = useState<ViewId>("plan");
+  go = setView;
+  return h(CaptureDraftProvider, null, renderActiveView(view, { ...ctx(), navigateTo: (v: ViewId) => setView(v) }));
+}
+
+async function navigate(view: ViewId) {
+  await act(async () => { go(view); });
+  await settle();
+}
+
 async function mountPlan() {
   root = document.createElement("div");
   document.body.appendChild(root);
-  await act(async () => { render(renderActiveView("plan", ctx()), root); });
+  await act(async () => { render(h(App, null), root); });
   await settle();
   await until(() => !!root.querySelector('.stage-tile[data-tile="capture"] .smart-add-btn-attach'));
 }
@@ -225,6 +245,27 @@ describe("Plan's capture tile", () => {
     ]);
     // One draft: the capture cleared the tile's row as well.
     expect(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.value).toBe("");
+  });
+
+  it("keeps the modal's text through Open ↗ to the Add Items page, and the page's text back on Plan", async () => {
+    await mountPlan();
+    await openMore();
+    await type(dialog()!.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!, "Redo the checkout header");
+    await act(async () => { dialog()!.querySelector<HTMLButtonElement>(".stage-tile-open-page")!.click(); });
+    await settle();
+    expect(root.querySelector(".stage-tile")).toBeNull();
+    expect(root.querySelector<HTMLTextAreaElement>(".rex-analysis-view .smart-add-textarea")!.value).toBe("Redo the checkout header");
+
+    await type(root.querySelector<HTMLTextAreaElement>(".rex-analysis-view .smart-add-textarea")!, "Redo the checkout footer");
+    await navigate("plan");
+    expect(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.value).toBe("Redo the checkout footer");
+  });
+
+  it("is shared from main.ts, above the router, not from the Plan page alone", () => {
+    const main = readFileSync(resolve(__dirname, "../../../src/viewer/main.ts"), "utf-8");
+    const registry = readFileSync(resolve(__dirname, "../../../src/viewer/views/view-registry.ts"), "utf-8");
+    expect(main).toMatch(/return h\(CaptureDraftProvider, null,/);
+    expect(registry).not.toContain("CaptureDraftProvider");
   });
 
   it("drops the tile's preview once the modal adds the change, so the change is added once", async () => {
