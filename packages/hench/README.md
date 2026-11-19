@@ -169,7 +169,12 @@ Direct runs share the API tool guard, task claims, budgets, completion/test
 gates and recovery. `--approve-diff` is supported; CLI self/pair review remains
 unavailable on API runs, as on Claude API. Explicit incompatible review flags
 are refused; saved/configured self-review follows the existing warning policy.
-OpenAI model/vendor failover is not enabled by this task.
+
+Direct API runs support bounded model/vendor failover when
+`llm.autoFailover=true`. Each fallback still requires a supported agent model
+and that vendor's API credentials. Codex CLI execution does not use this chain.
+See the [configuration guide](../../docs/guide/configuration.md#llm-vendor)
+for the failover policy.
 
 The Responses codec is tested against synthetic transport fixtures. Model
 listing and codec support do not prove live account access. The dashboard lists
