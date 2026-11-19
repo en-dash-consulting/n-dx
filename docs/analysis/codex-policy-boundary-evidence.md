@@ -4,6 +4,33 @@ Task: `9285e760-055c-4638-adf0-63358f35a339`. Supported policy controls and
 capability reporting are verified below. This is not admission evidence for
 Codex hub sessions: native repository-read confinement remains unsupported.
 
+## PR8 review remediation — 2026-11-19
+
+Task: `83b0a2a3-1f01-4f64-8e93-920b6a685b7e`. Hench's workspace-write
+execution and review spawns now own a private temporary directory. The completion
+provider uses the same owner. Each spawn adds only that directory to writable
+roots and sets `TMPDIR`, `TMP` and `TEMP` in both the CLI environment and its
+shell overrides. Resume and fork create new scratch directories; they do not
+reuse a path from a prior thread. Cleanup follows child exit, failure or
+cancellation, with a process-exit fallback. Host temp roots remain excluded.
+
+The resolved Codex pair reviewer now triggers the unsupported-guard warning
+even with a Claude executor. Resolution (also consumed by dashboard preparation),
+live output and persisted diagnostics carry the same warning. Core's separate
+`n-dx pair-programming` reviewer receives the compiled read-only, approval-never,
+strict-config policy and shell credential masks through its existing config
+helper boundary. Its test command still runs separately on the host.
+
+New deterministic coverage uses actual Node child processes for ordinary temp
+APIs, fresh/resume/fork scratch ownership, error and abort cleanup, symlink-safe
+disposal and idempotency. Scripted reviewer tests cover live/persisted warnings
+and both core reviewer spawn paths with hostile native config fixtures. These
+tests establish lifecycle and argv contracts, **not new installed-Codex
+enforcement evidence**. The November 18 host records below predate this change.
+The coordinator still owns the fresh mandatory review and any new host probe,
+then the original PR8 parent's supported Rex status correction. No task or
+parent completion is asserted by this executor.
+
 ## Same-task correction — 2026-11-18
 
 The earlier run explicitly reported incomplete criteria, but the outer runner

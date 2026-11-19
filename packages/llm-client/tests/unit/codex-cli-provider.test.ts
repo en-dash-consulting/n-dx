@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rm, readFile, mkdir, writeFile, symlink } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { writeFakeCli } from "../helpers/fake-cli.js";
 import {
@@ -10,6 +11,7 @@ import {
   codexShellEnvFlags,
   CODEX_AGENT_HIDDEN_ENV,
   createCodexCliClient,
+  createCodexScratch,
 } from "../../src/codex-cli-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
 import { DEFAULT_EXECUTION_POLICY } from "../../src/runtime-contract.js";
@@ -23,6 +25,63 @@ const SHELL_ENV = [
 ];
 
 const WORKSPACE = ["--strict-config", "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}'];
+
+describe("Codex provider scratch lifecycle", () => {
+  it("disposes only its own directory and does not reclaim a reused path", async () => {
+    const scratch = createCodexScratch();
+    const other = createCodexScratch();
+    try {
+      await writeFile(join(other.dir, "keep"), "owned by another spawn");
+      await symlink(other.dir, join(scratch.dir, "link"), process.platform === "win32" ? "junction" : "dir");
+      scratch.dispose();
+      expect(await readFile(join(other.dir, "keep"), "utf-8")).toBe("owned by another spawn");
+      await mkdir(scratch.dir);
+      await writeFile(join(scratch.dir, "keep"), "reused path");
+      scratch.dispose();
+      expect(await readFile(join(scratch.dir, "keep"), "utf-8")).toBe("reused path");
+    } finally {
+      scratch.dispose();
+      other.dispose();
+      await rm(scratch.dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each([0, 1])("supplies normal temp APIs a private bounded directory and cleans exit %s", async exitCode => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-scratch-test-"));
+    try {
+      const capture = join(dir, "capture.json");
+      const binary = writeFakeCli(dir, { name: "scratch-cli", script: `
+        import fs from 'node:fs';
+        import os from 'node:os';
+        import path from 'node:path';
+        const args = process.argv.slice(2);
+        if (!args.includes('-o')) process.exit(0);
+        const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'normal-api-'));
+        fs.writeFileSync(path.join(temporary, 'file'), 'ok');
+        fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({ args, tmp: os.tmpdir(),
+          temp: process.env.TEMP, tmpEnv: process.env.TMP, mode: fs.statSync(os.tmpdir()).mode & 0o777 }));
+        fs.writeFileSync(args[args.indexOf('-o') + 1], 'done');
+        process.exit(${exitCode});
+      ` });
+      const client = createCodexCliClient({ codexConfig: { cli_path: binary }, maxRetries: 0 });
+      const result = client.complete({ prompt: "test" });
+      if (exitCode) await expect(result).rejects.toThrow();
+      else await result;
+      const observed = JSON.parse(await readFile(capture, "utf-8"));
+      expect(observed.tmp).not.toBe(tmpdir());
+      expect(observed.temp).toBe(observed.tmp);
+      expect(observed.tmpEnv).toBe(observed.tmp);
+      if (process.platform !== "win32") expect(observed.mode).toBe(0o700);
+      expect(observed.args).toContain(`sandbox_workspace_write={network_access=false,writable_roots=[${JSON.stringify(observed.tmp)}],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}`);
+      expect(observed.args).toContain(`shell_environment_policy.set.TMPDIR=${JSON.stringify(observed.tmp)}`);
+      const output = observed.args[observed.args.indexOf("-o") + 1];
+      const relativeOutput = relative(observed.tmp, output);
+      expect(isAbsolute(relativeOutput) || relativeOutput.startsWith(`..${sep}`)).toBe(true);
+      expect(existsSync(output)).toBe(false);
+      expect(existsSync(observed.tmp)).toBe(false);
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+});
 
 describe("Codex policy flag compilation", () => {
   describe("mapSandboxToCodexFlag", () => {

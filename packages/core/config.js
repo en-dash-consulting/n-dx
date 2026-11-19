@@ -1841,6 +1841,18 @@ export async function loadCodexShellEnvFlags() {
   return codexShellEnvFlags();
 }
 
+/** Read-only, unattended review policy, including shell credential masking.
+ * Keep compilation at this existing spawn-exempt config boundary.
+ * @returns {Promise<string[]>}
+ */
+export async function loadCodexReviewerFlags() {
+  const { compileCodexPolicyFlags, DEFAULT_EXECUTION_POLICY } = await import("@n-dx/llm-client");
+  return compileCodexPolicyFlags({
+    ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only", approvals: "never",
+    networkAccess: false, writableRoots: [],
+  });
+}
+
 /** The auth preflight's arguments for a CLI vendor. */
 async function vendorAuthPreflightArgs(vendor) {
   return vendor === LLM_VENDOR.CODEX

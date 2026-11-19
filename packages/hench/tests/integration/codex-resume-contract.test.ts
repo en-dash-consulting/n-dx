@@ -29,7 +29,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
@@ -199,6 +199,10 @@ describe("codex batch resume — contract", () => {
     // two `-c` overrides re-apply the run's policy, which a resumed thread
     // does not keep; the rest keep the Codex credentials out of the resumed
     // agent's commands.
+    const tmpFlag = cli.invocations[0]!.args.find(arg => arg.startsWith("shell_environment_policy.set.TMPDIR="));
+    const scratch = JSON.parse(tmpFlag!.slice("shell_environment_policy.set.TMPDIR=".length));
+    expect(scratch).toMatch(/ndx-codex-scratch-/);
+    expect(existsSync(scratch)).toBe(false);
     expect(cli.invocations[0]!.args).toEqual([
       "exec",
       "resume",
@@ -208,7 +212,10 @@ describe("codex batch resume — contract", () => {
       "-c", 'sandbox_mode="workspace-write"',
       "-c", 'approval_policy="never"',
       "--strict-config",
-      "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}',
+      "-c", `sandbox_workspace_write={network_access=false,writable_roots=[${JSON.stringify(scratch)}],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}`,
+      "-c", `shell_environment_policy.set.TMPDIR=${JSON.stringify(scratch)}`,
+      "-c", `shell_environment_policy.set.TMP=${JSON.stringify(scratch)}`,
+      "-c", `shell_environment_policy.set.TEMP=${JSON.stringify(scratch)}`,
       "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",

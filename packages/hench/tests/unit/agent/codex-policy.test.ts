@@ -15,4 +15,12 @@ describe("Codex guard capability reporting", () => {
     expect(codexGuardLimitations("codex", "api")).toBeUndefined();
     expect(codexGuardLimitations("claude", "cli")).toBeUndefined();
   });
+
+  it("reports a resolved Codex pair reviewer with a Claude executor", () => {
+    expect(codexGuardLimitations("claude", "cli", "pair", "codex")).toContain("pair reviewer");
+    for (const [provider, mode, reviewer] of [
+      ["api", "pair", "codex"], ["cli", "off", "codex"],
+      ["cli", "self", "codex"], ["cli", "pair", "claude"],
+    ]) expect(codexGuardLimitations("claude", provider!, mode, reviewer)).toBeUndefined();
+  });
 });

@@ -23,7 +23,8 @@
 import { codexEffortFlags, resolveCodexCliEffort } from "./codex-effort.js";
 
 import { CodexCliUsage } from "./codex-cli-usage.js";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type {
@@ -206,7 +207,7 @@ export function mapApprovalToCodexFlag(policy: ApprovalPolicy): CodexApprovalPol
  */
 export function compileCodexPolicyFlags(
   policy: ExecutionPolicy,
-  options: { resume?: boolean } = {},
+  options: { resume?: boolean; scratchDir?: string } = {},
 ): string[] {
   // A disabled sandbox cannot enforce a network or writable-root restriction.
   // Refuse contradictory policies instead of silently discarding their limits.
@@ -233,6 +234,14 @@ export function compileCodexPolicyFlags(
   if (policy.sandbox === "workspace-write" && additionalRoots.length === policy.writableRoots.length) {
     throw new Error("Codex workspace-write always permits the project root; writableRoots must include '.' or use read-only");
   }
+  const scratchDir = policy.sandbox === "workspace-write" ? options.scratchDir : undefined;
+  if (scratchDir) additionalRoots.push(scratchDir);
+  const shellFlags = [
+    ...(scratchDir ? ["TMPDIR", "TMP", "TEMP"].flatMap(name => [
+      "-c", `shell_environment_policy.set.${name}=${JSON.stringify(scratchDir)}`,
+    ]) : []),
+    ...codexShellEnvFlags(),
+  ];
   // Strict parsing is required in every mode, including continuation turns.
   // Older CLIs must reject the flag rather than ignore unfamiliar controls.
   const workspaceFlags = ["--strict-config", ...(policy.sandbox === "workspace-write" ? [
@@ -245,7 +254,7 @@ export function compileCodexPolicyFlags(
       `sandbox_mode="${mapSandboxToCodexFlag(policy.sandbox)}"`,
       "-c",
       `approval_policy="${mapApprovalToCodexFlag(policy.approvals)}"`,
-      ...workspaceFlags, ...codexShellEnvFlags(),
+      ...workspaceFlags, ...shellFlags,
     ];
   }
   if (policy.approvals === "never" && policy.sandbox === "danger-full-access") {
@@ -257,8 +266,43 @@ export function compileCodexPolicyFlags(
     mapSandboxToCodexFlag(policy.sandbox),
     "-c",
     `approval_policy=${mapApprovalToCodexFlag(policy.approvals)}`,
-    ...workspaceFlags, ...codexShellEnvFlags(),
+    ...workspaceFlags, ...shellFlags,
   ];
+}
+
+const activeScratch = new Set<ReturnType<typeof createCodexScratch>>();
+function scratchEnv(dir: string): Record<string, string> {
+  return { TMPDIR: dir, TMP: dir, TEMP: dir };
+}
+
+function disposeActiveScratch(): void {
+  for (const scratch of activeScratch) {
+    try { scratch.dispose(); }
+    catch (error) { process.emitWarning(`Could not remove Codex scratch: ${String(error)}`); }
+  }
+}
+
+/** Owned by one spawn, never by a resumable thread. Only this private child
+ * directory is granted, never the host temp root. mkdtemp creates mode 0700.
+ * Normal completion awaits child exit before disposal; exit is the fallback.
+ */
+export function createCodexScratch(): { dir: string; env: Record<string, string>; dispose(): void } {
+  const dir = mkdtempSync(join(realpathSync(tmpdir()), "ndx-codex-scratch-"));
+  let disposed = false;
+  const scratch = {
+    dir,
+    env: scratchEnv(dir),
+    dispose(): void {
+      if (disposed) return;
+      rmSync(dir, { recursive: true, force: true });
+      disposed = true;
+      activeScratch.delete(scratch);
+      if (activeScratch.size === 0) process.removeListener("exit", disposeActiveScratch);
+    },
+  };
+  if (activeScratch.size === 0) process.once("exit", disposeActiveScratch);
+  activeScratch.add(scratch);
+  return scratch;
 }
 
 /**
@@ -355,13 +399,20 @@ async function spawnOnce(
   codexConfig?: CodexConfig,
   policy?: ExecutionPolicy,
 ): Promise<CompletionResult> {
-  const dir = await mkdtemp(join(tmpdir(), "ndx-codex-"));
+  const scratch = createCodexScratch();
+  const dir = scratch.dir;
   const outputPath = join(dir, "last-message.txt");
   const usage = new CodexCliUsage();
 
   try {
     const effectivePolicy = policy ?? DEFAULT_EXECUTION_POLICY;
-    const policyFlags = compileCodexPolicyFlags(effectivePolicy);
+    // Keep the CLI's result file outside the temp root granted to its commands.
+    const scratchDir = effectivePolicy.sandbox === "workspace-write" ? join(dir, "tmp") : undefined;
+    if (scratchDir) {
+      await mkdir(scratchDir, { mode: 0o700 });
+      env = { ...env, ...scratchEnv(scratchDir) };
+    }
+    const policyFlags = compileCodexPolicyFlags(effectivePolicy, { scratchDir });
     const effort = await resolveCodexCliEffort(request.model || resolveCodexModel(codexConfig), request.effort,
       { binary: cliBinary, env, cwd: process.cwd() }, request.taskClass);
     const args = [
@@ -494,7 +545,7 @@ async function spawnOnce(
     if (error instanceof Error) Object.assign(error, usage.finish());
     throw error;
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    scratch.dispose();
   }
 }
 

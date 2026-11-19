@@ -88,30 +88,34 @@ export const codexCliAdapter: VendorAdapter = {
     // filesystem, network and approval controls; it must not claim allowlists.
     //
     // Fork/resume reapply the execution policy; neither inherits permission.
-    const { binary, args, stdin } = codexSessionDriver.turnSpawn({
-      systemPrompt,
-      prompt: taskPrompt,
-      model: opts.model,
-      resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId, fork: opts.forkSession } : undefined,
-      codex: {
-        forkSupported: opts.codexForkSupported,
-        effort: opts.effort,
-        // Orientation must not reach write-capable MCP tools outside the sandbox.
-        configFlags: opts.codexOrientationFlags,
-        policyFlags: compileCodexPolicyFlags(policy),
-        resumePolicyFlags: compileCodexPolicyFlags(policy, { resume: true }),
-      },
-    });
+    const build = (scratchDir?: string): SpawnConfig => {
+      const { binary, args, stdin } = codexSessionDriver.turnSpawn({
+        systemPrompt,
+        prompt: taskPrompt,
+        model: opts.model,
+        resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId, fork: opts.forkSession } : undefined,
+        codex: {
+          forkSupported: opts.codexForkSupported,
+          effort: opts.effort,
+          // Orientation must not reach write-capable MCP tools outside the sandbox.
+          configFlags: opts.codexOrientationFlags,
+          policyFlags: compileCodexPolicyFlags(policy, { scratchDir }),
+          resumePolicyFlags: compileCodexPolicyFlags(policy, { resume: true, scratchDir }),
+        },
+      });
 
-    return {
-      binary,
-      usageResumeSessionId: opts.resumeSessionId,
-      args,
-      env: {},
-      // The prompt always travels on stdin; see the driver for why not argv.
-      stdinContent: stdin,
-      cwd: ".",
+      return {
+        binary,
+        usageResumeSessionId: opts.resumeSessionId,
+        args,
+        env: scratchDir ? { TMPDIR: scratchDir, TMP: scratchDir, TEMP: scratchDir } : {},
+        ...(policy.sandbox === "workspace-write" && !scratchDir ? { withScratchDir: build } : {}),
+        // The prompt always travels on stdin; see the driver for why not argv.
+        stdinContent: stdin,
+        cwd: ".",
+      };
     };
+    return build();
   },
 
   parseEvent(line: string, turn: number): RuntimeEvent | null {

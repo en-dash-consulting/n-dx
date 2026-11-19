@@ -454,7 +454,8 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
 
   // ── Provider ──────────────────────────────────────────
   const provider = settings.provider;
-  const policyLimitations = codexGuardLimitations(vendor, provider.value);
+  const policyLimitations = codexGuardLimitations(vendor, provider.value,
+    settings.reviewMode.value, settings.reviewVendor.value ?? undefined);
   if (provider.error) refuse("provider-unsupported", provider.error);
   if (!provider.error && !settings.model.mismatch && provider.value === "api" &&
       vendor === LLM_VENDOR.CODEX && !supportsOpenAiTurns(settings.model.value)) {
