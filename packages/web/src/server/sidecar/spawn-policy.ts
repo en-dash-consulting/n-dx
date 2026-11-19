@@ -61,9 +61,9 @@
  * - a backstop in the session registry: a turn whose events show a tool use
  *   on any MCP server but the broker is stopped
  *   ({@link strayMcpServer}).
- * - `--ignore-user-config` drops the user's `model_provider` too, so a user
- *   config selecting any provider but `openai` refuses the session at create
- *   and before every turn ({@link codexUserProviderRefusal}).
+ * - `--ignore-user-config` drops the user's `model_provider` too. The selected
+ *   provider alone is carried by `codex-provider.ts`; unsupported settings or
+ *   missing credentials refuse before a turn, without selecting a fallback.
  *
  * **Hub scope.** The hub session works from the hub snapshot and must not
  * read any repository, so its Claude spawn gets no built-in tool at all
@@ -74,12 +74,13 @@
 
 import { chmodSync, lstatSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
-import { CodexProjectConfigError, codexProjectMcpDisableFlags, codexUserConfigPath, codexUserModelProvider, compileCodexPolicyFlags } from "@n-dx/llm-client";
+import { CodexProjectConfigError, codexProjectMcpDisableFlags, compileCodexPolicyFlags } from "@n-dx/llm-client";
 import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy, RuntimeEvent } from "@n-dx/llm-client";
 import { errorMessage } from "../response-utils.js";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
 import type { SidecarScope } from "./context-refresh.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
+import { readSidecarCodexProvider } from "./codex-provider.js";
 
 /** The built-in Claude tools a Sidecar session keeps: reads only. */
 export const SIDECAR_READ_TOOLS = ["Read", "Grep", "Glob"] as const;
@@ -103,23 +104,16 @@ export function hubVendorRefusal(vendor: string, audited?: { platform: NodeJS.Pl
 }
 
 /**
- * Why a Codex Sidecar session cannot run under the user's Codex config, or
- * null when it can. A turn runs with `--ignore-user-config`, so a
- * `model_provider` the config selects (top level or through the selected
- * profile) would not apply: Codex would fall back to `openai` and never read
- * that provider's key. Checked at create and before every turn; the config
- * may change between them.
+ * Preflight selected settings/auth, without copying integrations or running a
+ * helper. The connection rechecks with its effective environment policy.
  */
 export function codexUserProviderRefusal(env: NodeJS.ProcessEnv = process.env): string | null {
-  const file = codexUserConfigPath(env);
-  let provider: string | undefined;
   try {
-    provider = codexUserModelProvider(env);
+    readSidecarCodexProvider(env);
+    return null;
   } catch (error) {
-    return `A Codex Sidecar session cannot start: ${file} could not be read (${errorMessage(error)}), so its model provider is unknown. Fix the file, or use Claude for the Sidecar.`;
+    return errorMessage(error);
   }
-  if (provider === undefined || provider === "openai") return null;
-  return `A Codex Sidecar session cannot start: ${file} selects model provider ${JSON.stringify(provider)}, but Codex Sidecar sessions skip the user's Codex config, so that provider would not apply. Use Claude for the Sidecar, or the default OpenAI provider.`;
 }
 
 /** Codex: read-only, never asks, no network, no writable root, no command or file tool beyond reads. */

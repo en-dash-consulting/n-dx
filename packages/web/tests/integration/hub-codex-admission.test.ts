@@ -21,7 +21,7 @@ vi.mock("../../src/server/sidecar/spawn-policy.js", async (original) => ({
   CODEX_HUB_SHA256: "7165e60b6463d4bea38f00a56eea90e96bfcc590aaa3d2b88c53208f54869348",
 }));
 vi.mock("../../src/server/sidecar/session-env.js", () => ({
-  resolveSidecarSessionEnv: async () => ({ llmConfig: { codex: { cli_path: fixture.binary } } }),
+  resolveSidecarSessionEnv: async () => ({ llmConfig: { codex: { cli_path: fixture.binary, model: "gpt-6-astra" } } }),
 }));
 vi.mock("@n-dx/llm-client", async (original) => {
   const actual = await original<typeof import("@n-dx/llm-client")>();
@@ -59,6 +59,7 @@ it("admits the selected exact executable and wires production broker confinement
   for (let i = 0; i < 3; i++) {
     const result = await connect(record);
     expect(result.binary).toBe(fixture.binary);
+    expect(result.model).toBe("gpt-6-astra");
     expect(result.codex?.policyFlags).toEqual(result.codex?.resumePolicyFlags);
     expect(result.codex?.policyFlags?.join(" ")).toContain('":root"="deny"');
     expect(result.codex?.configFlags?.join(" ")).toContain('mcp_servers.ndx-sidecar.required=true');
@@ -206,6 +207,7 @@ it("uses production registry admission across fresh/resume/restart and refuses a
   for (const [, args] of fixture.spawn.mock.calls) {
     expect(args.join(" ")).toContain('default_permissions="ndx-hub-candidate"');
     expect(args).not.toContain("--sandbox");
+    expect(args[args.indexOf("-m") + 1]).toBe("gpt-6-astra");
   }
   expect(fixture.spawn.mock.calls[1][1]).toContain("resume");
   expect(fixture.spawn.mock.calls[2][1]).toContain("stable-thread");

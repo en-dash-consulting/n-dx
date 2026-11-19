@@ -4,6 +4,7 @@ import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSyncCli, resolveVendorCliEnv } from "@n-dx/llm-client";
 import { resolveSidecarSessionEnv } from "./session-env.js";
+import { readSidecarCodexProvider } from "./codex-provider.js";
 import { CODEX_HUB_BINARY, CODEX_HUB_SHA256, CODEX_HUB_VERSION, CODEX_HUB_REQUIREMENT, codexUserProviderRefusal } from "./spawn-policy.js";
 export { CODEX_HUB_VERSION } from "./spawn-policy.js";
 
@@ -23,7 +24,14 @@ let verifiedStamp: string | undefined;
 export async function admitCodexHub(projectDir: string) {
   if (process.platform !== "darwin") throw new Error(CODEX_HUB_REQUIREMENT);
   const settings = await resolveSidecarSessionEnv(projectDir);
-  const env = resolveVendorCliEnv({ ...settings.llmConfig, vendor: "codex" }, settings.envPolicy);
+  const selectedProvider = readSidecarCodexProvider(process.env, settings.envPolicy);
+  const env = resolveVendorCliEnv({ ...settings.llmConfig, vendor: "codex",
+    ...(selectedProvider.provider !== "openai" && { codex: { ...settings.llmConfig.codex, auth: "cli" as const } }),
+  }, settings.envPolicy);
+  for (const name of Object.keys(env)) {
+    if (selectedProvider.sourceNames.includes(name) || Object.values(selectedProvider.env).includes(env[name] ?? "")) delete env[name];
+  }
+  const provider = readSidecarCodexProvider(env, settings.envPolicy);
   const refusal = codexUserProviderRefusal(env);
   if (refusal) throw new Error(refusal);
   const selected = settings.llmConfig.codex?.cli_path ?? "codex";
@@ -40,7 +48,7 @@ export async function admitCodexHub(projectDir: string) {
     if (hash.digest("hex") !== CODEX_HUB_SHA256) throw new Error(CODEX_HUB_REQUIREMENT);
     verifiedStamp = stamp;
   }
-  const identity = createHash("sha256").update(JSON.stringify([selected, original, binary, stamp, settings, env])).digest("hex");
+  const identity = createHash("sha256").update(JSON.stringify([selected, original, binary, stamp])).digest("hex");
   const check = (): void => {
     const current = lstatSync(binary);
     if (realpathSync(original) !== binary || JSON.stringify([current.dev, current.ino, current.size, current.mtimeMs, current.ctimeMs]) !== stamp) {
@@ -48,6 +56,9 @@ export async function admitCodexHub(projectDir: string) {
     }
     const refusal = codexUserProviderRefusal(env);
     if (refusal) throw new Error(refusal);
+    if (readSidecarCodexProvider(env, settings.envPolicy).identity !== provider.identity) {
+      throw new Error("Codex Sidecar provider settings/auth changed during turn preparation; retry the turn");
+    }
     const version = execFileSyncCli(binary, ["--version"], { env, cwd: projectDir, timeout: 5_000, encoding: "utf-8" }).toString().trim();
     if (version !== `codex-cli ${CODEX_HUB_VERSION}`) throw new Error(CODEX_HUB_REQUIREMENT);
   };

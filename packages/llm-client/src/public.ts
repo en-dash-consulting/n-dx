@@ -281,6 +281,7 @@ export {
 } from "./codex-project-config.js";
 
 export { codexUserConfigPath, codexUserModelProvider } from "./codex-user-config.js";
+export { codexConfigAssignments } from "./codex-project-config.js";
 
 export { supportsOpenAiTurns } from "./openai-responses.js";
 

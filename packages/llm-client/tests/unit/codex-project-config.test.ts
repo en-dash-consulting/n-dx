@@ -7,9 +7,32 @@ import {
   CODEX_DISABLED_MCP_URL,
   codexConfigMcpServerNames,
   codexConfigMcpServers,
+  codexConfigAssignments,
   codexProjectConfigPaths,
   codexProjectMcpDisableFlags,
 } from "../../src/codex-project-config.js";
+
+describe("codexConfigAssignments", () => {
+  it("retains exact selected values across inline, dotted and quoted table forms", () => {
+    const values = codexConfigAssignments(`profile='chosen'
+[profiles."chosen"]
+model_provider="custom"
+[model_providers.custom]
+env_http_headers = { "X-Auth" = "AUTH_VAR" }
+query_params.api-version = "2025-01-01"
+requires_openai_auth = false
+`);
+    expect(values.get(JSON.stringify(["profile"]))).toBe("'chosen'");
+    expect(values.get(JSON.stringify(["model_providers", "custom", "env_http_headers", "X-Auth"]))).toBe('"AUTH_VAR"');
+    expect(values.get(JSON.stringify(["model_providers", "custom", "query_params", "api-version"]))).toBe('"2025-01-01"');
+    expect(values.get(JSON.stringify(["model_providers", "custom", "requires_openai_auth"]))).toBe("false");
+  });
+
+  it("refuses duplicate selection and array tables instead of silently choosing another provider", () => {
+    expect(() => codexConfigAssignments('model_provider="a"\nmodel_provider="b"')).toThrow(/Duplicate/);
+    expect(() => codexConfigAssignments('[[profiles.selected]]\nmodel_provider="other"')).toThrow(/Array tables/);
+  });
+});
 
 describe("codexConfigMcpServerNames", () => {
   it("reads the servers ndx init writes", () => {

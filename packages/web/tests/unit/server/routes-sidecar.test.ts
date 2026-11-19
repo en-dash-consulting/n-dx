@@ -309,24 +309,23 @@ describe("sessions", () => {
   it.each([
     ["top level", `model_provider = "azure"\n`],
     ["selected profile", `model_provider = "openai"\nprofile = "az"\n\n[profiles.az]\nmodel_provider = "azure"\n`],
-  ])("refuses a Codex session, recording none, when the user Codex config selects another provider (%s)", async (_where, text) => {
-    const file = writeUserCodexConfig(text);
+  ])("refuses a Codex session, recording none, when the selected provider definition is missing (%s)", async (_where, text) => {
+    writeUserCodexConfig(text);
     const res = await api("", { method: "POST", body: { vendor: "codex" } });
     expect(res.status).toBe(400);
     const { error } = await res.json();
-    expect(error).toContain(`"azure"`);
-    expect(error).toContain(file);
-    expect(error).toContain("Use Claude for the Sidecar");
+    expect(error).toContain("Unsupported Codex Sidecar provider capability");
+    expect(error).toContain("no base_url");
     expect(registry.list()).toHaveLength(0);
     expect((await api("", { method: "POST", body: { vendor: "claude" } })).status).toBe(201);
   });
 
-  it("refuses a Codex session, naming the file, when the user Codex config cannot be read", async () => {
+  it("refuses a Codex session with a safe diagnostic when the user Codex config cannot be read", async () => {
     const file = join(process.env.CODEX_HOME as string, "config.toml");
     mkdirSync(file, { recursive: true });
     const res = await api("", { method: "POST", body: { vendor: "codex" } });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toContain(file);
+    expect((await res.json()).error).toContain("user config could not be read");
     expect(registry.list()).toHaveLength(0);
   });
 
@@ -535,15 +534,15 @@ describe("turns", () => {
     expect(registry.get(id)?.cursor).toBe(0);
   });
 
-  it("refuses a Codex turn without spawning when the user Codex config selects another provider", async () => {
+  it("refuses a Codex turn without spawning when the selected provider definition is missing", async () => {
     mkdirSync(join(root, ".git"));
     const { id } = registry.create({ scope: "worktree", worktree: root, vendor: "codex" });
-    const file = writeUserCodexConfig(`model_provider = "azure"\n`);
+    writeUserCodexConfig(`model_provider = "azure"\n`);
     const res = await api(`/${id}/turns`, { method: "POST", body: { prompt: "hi" } });
     expect(res.status).toBe(409);
     const { error } = await res.json();
-    expect(error).toContain(`"azure"`);
-    expect(error).toContain(file);
+    expect(error).toContain("Unsupported Codex Sidecar provider capability");
+    expect(error).toContain("no base_url");
     expect(spawns).toBe(0);
     expect(registry.get(id)?.cursor).toBe(0);
   });

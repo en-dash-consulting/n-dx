@@ -53,6 +53,7 @@ import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 import { admitCodexHub, hubCodexSnapshotPath } from "./hub-codex.js";
+import { readSidecarCodexProvider, sidecarProviderConnection, protectProviderSession, providerEvent, type SidecarCodexProvider } from "./codex-provider.js";
 import {
   candidateCodexHubSpawn,
   hubVendorRefusal,
@@ -77,6 +78,8 @@ export interface SidecarSessionRecord {
   name: string;
   vendor: string;
   model?: string;
+  /** Non-secret selection persisted so a removed custom config cannot resume on OpenAI. */
+  codexProvider?: string;
   lens?: string;
   /** What the lens is pointed at (an item id, display id or alias); absent means no target. */
   target?: PacketTarget;
@@ -143,7 +146,7 @@ export interface UpdateSidecarSessionInput {
 }
 
 /** Session options the registry does not own: env policy, LLM config, binary. */
-type SidecarConnectionOptions = Omit<VendorSessionOptions, "vendor" | "cwd" | "model">;
+type SidecarConnectionOptions = Omit<VendorSessionOptions, "vendor" | "cwd"> & { provider?: SidecarCodexProvider };
 export type SidecarSessionConnect = (
   record: SidecarSessionRecord,
 ) => SidecarConnectionOptions | Promise<SidecarConnectionOptions>;
@@ -272,14 +275,18 @@ export function sidecarSessionConnect(
           return profile.codex.turnConfigFlags?.() ?? [];
         } },
       };
-      if (!previous) admitted.set(record.id, { identity: settings.identity, spawn });
-      return { ...settings, codex: spawn.codex, extraEnv: spawn.env };
+      if (!previous) admitted.set(record.id, { identity: settings.identity, spawn: profile });
+      return sidecarProviderConnection(settings, spawn, record.worktree, record.scope, record.model);
     }
     const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs, record.worktree);
+    const settings = await resolveSidecarSessionEnv(envDir ?? record.worktree);
+    if (isCodex) {
+      writeBrokerMcpConfig(dir, record.id);
+      return sidecarProviderConnection(settings, codex, record.worktree, record.scope, record.model);
+    }
     return {
-      ...await resolveSidecarSessionEnv(envDir ?? record.worktree),
-      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, isCodex ? undefined : endpoint), record.scope, codex.codex),
-      ...(isCodex && Object.keys(codex.env).length > 0 && { extraEnv: codex.env }),
+      ...settings,
+      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, endpoint), record.scope, codex.codex),
     };
   };
 }
@@ -396,6 +403,7 @@ export class SidecarSessionRegistry {
       worktree: input.worktree,
       name: input.name ?? "Sidecar",
       vendor: input.vendor,
+      ...(input.vendor === "codex" && { codexProvider: readSidecarCodexProvider().provider }),
       ...(input.model && { model: input.model }),
       ...(input.lens && { lens: input.lens }),
       ...(input.target && { target: { ...input.target } }),
@@ -809,23 +817,31 @@ export class SidecarSessionRegistry {
   /** The open vendor session, resuming the stored id when there is none — after a restart or the TTL. */
   private async liveSession(record: SidecarSessionRecord, signal: AbortSignal): Promise<LiveSession | undefined> {
     const existing = this.live.get(record.id);
-    // A hub Codex turn revalidates selected binary, config and filesystem
-    // identity even when the previous turn left an in-memory session handle.
-    if (existing && !(record.scope === "hub" && record.vendor === "codex")) return existing;
+    // Every Codex turn re-resolves provider/auth/model. The hub additionally
+    // revalidates audited binary and filesystem identity. Retain the resume id,
+    // not the previous handle's captured environment or configuration.
+    if (existing && record.vendor !== "codex") return existing;
     const connection = await this.connect(record);
     if (signal.aborted) return undefined;
-    if (existing) return existing;
+    if (connection.provider) {
+      // Records predating provider selection could only have run on OpenAI.
+      if ((record.codexProvider ?? "openai") !== connection.provider.provider) {
+        throw new Error("Codex Sidecar selected provider changed; end this session and create one for the new provider. No fallback was attempted.");
+      }
+      const stored = this.records.get(record.id);
+      if (stored) stored.codexProvider = connection.provider.provider;
+    }
     const options: VendorSessionOptions = {
       ...connection,
       vendor: record.vendor,
       cwd: record.worktree,
       ...(record.model && { model: record.model }),
-      onEvent: (event) => entry.sink?.(event),
+      onEvent: (event) => entry.sink?.(providerEvent(connection.provider, event)),
     };
     const entry: LiveSession = {
-      session: record.resumeId
+      session: protectProviderSession(record.resumeId
         ? resumeVendorSession(record.resumeId, options)
-        : startVendorSession(options),
+        : startVendorSession(options), connection.provider),
     };
     this.live.set(record.id, entry);
     return entry;
