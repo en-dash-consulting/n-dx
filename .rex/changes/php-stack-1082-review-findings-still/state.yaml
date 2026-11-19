@@ -71,7 +71,14 @@ items:
     lastModified: "2026-11-19T02:15:14.055Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "70795381-c8f5-49f5-bdd4-c90bb9b7dca9":
-    lastModified: "2026-11-19T16:12:09.632Z"
+    status: "completed"
+    startedAt: "2026-11-19T16:12:29.769Z"
+    completedAt: "2026-11-19T16:13:00.895Z"
+    endedAt: "2026-11-19T16:13:00.895Z"
+    activeIntervals: [{"end":"2026-11-19T16:13:00.895Z","start":"2026-11-19T16:12:29.769Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Lead cut to 27 words; Python example moved to paragraph 2 (e2a0bbacb). Policy test not run in session."
+    lastModified: "2026-11-19T16:13:00.895Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7969bba2-eb02-4f21-a637-6c0cb4f1f4bb":
     status: "completed"
