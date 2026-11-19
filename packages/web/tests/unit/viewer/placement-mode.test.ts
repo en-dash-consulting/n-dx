@@ -431,6 +431,23 @@ describe("PlacementMode", () => {
     expect($<HTMLButtonElement>(".cp-place")!.disabled).toBe(false);
   });
 
+  it("draws the placement preview in the wide panel, undecided until a relation is chosen", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-label", { strength: "possible" })])]);
+    await mount(h(PlacementMode, { changeId: "a", navigateTo: vi.fn() }));
+    await act(async () => { $<HTMLInputElement>('.cp-card[data-target="cap-label"] input[type="radio"]')!.click(); });
+    await settle();
+    expect($(".cp-wide .pp")?.dataset.relation).toBe("unset");
+    expect($(".pp-diff-pending")).not.toBeNull();
+    expect($(".pp-why .inbox-strength")?.dataset.strength).toBe("possible");
+    expect($<HTMLButtonElement>(".cp-place")!.textContent).toBe("Place");
+
+    await act(async () => { $<HTMLInputElement>('.cp-card.is-checked .cp-relation input[value="touches"]')!.click(); });
+    await settle();
+    expect($(".pp-edge")?.dataset.relation).toBe("touches");
+    expect($$(".pp-flow .pp-title").map((el) => el.textContent)).toEqual(["Change a", "Home cap-label"]);
+    expect($<HTMLButtonElement>(".cp-place")!.textContent).toBe("Touch Home cap-label");
+  });
+
   it.each([
     ["possible", [candidate("cap-label", { strength: "possible" })], false],
     ["tied", [candidate("cap-label"), candidate("cap-vat")], true],

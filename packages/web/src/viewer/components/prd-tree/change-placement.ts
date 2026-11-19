@@ -12,6 +12,11 @@
  * "Nothing fits", which swaps in a proposal for a new capability or
  * constraint.
  *
+ * Once a target is chosen, a preview (`placement-preview.ts`) draws the
+ * change, the relation and the target, why rex suggested it and the target
+ * before and after; it redraws on every pick and edit, and the Place button
+ * takes its label: "Touch Refunds", "Amend Refunds".
+ *
  * Nothing is auto-accepted: every write is a button press, through
  * `POST /api/rex/changes/:id/place` or `/propose`. Rex decides; its refusals
  * show inline in its words, with a hint picked by their `kind`.
@@ -52,6 +57,7 @@ import { Pending } from "../../views/product-notices.js";
 import type { CriterionDraft, PlacementTarget } from "./placement-types.js";
 export type { CriterionDraft, PlacementTarget } from "./placement-types.js";
 import { StrengthChip } from "../strength-chip.js";
+import { PlacementPreview, placePreview, type PreviewModel } from "../placement-preview.js";
 import { PlaceWithSidecarButton, PlaceWithSidecarContext } from "../place-with-sidecar.js";
 import type {
   CapabilityDetail,
@@ -504,6 +510,48 @@ export function TargetSearch({ map, mapError, onChoose }: {
 
 // ── Place form ───────────────────────────────────────────────────────
 
+/** The preview of the place form's current choice: what Place would do, and why that target. */
+export function previewOf({ changeTitle, changeWhere, chosen, relation, placement, onShortlist, byModel, drafts, criteriaLoading, proposed }: {
+  changeTitle: string;
+  /** Where the change sits now: the Inbox, or already placed or applied. */
+  changeWhere: string;
+  chosen: PlacementTarget;
+  relation: PlacementRelation | null;
+  placement: ChangePlacement | null;
+  /** The target is a shortlist row, so rex's strength and reasons stand behind it. */
+  onShortlist: boolean;
+  byModel: boolean;
+  drafts: readonly CriterionDraft[];
+  criteriaLoading: boolean;
+  proposed: string;
+}): PreviewModel {
+  // Once read, the target's own criteria are the drafts' originals.
+  const criteria = criteriaLoading
+    ? chosen.criteria
+    : drafts.filter((d) => d.original !== undefined).map((d) => ({ id: d.id, text: d.original! }));
+  return placePreview({
+    changeTitle,
+    changeWhere,
+    target: { ...chosen, ...(criteria ? { criteria } : {}) },
+    relation,
+    suggested: onShortlist,
+    byModel,
+    // A tied shortlist ties only its top rows: a lower row is not tied with anything.
+    tied: !!placement?.tied && onShortlist && chosen.score !== undefined && chosen.score === placement.shortlist[0]?.score,
+    ...(placement ? { rule: { relation: placement.relation, text: placement.relationRule } } : {}),
+    ...(relation === "amends"
+      ? {
+          amendment: {
+            proposed,
+            added: drafts.filter((d) => d.original === undefined && !d.removed).length,
+            replaced: drafts.filter((d) => d.original !== undefined && !d.removed && d.text !== d.original).length,
+            removed: drafts.filter((d) => d.original !== undefined && d.removed).length,
+          },
+        }
+      : {}),
+  });
+}
+
 type PlaceMode = "place" | "next" | "another";
 
 interface PlaceFormProps {
@@ -600,6 +648,8 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const criteriaRef = useRef<HTMLDivElement>(null);
   // The model's pick in the wide panel: a card marked "model", never checked for the person.
   const [modelPick, setModelPick] = useState<PlacementTarget | null>(null);
+  // The target the model picked in either layout, so the preview says who suggested it.
+  const [modelTarget, setModelTarget] = useState<string | null>(null);
   // Drafting is for open changes: rex refuses an applied one, and an extra place only touches.
   const canDraft = draftEnabled && !touchesOnly && !another;
 
@@ -607,12 +657,14 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
     setDraftNote(null);
     // Each draft stands alone: an earlier pick's "model" card does not outlive it.
     setModelPick(null);
+    setModelTarget(null);
     const answer = await draft.run();
     if (!answer) return;
     if (answer.proposal) { onDraftProposal(answer); return; }
     const row = answer.pick !== undefined
       ? answer.shortlist.find((c) => c.target === answer.pick) ?? shortlist.find((c) => c.target === answer.pick)
       : undefined;
+    if (row) setModelTarget(row.target);
     if (row && wide) setModelPick(row);
     else if (row) setChosen(row);
     setDraftNote({ text: draftNoteText(answer, row?.title), warnings: answer.warnings });
@@ -737,6 +789,10 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   // An amendment in the wide card waits for rex to accept its dry run.
   const cannotPlace = !body || busy || (effectiveRelation === "amends" && criteriaLoading) || amendsEmpty || (amending && !dryRun?.ok);
   const relationName = `cp-relation-${changeId}`;
+  // What Place would do, redrawn on every pick and edit; nothing in it writes.
+  const preview = chosen
+    ? previewOf({ changeTitle, changeWhere: touchesOnly ? "Applied" : another ? "Already placed" : "Inbox", chosen, relation: effectiveRelation, placement, onShortlist: !searchPick, byModel: chosen.target === modelTarget, drafts, criteriaLoading, proposed })
+    : null;
   const relationChoice = (target?: PlacementTarget) => another || touchesOnly
     ? null
     : h(RelationChoice, { name: relationName, relation, onChange: setRelation, target });
@@ -830,10 +886,12 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
     wide ? null : relationChoice(),
     wide ? null : amendsEditor,
 
+    preview ? h(PlacementPreview, { model: preview }) : null,
+
     refusal ? h(RefusalNote, { refusal }) : null,
 
     h("div", { class: "cp-actions" },
-      h("button", { type: "button", class: "btn btn-sm cp-place", disabled: cannotPlace, onClick: () => submit("place") }, "Place"),
+      h("button", { type: "button", class: "btn btn-sm cp-place", disabled: cannotPlace, onClick: () => submit("place") }, preview?.action ?? "Place"),
       another
         ? h("button", { type: "button", class: "btn btn-sm cp-done", onClick: onDone }, "Done")
         : [

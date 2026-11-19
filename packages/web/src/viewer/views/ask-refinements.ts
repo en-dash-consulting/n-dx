@@ -42,6 +42,7 @@
 
 import { h } from "preact";
 import { CRITERIA_LABEL } from "../external.js";
+import { PlacementPreview, movePreview, type PreviewModel } from "../components/index.js";
 
 /** Path of the apply endpoint. Exported so tests assert on the real string. */
 export const REFINEMENT_APPLY_ENDPOINT = "/api/rex/apply-refinements";
@@ -166,6 +167,24 @@ export function outcomeStates(
   return states;
 }
 
+/**
+ * A reparent as the placement picture draws it: the item, the parent it
+ * leaves, the one it joins, and the rationale as the reason. Null for any
+ * other op, or a reparent without its parent diff.
+ */
+export function reparentPreview(proposal: RefinementProposal): PreviewModel | null {
+  if (proposal.op !== "reparent") return null;
+  const parent = proposal.diffs.find((d) => d.field === "parent");
+  if (!parent) return null;
+  return movePreview({
+    title: proposal.itemTitle,
+    kind: proposal.itemType,
+    from: parent.before[0] ?? "(top level)",
+    to: parent.after[0] ?? "(top level)",
+    rationale: proposal.rationale,
+  });
+}
+
 /** Render one side of a diff. An empty list is stated, never left blank. */
 function diffSide(kind: "before" | "after", lines: string[]) {
   return h("div", { class: `sv-ask-diff-side sv-ask-diff-${kind}` },
@@ -207,6 +226,8 @@ export interface RefinementCardProps {
 export function RefinementCard({ proposal, state, onAccept, onReject }: RefinementCardProps) {
   const pending = state.status === "pending";
   const applying = state.status === "applying";
+  // A move is drawn as the placement picture, which carries the rationale and the parent's before/after.
+  const move = reparentPreview(proposal);
 
   return h("li", {
     class: `card sv-ask-proposal sv-ask-proposal-${state.status}`,
@@ -215,11 +236,13 @@ export function RefinementCard({ proposal, state, onAccept, onReject }: Refineme
   },
     h("h4", { class: "section-header-sm sv-ask-proposal-title" }, proposal.itemTitle),
     h("p", { class: "section-sub sv-ask-proposal-summary" }, describeProposal(proposal)),
-    proposal.rationale
+    proposal.rationale && !move
       ? h("p", { class: "section-sub sv-ask-proposal-rationale" }, proposal.rationale)
       : null,
 
-    proposal.diffs.length > 0
+    move
+      ? h(PlacementPreview, { model: move })
+      : proposal.diffs.length > 0
       ? h("div", { class: "sv-ask-diffs" }, ...proposal.diffs.map(diffBlock))
       // A merge whose target already carries every field of the absorbed item
       // changes no field on the survivor. Saying so is the diff.
@@ -237,7 +260,7 @@ export function RefinementCard({ proposal, state, onAccept, onReject }: Refineme
             // second press, the same rule the submit button follows.
             "aria-disabled": applying ? "true" : undefined,
             onClick: () => { if (!applying) onAccept(proposal); },
-          }, applying ? "Applying..." : "Accept"),
+          }, applying ? "Applying..." : move?.action ?? "Accept"),
           h("button", {
             type: "button",
             class: "btn sv-ask-proposal-reject",

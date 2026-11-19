@@ -122,6 +122,8 @@ export { SidecarDock, SidecarButton } from "./sidecar-drawer.js";
 export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
 export { StrengthChip } from "./strength-chip.js";
 export type { GuessStrength } from "./strength-chip.js";
+export { PlacementPreview, movePreview, placePreview } from "./placement-preview.js";
+export type { PreviewModel } from "./placement-preview.js";
 export { HubSessionDrawer, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
 export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
 export { PlaceWithSidecarContext, PlaceWithSidecarButton } from "./place-with-sidecar.js";
