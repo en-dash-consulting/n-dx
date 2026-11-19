@@ -56,7 +56,8 @@ function readyCue(summary: ChangeSummary): string {
 
 /**
  * The step the project needs most. Finishing beats starting: done work waiting
- * to be applied comes first, then Inbox changes waiting for a place, then work
+ * for a steward to apply it comes first (under `rex.applyOn: release` it waits
+ * for the release instead, and ranks last), then Inbox changes waiting for a place, then work
  * — changes marked ready, work already running, or rex's next pick — and only
  * then placed changes not marked ready. With nothing open, the next thing to do
  * is capture an idea.
@@ -71,8 +72,12 @@ function readyCue(summary: ChangeSummary): string {
 export function processFocus(summary: ChangeSummary): ProcessFocus {
   const { stages } = summary;
   const placeable = Math.max(0, summary.inbox - summary.inboxInStage);
-  if (stages["awaiting-apply"] > 0) {
-    return { step: "apply", cue: `${changes(stages["awaiting-apply"])} done: apply ${stages["awaiting-apply"] === 1 ? "it" : "them"} to the product map` };
+  const awaiting = stages["awaiting-apply"];
+  // Under `rex.applyOn: release` the next `rex release` applies them: nothing
+  // to do by hand, so they rank last, ahead only of an empty project.
+  const atRelease = summary.applyOn === "release";
+  if (awaiting > 0 && !atRelease) {
+    return { step: "apply", cue: `${changes(awaiting)} done: apply ${awaiting === 1 ? "it" : "them"} to the product map` };
   }
   if (placeable > 0) {
     return { step: "place", cue: `${changes(placeable)} in the Inbox waiting for a place on the map` };
@@ -88,6 +93,9 @@ export function processFocus(summary: ChangeSummary): ProcessFocus {
   }
   if (stages.proposed > 0) {
     return { step: "ready", cue: readyCue(summary) };
+  }
+  if (awaiting > 0) {
+    return { step: "apply", cue: `${changes(awaiting)} done: ${awaiting === 1 ? "it applies" : "they apply"} to the product map at the next rex release` };
   }
   return { step: "capture", cue: "Nothing open: describe the next idea in the capture bar" };
 }

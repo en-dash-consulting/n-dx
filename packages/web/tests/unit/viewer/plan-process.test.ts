@@ -85,6 +85,29 @@ describe("processFocus", () => {
     });
   });
 
+  it("ranks Apply first under applyOn complete and review, where a steward applies", () => {
+    for (const applyOn of ["complete", "review"] as const) {
+      expect(processFocus(summary({ applyOn, inbox: 2, stages: { "awaiting-apply": 2 } }))).toEqual({
+        step: "apply",
+        cue: "2 changes done: apply them to the product map",
+      });
+    }
+  });
+
+  it("under applyOn release, never asks to apply by hand and ranks placement ahead of it", () => {
+    const s = summary({ applyOn: "release", inbox: 1, stages: { "awaiting-apply": 2 } });
+    expect(processFocus(s).step).toBe("place");
+    expect(processFocus(summary({ applyOn: "release", stages: { "awaiting-apply": 1, "in-progress": 1 } })).step).toBe("work");
+    expect(processFocus(summary({ applyOn: "release", stages: { "awaiting-apply": 1, proposed: 1 } })).step).toBe("ready");
+  });
+
+  it("under applyOn release, says done changes wait for the release when nothing else is open", () => {
+    expect(processFocus(summary({ applyOn: "release", stages: { "awaiting-apply": 2 } }))).toEqual({
+      step: "apply",
+      cue: "2 changes done: they apply to the product map at the next rex release",
+    });
+  });
+
   it("asks for work when a change can run", () => {
     expect(processFocus(summary({ stages: { proposed: 5, ready: 2 } }))).toEqual({
       step: "work",
