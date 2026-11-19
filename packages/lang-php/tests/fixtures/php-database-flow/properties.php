@@ -56,3 +56,23 @@ function copied_sibling() {
     $y = $x;
     call_user_func($y->handler);
 }
+
+// Parentheses around the object, or around a copy's source, keep provenance per property.
+function parenthesised_sibling() {
+    $row = mysql_fetch_assoc(mysql_query('SELECT body FROM blocks'));
+    $x = new stdClass();
+    $x->body = $row['body'];
+    $x->handler = 'trim';
+    call_user_func(($x)->handler);
+    eval(($x)->body);
+}
+
+function parenthesised_copy() {
+    $row = mysql_fetch_assoc(mysql_query('SELECT body FROM blocks'));
+    $x = new stdClass();
+    $x->body = $row['body'];
+    $x->handler = 'trim';
+    $y = ($x);
+    call_user_func($y->handler);
+    eval($y->body);
+}

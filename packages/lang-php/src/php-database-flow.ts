@@ -37,7 +37,8 @@
  * to it, else the variable's own (`$obj = $row; $obj['handler']`), never a
  * sibling's; reading any other key gives every such write's and the
  * variable's own; reading the variable whole gives all of them, and `$b = $a`
- * copies them. A value read through `$row['x']`, `$row->x`, `( … )`, `.` or
+ * copies them. Parentheses around a variable change none of this (`($o)->p`,
+ * `$b = ($a)`). A value read through `$row['x']`, `$row->x`, `( … )`, `.` or
  * interpolation keeps its sources; any other call or operator gives none. Parameters, properties of `$this`, loop-carried and
  * branch-merged values are never sources: what cannot be decided is missed,
  * not guessed.
@@ -333,7 +334,7 @@ class FlowCompiler {
 
   private target(left: Capture, right: Capture): Target | undefined {
     const name = variable(left);
-    if (name !== undefined) return { t: "variable", name, from: variable(right), client: this.isClient(right) };
+    if (name !== undefined) return { t: "variable", name, from: this.variableIn(right), client: this.isClient(right) };
     if (left.nodeType === "list_literal") {
       return { t: "list", names: (this.c.partsOf("list", "list-variable").get(nodeKey(left)) ?? []).map((v) => variable(v)!) };
     }
@@ -410,7 +411,7 @@ class FlowCompiler {
     const name = this.c.partsOf("method-call", "method-name").get(nodeKey(call))?.[0];
     const object = this.c.partsOf("method-call", "method-object").get(nodeKey(call))?.[0];
     if (name === undefined || object === undefined || name.nodeType !== "name") return undefined;
-    const receiverName = variable(object);
+    const receiverName = this.variableIn(object);
     return {
       t: "method",
       at: call.start,
@@ -437,19 +438,28 @@ class FlowCompiler {
     return { t: "static", at: call.start, call: nodeKey(call), summary: owner === undefined ? undefined : `${owner}::${method}` };
   }
 
-  /** `$a['k']`, `$a[0]` and `$o->p` as `['k']`, `[0]` and `->p`; {@link ANY_ELEMENT} for any other key; undefined unless `node`'s base is a variable. */
+  /** The variable `node` is, through any parentheses (`$x`, `($x)`, `(($x))`); undefined for any other expression. */
+  private variableIn(node: Capture): string | undefined {
+    let inner: Capture | undefined = node;
+    for (let depth = 0; inner?.nodeType === "parenthesized_expression" && depth < MAX_EXPRESSION_DEPTH; depth++) {
+      inner = this.c.partsOf("parenthesized", "parenthesized-inner").get(nodeKey(inner))?.[0];
+    }
+    return inner === undefined ? undefined : variable(inner);
+  }
+
+  /** `$a['k']`, `$a[0]` and `$o->p` as `['k']`, `[0]` and `->p`; {@link ANY_ELEMENT} for any other key; undefined unless `node`'s base is a variable, parenthesised or not. */
   private readPathOf(node: Capture): VariablePath | undefined {
     const c = this.c;
     if (node.nodeType === "subscript_expression") {
       const base = c.partsOf("subscript", "subscript-base").get(nodeKey(node))?.[0];
-      const root = base === undefined ? undefined : variable(base);
+      const root = base === undefined ? undefined : this.variableIn(base);
       if (root === undefined) return undefined;
       const key = literalKey(c.partsOf("indexed", "subscript-index").get(nodeKey(node))?.[0]);
       return { root, path: key === undefined ? ANY_ELEMENT : `[${key}]` };
     }
     if (node.nodeType === "member_access_expression" || node.nodeType === "nullsafe_member_access_expression") {
       const object = c.partsOf("member", "member-object").get(nodeKey(node))?.[0];
-      const root = object === undefined ? undefined : variable(object);
+      const root = object === undefined ? undefined : this.variableIn(object);
       if (root === undefined) return undefined;
       const name = c.partsOf("named-member", "member-name").get(nodeKey(node))?.[0];
       return { root, path: name?.nodeType === "name" ? `->${name.text}` : ANY_ELEMENT };

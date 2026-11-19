@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "03468932-0d88-42ed-a764-c25c654a20f5":
-    lastModified: "2026-11-18T22:35:17.288Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:12:36.763Z"
+    completedAt: "2026-11-19T03:17:53.883Z"
+    endedAt: "2026-11-19T03:17:53.883Z"
+    activeIntervals: [{"end":"2026-11-19T03:17:53.883Z","start":"2026-11-19T03:12:36.763Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "FlowCompiler.variableIn unwraps parenthesised expressions; readPathOf, the copy source (target.from) and method receiver names use it."
+    lastModified: "2026-11-19T03:17:53.883Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "132dbb84-f95a-4c01-98e7-bb0fdfd395d6":
     status: "completed"
@@ -69,7 +76,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94add228-871f-4544-bcb3-6c25ff72ef4d":
     createdAt: "2026-11-18T22:33:39.769Z"
-    lastModified: "2026-11-19T02:32:52.342Z"
+    lastModified: "2026-11-19T03:17:33.037Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96c36dff-2ec0-445a-9319-91d3f350c83c":
     status: "completed"
@@ -99,6 +106,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "docroot.scm captures direct-access guards (defined() or exit/die; if (!defined()) exit/die or a block that exits) and include/require statements; isFragment treats guard-first files with only declarations/includes after as fragments. php-htaccess reads Require ip|host|local (no grant) as a restriction: routes kept, source unchanged, one notice per .htaccess. Fixture php-docroot-guarded."
     lastModified: "2026-11-19T02:33:20.765Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d4da1efe-89b4-4d06-ad10-382baa25d3a2":
+    lastModified: "2026-11-19T03:17:33.037Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dcd473b7-2b77-42f1-8720-e1cd223a4562":
     status: "completed"
