@@ -9,7 +9,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import type { VNode } from "preact";
 import { act } from "preact/test-utils";
-import { InboxPage, InboxView, sortInbox, type InboxRow } from "../../../src/viewer/views/inbox.js";
+import {
+  InboxPage, InboxView, PlaceBestGuesses, bestGuessPicks, placeBestLine, requestBestGuessReview, sortInbox, takeInboxSelection, tickedByDefault, type InboxRow,
+} from "../../../src/viewer/views/inbox.js";
 import { StagePage } from "../../../src/viewer/views/stage-pages.js";
 import { STAGES, viewBlurb, viewLabel } from "../../../src/viewer/views/index.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -117,7 +119,7 @@ describe("the Plan tile", () => {
   it("leads the grid, server-backed, with the Inbox badge", () => {
     // The lifecycle strip leads, above the grid; it is a band, not a view tile.
     expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["inbox", "changes", "validation", "changes"]);
-    expect(STAGES.plan.tiles!.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true });
+    expect(STAGES.plan.tiles!.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true });
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
     expect(viewBlurb("inbox")).toBe("Changes with no place on the product map yet. {cli} work skips their tasks until each is placed.");
@@ -208,14 +210,16 @@ describe("InboxPage on a v2 project", () => {
     expect(root.querySelector(".inbox-more")).toBeNull();
   });
 
-  it("a row opens the change's detail panel in Tasks; its Place opens placement mode for it", async () => {
+  it("a row opens the change's detail panel in Tasks; its Place opens the Inbox page on it", async () => {
     serveInbox([change("x"), change("y")], [placement("x", "strong"), placement("y", "weak")]);
     const navigateTo = vi.fn();
     await mount(h(InboxPage, { navigateTo }));
     act(() => { root.querySelector<HTMLElement>(".inbox-row")!.click(); });
     act(() => { root.querySelectorAll<HTMLButtonElement>(".inbox-place")[1]!.click(); });
-    // Place does not also bubble to the row.
-    expect(navigateTo.mock.calls).toEqual([["prd", { taskId: "x" }], ["product", { tab: "place/y" }]]);
+    // Place does not also bubble to the row, and the page it opens selects y.
+    expect(navigateTo.mock.calls).toEqual([["prd", { taskId: "x" }], ["inbox"]]);
+    expect(takeInboxSelection()).toBe("y");
+    expect(takeInboxSelection()).toBeNull();
   });
 
   it("Place opens the row like a click when nothing can open placement mode", async () => {
@@ -363,6 +367,110 @@ describe("InboxPage on a v1 project", () => {
   it("renders nothing", async () => {
     stub({ "/api/rex/changes": { layout: "v1" }, "/api/status": status() });
     await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(root.innerHTML).toBe("");
+  });
+});
+
+// ── Placing on the best guess ────────────────────────────────────────
+
+/** The bodies POSTed to place-best, in order. */
+function placeBestCalls(): unknown[] {
+  const calls = (fetch as unknown as { mock: { calls: Array<[string, RequestInit?]> } }).mock.calls;
+  return calls.filter(([url, init]) => url === "/api/rex/changes/place-best" && init?.method === "POST")
+    .map(([, init]) => JSON.parse(String(init!.body)));
+}
+
+const rowsOf = (...pairs: Array<[string, PlacementStrength | null]>): InboxRow[] =>
+  pairs.map(([id, strength]) => ({ change: change(id), shortlist: { placement: placement(id, strength) } }));
+
+describe("best-guess picks", () => {
+  it("take every row with a guess, open changes before applied ones, and tick all but weak ones", () => {
+    const picks = bestGuessPicks(rowsOf(["a", "strong"], ["b", null], ["c", "weak"]), rowsOf(["d", "possible"]));
+    expect(picks.map((p) => [p.change.id, p.guess.candidate.target, p.applied])).toEqual([
+      ["a", "cap-a", false], ["c", "cap-c", false], ["d", "cap-d", true],
+    ]);
+    expect(picks.map(tickedByDefault)).toEqual([true, false, true]);
+  });
+
+  it("say what a write did", () => {
+    expect(placeBestLine({ placed: [{ change: "a", target: "t", title: "T" }], refused: [] })).toBe("Placed 1 change");
+    expect(placeBestLine({ placed: [], refused: [{ change: "a", target: "t", error: "no" }] })).toBe("Placed 0 changes; 1 refused");
+    expect(placeBestLine({ error: "HTTP 500" })).toBe("Nothing placed: HTTP 500");
+  });
+});
+
+describe("Accept on a row", () => {
+  it("places the change on its best guess and reads the Inbox again", async () => {
+    serveInbox([change("x"), change("y")], [placement("x", "strong"), placement("y", null)]);
+    routes["/api/rex/changes/place-best"] = { placed: [{ change: "x", target: "cap-x", title: "Home for x" }], refused: [] };
+    const navigateTo = vi.fn();
+    await mount(h(InboxPage, { navigateTo }));
+    // y has no guess, so only x offers Accept.
+    expect(root.querySelectorAll(".inbox-accept")).toHaveLength(1);
+    await act(async () => { root.querySelector<HTMLButtonElement>(".inbox-accept")!.click(); });
+    await settle();
+    expect(placeBestCalls()).toEqual([{ placements: [{ change: "x", target: "cap-x" }] }]);
+    // Accept does not also open the row.
+    expect(navigateTo).not.toHaveBeenCalled();
+  });
+
+  it("says why when rex refuses", async () => {
+    serveInbox([change("x")], [placement("x", "strong")]);
+    routes["/api/rex/changes/place-best"] = { placed: [], refused: [{ change: "x", target: "cap-x", error: "That node is retired." }] };
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    await act(async () => { root.querySelector<HTMLButtonElement>(".inbox-accept")!.click(); });
+    await settle();
+    expect(root.querySelector(".inbox-row-refusal")?.textContent).toBe("Not placed: That node is retired.");
+  });
+});
+
+describe("Place best guesses", () => {
+  it("in the Plan tile, hands off to the Inbox page with the review open", async () => {
+    serveInbox([change("x")], [placement("x", "strong")]);
+    const navigateTo = vi.fn();
+    await mount(h(InboxPage, { navigateTo, limit: 5 }));
+    act(() => { root.querySelector<HTMLButtonElement>(".inbox-best-open")!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("inbox");
+    // The tile does not open the review itself; the Inbox page's does, once.
+    expect(root.querySelector(".inbox-best-list")).toBeNull();
+    act(() => { render(null, root); });
+    await mount(h(PlaceBestGuesses, { rows: rowsOf(["x", "strong"]), onPlaced: vi.fn() }));
+    expect(root.querySelector(".inbox-best-list")).not.toBeNull();
+  });
+
+  it("reviews each guess, leaves weak ones unticked, and places the ticked ones in one write", async () => {
+    stub({ "/api/rex/changes/place-best": { placed: [{ change: "a", target: "cap-a", title: "Home for a" }, { change: "c", target: "cap-c", title: "Home for c" }], refused: [] } });
+    const onPlaced = vi.fn();
+    await mount(h(PlaceBestGuesses, { rows: rowsOf(["a", "strong"], ["b", "weak"], ["c", "possible"]), onPlaced }));
+    expect(root.querySelector(".inbox-best-open")?.textContent).toBe("Place best guesses (3)");
+    act(() => { root.querySelector<HTMLButtonElement>(".inbox-best-open")!.click(); });
+    const boxes = () => [...root.querySelectorAll<HTMLInputElement>(".inbox-best-row input")].map((b) => b.checked);
+    expect(boxes()).toEqual([true, false, true]);
+    expect(root.querySelector(".inbox-best-place")?.textContent).toBe("Place 2");
+    // Untick c, tick b: the person's choice replaces the defaults.
+    act(() => { root.querySelectorAll<HTMLInputElement>(".inbox-best-row input")[2]!.click(); });
+    act(() => { root.querySelectorAll<HTMLInputElement>(".inbox-best-row input")[1]!.click(); });
+    expect(boxes()).toEqual([true, true, false]);
+    await act(async () => { root.querySelector<HTMLButtonElement>(".inbox-best-place")!.click(); });
+    await settle();
+    expect(placeBestCalls()).toEqual([{ placements: [{ change: "a", target: "cap-a" }, { change: "b", target: "cap-b" }] }]);
+    expect(onPlaced).toHaveBeenCalledTimes(1);
+    expect(root.querySelector(".inbox-best-list")).toBeNull();
+    expect(root.querySelector(".inbox-best-result")?.textContent).toBe("Placed 2 changes");
+  });
+
+  it("opens with the review showing when the Plan tile asked for it", async () => {
+    requestBestGuessReview();
+    await mount(h(PlaceBestGuesses, { rows: rowsOf(["a", "strong"]), onPlaced: vi.fn() }));
+    expect(root.querySelector(".inbox-best-list")).not.toBeNull();
+    // Asked once: the next mount opens closed.
+    act(() => { render(null, root); });
+    await mount(h(PlaceBestGuesses, { rows: rowsOf(["a", "strong"]), onPlaced: vi.fn() }));
+    expect(root.querySelector(".inbox-best-list")).toBeNull();
+  });
+
+  it("renders nothing while no change has a guess", async () => {
+    await mount(h(PlaceBestGuesses, { rows: rowsOf(["a", null]), onPlaced: vi.fn() }));
     expect(root.innerHTML).toBe("");
   });
 });

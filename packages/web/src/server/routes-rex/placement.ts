@@ -7,6 +7,10 @@
  *                                         every open change awaiting placement, from one model load
  *   POST /api/rex/changes/:id/place     → { change, target, relation, warnings? }
  *   POST /api/rex/changes/:id/propose   → { change, proposed: { target, under, title, type }, warnings? }
+ *   POST /api/rex/changes/place-best    → { placed: [{ change, target, title }], refused: [{ change, target, error, kind? }] }
+ *                                         body { placements: [{ change, target }] }: each as a touches, in one
+ *                                         transaction — the Inbox's "Place best guesses". A refused pair is
+ *                                         reported and skipped; the rest are written.
  *   POST /api/rex/changes/:id/unplace   → { change, target }
  *                                         takes back one touches ("Place & add another"'s Remove)
  *   POST /api/rex/changes/:id/placement/draft
@@ -620,6 +624,85 @@ async function handlePlacementWrite(
   return true;
 }
 
+// ── Batch placement ("Place best guesses") ──────────────────────────
+
+export interface PlaceBestRequestWire {
+  placements: Array<{ change: string; target: string }>;
+}
+
+export interface PlaceBestResultWire {
+  placed: Array<{ change: string; target: string; title: string }>;
+  refused: Array<{ change: string; target: string; error: string; kind?: string }>;
+}
+
+/** Most pairs one request may carry: a backlog, not an unbounded write. */
+export const PLACE_BEST_MAX = 500;
+
+export function parsePlaceBestBody(body: Json): PlaceBestRequestWire | string {
+  const list = body.placements;
+  if (!Array.isArray(list) || list.length === 0) return "placements must be a non-empty array of { change, target }";
+  if (list.length > PLACE_BEST_MAX) return `placements may hold at most ${PLACE_BEST_MAX} pairs`;
+  const placements: PlaceBestRequestWire["placements"] = [];
+  for (const entry of list) {
+    if (!isRecord(entry) || typeof entry.change !== "string" || !entry.change || typeof entry.target !== "string" || !entry.target) {
+      return "each placement must be { change, target } with non-empty strings";
+    }
+    placements.push({ change: entry.change, target: entry.target });
+  }
+  return { placements };
+}
+
+/**
+ * Record each pair on `tree` as a touches, in order, through rex's own rule.
+ * Pure: a pair rex refuses is reported and leaves the tree as the previous
+ * pair left it. Only touches — an amendment needs text a person writes.
+ */
+export function placeBest(tree: V2Tree, request: PlaceBestRequestWire, now: Date): { tree: V2Tree; result: PlaceBestResultWire } {
+  const result: PlaceBestResultWire = { placed: [], refused: [] };
+  let current = tree;
+  for (const { change, target } of request.placements) {
+    try {
+      const placed = recordPlacement(current, change, { target, relation: "touches" }, now);
+      current = placed.tree;
+      const node = indexTree(current).resolve(placed.placement.target);
+      result.placed.push({ change: placed.change, target: placed.placement.target, title: node?.title ?? placed.placement.target });
+    } catch (err) {
+      if (!(err instanceof ChangePlacementError)) throw err;
+      result.refused.push({ change, target, error: err.plain, kind: err.kind });
+    }
+  }
+  return { tree: current, result };
+}
+
+async function handlePlaceBest(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, broadcast?: WebSocketBroadcaster): Promise<boolean> {
+  const json = parseJson(await readBody(req, res));
+  const parsed = typeof json === "string" ? json : parsePlaceBestBody(json);
+  if (typeof parsed === "string") {
+    errorResponse(res, 400, parsed);
+    return true;
+  }
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, V1_REFUSAL);
+    return true;
+  }
+  try {
+    const now = new Date();
+    const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => placeBest(model.tree, parsed, now), { now: () => now });
+    if (result.placed.length) {
+      refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
+      const timestamp = now.toISOString();
+      for (const p of result.placed) {
+        appendLog(ctx, { timestamp, event: "change_placed", itemId: p.change, detail: `touches ${p.target} (via web, best guess)` });
+      }
+      broadcast?.({ type: "rex:prd-changed", timestamp });
+    }
+    jsonResponse(res, 200, result);
+  } catch (err) {
+    refuse(res, err);
+  }
+  return true;
+}
+
 /** `POST /api/rex/changes/:id/placement/check`: rex's dry run of an edited placement; writes nothing. */
 async function handlePlacementCheck(changeRef: string, req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
   const json = parseJson(await readBody(req, res));
@@ -730,6 +813,7 @@ export function routePlacement(
   broadcast?: WebSocketBroadcaster,
 ): boolean | Promise<boolean> {
   if (path === "changes/placements") return method === "GET" ? handlePlacementsRead(res, ctx) : false;
+  if (path === "changes/place-best") return method === "POST" ? handlePlaceBest(req, res, ctx, broadcast) : false;
   const match = PLACEMENT_PATH.exec(path);
   if (!match) return false;
   const changeRef = decodeURIComponent(match[1]);
