@@ -10,8 +10,11 @@ import { OpenAiAgentTurn } from "./openai-agent-turn.js";
 import { buildCachedMessageRequest } from "./prompt-cache.js";
 import { resolveAgentApiEffort } from "./agent-effort.js";
 
-// Includes provider retries and response-body reads for an OpenAI attempt.
-const API_ATTEMPT_TIMEOUT_MS = 60_000;
+// Allow two minutes of setup/reasoning plus output at 10 tokens/second.
+// Whole attempts (including retries and body reads) get 10–30 minutes, for
+// both vendors. This is a deadline, not a retry delay or an idle timer.
+const attemptTimeoutMs = (maxTokens: number): number =>
+  Math.min(30 * 60_000, Math.max(10 * 60_000, 120_000 + Math.ceil(maxTokens / 10) * 1000));
 
 type Selection = { vendor: "codex" | "claude"; model: string };
 type Request = Parameters<OpenAiAgentTurn["call"]>[0];
@@ -58,18 +61,20 @@ export class OpenAiFailover {
       throw auth.apiRefusal ?? new ClaudeClientError("Claude API credentials unavailable", "auth", false);
     }
     const client = new Anthropic({ apiKey: auth.key.value, baseURL: claude.api_endpoint,
-      maxRetries: 0, timeout: API_ATTEMPT_TIMEOUT_MS });
+      maxRetries: 0, timeout: attemptTimeoutMs(this.config.maxTokens) });
     return async request => {
       // The SDK's fetch timeout alone does not bound reading the response body.
-      const deadline = AbortSignal.timeout(API_ATTEMPT_TIMEOUT_MS);
+      const deadline = AbortSignal.timeout(attemptTimeoutMs(this.config.maxTokens));
       const signal = AbortSignal.any([request.signal, deadline]);
       try {
-        return await client.messages.create(buildCachedMessageRequest({
+        const response = await client.messages.create(buildCachedMessageRequest({
           model: request.model, maxTokens: this.config.maxTokens,
           systemPrompt: request.systemPrompt, messages: request.messages, tools: TOOL_DEFINITIONS,
           promptCache: this.config.promptCache, promptCacheTtl: this.config.promptCacheTtl,
           effort: resolveAgentApiEffort(request.model, { ...this.llm, vendor: "claude" }),
         }), { signal });
+        signal.throwIfAborted();
+        return response;
       } catch (error) {
         if (deadline.aborted && !request.signal.aborted) {
           throw new ClaudeClientError("Claude failover request timed out", "timeout", true);
@@ -105,7 +110,7 @@ export class OpenAiFailover {
       try {
         if (needsClient) this.callTurn = this.createCall(this.selection);
         return await this.callTurn({ ...request, model: this.selection.model,
-          ...(this.llm.autoFailover ? { timeoutMs: API_ATTEMPT_TIMEOUT_MS } : {}) });
+          ...(this.llm.autoFailover ? { timeoutMs: attemptTimeoutMs(this.config.maxTokens) } : {}) });
       } catch (error) {
         hooks.failed(error, this.selection);
         if (!hasError) { originalError = error; hasError = true; }

@@ -28,6 +28,59 @@ async function collect(input = request) {
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe("Responses agent turns", () => {
+  it("requests encrypted reasoning so a stateless transport accepts the next tool turn without retries", async () => {
+    const fetch = mockFetch().mockImplementation(async (_url, init) => {
+      const body = JSON.parse(init!.body as string);
+      if (body.input.some((item: any) => item.type === "function_call_output")) {
+        const replay = body.input.find((item: any) => item.type === "reasoning");
+        if (!replay?.encrypted_content) return new Response(null, { status: 400 });
+        return Response.json(response());
+      }
+      const { encrypted_content, ...plain } = reasoning;
+      return Response.json(response([body.include?.includes("reasoning.encrypted_content") ? reasoning : plain, call()]));
+    });
+    const client = provider({ maxRetries: 2 });
+    const first = await client.completeTurn!(request);
+    const next = await client.completeTurn!({ ...request, messages: [...request.messages, first.message,
+      { role: "tool", toolCallId: "a", content: "read result" }] });
+    expect(next.stopReason).toBe("end_turn");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([[], [reasoning], [{ ...message("Halfway"), status: "incomplete" }],
+    [reasoning, call("finished"), { ...call("partial"), status: "incomplete", arguments: '{"path":' }],
+  ].map(items => [items]))("resumes token exhaustion with measured usage and no unanswered calls: %j", async items => {
+    const fetch = mockFetch().mockResolvedValueOnce(Response.json({ ...response(items, "incomplete"),
+      incomplete_details: { reason: "max_output_tokens" } })).mockResolvedValueOnce(Response.json(response()));
+    const client = provider();
+    const first = await client.completeTurn!(request);
+    expect(first).toMatchObject({ stopReason: "max_tokens", usageStatus: "measured",
+      tokenUsage: { input: 60, output: 20 }, message: { toolCalls: [] } });
+    await client.completeTurn!({ ...request, messages: [...request.messages, first.message,
+      { role: "user", content: "Continue; retry any unfinished tool call." }] });
+    const replay = JSON.parse(fetch.mock.calls[1][1]!.body as string).input;
+    expect(replay.some((item: any) => item.type === "function_call")).toBe(false);
+    expect(replay.some((item: any) => item.status === "incomplete")).toBe(false);
+  });
+
+  it("continues to reject truncated context summaries with their measured spend", async () => {
+    mockFetch().mockResolvedValue(Response.json({ ...response([message("Unfinished summary")], "incomplete"),
+      incomplete_details: { reason: "max_output_tokens" } }));
+    await expect(provider().completeTurn!({ ...request, tools: [], taskClass: "context.summarize" }))
+      .rejects.toMatchObject({ retryable: false, usageStatus: "measured", tokenUsage: { output: 20 } });
+  });
+
+  it.each([
+    { ...response([], "incomplete"), incomplete_details: { reason: "content_filter" } },
+    { ...response([null], "incomplete"), incomplete_details: { reason: "max_output_tokens" } },
+    { ...response([{ ...call(), arguments: 42 }], "incomplete"), incomplete_details: { reason: "max_output_tokens" } },
+    { ...response([{ ...message(), content: null }], "incomplete"), incomplete_details: { reason: "max_output_tokens" } },
+  ])("rejects non-token and malformed incomplete payloads: %j", async data => {
+    const fetch = mockFetch().mockResolvedValue(Response.json(data));
+    await expect(provider({ maxRetries: 2 }).completeTurn!(request)).rejects.toMatchObject({ retryable: false, tokenUsage: { output: 20 } });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it("round trips parallel calls, failed results and encrypted reasoning over multiple turns", async () => {
     const fetch = mockFetch()
       .mockResolvedValueOnce(Response.json(response([reasoning, call("a"), call("b", "b.txt")])))
@@ -154,12 +207,18 @@ describe("Responses agent turns", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("rejects a call ID already answered in a previous turn", async () => {
-    mockFetch().mockResolvedValue(Response.json(response([call("a")])));
+  it.each([
+    response([call("a")]),
+    ...[call("a"), { ...call("b"), name: "unadvertised_tool" }].map(item => ({
+      ...response([{ ...item, status: "incomplete", arguments: "{" }], "incomplete"),
+      incomplete_details: { reason: "max_output_tokens" },
+    })),
+  ])("rejects reused call IDs and unadvertised tools even when arguments are truncated", async data => {
+    mockFetch().mockResolvedValue(Response.json(data));
     await expect(provider().completeTurn!({ ...request, messages: [...request.messages,
       { role: "assistant", content: "", toolCalls: [{ id: "a", name: tool.name, arguments: {} }] },
       { role: "tool", toolCallId: "a", content: "already executed" },
-    ] })).rejects.toThrow("Invalid OpenAI Responses");
+    ] })).rejects.toMatchObject({ retryable: false, tokenUsage: { output: 20 } });
   });
 
   it("does not replay opaque context across models", async () => {
@@ -194,6 +253,51 @@ describe("Responses agent turns", () => {
 });
 
 describe("Responses SSE", () => {
+  it("finishes a token-limited stream without releasing or replaying any function calls", async () => {
+    const partial = { ...call(), arguments: '{"path":', status: "incomplete" };
+    const fetch = mockFetch().mockResolvedValueOnce(sse([
+      { type: "response.output_item.added", output_index: 2, item: { ...partial, arguments: "", status: "in_progress" } },
+      { type: "response.function_call_arguments.delta", output_index: 2, item_id: partial.id, delta: partial.arguments },
+      { type: "response.output_text.delta", delta: "Working" },
+      { type: "response.incomplete", response: { ...response([reasoning, { ...message("Working"), status: "incomplete" }, partial], "incomplete"), incomplete_details: { reason: "max_output_tokens" } } },
+    ])).mockResolvedValueOnce(Response.json(response()));
+    const events = await collect();
+    expect(events).toHaveLength(2);
+    const final = events[1];
+    expect(final).toMatchObject({ type: "completed", result: { stopReason: "max_tokens", usageStatus: "measured", tokenUsage: { output: 20 }, message: { toolCalls: [] } } });
+    if (final.type !== "completed") throw new Error("missing terminal result");
+    await provider().completeTurn!({ ...request, messages: [...request.messages, final.result.message, { role: "user", content: "Continue" }] });
+    expect(JSON.parse(fetch.mock.calls[1][1]!.body as string).input.some((item: any) => item.type === "function_call")).toBe(false);
+  });
+
+  it.each([[], [reasoning]].map(items => [items]))("accepts reasoning-only token exhaustion over SSE: %j", async items => {
+    mockFetch().mockResolvedValue(sse([{ type: "response.incomplete", response: {
+      ...response(items, "incomplete"), incomplete_details: { reason: "max_output_tokens" },
+    } }]));
+    expect(await collect()).toMatchObject([{ type: "completed", result: { stopReason: "max_tokens", text: "", usageStatus: "measured" } }]);
+  });
+
+  it("retains earlier usage as partial when a token-limited terminal event omits counters", async () => {
+    mockFetch().mockResolvedValue(sse([
+      { type: "response.in_progress", response: response([], "in_progress") },
+      { type: "response.incomplete", response: { ...response([], "incomplete"), usage: undefined,
+        incomplete_details: { reason: "max_output_tokens" } } },
+    ]));
+    expect(await collect()).toMatchObject([{ type: "completed", result: {
+      stopReason: "max_tokens", usageStatus: "partial", tokenUsage: { input: 60, output: 20 },
+    } }]);
+  });
+
+  it.each([
+    { type: "response.completed", response: { ...response([], "incomplete"), incomplete_details: { reason: "max_output_tokens" } } },
+    { type: "response.incomplete", response: response() },
+    { type: "response.failed", response: response() },
+    { type: "response.incomplete", response: { ...response([], "incomplete"), incomplete_details: { reason: "content_filter" } } },
+  ])("rejects inconsistent or unsupported terminal events: %j", async event => {
+    mockFetch().mockResolvedValue(sse([event]));
+    await expect(collect()).rejects.toMatchObject({ retryable: false, tokenUsage: { output: 20 } });
+  });
+
   it("handles split UTF-8, CRLF, interleaved calls, and terminal usage exactly once", async () => {
     const a = call("a"); const b = call("b", "b.txt");
     mockFetch().mockResolvedValue(sse([

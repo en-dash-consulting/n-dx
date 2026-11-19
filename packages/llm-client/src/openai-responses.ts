@@ -29,23 +29,29 @@ function toolCall(raw: ObjectValue): ProviderToolCall {
   return { id: raw.call_id, name: raw.name, arguments: args as ObjectValue };
 }
 
-function output(items: unknown): { text: string; calls: ProviderToolCall[]; refusal: boolean } {
+function output(items: unknown, truncated = false, request?: ProviderTurnRequest): { text: string; calls: ProviderToolCall[]; refusal: boolean } {
   if (!Array.isArray(items)) throw invalid();
   let text = "";
   let refusal = false;
   const calls: ProviderToolCall[] = [];
-  const ids = new Set<string>();
+  const ids = new Set(request?.messages.filter(message => message.role === "tool").map(message => message.toolCallId));
+  const names = request && new Set(request.tools.map(tool => tool.name));
   for (const value of items) {
     const item = object(value);
     if (!item) throw invalid();
+    if (item.status !== undefined && item.status !== "completed" &&
+        !(truncated && (item.status === "incomplete" || item.status === "in_progress"))) throw invalid();
     if (item.type === "function_call") {
-      if (item.status !== undefined && item.status !== "completed") throw invalid();
+      if (typeof item.call_id !== "string" || !item.call_id || typeof item.name !== "string" || !item.name || typeof item.arguments !== "string") throw invalid();
+      if (ids.has(item.call_id) || (names && !names.has(item.name))) throw invalid();
+      ids.add(item.call_id);
+      // A partial argument string is expected at the token limit. Validate its
+      // envelope, but never parse it into an executable call.
+      if (truncated && item.status !== "completed") continue;
       const call = toolCall(item);
-      if (ids.has(call.id)) throw invalid();
-      ids.add(call.id);
       calls.push(call);
     } else if (item.type === "message") {
-      if (item.role !== "assistant" || (item.status !== undefined && item.status !== "completed") || !Array.isArray(item.content)) throw invalid();
+      if (item.role !== "assistant" || !Array.isArray(item.content)) throw invalid();
       for (const part of item.content) {
         const block = object(part);
         if (block?.type === "output_text" && typeof block.text === "string") text += block.text;
@@ -141,18 +147,20 @@ export function createOpenAiTurns(options: Options) {
     try {
       if (!data) throw invalid();
       if (data.status === "failed" || data.error) throw eventError(data.error);
-      if (data.status !== "completed") throw new ClaudeClientError("OpenAI response did not complete", "unknown", false);
-      const parsed = output(data.output);
-      if (!parsed.text && !parsed.calls.length && !parsed.refusal) throw invalid();
-      const names = new Set(request.tools.map(tool => tool.name));
-      if (parsed.calls.some(call => !names.has(call.name))) throw invalid();
-      const answered = new Set(request.messages.filter(message => message.role === "tool").map(message => message.toolCallId));
-      if (parsed.calls.some(call => answered.has(call.id))) throw invalid();
-      const message: ProviderMessage = { role: "assistant", content: parsed.text, toolCalls: parsed.calls,
-        continuation: { vendor: "codex", model: request.model, items: data.output as unknown[] } };
+      const truncated = data.status === "incomplete" && object(data.incomplete_details)?.reason === "max_output_tokens";
+      if (data.status !== "completed" && !truncated) throw new ClaudeClientError("OpenAI response did not complete", "unknown", false);
+      const parsed = output(data.output, truncated, request);
+      // Summaries must be complete: the caller treats their text as authoritative.
+      if (truncated && request.taskClass === "context.summarize") throw new ClaudeClientError("OpenAI summary did not complete", "unknown", false);
+      if (!truncated && !parsed.text && !parsed.calls.length && !parsed.refusal) throw invalid();
+      // No calls from a truncated turn are executed, even ones marked complete.
+      // Drop opaque reasoning with them: it may refer to those unanswered calls.
+      // Only visible text is safe to replay with the loop's continuation prompt.
+      const message: ProviderMessage = { role: "assistant", content: parsed.text, toolCalls: truncated ? [] : parsed.calls,
+        ...(!truncated ? { continuation: { vendor: "codex" as const, model: request.model, items: data.output as unknown[] } } : {}) };
       return { text: parsed.text, message, model: typeof data.model === "string" ? data.model : request.model,
         ...(effort ? { effort } : {}), ...usage,
-        stopReason: parsed.calls.length ? "tool_use" : parsed.refusal ? "refusal" : "end_turn" };
+        stopReason: parsed.refusal ? "refusal" : truncated ? "max_tokens" : parsed.calls.length ? "tool_use" : "end_turn" };
     } catch (error) {
       if (error instanceof ClaudeClientError) Object.assign(error, usage);
       throw error;
@@ -170,6 +178,7 @@ export function createOpenAiTurns(options: Options) {
   async function post(request: ProviderTurnRequest, stream: boolean, signal: AbortSignal, effort?: string): Promise<Response> {
     if (!supportsOpenAiTurns(request.model)) throw new ClaudeClientError("Model has no verified OpenAI agent-turn support", "unknown", false);
     const body = JSON.stringify({ model: request.model, input: input(request), store: false,
+      include: ["reasoning.encrypted_content"],
       max_output_tokens: options.maxTokens, stream,
       ...(effort ? { reasoning: { effort } } : {}),
       // Explicit best-effort mode preserves optional fields in the neutral schemas.
@@ -262,9 +271,10 @@ export function createOpenAiTurns(options: Options) {
         if (["response.completed", "response.failed", "response.incomplete"].includes(event.type)) {
           terminalUsage = snapshot?.usage != null;
           if (!terminalUsage) observeUsage(undefined);
+          if (snapshot?.status !== event.type.slice("response.".length)) throw invalid();
         }
         if (event.type === "error") throw eventError(event);
-        if (event.type === "response.failed" || event.type === "response.incomplete") {
+        if (event.type === "response.failed") {
           decode(snapshot, request, effort); throw invalid();
         }
         if (event.type === "response.output_text.delta") {
@@ -285,7 +295,7 @@ export function createOpenAiTurns(options: Options) {
             call.arguments += event.delta;
           } else if (call.arguments !== event.arguments) throw invalid();
         }
-        if (event.type === "response.completed") {
+        if (event.type === "response.completed" || event.type === "response.incomplete") {
           const result = decode(snapshot, request, effort);
           if (text && text !== result.text) throw invalid();
           for (const [index, call] of calls) {

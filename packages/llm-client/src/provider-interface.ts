@@ -203,7 +203,8 @@ export interface ProviderTurnResult extends CompletionResult {
   message: ProviderMessage;
   model: string;
   effort?: string;
-  stopReason: "end_turn" | "tool_use" | "refusal";
+  /** max_tokens is nonterminal; its message contains no executable calls. */
+  stopReason: "end_turn" | "tool_use" | "refusal" | "max_tokens";
 }
 
 /** Text is provisional; tools and continuation are available only on completed. */

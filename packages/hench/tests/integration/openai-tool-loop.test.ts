@@ -88,9 +88,109 @@ describe("direct OpenAI agent execution", () => {
       return response(turns[index++] ?? [done]);
     }));
   }
-  const run = (taskId = "task-1", abortSignal?: AbortSignal) => agentLoop({
-    config, store, projectDir, henchDir, taskId, model: "gpt-6-astra",
+  const run = (taskId = "task-1", abortSignal?: AbortSignal, model = "gpt-6-astra") => agentLoop({
+    config, store, projectDir, henchDir, taskId, model,
     yes: true, autonomous: true, abortSignal,
+  });
+
+  it.each([false, true])("resumes max-token output safely (reasoning only=%s)", async reasoningOnly => {
+    script(scriptFor("resumed.ts"));
+    const success = globalThis.fetch;
+    const partial = call("unfinished", "write_file", { path: "partial.ts", content: "must not execute" });
+    const fetch = vi.fn().mockResolvedValueOnce(Response.json({
+      status: "incomplete", incomplete_details: { reason: "max_output_tokens" },
+      output: reasoningOnly ? [{ type: "reasoning", id: "rs_limit", summary: [], encrypted_content: "limited-reasoning" }]
+        : [partial, { ...call("broken", "write_file", {}), status: "incomplete", arguments: '{"path":' },
+          { ...done, status: "incomplete" }],
+      usage: { input_tokens: 30, output_tokens: 90 },
+    })).mockImplementation(success);
+    vi.stubGlobal("fetch", fetch);
+    const { run: record } = await run();
+    expect(record.status).toBe("completed");
+    expect(record.turnTokenUsage).toHaveLength(5);
+    expect(record.tokenUsage).toMatchObject({ input: 330, output: 170, cacheReadInput: 100 });
+    expect(record.toolCalls).toHaveLength(3);
+    await expect(readFile(join(projectDir, "partial.ts"))).rejects.toMatchObject({ code: "ENOENT" });
+    const continuation = JSON.stringify(requests[0].input);
+    expect(continuation).toContain("Your response was truncated");
+    expect(requests[0].input.some((item: any) => item.type === "function_call" || item.type === "function_call_output")).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(5);
+  });
+
+  it("keeps a truncated Responses compaction summary out of subsequent turns", async () => {
+    config.prune = { triggerPairs: 3, retainPairs: 2 };
+    await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: { tiers: { codex: { light: "gpt-6.1-sol" } } } }));
+    script([...["one", "two", "three", "four"].map(id => [call(id, "read_file", { path: "target.ts" })]), ...scriptFor("summarized.ts")]);
+    const success = globalThis.fetch;
+    const fetch = vi.fn(async (url, init) => {
+      const body = JSON.parse(init!.body as string);
+      if (body.tools?.length === 0) return Response.json({ status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output: [{ ...done, content: [{ type: "output_text", text: "TRUNCATED SUMMARY MUST NOT REPLAY" }] }],
+        usage: { input_tokens: 10, output_tokens: 5 } });
+      return success(url, init);
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { run: record } = await run();
+    expect(record.status).toBe("completed");
+    expect(JSON.stringify(requests)).not.toContain("TRUNCATED SUMMARY MUST NOT REPLAY");
+    expect(record.toolCalls).toHaveLength(7);
+    expect(fetch.mock.calls.filter(([, init]) => JSON.parse(init.body as string).tools?.length === 0)).toHaveLength(2);
+  });
+
+  async function selectClaude(fallback: boolean) {
+    await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: {
+      vendor: fallback ? "codex" : "claude", autoFailover: true,
+      codex: { lightModel: "gpt-6.1-sol" },
+      claude: { auth: "api", api_key: "claude-fixture", model: "claude-sonnet-4-6" },
+    } }));
+  }
+
+  it.each([false, true])("identifies a Claude refusal (fallback=%s) without another switch", async fallback => {
+    await selectClaude(fallback);
+    const fetch = vi.fn(async (url: string) => String(url).includes("openai")
+      ? new Response(null, { status: 401 })
+      : Response.json({ id: "refusal", type: "message", role: "assistant", model: "claude-sonnet-4-6",
+        stop_reason: "refusal", content: [], usage: { input_tokens: 10, output_tokens: 2 } }));
+    vi.stubGlobal("fetch", fetch);
+    const { run: record } = await run("task-1", undefined, fallback ? "gpt-6-astra" : "claude-sonnet-4-6");
+    expect(record.status).toBe("failed");
+    expect(record.error).toBe("Claude refused the agent request");
+    expect(fetch).toHaveBeenCalledTimes(fallback ? 3 : 1);
+  });
+
+  it.each(["codex", "claude", "fallback"])("cancels %s without deferral, failure events or another vendor attempt", async vendor => {
+    if (vendor !== "codex") await selectClaude(vendor === "fallback");
+    const controller = new AbortController();
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      if (vendor === "fallback" && String(url).includes("openai")) return new Response(null, { status: 401 });
+      controller.abort();
+      // A response/error racing the caller abort must never cause failover.
+      init.signal?.throwIfAborted();
+      return new Response(null, { status: 503 });
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { run: record } = await run("task-1", controller.signal, vendor === "claude" ? "claude-sonnet-4-6" : "gpt-6-astra");
+    expect(record.status).toBe("cancelled");
+    expect((await store.getItem("task-1"))?.status).toBe("pending");
+    expect((await store.getItem("task-2"))?.status).toBe("pending");
+    const log = await readFile(join(projectDir, ".rex", "execution-log.jsonl"), "utf8");
+    expect(log).toContain('"event":"task_cancelled"');
+    expect(log).not.toContain('"event":"task_failed"');
+    expect(fetch).toHaveBeenCalledTimes(vendor === "fallback" ? 3 : 1);
+  });
+
+  it.each(["codex", "claude"])("logs %s cancellation before the first API turn", async vendor => {
+    if (vendor === "claude") await selectClaude(false);
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const { run: record } = await run("task-1", AbortSignal.abort(), vendor === "claude" ? "claude-sonnet-4-6" : "gpt-6-astra");
+    expect(record.status).toBe("cancelled");
+    expect((await store.getItem("task-1"))?.status).toBe("pending");
+    const log = await readFile(join(projectDir, ".rex", "execution-log.jsonl"), "utf8");
+    expect(log).toContain('"event":"task_cancelled"');
+    expect(log).not.toContain('"event":"task_failed"');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it.each([false, true])("completes explicit tasks through Responses with useRegistryProvider=%s, preserving continuation and disjoint usage", async (useRegistryProvider) => {
@@ -109,6 +209,7 @@ describe("direct OpenAI agent execution", () => {
     expect(requests[1].input).toContainEqual({ type: "reasoning", id: "rs_fixture", summary: [], encrypted_content: "opaque-fixture" });
     expect(requests[1].input.some((item: any) => item.type === "function_call_output" && item.call_id === "write")).toBe(true);
     expect(requests.every(request => request.model === "gpt-6-astra" && request.store === false)).toBe(true);
+    expect(requests.every(request => request.include?.includes("reasoning.encrypted_content"))).toBe(true);
   });
 
   it("continues tools on a fallback model and records effective usage and switch cost", async () => {
@@ -157,16 +258,27 @@ describe("direct OpenAI agent execution", () => {
     expect(JSON.stringify(record)).not.toContain("private-claude-fixture");
   });
 
-  it("uses Anthropic tools after cross-vendor failover and prices usage against Claude", async () => {
+  it("resumes a reasoning-only OpenAI turn on Claude with valid history and per-vendor usage", async () => {
     await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: {
       autoFailover: true, codex: { lightModel: "gpt-6.1-sol" },
       claude: { auth: "api", api_key: "claude-fixture", model: "claude-sonnet-4-6" },
     } }));
     const turns = scriptFor("cross-vendor.ts");
     let index = 0;
+    let openAiRequests = 0;
     vi.stubGlobal("fetch", vi.fn(async (url, init) => {
       const body = JSON.parse(init.body as string);
-      if (String(url).includes("openai")) return new Response("", { status: 401 });
+      if (String(url).includes("openai")) {
+        if (openAiRequests++ === 0) return Response.json({
+          status: "incomplete", incomplete_details: { reason: "max_output_tokens" },
+          output: [{ type: "reasoning", id: "rs_limit", summary: [] }],
+          usage: { input_tokens: 30, output_tokens: 90 },
+        });
+        return new Response(null, { status: 401 });
+      }
+      if (body.messages.some((message: { content: unknown[] }) => message.content.length === 0)) {
+        return new Response("messages must have non-empty content", { status: 400 });
+      }
       expect(new Headers(init.headers).get("x-api-key")).toBe("claude-fixture");
       expect(body.tools[0].input_schema).toBeDefined();
       const content = turns[index++].filter((item: any) => item.type !== "reasoning").map((item: any) => item.type === "function_call"
@@ -181,8 +293,8 @@ describe("direct OpenAI agent execution", () => {
     expect(record.status).toBe("completed");
     expect(record.vendor).toBe("claude");
     expect(record.model).toBe("claude-sonnet-4-6");
-    expect(record.tokenUsage).toMatchObject({ input: 200, output: 40 });
-    expect(record.turnTokenUsage?.slice(2).every(turn => turn.vendor === "claude" && turn.model === "claude-sonnet-4-6")).toBe(true);
+    expect(record.tokenUsage).toMatchObject({ input: 230, output: 130 });
+    expect(record.turnTokenUsage?.slice(3).every(turn => turn.vendor === "claude" && turn.model === "claude-sonnet-4-6")).toBe(true);
     expect(JSON.stringify(record)).not.toContain("claude-fixture");
   });
 
@@ -363,11 +475,12 @@ describe("direct OpenAI agent execution", () => {
     expect((await store.getItem("task-2"))?.status).toBe("pending");
   });
 
-  it("cancels a running command before executing the next returned tool", async () => {
+  it.each([false, true])("cancels a running command on the final turn (another tool queued=%s)", async queuedTool => {
+    config.maxTurns = 1;
     const controller = new AbortController();
     script([[
       call("command", "run_command", { command: `node -e "require('fs').writeFileSync('started.txt', 'started');setInterval(()=>{}, 1000)"` }),
-      call("late", "write_file", { path: "late.txt", content: "must not run" }),
+      ...(queuedTool ? [call("late", "write_file", { path: "late.txt", content: "must not run" })] : []),
     ]]);
     const running = run("task-1", controller.signal);
     try {
@@ -378,6 +491,9 @@ describe("direct OpenAI agent execution", () => {
     const { run: record } = await running;
     expect(record.status).toBe("cancelled");
     expect(record.toolCalls).toHaveLength(1);
+    const log = await readFile(join(projectDir, ".rex", "execution-log.jsonl"), "utf8");
+    expect(log).toContain('"event":"task_cancelled"');
+    expect(log).not.toContain('"event":"task_failed"');
     await expect(readFile(join(projectDir, "late.txt"))).rejects.toMatchObject({ code: "ENOENT" });
     expect((await store.getItem("task-1"))?.status).toBe("pending");
   });
