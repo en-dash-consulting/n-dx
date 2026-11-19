@@ -227,6 +227,19 @@ describe("Plan's capture tile", () => {
     expect(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.value).toBe("");
   });
 
+  it("keeps an image attached in the modal when it closes: the tile shows it, and so does the modal reopened", async () => {
+    await mountPlan();
+    await openMore();
+    await attachPng(dialog()!);
+    await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(dialog()).toBeNull();
+    expect(tile().querySelector<HTMLImageElement>(".smart-add-attachment-thumb")?.getAttribute("alt")).toBe("mock.png");
+
+    await openMore();
+    expect(dialog()!.querySelector<HTMLImageElement>(".smart-add-attachment-thumb")?.getAttribute("alt")).toBe("mock.png");
+    expect(uploads()).toHaveLength(0);
+  });
+
   it("carries an image attached in the tile into the modal, uploads it on the modal's Add, and clears both", async () => {
     await mountPlan();
     await type(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!, "Redo the checkout header");
