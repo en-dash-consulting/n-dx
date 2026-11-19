@@ -66,6 +66,37 @@ coordinator's earlier host record. Hench's read-only orientation skips the
 scratch preflight. Fresh, resumed and forked model execution with the final
 build still requires host verification before the original Rex status correction.
 
+### Final host verification and status correction — 2026-11-19
+
+After commit `5a62b2765`, the coordinator reran the built Hench adapter and
+spawn path against the installed CLI. Ordinary workspace-write fresh, same-thread
+resume and distinct-thread fork each used a different mode-0700 scratch directory.
+Node's normal temp API succeeded; scratch was removed after each child. The
+latest turn contexts retained approval `never` and disabled network. Credential
+environment canaries were masked, and outside-workspace writes, host-temp sibling
+writes and network sockets were denied. Production core reviewer flags also
+denied workspace and temp writes in a separate native sandbox check. This was
+not a core model review, browser test or Windows verification.
+
+The final probe omitted orientation-only `--ignore-user-config` flags from the
+workspace turns; production read-only orientation remains separate. Explicitly
+combining that selector with workspace-write remains unsupported on this binary
+and fails before model work, without removing the selector or weakening filters.
+A separate final PATH-only filter probe returned the actionable TMPDIR/TMP/TEMP
+incompatibility with no model session started. Raw records are
+`final-live-scratch-probe.json` and `final-live-scratch-filter-probe.json` in the
+external PR8 review-remediation evidence directory.
+
+The final mandatory distinct-model review passed 819 scoped tests (164
+llm-client, 262 Hench, 41 dashboard and 352 root), including both required startup
+checks; changed packages built and passed typecheck. The intensive outer gate
+was explicitly skipped. After these checks, supported Rex completion corrected
+both the original PR8 change and the remediation change to completed without
+reapplying product amendments. Historical failure reasons remain audit history;
+the completed status and current resolution detail supersede them. Native
+command/Git/read confinement remains unsupported and Codex hub admission remains
+refused.
+
 ## Same-task correction — 2026-11-18
 
 The earlier run explicitly reported incomplete criteria, but the outer runner
