@@ -30,7 +30,7 @@
 import { h, Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import {
-  AssigneeFilter, AssigneePicker, PlaceWithSidecarButton, StrengthChip,
+  AssigneeFilter, AssigneeFilterPending, AssigneePicker, PlaceWithSidecarButton, StrengthChip,
   pickerChoices, saveAssignee, useAssigneeFilter, usePeople, useProjectStatus,
 } from "../components/index.js";
 import type { AssignableRow, GuessStrength } from "../components/index.js";
@@ -435,11 +435,14 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
     onPlaced
       ? h(PlaceBestGuesses, { rows: sorted, applied: appliedRows, onPlaced, onOpenReview: onOpenAll })
       : null,
-    sorted.length > 0 ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
+    sorted.length > 0 && !filter.pending ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
     sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" },
           h("p", null, "Inbox is empty"),
           h("p", { class: "section-sub" }, resolveCliLabel(HELD_EXPLANATION, cliName)))
+      // Held until the people list is read: the default (Mine or All) depends on it.
+      : filter.pending
+        ? h(AssigneeFilterPending, null)
       : visible.length === 0
         ? h("div", { class: "empty-state inbox-empty inbox-filtered-empty", role: "status" },
             h("p", null, "No Inbox changes match this filter."))

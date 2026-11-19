@@ -24,7 +24,7 @@ export { ReadyToRun } from "./ready-to-run.js";
 export { ImpactFlags, ImpactTags, displayTitle, sizeCell, useItemImpacts } from "./impact-tags.js";
 export type { ItemImpact, ImpactMap } from "./impact-tags.js";
 export type { ReadyToRunProps } from "./ready-to-run.js";
-export { AssigneeFilter, AssigneePicker, saveAssignee, useAssigneeFilter, usePeople } from "./assignee.js";
+export { AssigneeFilter, AssigneeFilterPending, AssigneePicker, saveAssignee, useAssigneeFilter, usePeople } from "./assignee.js";
 export type { AssigneeFilterState, AssigneePickerProps } from "./assignee.js";
 export { pickerChoices } from "./assignee-model.js";
 export type { AssignableRow } from "./assignee-model.js";

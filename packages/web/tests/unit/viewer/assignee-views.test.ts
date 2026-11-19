@@ -125,6 +125,64 @@ describe("the Inbox assignee filter", () => {
   });
 });
 
+describe("while the people list is being read", () => {
+  /** Serve `routes`, holding `/api/rex/people` until `release` is called. */
+  function serveHeld(routes: Record<string, unknown>): { release: () => void } {
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/rex/people") {
+        await held;
+        return new Response(JSON.stringify({ me: ME, people: PEOPLE }), { status: 200 });
+      }
+      const body = routes[url];
+      return new Response(JSON.stringify(body ?? { error: "not found" }), { status: body === undefined ? 404 : 200 });
+    }));
+    return { release };
+  }
+
+  const inbox = [change("bos", { assignee: "Bo Chen <bo@shop.io>" }), change("mine", { assignee: ME })];
+  const ids = () => [...root.querySelectorAll<HTMLElement>(".inbox-row")].map((r) => r.dataset.changeId);
+
+  it("holds the Inbox rows, then opens straight on Mine, never showing All first", async () => {
+    const { release } = serveHeld({});
+    await mount(h(InboxView, { rows: rows(inbox), appliedUnplaced: 0, onOpenChange: vi.fn() }));
+    // Nothing filtered yet: no rows and no filter control, only a status.
+    expect(ids()).toEqual([]);
+    expect(root.querySelector(".assignee-filter-select")).toBeNull();
+    expect(root.querySelector(".assignee-filter-pending")?.getAttribute("role")).toBe("status");
+
+    await act(async () => { release(); });
+    await settle();
+    expect(filterSelect().value).toBe("mine");
+    expect(ids()).toEqual(["mine"]);
+  });
+
+  it("makes the Inbox page's first pick from the list as filtered once people load", async () => {
+    const { InboxTriagePage } = await import("../../../src/viewer/views/inbox-triage.js");
+    const placement = (id: string, score: number) => ({
+      layout: "v2", change: { id, title: `Change ${id}`, status: "pending", taskCount: 1 }, relation: "touches",
+      relationRule: "a rule", tied: false,
+      shortlist: [{ target: `cap-${id}`, type: "capability", title: `Home ${id}`, area: "Checkout", criteria: [], score, strength: "strong", reasons: [] }],
+    });
+    // Bo's change has the stronger guess, so it leads the unfiltered queue.
+    const { release } = serveHeld({
+      "/api/rex/changes": { layout: "v2", changes: inbox },
+      "/api/rex/changes/placements": { layout: "v2", placements: { bos: placement("bos", 9), mine: placement("mine", 3) } },
+    });
+    await mount(h(InboxTriagePage, { navigateTo: vi.fn() }));
+    // Shortlists are in; people are not: no queue and no pick yet.
+    expect(root.querySelectorAll(".inbox-qitem")).toHaveLength(0);
+    expect(root.querySelector(".inbox-detail-title")).toBeNull();
+
+    await act(async () => { release(); });
+    await settle();
+    expect([...root.querySelectorAll<HTMLElement>(".inbox-qitem")].map((el) => el.dataset.changeId)).toEqual(["mine"]);
+    expect(root.querySelector<HTMLElement>(".inbox-qitem.is-selected")?.dataset.changeId).toBe("mine");
+    expect(root.querySelector(".inbox-detail-title")?.textContent).toBe("Change mine");
+  });
+});
+
 describe("the Inbox row's assignee picker", () => {
   it("saves a free-form email for someone not in the repository, without opening the row", async () => {
     serve({ me: ME, people: PEOPLE });

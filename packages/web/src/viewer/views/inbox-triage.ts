@@ -23,7 +23,7 @@
 import { h } from "preact";
 import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
-  AssigneeFilter, AssigneePicker, PlaceWithSidecarContext, StrengthChip,
+  AssigneeFilter, AssigneeFilterPending, AssigneePicker, PlaceWithSidecarContext, StrengthChip,
   pickerChoices, saveAssignee, useAssigneeFilter, usePeople, useProjectStatus,
 } from "../components/index.js";
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
@@ -199,6 +199,8 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
     [peopleRead, allRows],
   );
   // The queue is the filtered Inbox: J/K, Skip and the first pick follow it.
+  // Empty while the people list is read, so the first pick is made from the
+  // list as filtered, never from All before it narrows to Mine.
   const rows = useMemo(() => allRows.filter((r) => filter.shows(changeAssignees(r.change))), [allRows, filter.value, peopleRead]);
   // A row's Place on the Plan tile asked for this change.
   const [selected, setSelected] = useState<string | null>(() => takeInboxSelection());
@@ -272,7 +274,7 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
     h(PlaceBestGuesses, { rows, applied, onPlaced: refetch }),
     h("div", { class: "inbox-triage" },
       h("div", { class: "inbox-queue" },
-        allRows.length ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
+        allRows.length && !filter.pending ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
         rows.length
           ? h("ul", {
               ref: listRef,
@@ -282,8 +284,10 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
               "aria-label": "Changes to place",
               "aria-activedescendant": index >= 0 ? optionId(order[index]) : undefined,
             }, rows.map((row) => h(QueueItem, { key: row.change.id, row, selected: row.change.id === selected, onSelect: select })))
-          : h("div", { class: "empty-state inbox-empty", role: "status" },
-              allRows.length ? "No Inbox changes match this filter." : "Inbox is empty"),
+          : allRows.length && filter.pending
+            ? h(AssigneeFilterPending, null)
+            : h("div", { class: "empty-state inbox-empty", role: "status" },
+                allRows.length ? "No Inbox changes match this filter." : "Inbox is empty"),
         h(AppliedHistory, {
           count: status?.rex.inbox?.appliedUnplaced ?? null,
           rows: applied,

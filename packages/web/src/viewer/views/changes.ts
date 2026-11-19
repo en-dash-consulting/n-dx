@@ -19,7 +19,7 @@ import { ApplyAllBar } from "./apply-all.js";
 import type { NavigateTo } from "../types.js";
 import type { KnownPerson } from "../external.js";
 import {
-  AssigneeFilter, AssigneePicker, BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle,
+  AssigneeFilter, AssigneeFilterPending, AssigneePicker, BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle,
   pickerChoices, saveAssignee, useAssigneeFilter, useItemImpacts, usePeople,
   type AssignableRow, type ItemImpact,
 } from "../components/index.js";
@@ -415,6 +415,9 @@ export function ChangesView({ changes: allChanges, onSelectChange, area = null, 
     allChanges.length === 0
       ? h("div", { class: "empty-state", role: "status" },
           "No changes yet. Captured work appears here, grouped by the release it is planned for.")
+      // Held until the people list is read: the default (Mine or All) depends on it.
+      : assigneeFilter.pending
+        ? h(AssigneeFilterPending, null)
       : h(Fragment, null,
           h("div", { class: "ch-filters", role: "group", "aria-label": "Filter changes" },
             h(AssigneeFilter, { state: assigneeFilter }),
