@@ -6,12 +6,13 @@
 
 import { describe, expect, it } from "vitest";
 import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../lang-kit/tests/helpers/call-within-budget.js";
-import { htaccessWords, isCliCheck, parseHtaccess, parsePhpIncludeConfig, splitComparison } from "../../src/index.js";
+import { connectionKeyValues, htaccessWords, isCliCheck, parseHtaccess, parsePhpIncludeConfig, splitComparison } from "../../src/index.js";
 import { MAX_CONFIG_LINE_LENGTH } from "../../src/php-line-cap.js";
 
 const HTACCESS = new URL("../../src/php-htaccess.ts", import.meta.url);
 const INCLUDES = new URL("../../src/php-includes.ts", import.meta.url);
 const ENTRY_POINTS = new URL("../../src/php-entry-points.ts", import.meta.url);
+const OUTBOUND = new URL("../../src/php-outbound.ts", import.meta.url);
 
 /**
  * Sizes at which each replaced regex overruns the call budget (5 s by default)
@@ -129,6 +130,28 @@ describe("splitComparison", () => {
     async () => {
       const text = `PHP_SAPI${" ".repeat(HUGE)}x=`;
       expect(await callWithinBudget<typeof isCliCheck>(ENTRY_POINTS, "isCliCheck", text)).toBe(false);
+    },
+    BOUNDED_TEST_TIMEOUT_MS,
+  );
+});
+
+describe("connectionKeyValues", () => {
+  it("reads key=value pairs separated by ; or white space, the first of a key kept", () => {
+    const pairs = (text: string) => Object.fromEntries(connectionKeyValues(text));
+    expect(pairs("host=db port=5432 dbname='app'")).toEqual({ host: "db", port: "5432", dbname: "app" });
+    expect(pairs("Data Source = srv;Initial Catalog=x;host=a;HOST=b")).toEqual({ "data source": "srv", "initial catalog": "x", host: "a" });
+    // A tab breaks a key: it starts at the next letter.
+    expect(pairs("a\tb c=1")).toEqual({ "b c": "1" });
+    expect(pairs("x=\"unclosed y=2")).toEqual({ x: '"unclosed', y: "2" });
+  });
+
+  // #134: a long run of key characters with no `=`.
+  it(
+    "runs in linear time on a long run of key characters",
+    async () => {
+      const text = `${"a ".repeat(HUGE / 2)};host=db`;
+      const out = await callWithinBudget<typeof connectionKeyValues>(OUTBOUND, "connectionKeyValues", text);
+      expect([...out]).toEqual([["host", "db"]]);
     },
     BOUNDED_TEST_TIMEOUT_MS,
   );

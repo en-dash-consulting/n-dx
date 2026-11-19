@@ -222,12 +222,77 @@ function joinPort(host: string, port: string): string {
   return `${host}:${port}`;
 }
 
-/** `key=value` pairs separated by `;` or whitespace, keys in lowercase, quotes around a value dropped. */
-function keyValues(text: string): Map<string, string> {
+/** A value without the matching quotes around it; quotes around a line break stay. */
+function unquoteValue(value: string): string {
+  const quote = value[0];
+  const wrapped = value.length >= 2 && (quote === "'" || quote === '"') && value[value.length - 1] === quote;
+  return wrapped && !/[\n\r\u2028\u2029]/.test(value) ? value.slice(1, -1) : value;
+}
+
+const isSpace = (c: string): boolean => /\s/.test(c);
+const isKeyStart = (c: string): boolean => /[A-Za-z_]/.test(c);
+/** A key's characters after its first: word characters and spaces. */
+const isKeyPart = (c: string): boolean => /[\w ]/.test(c);
+
+/**
+ * `key=value` pairs separated by `;` or whitespace, keys in lowercase, the
+ * first of a repeated key kept, quotes around a value dropped. A key is a
+ * letter or `_` then word characters and spaces (`Data Source=x`); white
+ * space other than a space breaks it. A value is quoted, or runs to a `;` or
+ * white space.
+ *
+ * A linear scan: the regex it replaces,
+ * `/([A-Za-z_][\w ]*?)\s*=\s*('[^']*'|"[^"]*"|[^;\s]*)/g`, retried every
+ * letter of a long run with no `=`, quadratic on repository input. It finds
+ * the same pairs.
+ */
+export function connectionKeyValues(text: string): Map<string, string> {
   const pairs = new Map<string, string>();
-  for (const m of text.matchAll(/([A-Za-z_][\w ]*?)\s*=\s*('[^']*'|"[^"]*"|[^;\s]*)/g)) {
-    const key = m[1]!.trim().toLowerCase();
-    if (!pairs.has(key)) pairs.set(key, m[2]!.replace(/^(['"])(.*)\1$/, "$2"));
+  // An unclosed quote has no closing quote at any later place either.
+  const unclosed = { "'": false, '"': false };
+  let i = 0;
+  while (i < text.length) {
+    if (!isKeyStart(text[i]!)) {
+      i += 1;
+      continue;
+    }
+    // The run of key characters and white space from here; the `=` must end it.
+    let end = i + 1;
+    let lastWord = i;
+    let lastBreak = -1;
+    let breakInKey = -1;
+    while (end < text.length && (isKeyPart(text[end]!) || isSpace(text[end]!))) {
+      if (!isSpace(text[end]!)) [lastWord, breakInKey] = [end, lastBreak];
+      else if (text[end] !== " ") lastBreak = end;
+      end += 1;
+    }
+    // Any key starting before the run's end would need this `=`, so none can when it is missing.
+    let start = i;
+    if (breakInKey >= 0) {
+      // White space other than a space breaks a key: it starts at the first letter or `_` after the last break.
+      start = breakInKey + 1;
+      while (start <= lastWord && !isKeyStart(text[start]!)) start += 1;
+    }
+    if (text[end] !== "=" || start > lastWord) {
+      i = end + 1;
+      continue;
+    }
+    const key = text.slice(start, lastWord + 1).toLowerCase();
+    let v = end + 1;
+    while (v < text.length && isSpace(text[v]!)) v += 1;
+    let valueEnd = -1;
+    const quote = text[v];
+    if ((quote === "'" || quote === '"') && !unclosed[quote]) {
+      const close = text.indexOf(quote, v + 1);
+      if (close < 0) unclosed[quote] = true;
+      else valueEnd = close + 1;
+    }
+    if (valueEnd < 0) {
+      valueEnd = v;
+      while (valueEnd < text.length && text[valueEnd] !== ";" && !isSpace(text[valueEnd]!)) valueEnd += 1;
+    }
+    if (!pairs.has(key)) pairs.set(key, unquoteValue(text.slice(v, valueEnd)));
+    i = valueEnd;
   }
   return pairs;
 }
@@ -258,7 +323,7 @@ export function connectionTarget(value: string, form: ConnectionForm): Connectio
   }
   const withDriver = (target: Target): Connection => (driver === undefined ? { target } : { target, driver });
   if (!rest.includes("=")) return withDriver(literal(rest));
-  const pairs = keyValues(rest);
+  const pairs = connectionKeyValues(rest);
   const host = pairs.get("host") ?? pairs.get("server") ?? pairs.get("hostaddr");
   const port = pairs.get("port");
   if (host) return withDriver(literal(port && /^\d+$/.test(port) ? joinPort(host, port) : host));
