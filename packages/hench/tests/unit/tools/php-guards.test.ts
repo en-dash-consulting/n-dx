@@ -74,9 +74,9 @@ describe("planPhpGuards", () => {
       posix,
     );
     expect(plan.checks.map((c) => c.command)).toEqual([
-      "php -l src/A.php",
-      "php -l views/page.phtml",
-      "php -l lib/legacy.INC",
+      "php -l ./src/A.php",
+      "php -l ./views/page.phtml",
+      "php -l ./lib/legacy.INC",
       COMPOSER_VALIDATE_COMMAND,
     ]);
     expect(plan.skipped).toEqual([]);
@@ -133,13 +133,25 @@ describe("projectRelativePaths", () => {
 
 describe("quotePathForShell", () => {
   it("leaves ordinary paths bare and quotes the rest for sh", () => {
-    expect(quotePathForShell("src/A.php", "posix")).toBe("src/A.php");
-    expect(quotePathForShell("my dir/it's.php", "posix")).toBe("'my dir/it'\\''s.php'");
-    expect(quotePathForShell("a;rm -rf x.php", "posix")).toBe("'a;rm -rf x.php'");
+    expect(quotePathForShell("src/A.php", "posix")).toBe("./src/A.php");
+    expect(quotePathForShell("my dir/it's.php", "posix")).toBe("'./my dir/it'\\''s.php'");
+    expect(quotePathForShell("a;rm -rf x.php", "posix")).toBe("'./a;rm -rf x.php'");
+  });
+
+  // `-zx.php` matches SHELL_SAFE_PATH; bare, php would read it as options.
+  it.each(["posix", "cmd"] as const)("never passes a relative path as an option (%s)", (shellKind) => {
+    expect(quotePathForShell("-zx.php", shellKind)).toBe("./-zx.php");
+    expect(quotePathForShell("./a.php", shellKind)).toBe("./a.php");
+  });
+
+  it("lints a changed root file named -zx.php as ./-zx.php", async () => {
+    await put("-zx.php");
+    const plan = await planPhpGuards(projectDir, ["-zx.php"], posix);
+    expect(plan.checks.map((c) => c.command)).toEqual(["php -l ./-zx.php"]);
   });
 
   it("refuses what cmd.exe would expand inside quotes", () => {
-    expect(quotePathForShell("my dir/a.php", "cmd")).toBe('"my dir/a.php"');
+    expect(quotePathForShell("my dir/a.php", "cmd")).toBe('"./my dir/a.php"');
     expect(quotePathForShell("%PATH%.php", "cmd")).toBeUndefined();
   });
 
@@ -164,7 +176,7 @@ describe("runPhpGuards", () => {
       execCommand: async (command, opts) => { calls.push([command, opts]); return result(0); },
     });
     expect(r.passed).toBe(true);
-    expect(calls.map(([c]) => c)).toEqual(["php -l index.php", COMPOSER_VALIDATE_COMMAND]);
+    expect(calls.map(([c]) => c)).toEqual(["php -l ./index.php", COMPOSER_VALIDATE_COMMAND]);
     expect(calls.every(([, o]) => o.timeout === 1234 && o.cwd === projectDir)).toBe(true);
   });
 
@@ -178,7 +190,7 @@ describe("runPhpGuards", () => {
       execCommand: async () => result(255, "PHP Parse error: syntax error in bad.php on line 3"),
     });
     expect(r.passed).toBe(false);
-    expect(r.results[0]).toMatchObject({ command: "php -l bad.php", passed: false });
+    expect(r.results[0]).toMatchObject({ command: "php -l ./bad.php", passed: false });
     expect(r.results[0].output).toContain("Parse error");
   });
 

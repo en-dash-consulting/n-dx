@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "009f879d-64a5-4bbc-8c67-dd2f8dafa7da":
+    lastModified: "2026-11-19T03:43:43.308Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "03468932-0d88-42ed-a764-c25c654a20f5":
     status: "completed"
     startedAt: "2026-11-19T03:12:36.763Z"
@@ -76,7 +79,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94add228-871f-4544-bcb3-6c25ff72ef4d":
     createdAt: "2026-11-18T22:33:39.769Z"
-    lastModified: "2026-11-19T03:17:33.037Z"
+    lastModified: "2026-11-19T03:43:43.308Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96c36dff-2ec0-445a-9319-91d3f350c83c":
     status: "completed"
@@ -89,7 +92,14 @@ items:
     lastModified: "2026-11-19T03:06:10.342Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a739a401-b0e9-4203-9156-16e8431a584f":
-    lastModified: "2026-11-18T22:35:20.403Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:40:48.562Z"
+    completedAt: "2026-11-19T03:44:07.844Z"
+    endedAt: "2026-11-19T03:44:07.844Z"
+    activeIntervals: [{"end":"2026-11-19T03:44:07.844Z","start":"2026-11-19T03:40:48.562Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "All-skipped PHP guards emit \"PHP guards skipped\" with reasons (ok: true). Relative paths reach php -l as ./<path>. Tests added; not run locally (commands refused), so the gate runs them."
+    lastModified: "2026-11-19T03:44:07.844Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bd91778d-ccce-4732-a205-581368648413":
     lastModified: "2026-11-19T02:32:52.342Z"

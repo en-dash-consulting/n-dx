@@ -1248,10 +1248,15 @@ export async function runPhpGuardsIfNeeded(
     ...result.results.filter((r) => !r.passed).map((r) => r.command),
     ...result.errors,
   ];
-  emitRunEvent("gate", result.passed ? "PHP guards passed" : `PHP guards failed — ${failed.length} check(s)`, {
+  // Every check skipped is not a pass: say so, without failing the run (LS16).
+  const allSkipped = result.results.length === 0 && failed.length === 0;
+  const summary = !result.passed
+    ? `PHP guards failed — ${failed.length} check(s)`
+    : allSkipped ? "PHP guards skipped" : "PHP guards passed";
+  emitRunEvent("gate", summary, {
     ok: result.passed,
-    detail: failed.join(", ") || undefined,
-    counts: { checks: result.results.length, failed: failed.length },
+    detail: (allSkipped ? result.skipped : failed).join(", ") || undefined,
+    counts: { checks: result.results.length, failed: failed.length, skipped: result.skipped.length },
   });
 
   if (!result.passed) {
