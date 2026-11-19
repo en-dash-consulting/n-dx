@@ -5,5 +5,8 @@ items:
     lastModified: "2026-11-19T02:49:57.732Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cb5b35e3-9332-4dc8-bbef-b6fd923249aa":
-    lastModified: "2026-11-19T02:49:57.732Z"
+    startedAt: "2026-11-19T03:01:54.921Z"
+    activeIntervals: [{"end":"2026-11-19T03:38:38.213Z","start":"2026-11-19T03:01:54.921Z"}]
+    failureReason: "Test gate failed [command: env -u CODEX_SANDBOX_NETWORK_DISABLED PATH=\"/Users/ryankeith/.nvm/versions/node/v22.22.2/bin:$PATH\" CODEX_HOME=/private/tmp/ndx-pr6-review-validation-home VITEST_MAX_WORKERS=2 node scripts/run-all-tests.mjs affec…\nFailing tests (30):\n- web rex-gateway source exports match contract test list\n- filters async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {\n- filters async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {\n- returns mode=llm-review and passed=true when mock reviewer exits 0\n- returns mode=llm-review and passed=false when mock reviewer exits 1\n- invokes LLM even when no test command is configured\n- includes contextFiles in result when reviewer passes and contextFiles provided\n- uses 'exec -' subcommand (stdin) when reviewer is codex\n… and 22 more"
+    lastModified: "2026-11-19T03:38:38.968Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

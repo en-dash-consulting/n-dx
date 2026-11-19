@@ -1,3 +1,4 @@
+export { getUsageScope } from "./llm-bridge.js";
 export type { ScanResult, ScanOptions, ScanSourceVisionResult, GoModData } from "./scanners.js";
 export { scanTests, scanDocs, scanSourceVision, scanPackageJson, scanGoMod, parseGoMod } from "./scanners.js";
 
