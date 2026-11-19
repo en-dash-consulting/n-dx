@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { shellCheckPassed, threadContinued, shellCall, advertisedTools, responseEvents } from "../../packages/web/scripts/sidecar-provider-probe-checks.mjs";
 
 it("requires the current call's result and a real thread id for host evidence", () => {
-  const prior = { type: "function_call_output", call_id: "old", output: "PR9_PROVIDER_HEADERS_HIDDEN" };
+  const prior = { type: "function_call_output", call_id: "old", output: JSON.stringify({ exit_code: 0, output: "PR9_PROVIDER_HEADERS_HIDDEN" }) };
   expect(shellCheckPassed([prior, { ...prior, call_id: "new", output: "exit 1" }], "new")).toBe(false);
   expect(shellCheckPassed([{ ...prior, call_id: "new" }], "new")).toBe(true);
   expect(threadContinued(undefined, undefined)).toBe(false);
@@ -43,7 +43,7 @@ it("detects unrelated namespace and leaf tools in both advertisement locations",
 
 it.each(["function_call_output", "custom_tool_call_output"])("requires current %s output, never historical markers or metadata", type => {
   const marker = "PR9_PROVIDER_HEADERS_HIDDEN";
-  const text = type === "custom_tool_call_output" ? JSON.stringify({ exit_code: 0, output: marker }) : marker;
+  const text = JSON.stringify({ exit_code: 0, output: marker });
   const old = { type, call_id: "old", output: [{ type: "input_text", text }] };
   expect(shellCheckPassed([old], "current")).toBe(false);
   expect(shellCheckPassed([old, { ...old, call_id: "current", output: [{ type: "input_text", text: "exit 1" }] }], "current")).toBe(false);
@@ -52,8 +52,11 @@ it.each(["function_call_output", "custom_tool_call_output"])("requires current %
   expect(shellCheckPassed([{ type: "custom_tool_call", call_id: "current", input: "PR9_PROVIDER_HEADERS_HIDDEN" }], "current")).toBe(false);
 });
 
-it("rejects custom shell errors that echo a snapshot path containing the marker", () => {
+it.each(["function_call_output", "custom_tool_call_output"])("rejects %s errors that echo the marker", type => {
   const marker = "PR9_PROVIDER_HEADERS_HIDDEN";
+  for (const output of [marker, `Error: /tmp/${marker}/snapshot missing`, JSON.stringify({ exit_code: 0, output: `prefix ${marker}` })]) {
+    expect(shellCheckPassed([{ type, call_id: "current", output }], "current")).toBe(false);
+  }
   for (const result of [
     { exit_code: 127, output: `/bin/sh: /tmp/${marker}/snapshot: No such file or directory` },
     { exit_code: 1, output: marker },
@@ -61,7 +64,7 @@ it("rejects custom shell errors that echo a snapshot path containing the marker"
     { exit_code: 0, output: "", diagnostic: marker },
   ]) {
     const output = [{ type: "input_text", text: JSON.stringify(result) }];
-    expect(shellCheckPassed([{ type: "custom_tool_call_output", call_id: "current", output }], "current")).toBe(false);
+    expect(shellCheckPassed([{ type, call_id: "current", output }], "current")).toBe(false);
   }
 });
 

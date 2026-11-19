@@ -41,6 +41,25 @@ These document settings, not account access or host acceptance.
 
 ## Evidence and limits
 
+Latest coordinator evidence supersedes the incomplete historical retry below.
+The supplied `.local_testing/pr9-host-evidence/custom-provider-seven-phases.json`
+(SHA-256 `e744b830c4c205dc5ffbe94befff08577aed7f0b2603de50e273c0e17f8beaa3`)
+records a passing native installed-CLI run through the production hub and a local
+scripted Responses service: fresh/resume/restart continuity, saved and explicit
+models, hidden shell credentials, distinct rejected-auth/connection failures,
+and missing auth without a request. Counts are 10 provider requests, 18 broker
+requests and zero unrelated requests. Saved task context additionally reports
+clean persisted credential scans and 88 passing host listener tests in five files.
+This executor inspected the supplied result, but did not rerun host acceptance.
+No paid-provider or new browser acceptance is claimed.
+
+The remaining standard-function probe false positive now requires JSON with
+numeric `exit_code: 0` and the exact marker in `output`, just as custom-tool
+results do. Plain text, marker-bearing errors and stale call ids cannot pass.
+Legacy function formats have deterministic coverage only; unstructured formats
+are refused as unproven. Fresh independent review of this final correction
+remains coordinator work; this run prohibits nested models and subagents.
+
 `sidecar-custom-provider.test.ts` uses a mocked process boundary: it exercises
 production config parsing, registry, driver argv, per-turn credential rotation,
 model precedence, persisted resume, and transcript redaction. It is not actual

@@ -55,8 +55,8 @@ export function shellCheckPassed(input, callId) {
     const blocks = typeof item.output === "string" ? [item.output] : Array.isArray(item.output)
       ? item.output.filter(block => block?.type === "input_text").map(block => block.text)
       : [];
-    if (item.type === "function_call_output") return blocks.some(text => typeof text === "string" && text.includes(marker));
-    if (item.type !== "custom_tool_call_output") return false;
+    if (!["function_call_output", "custom_tool_call_output"].includes(item.type)) return false;
+    // Unstructured legacy output is unproven: even an error can echo the marker.
     // text(r) emits the exec_command result as JSON alongside CLI status text.
     return blocks.some(text => {
       try {
