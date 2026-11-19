@@ -102,8 +102,15 @@ items:
     lastModified: "2026-11-19T03:02:01.578Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94add228-871f-4544-bcb3-6c25ff72ef4d":
+    status: "completed"
+    startedAt: "2026-11-19T17:27:43.232Z"
+    completedAt: "2026-11-19T17:27:43.232Z"
+    endedAt: "2026-11-19T17:27:43.232Z"
+    activeIntervals: [{"end":"2026-11-19T17:27:43.232Z","start":"2026-11-19T17:27:43.232Z"}]
+    appliedAt: "2026-11-19T17:27:43.232Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T22:33:39.769Z"
-    lastModified: "2026-11-19T16:12:09.632Z"
+    lastModified: "2026-11-19T17:27:43.232Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "96c36dff-2ec0-445a-9319-91d3f350c83c":
     status: "completed"
@@ -176,7 +183,14 @@ items:
     lastModified: "2026-11-19T02:57:36.624Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ec36a246-db57-4541-a4d4-28895bc10caf":
-    lastModified: "2026-11-19T02:13:41.817Z"
+    status: "completed"
+    startedAt: "2026-11-19T16:32:16.353Z"
+    completedAt: "2026-11-19T17:27:43.232Z"
+    endedAt: "2026-11-19T17:27:43.232Z"
+    activeIntervals: [{"end":"2026-11-19T17:27:43.232Z","start":"2026-11-19T16:32:16.353Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-config, php-outbound and php-legacy digest per file (digestConfig/digestOutbound/digestLegacy). Peak heap, all kinds on 20 MB generated PHP: 992 MB → 704 MB minimum --max-old-space-size. Facts byte-identical on all 219 lang-php fixture projects."
+    lastModified: "2026-11-19T17:27:43.232Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ec5c180b-a937-4585-afe2-b61c8ad83564":
     status: "completed"

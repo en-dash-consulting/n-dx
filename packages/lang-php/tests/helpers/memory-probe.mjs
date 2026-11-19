@@ -2,7 +2,8 @@
  * Run by `php-dynamic-memory.test.ts` in a child Node whose heap is capped
  * (`--max-old-space-size`): writes `<megabytes>` MB of generated PHP class
  * files, about 900 KB each, analyzes them with the built pack for `<kinds>`,
- * and prints what it read as JSON. Out of heap, the child aborts.
+ * and prints what it read, with its peak resident set, as JSON. Out of heap,
+ * the child aborts.
  *
  * Usage: node --max-old-space-size=<MB> memory-probe.mjs <dist index.js> <megabytes> <kind,...>
  */
@@ -61,6 +62,8 @@ try {
       sites: sites.length,
       databaseSites: sites.filter((s) => s.database !== undefined).length,
       notices: result.notices ?? [],
+      // Peak resident set, in MB: what the analysis needed at its largest.
+      maxRssMb: Math.round(process.resourceUsage().maxRSS / 1024),
     }),
   );
 } finally {

@@ -11,9 +11,11 @@
  *   imports as `f`; else the current namespace's `f` when one is declared,
  *   then the global `f`.
  *
- * The legacy-construct and dynamic-code scanners ask {@link builtinCallResolver}
- * which built-in a call reaches: a call that resolves to a function the
- * repository declares (a namespaced helper, a global polyfill) reaches none.
+ * The legacy-construct and dynamic-code scanners take a call's
+ * {@link callCandidates} as each file is parsed, and ask {@link builtinReached}
+ * which built-in it reaches once every file's declarations are known: a call
+ * that resolves to a function the repository declares (a namespaced helper,
+ * a global polyfill) reaches none.
  *
  * @module lang-php/php-namespaces
  */
@@ -97,17 +99,6 @@ const importsFunctions = (file: PackSourceFile): boolean =>
   (file.captures.imports ?? []).some((c) => c.name === "use.type" && c.text.toLowerCase() === "function");
 
 /**
- * For each function call's callee in `file`, the built-in it reaches: the
- * global function's name (as written, or as its `use function` names it),
- * or undefined when the call resolves to a function in `declared`
- * ({@link declaredFunctions}) or to a namespaced one.
- */
-export function builtinCallResolver(file: PackSourceFile, declared: ReadonlySet<string>): (callee: Capture) => string | undefined {
-  const candidatesOf = callCandidates(file);
-  return (callee) => builtinReached(candidatesOf(callee), declared);
-}
-
-/**
  * For each function call's callee in `file`, the functions it may name, in
  * the order PHP tries them (a namespaced name, then the global fallback);
  * undefined for a qualified name, which never reaches a built-in. Reads one
@@ -127,7 +118,11 @@ export function callCandidates(file: PackSourceFile): (callee: Capture) => strin
   };
 }
 
-/** The built-in {@link callCandidates} reach: the global function, unless one of them is in `declared` ({@link declaredFunctions}). */
+/**
+ * The built-in {@link callCandidates} reach: the global function's name (as
+ * written, or as its `use function` names it), unless one of them is in
+ * `declared` ({@link declaredFunctions}) or the last is namespaced.
+ */
 export function builtinReached(candidates: readonly string[] | undefined, declared: ReadonlySet<string>): string | undefined {
   if (candidates === undefined || candidates.some((c) => declared.has(c.toLowerCase()))) return undefined;
   const reached = candidates[candidates.length - 1]!;

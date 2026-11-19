@@ -78,7 +78,7 @@
 
 import { join } from "node:path";
 import { withoutUrlUserinfo, type FactKind, type FileFacts, type OutboundCallFact, type SourcePosition } from "@n-dx/lang-kit";
-import { innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
+import { innermostEach, type Capture, type FrameworkContext, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
 import { before, readAssignments, scopeAt, type Assignment } from "./php-assignments.js";
 import { concatenationOperands, evaluatePath, interpolatedEnds, isPlainValue, repositoryConstants, type ConstantLookup } from "./php-includes.js";
@@ -605,7 +605,7 @@ function argumentValue(argument: Capture): { readonly name?: string; readonly te
 }
 
 /** The argument at `position`, else the one named `name`; undefined after a spread. */
-function argumentAt(call: Call, position: number, name: string): Capture | undefined {
+function argumentAt(call: { readonly arguments: readonly Capture[] }, position: number, name: string): Capture | undefined {
   for (const [i, argument] of call.arguments.entries()) {
     const value = argumentValue(argument);
     if (value === undefined) return undefined;
@@ -731,15 +731,51 @@ export const PHP_OUTBOUND_METHODS: readonly string[] = [
 
 // ── One file ────────────────────────────────────────────────────────────────
 
-/** One file's outbound calls, in document order. */
-export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup, config: ConfigLookup = () => undefined): OutboundCallFact[] {
+/**
+ * A call of the query with what one file settles about it: the class of a
+ * `new` or a static call's scope as PHP qualifies it ("" when it is not a
+ * class reference), the class a receiver is bound to, and a `getenv` key.
+ */
+interface DigestCall {
+  readonly at: SourcePosition;
+  readonly function?: string;
+  readonly class?: string;
+  readonly scope?: string;
+  readonly staticMethod?: string;
+  readonly receiver?: string;
+  readonly receiverClass?: string;
+  readonly method?: string;
+  readonly envKey?: string;
+  readonly arguments: readonly Capture[];
+}
+
+/** A `$config['a']['b'] = value` assignment: the key (`a.b`) and the value as written. */
+interface ConfigAssignment {
+  readonly key: string;
+  readonly value: string;
+}
+
+/**
+ * What {@link readFileOutbound} and {@link repositoryConfigValues} need from
+ * one file's `outbound` captures, read as the file is parsed
+ * (`FrameworkPack.digest`), so those captures need not outlive it. Targets
+ * are left to the read: they follow the repository's constants and
+ * configuration values. `env` holds the `$_ENV`/`$_SERVER` reads, which
+ * depend on nothing else.
+ */
+export interface OutboundDigest {
+  readonly calls: readonly DigestCall[];
+  readonly elements: readonly Element[];
+  readonly env: readonly OutboundCallFact[];
+  readonly configs: readonly ConfigAssignment[];
+}
+
+const EMPTY_DIGEST: OutboundDigest = { calls: [], elements: [], env: [], configs: [] };
+
+/** One file's {@link OutboundDigest}, from its captures alone. */
+export function digestOutbound(file: PackSourceFile): OutboundDigest {
   const captures = file.captures[OUTBOUND_QUERY] ?? [];
-  if (captures.length === 0) return [];
-  const targets = new TargetReader(file, constant, config);
-  const facts: OutboundCallFact[] = [];
-  const add = (kind: OutboundCallFact["kind"], client: string, target: Target, position: SourcePosition): void => {
-    facts.push({ kind, ...target, client, confidence: "certain", position });
-  };
+  if (captures.length === 0) return EMPTY_DIGEST;
 
   // Classes as PHP qualifies them (`new X`, `X::m()`), by the position of the name.
   const classes = new Map<string, string>();
@@ -795,8 +831,56 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup,
     assigned.set(key, earlier === undefined || earlier === klass ? klass : null);
   }
   const receiverClass = (receiver: string, at: SourcePosition): string | undefined => assigned.get(scopeKey(receiver, at)) ?? undefined;
+  const digested: DigestCall[] = calls.map((call) => {
+    const at = call.node.start;
+    const envKeyOf = call.function === "getenv" ? envKey(call.node.text) : undefined;
+    const receiverOf = call.receiver !== undefined && call.method !== undefined ? receiverClass(call.receiver, at) : undefined;
+    return {
+      at,
+      ...(call.function !== undefined && { function: call.function }),
+      ...(call.class !== undefined && { class: classOf(call.class) ?? "" }),
+      ...(call.scope !== undefined && { scope: classOf(call.scope) ?? "" }),
+      ...(call.staticMethod !== undefined && { staticMethod: call.staticMethod }),
+      ...(call.receiver !== undefined && { receiver: call.receiver }),
+      ...(receiverOf !== undefined && { receiverClass: receiverOf }),
+      ...(call.method !== undefined && { method: call.method }),
+      ...(envKeyOf !== undefined && { envKey: envKeyOf }),
+      arguments: call.arguments,
+    };
+  });
+
+  // Environment reads through $_ENV and $_SERVER.
+  const env: OutboundCallFact[] = [];
+  const written = new Set(captures.filter((c) => c.name === "out.written").map(spanKey));
+  for (const read of captures.filter((c) => c.name === "out.superglobal")) {
+    if (written.has(spanKey(read))) continue;
+    const text = read.text.trim();
+    const superglobal = SUPERGLOBAL_ANY.exec(text);
+    if (!superglobal) continue;
+    const key = envKey(text);
+    if (key === undefined) continue;
+    env.push({ kind: "env", ...(key === "" ? UNKNOWN : { target: key, targetSource: "env" }), client: `$_${superglobal[1]}`, confidence: "certain", position: read.start });
+  }
+
+  return { calls: digested, elements, env, configs: configAssignments(captures) };
+}
+
+/** One file's outbound calls, in document order. `digest` is the file's {@link digestOutbound}, taken from `file` when absent. */
+export function readFileOutbound(
+  file: PackSourceFile,
+  constant: ConstantLookup,
+  config: ConfigLookup = () => undefined,
+  digest: OutboundDigest = digestOutbound(file),
+): OutboundCallFact[] {
+  const { calls, elements } = digest;
+  if (calls.length === 0 && digest.env.length === 0) return [];
+  const targets = new TargetReader(file, constant, config);
+  const facts: OutboundCallFact[] = [];
+  const add = (kind: OutboundCallFact["kind"], client: string, target: Target, position: SourcePosition): void => {
+    facts.push({ kind, ...target, client, confidence: "certain", position });
+  };
   const port = (host: Target, argument: Capture | undefined, at: SourcePosition): Target => targets.withPort(host, argument, at);
-  const server = (call: Call, at: SourcePosition): Target => {
+  const server = (call: DigestCall, at: SourcePosition): Target => {
     const host = argumentTarget(call, argumentAt(call, 0, "host"));
     return port(credentialFree(host), argumentAt(call, 1, "port"), at);
   };
@@ -809,13 +893,13 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup,
     const path = options.get("path");
     return path ? targets.of(path.value.text, at) : UNKNOWN;
   };
-  const argumentTarget = (call: Call, argument: Capture | undefined): Target => {
+  const argumentTarget = (call: DigestCall, argument: Capture | undefined): Target => {
     const text = argumentText(argument);
-    return text === undefined ? UNKNOWN : targets.of(text, call.node.start);
+    return text === undefined ? UNKNOWN : targets.of(text, call.at);
   };
 
   for (const call of calls) {
-    const at = call.node.start;
+    const at = call.at;
     const target = (argument: Capture | undefined): Target => argumentTarget(call, argument);
     const connection = (argument: Capture | undefined, form: ConnectionForm): Connection => {
       const text = argumentText(argument);
@@ -845,13 +929,13 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup,
       } else if (name === "fsockopen") {
         add("http", "fsockopen", target(argumentAt(call, 0, "hostname")), at);
       } else if (name === "getenv") {
-        const key = envKey(call.node.text);
+        const key = call.envKey;
         if (key !== undefined && argumentAt(call, 0, "name")) add("env", "getenv", key === "" ? UNKNOWN : { target: key, targetSource: "env" }, at);
       }
       continue;
     }
     if (call.class !== undefined) {
-      const qualified = classOf(call.class);
+      const qualified = call.class;
       if (qualified === SOAP_CLIENT) {
         const wsdl = argumentAt(call, 0, "wsdl");
         const location = optionsOf(argumentAt(call, 1, "options"), elements).get("location");
@@ -874,13 +958,13 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup,
       continue;
     }
     if (call.scope !== undefined) {
-      if (call.staticMethod === "getconnection" && classOf(call.scope) === DBAL_DRIVER_MANAGER) {
+      if (call.staticMethod === "getconnection" && call.scope === DBAL_DRIVER_MANAGER) {
         add("database", "doctrine-dbal", parameters(optionsOf(argumentAt(call, 0, "params"), elements), at), at);
       }
       continue;
     }
     if (call.receiver === undefined || call.method === undefined) continue;
-    const receiver = receiverClass(call.receiver, at);
+    const receiver = call.receiverClass;
     if (receiver === GUZZLE_CLIENT) {
       const method = call.method.replace(/async$/, "");
       if (GUZZLE_VERBS.has(method)) add("http", "guzzle", target(argumentAt(call, 0, "uri")), at);
@@ -891,17 +975,7 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup,
     }
   }
 
-  // Environment reads through $_ENV and $_SERVER.
-  const written = new Set(captures.filter((c) => c.name === "out.written").map(spanKey));
-  for (const read of captures.filter((c) => c.name === "out.superglobal")) {
-    if (written.has(spanKey(read))) continue;
-    const text = read.text.trim();
-    const superglobal = SUPERGLOBAL_ANY.exec(text);
-    if (!superglobal) continue;
-    const key = envKey(text);
-    if (key === undefined) continue;
-    add("env", `$_${superglobal[1]}`, key === "" ? UNKNOWN : { target: key, targetSource: "env" }, read.start);
-  }
+  facts.push(...digest.env);
 
   const seen = new Set<string>();
   return facts
@@ -924,29 +998,17 @@ export type ConfigLookup = (key: string) => string | undefined;
  * anywhere is not computable, as a constant defined twice is not: which one
  * a call sees depends on which file ran.
  */
-export function repositoryConfigValues(files: readonly PackSourceFile[], constant: ConstantLookup): ConfigLookup {
+export function repositoryConfigValues(
+  files: readonly PackSourceFile[],
+  constant: ConstantLookup,
+  digests: ReadonlyMap<string, OutboundDigest> = new Map(files.map((f) => [f.path, digestOutbound(f)])),
+): ConfigLookup {
   const values = new Map<string, Set<string | undefined>>();
   for (const file of [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))) {
-    const captures = file.captures[OUTBOUND_QUERY] ?? [];
-    const parts = captures.filter((c) => c.name === "out.config_key" || c.name === "out.config_value");
-    const byAssign = new Map<string, { key?: Capture; value?: Capture }>();
-    innermostEach(
-      captures.filter((c) => c.name === "out.config_assign"),
-      parts,
-    ).forEach((owner, i) => {
-      if (!owner) return;
-      const k = `${owner.start.line}:${owner.start.column}`;
-      const entry = byAssign.get(k) ?? {};
-      entry[parts[i]!.name === "out.config_key" ? "key" : "value"] ??= parts[i]!;
-      byAssign.set(k, entry);
-    });
-    for (const { key, value } of byAssign.values()) {
-      if (!key || !value) continue;
-      const config = configSubscript(key.text);
-      if (!config || !CONFIG_NAMES.has(config.array)) continue;
-      const computed = evaluatePath(value.text, file.path, constant);
-      let set = values.get(config.key);
-      if (set === undefined) values.set(config.key, (set = new Set()));
+    for (const { key, value } of digests.get(file.path)?.configs ?? []) {
+      const computed = evaluatePath(value, file.path, constant);
+      let set = values.get(key);
+      if (set === undefined) values.set(key, (set = new Set()));
       set.add(computed !== undefined && isPlainValue(computed) ? computed : undefined);
     }
   }
@@ -958,19 +1020,22 @@ export function repositoryConfigValues(files: readonly PackSourceFile[], constan
   };
 }
 
-/** Every outbound call of a project, by file. */
-export function readOutbound(files: readonly PackSourceFile[]): FrameworkFacts {
+/** Every outbound call of a project, by file. `digests` are each file's {@link digestOutbound}, taken from `files` when absent. */
+export function readOutbound(
+  files: readonly PackSourceFile[],
+  digests: ReadonlyMap<string, OutboundDigest> = new Map(files.map((f) => [f.path, digestOutbound(f)])),
+): FrameworkFacts {
   const constant = repositoryConstants(files);
-  const config = repositoryConfigValues(files, constant);
+  const config = repositoryConfigValues(files, constant, digests);
   const facts = new Map<string, Omit<FileFacts, "path">>();
   for (const file of files) {
-    const calls = readFileOutbound(file, constant, config);
+    const calls = readFileOutbound(file, constant, config, digests.get(file.path) ?? EMPTY_DIGEST);
     if (calls.length > 0) facts.set(file.path, { outboundCalls: calls });
   }
   return { facts, notices: [] };
 }
 
-export const phpOutbound: FrameworkPack = {
+export const phpOutbound: FrameworkPack<OutboundDigest> = {
   id: "php-outbound",
   produces: ["outboundCalls"],
   // A getter, so the path is computed on first use rather than at import.
@@ -978,7 +1043,31 @@ export const phpOutbound: FrameworkPack = {
     return [{ name: OUTBOUND_QUERY, path: join(PHP_PACKAGE.queryDir("php-outbound"), `${OUTBOUND_QUERY}.scm`) }];
   },
   provenance: PROVENANCE,
-  read(files: readonly PackSourceFile[], kinds: readonly FactKind[]): FrameworkFacts {
-    return kinds.includes("outboundCalls") ? readOutbound(files) : { facts: new Map(), notices: [] };
+  digest: digestOutbound,
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], _context?: FrameworkContext, digests?: ReadonlyMap<string, OutboundDigest>): FrameworkFacts {
+    return kinds.includes("outboundCalls") ? readOutbound(files, digests) : { facts: new Map(), notices: [] };
   },
 };
+
+/** A file's `$config[…] = value` assignments to an array named in {@link CONFIG_NAMES}, from its `outbound` captures. */
+function configAssignments(captures: readonly Capture[]): ConfigAssignment[] {
+  const parts = captures.filter((c) => c.name === "out.config_key" || c.name === "out.config_value");
+  const byAssign = new Map<string, { key?: Capture; value?: Capture }>();
+  innermostEach(
+    captures.filter((c) => c.name === "out.config_assign"),
+    parts,
+  ).forEach((owner, i) => {
+    if (!owner) return;
+    const k = `${owner.start.line}:${owner.start.column}`;
+    const entry = byAssign.get(k) ?? {};
+    entry[parts[i]!.name === "out.config_key" ? "key" : "value"] ??= parts[i]!;
+    byAssign.set(k, entry);
+  });
+  const out: ConfigAssignment[] = [];
+  for (const { key, value } of byAssign.values()) {
+    if (!key || !value) continue;
+    const config = configSubscript(key.text);
+    if (config && CONFIG_NAMES.has(config.array)) out.push({ key: config.key, value: value.text });
+  }
+  return out;
+}

@@ -223,6 +223,107 @@ interface Load {
   readonly sourceFile: string;
 }
 
+/** A settings loader call's source and its path argument as written. */
+interface Loader {
+  readonly source: ConfigSource;
+  readonly path: string;
+}
+
+/**
+ * An assignment to a variable, in document order: an include's value, or the
+ * value of the call at `call` in {@link ConfigDigest.calls}, a settings loader
+ * whose file is known only once the repository's constants are.
+ */
+type BoundStep = { readonly name: string; readonly kind: "include" } | { readonly name: string; readonly kind: "load"; readonly call: number };
+
+/** A constant name or a subscript read, and the condition it is checked in. */
+interface Checked {
+  readonly text: string;
+  readonly start: SourcePosition;
+  readonly condition?: Condition;
+}
+
+/** A call as the read needs it. */
+interface DigestCall {
+  readonly at: SourcePosition;
+  readonly condition?: Condition;
+  /** Lowercase, without a leading `\`. */
+  readonly function?: string;
+  /** Lowercase. */
+  readonly method?: string;
+  /** The function or method name as written, without a leading `\`. */
+  readonly written?: string;
+  /** The first argument's content, when it is a plain string. */
+  readonly argument?: string;
+  /** `getenv`'s variable ({@link envKey}). */
+  readonly envKey?: string;
+  readonly registryKey?: string;
+  readonly loader?: Loader;
+}
+
+/**
+ * What {@link readConfigFacts} needs from one file's `config` captures, read
+ * as the file is parsed (`FrameworkPack.digest`), so those captures need not
+ * outlive it. What the read resolves through the repository is kept as
+ * written: a loader's path (the repository's constants), constant names
+ * (boolean and config-file constants), registry keys and subscript reads (the
+ * settings files, found through the resolver's context).
+ */
+export interface ConfigDigest {
+  readonly keys: readonly DefinedKey[];
+  readonly names: readonly Checked[];
+  readonly calls: readonly DigestCall[];
+  /** Outermost subscript reads, writes excluded, their text trimmed. */
+  readonly reads: readonly Checked[];
+  readonly bound: readonly BoundStep[];
+  /** The flag SDKs whose classes the file references, when it calls a method. */
+  readonly sdks: readonly (typeof FLAG_SDKS)[number][];
+}
+
+const EMPTY_DIGEST: ConfigDigest = { keys: [], names: [], calls: [], reads: [], bound: [], sdks: [] };
+
+/** One file's {@link ConfigDigest}, from its captures alone. */
+export function digestConfig(file: PackSourceFile): ConfigDigest {
+  const scan = new FileScan(file);
+  const checked = (nodes: readonly Capture[], text: (node: Capture) => string): Checked[] => {
+    const conditions = scan.conditionsOf(nodes);
+    return nodes.map((node, i) => ({ text: text(node), start: node.start, ...(conditions[i] && { condition: conditions[i] }) }));
+  };
+  const sdks = new Set<(typeof FLAG_SDKS)[number]>();
+  if (scan.calls.some((c) => c.method !== undefined)) {
+    for (const ref of readPhpReferences(file)) {
+      const qualified = ref.qualified.toLowerCase();
+      for (const sdk of FLAG_SDKS) if (qualified.startsWith(sdk.namespace)) sdks.add(sdk);
+    }
+  }
+  const callConditions = scan.conditionsOf(scan.calls.map((c) => c.node));
+  const calls = scan.calls.map((call, i): DigestCall => {
+    const argument = literal(call.argument?.text);
+    const envKeyOf = call.function === "getenv" ? envKey(call.node.text) : undefined;
+    const registry = registryKey(call);
+    const loader = loaderOf(call);
+    return {
+      at: call.node.start,
+      ...(callConditions[i] && { condition: callConditions[i] }),
+      ...(call.function !== undefined && { function: call.function }),
+      ...(call.method !== undefined && { method: call.method }),
+      ...(call.written !== undefined && { written: call.written }),
+      ...(argument !== undefined && { argument }),
+      ...(envKeyOf !== undefined && { envKey: envKeyOf }),
+      ...(registry !== undefined && { registryKey: registry }),
+      ...(loader !== undefined && { loader }),
+    };
+  });
+  return {
+    keys: scan.keys,
+    names: checked(scan.names, (node) => node.text),
+    calls,
+    reads: checked(scan.reads, (node) => node.text.trim()),
+    bound: scan.bound,
+    sdks: [...sdks],
+  };
+}
+
 class FileScan {
   readonly captures: readonly Capture[];
   private readonly conditions = new Map<string, Condition>();
@@ -233,10 +334,9 @@ class FileScan {
   readonly reads: Capture[];
   readonly names: Capture[];
   readonly keys: DefinedKey[];
-  readonly loads = new Map<string, Load>();
-  readonly bound = new Map<string, Bound>();
+  readonly bound: BoundStep[] = [];
 
-  constructor(readonly file: PackSourceFile, constant: ConstantLookup) {
+  constructor(readonly file: PackSourceFile) {
     this.captures = file.captures[CONFIG_QUERY] ?? [];
     const named = (name: string): Capture[] => this.captures.filter((c) => c.name === name);
     this.readConditions(named("cfg.gate"), named("cfg.condition"), named("cfg.body"));
@@ -246,10 +346,6 @@ class FileScan {
     this.reads = outermost(named("cfg.subscript")).filter((c) => !written.has(spanKey(c)));
     this.names = named("cfg.name");
     this.keys = this.readKeys(named("cfg.write"), named("cfg.written"), named("cfg.written_value"), named("cfg.returned"), named("cfg.element"));
-    for (const call of this.calls) {
-      const load = loadOf(call, file.path, constant);
-      if (load !== undefined) this.loads.set(spanKey(call.node), load);
-    }
     this.readBound(named("cfg.bound"), named("cfg.bound_variable"), named("cfg.bound_value"));
   }
 
@@ -360,16 +456,21 @@ class FileScan {
 
   private readBound(nodes: readonly Capture[], variables: readonly Capture[], values: readonly Capture[]): void {
     const parts = partsByOwner(nodes, [...variables, ...values]);
+    // A loader call's span is its value's: the value is the call.
+    const loaders = new Map<string, number>();
+    this.calls.forEach((call, i) => {
+      if (loaderOf(call) !== undefined) loaders.set(spanKey(call.node), i);
+    });
     for (const node of nodes) {
       const own = parts.get(spanKey(node));
       const variable = firstNamed(own, "cfg.bound_variable");
       const value = firstNamed(own, "cfg.bound_value");
       if (!variable || !value) continue;
       const name = variable.text.replace(/^\$/, "").toLowerCase();
-      if (/^(?:include|require)/.test(value.nodeType)) this.bound.set(name, { kind: "include" });
+      if (/^(?:include|require)/.test(value.nodeType)) this.bound.push({ name, kind: "include" });
       else {
-        const load = this.loads.get(spanKey(value));
-        if (load) this.bound.set(name, { kind: "load", ...load });
+        const call = loaders.get(spanKey(value));
+        if (call !== undefined) this.bound.push({ name, kind: "load", call });
       }
     }
   }
@@ -387,15 +488,19 @@ function outermost(subscripts: readonly Capture[]): Capture[] {
   return unique.filter((s, i) => !(owners[i] && samePosition(owners[i]!.start, s.start)));
 }
 
-/** A settings loader call's source and the repository file it reads; undefined when the path is not computable or not in the repository. */
-function loadOf(call: Call, file: string, constant: ConstantLookup): Load | undefined {
+/** A settings loader call's source and path as written; undefined for any other call, or a loader without an argument. */
+function loaderOf(call: Call): Loader | undefined {
   let source: ConfigSource | undefined;
   if (call.function !== undefined) source = Object.hasOwn(LOADERS, call.function) ? LOADERS[call.function] : undefined;
   else if (call.scope !== undefined && call.staticMethod === "parsefile" && lastSegment(call.scope) === "yaml") source = "yaml";
-  if (source === undefined || call.argument === undefined) return undefined;
-  const value = evaluatePath(call.argument.text, file, constant);
+  return source === undefined || call.argument === undefined ? undefined : { source, path: call.argument.text };
+}
+
+/** A loader's source and the repository file it reads; undefined when the path is not computable or not in the repository. */
+function loadOf(loader: Loader, file: string, constant: ConstantLookup): Load | undefined {
+  const value = evaluatePath(loader.path, file, constant);
   const sourceFile = value === undefined ? undefined : repositoryPath(file, value);
-  return sourceFile === undefined ? undefined : { source, sourceFile };
+  return sourceFile === undefined ? undefined : { source: loader.source, sourceFile };
 }
 
 /** A registry read's dotted key: `Config::get('a.b')`, `config('a.b')`, `$this->config->item('a')`. */
@@ -457,10 +562,38 @@ class SettingsKeys {
 /** How many tenant files a notice names before the rest are counted. */
 const NOTICE_FILES = 5;
 
-/** Every config read and flag check of a project, by file. */
-export function readConfigFacts(files: readonly PackSourceFile[], context?: FrameworkContext): FrameworkFacts {
+/** A file's digest with its loads, which follow the repository's constants: each call's, and each variable's. */
+interface Scan {
+  readonly path: string;
+  readonly digest: ConfigDigest;
+  readonly loads: readonly (Load | undefined)[];
+  readonly bound: ReadonlyMap<string, Bound>;
+}
+
+function scanOf(path: string, digest: ConfigDigest, constant: ConstantLookup): Scan {
+  const loads = digest.calls.map((call) => (call.loader === undefined ? undefined : loadOf(call.loader, path, constant)));
+  const bound = new Map<string, Bound>();
+  for (const step of digest.bound) {
+    if (step.kind === "include") bound.set(step.name, { kind: "include" });
+    else {
+      const load = loads[step.call];
+      if (load) bound.set(step.name, { kind: "load", ...load });
+    }
+  }
+  return { path, digest, loads, bound };
+}
+
+/**
+ * Every config read and flag check of a project, by file. `digests` are each
+ * file's {@link digestConfig}, taken from `files` when absent.
+ */
+export function readConfigFacts(
+  files: readonly PackSourceFile[],
+  context?: FrameworkContext,
+  digests: ReadonlyMap<string, ConfigDigest> = new Map(files.map((f) => [f.path, digestConfig(f)])),
+): FrameworkFacts {
   const constant = repositoryConstants(files);
-  const scans = files.map((file) => new FileScan(file, constant));
+  const scans = files.map((file) => scanOf(file.path, digests.get(file.path) ?? EMPTY_DIGEST, constant));
   const booleans = booleanConstants(files);
 
   // Host-selected includes and their candidates, the tenant settings files.
@@ -482,7 +615,7 @@ export function readConfigFacts(files: readonly PackSourceFile[], context?: Fram
 
   // Settings files and the keys they hold; config-defined constants.
   const settings = new Map<string, SettingsKeys>();
-  for (const scan of scans) if (scan.keys.length > 0) settings.set(scan.file.path, new SettingsKeys(new Set(scan.keys.map((k) => k.key))));
+  for (const { path, digest } of scans) if (digest.keys.length > 0) settings.set(path, new SettingsKeys(new Set(digest.keys.map((k) => k.key))));
   for (const tenant of tenants) if (!settings.has(tenant)) settings.set(tenant, new SettingsKeys(new Set()));
   const definers = new Map<string, string[]>();
   const definesByFile = new Map<string, ReturnType<typeof definesOf>>();
@@ -512,8 +645,7 @@ export function readConfigFacts(files: readonly PackSourceFile[], context?: Fram
   };
 
   const facts = new Map<string, Omit<FileFacts, "path">>();
-  for (const scan of scans) {
-    const path = scan.file.path;
+  for (const { path, digest, loads, bound: boundTo } of scans) {
     const reads: ConfigReadFact[] = [];
     const checks: FlagCheckFact[] = [];
     const read = (key: string, source: ConfigSource, position: SourcePosition, sourceFile?: string): void => {
@@ -532,34 +664,21 @@ export function readConfigFacts(files: readonly PackSourceFile[], context?: Fram
     if (settings.has(path)) sources.add(path);
 
     // Settings keys this file holds, and its config constants.
-    for (const { key, position } of scan.keys) read(key, "file", position, path);
+    for (const { key, position } of digest.keys) read(key, "file", position, path);
     for (const { name, position } of definesByFile.get(path) ?? []) read(name, "define", position, path);
     // Host-selected includes read their candidates whole.
     for (const { candidates, position } of hostIncludes.get(path) ?? []) for (const c of candidates) read("*", "file", position, c);
 
     // Constants: flags in conditions; config constants anywhere.
-    const nameConditions = scan.conditionsOf(scan.names);
-    scan.names.forEach((node, i) => {
-      const name = node.text;
-      const condition = nameConditions[i];
-      if (condition && (isFlagName(name) || booleans.has(name))) check(name, "constant", node.start, condition);
-      for (const definer of definers.get(name) ?? []) read(name, "define", node.start, definer);
-    });
+    for (const { text: name, start, condition } of digest.names) {
+      if (condition && (isFlagName(name) || booleans.has(name))) check(name, "constant", start, condition);
+      for (const definer of definers.get(name) ?? []) read(name, "define", start, definer);
+    }
 
     // Calls.
-    const sdks = new Set<(typeof FLAG_SDKS)[number]>();
-    if (scan.calls.some((c) => c.method !== undefined)) {
-      for (const ref of readPhpReferences(scan.file)) {
-        const qualified = ref.qualified.toLowerCase();
-        for (const sdk of FLAG_SDKS) if (qualified.startsWith(sdk.namespace)) sdks.add(sdk);
-      }
-    }
-    const callConditions = scan.conditionsOf(scan.calls.map((c) => c.node));
-    scan.calls.forEach((call, i) => {
-      const at = call.node.start;
-      const condition = callConditions[i];
-      const argument = literal(call.argument?.text);
-      const load = scan.loads.get(spanKey(call.node));
+    digest.calls.forEach((call, i) => {
+      const { at, condition, argument } = call;
+      const load = loads[i];
       if (load) read("*", load.source, at, load.sourceFile);
       if (call.function !== undefined) {
         if (call.function === "defined") {
@@ -567,16 +686,16 @@ export function readConfigFacts(files: readonly PackSourceFile[], context?: Fram
         } else if (HELPER_FUNCTIONS.has(call.function)) {
           if (argument !== undefined) check(argument, "function", at, condition, call.written);
         } else if (call.function === "getenv") {
-          const key = envKey(call.node.text);
+          const key = call.envKey;
           if (condition && key !== undefined && isFlagName(key)) check(key, "env", at, condition, "getenv");
         }
       }
       if (call.method !== undefined && argument !== undefined) {
-        const sdk = [...sdks].find((s) => s.method === call.method);
+        const sdk = digest.sdks.find((s) => s.method === call.method);
         if (sdk) check(argument, "sdk", at, condition, sdk.client);
         else if (HELPER_METHODS.has(call.method)) check(argument, "function", at, condition, `->${call.written}`);
       }
-      const key = registryKey(call);
+      const key = call.registryKey;
       if (key !== undefined) {
         const source = registrySource(key);
         read(key, source === undefined ? "unknown" : "file", at, source);
@@ -585,25 +704,25 @@ export function readConfigFacts(files: readonly PackSourceFile[], context?: Fram
     });
 
     // Subscript reads: environment and configuration flags, configuration reads.
-    const readConditions = scan.conditionsOf(scan.reads);
-    scan.reads.forEach((node, i) => {
-      const condition = readConditions[i];
-      const text = node.text.trim();
+    for (const { text, start, condition } of digest.reads) {
       if (condition) {
         const env = /^\$_(ENV|SERVER)\s*\[/.exec(text);
         const key = env ? envKey(text) : undefined;
-        if (env && key !== undefined && isFlagName(key)) check(key, "env", node.start, condition, `$_${env[1]}`);
+        if (env && key !== undefined && isFlagName(key)) check(key, "env", start, condition, `$_${env[1]}`);
       }
       const subscript = configSubscript(text);
-      if (subscript === undefined || subscript.key === "") return;
-      if (condition && CONFIG_NAMES.has(subscript.array) && isFlagKey(subscript.key)) check(subscript.key, "config", node.start, condition);
-      const bound = /^\$\w+\s*\[/.test(text) ? scan.bound.get(subscript.array) : undefined;
-      if (bound?.kind === "load") return read(subscript.key, bound.source, node.start, bound.sourceFile);
-      if (bound === undefined && !CONFIG_ARRAYS.has(subscript.array)) return;
+      if (subscript === undefined || subscript.key === "") continue;
+      if (condition && CONFIG_NAMES.has(subscript.array) && isFlagKey(subscript.key)) check(subscript.key, "config", start, condition);
+      const bound = /^\$\w+\s*\[/.test(text) ? boundTo.get(subscript.array) : undefined;
+      if (bound?.kind === "load") {
+        read(subscript.key, bound.source, start, bound.sourceFile);
+        continue;
+      }
+      if (bound === undefined && !CONFIG_ARRAYS.has(subscript.array)) continue;
       const from = [...sources].filter((s) => settings.get(s)!.holds(subscript.key));
-      if (from.length === 0) read(subscript.key, "unknown", node.start);
-      for (const s of from) read(subscript.key, "file", node.start, s);
-    });
+      if (from.length === 0) read(subscript.key, "unknown", start);
+      for (const s of from) read(subscript.key, "file", start, s);
+    }
 
     if (reads.length === 0 && checks.length === 0) continue;
     facts.set(path, {
@@ -634,7 +753,7 @@ function distinct<T extends { readonly position: SourcePosition }>(facts: readon
     });
 }
 
-export const phpConfigFlags: FrameworkPack = {
+export const phpConfigFlags: FrameworkPack<ConfigDigest> = {
   id: "php-config",
   produces: ["configReads", "flagChecks"],
   // A getter, so the path is computed on first use rather than at import.
@@ -642,9 +761,10 @@ export const phpConfigFlags: FrameworkPack = {
     return [{ name: CONFIG_QUERY, path: join(PHP_PACKAGE.queryDir("php-config"), `${CONFIG_QUERY}.scm`) }];
   },
   provenance: PROVENANCE,
-  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], context?: FrameworkContext): FrameworkFacts {
+  digest: digestConfig,
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], context?: FrameworkContext, digests?: ReadonlyMap<string, ConfigDigest>): FrameworkFacts {
     if (!kinds.includes("configReads") && !kinds.includes("flagChecks")) return { facts: new Map(), notices: [] };
-    const { facts, notices } = readConfigFacts(files, context);
+    const { facts, notices } = readConfigFacts(files, context, digests);
     if (kinds.includes("configReads") && kinds.includes("flagChecks")) return { facts, notices };
     const only = new Map<string, Omit<FileFacts, "path">>();
     for (const [path, f] of facts) {
