@@ -73,6 +73,14 @@ export interface SmartAddInputProps {
   images?: PendingImage[];
   /** Updates `images`; required with it. Takes a value or an updater, like a state setter. */
   onImagesChange?: Dispatch<StateUpdater<PendingImage[]>>;
+  /**
+   * Counts captures among the instances sharing a draft. When it moves and
+   * this instance did not capture, its preview is dropped: the change it
+   * shows was added elsewhere.
+   */
+  captureCount?: number;
+  /** Called when this instance adds to the PRD, before `onPrdChanged`; it should move `captureCount`. */
+  onCaptured?: () => void;
 }
 
 /** The area a capture is limited to, as the area read gives it. */
@@ -296,7 +304,7 @@ function areaCopy(area: CaptureArea): PanelCopy {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area, draft, onDraftChange, images: sharedImages, onImagesChange }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area, draft, onDraftChange, images: sharedImages, onImagesChange, captureCount, onCaptured }: SmartAddInputProps) {
   const copy = area ? areaCopy(area) : layout === "v2" ? V2_COPY : V1_COPY;
   const [ownInput, setOwnInput] = useState("");
   const shared = draft !== undefined && onDraftChange !== undefined;
@@ -480,6 +488,40 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     };
   }, []);
 
+  // A capture this instance made resets it as it lands; one made by another
+  // instance sharing the draft (the tile's modal) resets it here, so a preview
+  // left on screen cannot add the same change a second time.
+  const capturedHereRef = useRef(false);
+  const seenCaptureRef = useRef(captureCount);
+  useEffect(() => {
+    if (captureCount === seenCaptureRef.current) return;
+    seenCaptureRef.current = captureCount;
+    if (capturedHereRef.current) {
+      capturedHereRef.current = false;
+      return;
+    }
+    abortRef.current?.abort();
+    requestIdRef.current++;
+    previewedRef.current = null;
+    setState("idle");
+    setProposals([]);
+    setChanges([]);
+    setChoices([]);
+    setConfidence(0);
+    setQualityIssues([]);
+    setEditing(false);
+    setError(null);
+  }, [captureCount]);
+
+  /** A capture landed: tell the caller, and through it every instance sharing the draft. */
+  const captured = useCallback(() => {
+    if (onCaptured) {
+      capturedHereRef.current = true;
+      onCaptured();
+    }
+    onPrdChanged();
+  }, [onCaptured, onPrdChanged]);
+
   // ── Accept proposals ─────────────────────────────────────────────
 
   const handleAccept = useCallback(async () => {
@@ -536,13 +578,13 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       setConfidence(0);
       setState("idle");
       refreshScopes();
-      onPrdChanged();
+      captured();
     } catch (err) {
       setError(String(err));
     } finally {
       setAccepting(false);
     }
-  }, [proposals, onPrdChanged, refreshScopes, setInput]);
+  }, [proposals, captured, refreshScopes, setInput]);
 
   // ── Accept changes (v2 PRD) ──────────────────────────────────────
 
@@ -603,7 +645,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       previewedRef.current = null;
       if (attachError) setError(attachError);
       refreshScopes();
-      onPrdChanged();
+      captured();
 
       // Amends…: the change is in the Inbox; its panel opens on the amendment.
       const amend = effects.indexOf("amend");
@@ -617,7 +659,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } finally {
       setAccepting(false);
     }
-  }, [changes, choices, images, onPrdChanged, onOpenChange, refreshScopes, setInput, setImages]);
+  }, [changes, choices, images, captured, onOpenChange, refreshScopes, setInput, setImages]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
@@ -628,8 +670,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     setConfidence(0);
     setState("idle");
     refreshScopes();
-    onPrdChanged();
-  }, [onPrdChanged, refreshScopes, setInput]);
+    captured();
+  }, [captured, refreshScopes, setInput]);
 
   // Scope label for display. Read before the editor's early return, so the
   // hooks run in the same order on every render.

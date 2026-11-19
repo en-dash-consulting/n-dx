@@ -227,6 +227,37 @@ describe("Plan's capture tile", () => {
     expect(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!.value).toBe("");
   });
 
+  it("drops the tile's preview once the modal adds the change, so the change is added once", async () => {
+    await mountPlan();
+    await type(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!, "Redo the checkout header");
+    await click(tile().querySelector<HTMLButtonElement>(".smart-add-btn-generate")!);
+    await until(() => !!tile().querySelector(".smart-add-btn-accept"));
+
+    await openMore();
+    const modal = dialog()!;
+    await click(modal.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!);
+    await until(() => !!modal.querySelector(".smart-add-btn-accept"));
+    await click(modal.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!);
+    await until(() => accepts().length > 0);
+    await settle();
+    await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+
+    expect(tile().querySelector(".smart-add-btn-accept")).toBeNull();
+    expect(tile().querySelector(".smart-add-preview-card")).toBeNull();
+    expect(accepts()).toHaveLength(1);
+
+    // And the other way: a modal opened after a tile capture shows no stale preview.
+    await type(tile().querySelector<HTMLTextAreaElement>(".smart-add-textarea")!, "Redo the checkout footer");
+    await click(tile().querySelector<HTMLButtonElement>(".smart-add-btn-generate")!);
+    await until(() => !!tile().querySelector(".smart-add-btn-accept"));
+    await click(tile().querySelector<HTMLButtonElement>(".smart-add-btn-accept")!);
+    await until(() => accepts().length > 1);
+    await settle();
+    await openMore();
+    expect(dialog()!.querySelector(".smart-add-btn-accept")).toBeNull();
+    expect(accepts()).toHaveLength(2);
+  });
+
   it("keeps an image attached in the modal when it closes: the tile shows it, and so does the modal reopened", async () => {
     await mountPlan();
     await openMore();

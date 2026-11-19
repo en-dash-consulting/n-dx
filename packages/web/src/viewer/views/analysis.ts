@@ -41,6 +41,9 @@ interface CaptureDraft {
   /** Images waiting to be attached; the capture that adds the change clears them. */
   images: PendingImage[];
   setImages: Dispatch<StateUpdater<PendingImage[]>>;
+  /** Captures made by any view sharing the draft; the others drop their preview when it moves. */
+  captures: number;
+  markCaptured: () => void;
 }
 
 const CaptureDraftContext = createContext<CaptureDraft | null>(null);
@@ -53,7 +56,9 @@ const CaptureDraftContext = createContext<CaptureDraft | null>(null);
 export function CaptureDraftProvider({ children }: { children?: ComponentChildren }) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<PendingImage[]>([]);
-  const value = useMemo(() => ({ text, setText, images, setImages }), [text, images]);
+  const [captures, setCaptures] = useState(0);
+  const markCaptured = useCallback(() => setCaptures((n) => n + 1), []);
+  const value = useMemo(() => ({ text, setText, images, setImages, captures, markCaptured }), [text, images, captures, markCaptured]);
   return h(CaptureDraftContext.Provider, { value }, children);
 }
 
@@ -133,7 +138,9 @@ export function AnalysisView({ navigateTo, onMore }: AnalysisViewProps = {}) {
     barAction: bar ? moreButton(onMore!) : null,
     layout,
     onOpenChange: openChange,
-    ...(draft ? { draft: draft.text, onDraftChange: draft.setText, images: draft.images, onImagesChange: draft.setImages } : {}),
+    ...(draft
+      ? { draft: draft.text, onDraftChange: draft.setText, images: draft.images, onImagesChange: draft.setImages, captureCount: draft.captures, onCaptured: draft.markCaptured }
+      : {}),
   });
 
   if (row) {
