@@ -334,6 +334,20 @@ describe("an Inbox change's panel", () => {
     expect(posts).toEqual([]);
   });
 
+  it("notes a tie only on the rows that share the top score", async () => {
+    serve([change("a")], [placement("a", [
+      candidate("cap-1", { score: 10 }),
+      candidate("cap-2", { score: 10 }),
+      candidate("cap-3", { score: 3, strength: "weak" }),
+    ], { tied: true })]);
+    await mountSection("a");
+    const TIED = "Tied with another match: their order means nothing";
+    await pick("cap-2");
+    expect($(".pp-why")?.textContent).toContain(TIED);
+    await pick("cap-3");
+    expect($(".pp-why")?.textContent).not.toContain(TIED);
+  });
+
   it("warns in the Amends preview when another open change already amends the target", async () => {
     serve([change("a")], [placement("a", [candidate("cap-1", { amendedBy: ["C-12"] })])]);
     await mountSection("a");

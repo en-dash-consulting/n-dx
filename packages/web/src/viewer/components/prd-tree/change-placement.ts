@@ -140,6 +140,8 @@ export interface PlacementTarget {
   reasons?: string[];
   /** Other open changes that already amend this target (shortlist rows only). */
   amendedBy?: string[];
+  /** Rex's score (shortlist rows only). */
+  score?: number;
 }
 
 /** A target criterion as the Amends form holds it while it is edited. */
@@ -560,7 +562,8 @@ export function previewOf({ changeTitle, changeWhere, chosen, relation, placemen
     relation,
     suggested: onShortlist,
     byModel,
-    tied: !!placement?.tied && onShortlist,
+    // A tied shortlist ties only its top rows: a lower row is not tied with anything.
+    tied: !!placement?.tied && onShortlist && chosen.score !== undefined && chosen.score === placement.shortlist[0]?.score,
     ...(placement ? { rule: { relation: placement.relation, text: placement.relationRule } } : {}),
     ...(relation === "amends"
       ? {
