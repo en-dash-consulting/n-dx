@@ -221,7 +221,7 @@ export const addItemTool = defineTool({
     type: z.enum(ADD_TYPES).optional().describe("v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level"),
     level: z.enum(getAllLevels() as [string, ...string[]]).optional().describe("v1 only: item level. Refused on a v2 PRD, which takes type"),
     parentId: z.string().optional().describe("Parent item ID"),
-    shortTitle: z.string().optional().describe("Optional short name the dashboard shows in place of the title, which stays the full name. Refused when an open item (pending, in_progress, blocked, deferred) already shows that name; completed items may share it"),
+    shortTitle: z.string().optional().describe("Optional short name the dashboard shows in place of the title, which stays the full name. Refused when an open item (pending, in_progress, failing, blocked, deferred) already shows that name; completed items may share it"),
     summary: z.string().optional().describe("Plain-language summary for a product owner or team lead who does not write code: 1-2 sentences on what the work does and why it is worth doing. No file paths or code identifiers. Shown in place of the title on the dashboard"),
     description: z.string().optional().describe("Item description (a v2 change's intent)"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("Priority"),

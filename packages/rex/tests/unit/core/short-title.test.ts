@@ -23,12 +23,12 @@ describe("shownName", () => {
 });
 
 describe("holdsName", () => {
-  it("holds for pending, in_progress, blocked and deferred, and a missing status", () => {
-    for (const s of ["pending", "in_progress", "blocked", "deferred", undefined]) expect(holdsName(s)).toBe(true);
+  it("holds for pending, in_progress, failing, blocked and deferred, and a missing status", () => {
+    for (const s of ["pending", "in_progress", "failing", "blocked", "deferred", undefined]) expect(holdsName(s)).toBe(true);
   });
 
-  it("does not hold for completed or any other closed status", () => {
-    for (const s of ["completed", "cancelled", "deleted", "failing"]) expect(holdsName(s)).toBe(false);
+  it("does not hold for completed, cancelled or deleted", () => {
+    for (const s of ["completed", "cancelled", "deleted"]) expect(holdsName(s)).toBe(false);
   });
 });
 
@@ -68,7 +68,16 @@ describe("assertShortTitleAvailable", () => {
   const items: NamedItem[] = [
     item("a", "Add Apple Pay to checkout", "blocked", { shortTitle: "Apple Pay", displayId: "CH-1", type: "change" }),
     item("b", "Refunds", "completed"),
+    item("f", "Gift cards", "failing"),
   ];
+
+  it("refuses a failing item's shown name", () => {
+    expect(() => assertShortTitleAvailable(items, "gift cards", { id: "x" })).toThrow(ShortTitleCollisionError);
+  });
+
+  it("refuses a failing item an open item's shown name", () => {
+    expect(() => assertShortTitleAvailable(items, "Apple Pay", { id: "f", status: "failing" })).toThrow(/Apple Pay/);
+  });
 
   it("refuses a short title an open item shows, naming that item", () => {
     let error: unknown;

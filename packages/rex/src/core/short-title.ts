@@ -2,7 +2,8 @@
  * An item's short title and the name the dashboard shows for it.
  *
  * The shown name is the short title when an item has one, else its title. It
- * must be unique among open items (pending, in_progress, blocked, deferred):
+ * must be unique among open items (pending, in_progress, failing, blocked,
+ * deferred):
  * a short title that matches another open item's shown name is refused,
  * naming that item. Items in any other status (completed above all) are
  * exempt, so a follow-up to finished work may reuse its name. Names compare
@@ -15,7 +16,7 @@
  */
 
 /** Statuses whose items' shown names must be unique. A missing status reads as pending. */
-export const NAME_HOLDING_STATUSES: ReadonlySet<string> = new Set(["pending", "in_progress", "blocked", "deferred"]);
+export const NAME_HOLDING_STATUSES: ReadonlySet<string> = new Set(["pending", "in_progress", "failing", "blocked", "deferred"]);
 
 /** The fields the name rule reads from an item or node. */
 export interface NamedItem {
@@ -70,7 +71,7 @@ export class ShortTitleCollisionError extends Error {
     const title = shortTitleOf(other) ? `"${shownName(other)}" (${other.title})` : `"${other.title}"`;
     super(
       `Short title "${shortTitle}" is already the name of open ${kind} ${title} [${ref}], status ${other.status ?? "pending"}. ` +
-        "Names must be unique among pending, in-progress, blocked and deferred items; choose another short title.",
+        "Names must be unique among pending, in-progress, failing, blocked and deferred items; choose another short title.",
     );
     this.name = "ShortTitleCollisionError";
     this.collidingId = other.id;

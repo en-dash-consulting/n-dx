@@ -171,7 +171,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "type": "string"
         },
         "shortTitle": {
-          "description": "Optional short name the dashboard shows in place of the title, which stays the full name. Refused when an open item (pending, in_progress, blocked, deferred) already shows that name; completed items may share it",
+          "description": "Optional short name the dashboard shows in place of the title, which stays the full name. Refused when an open item (pending, in_progress, failing, blocked, deferred) already shows that name; completed items may share it",
           "type": "string"
         },
         "summary": {
@@ -462,7 +462,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "type": "string"
         },
         "shortTitle": {
-          "description": "New short name the dashboard shows in place of the title. Refused when an open item (pending, in_progress, blocked, deferred) already shows that name; completed items may share it. An empty string removes it.",
+          "description": "New short name the dashboard shows in place of the title. Refused when an open item (pending, in_progress, failing, blocked, deferred) already shows that name; completed items may share it. An empty string removes it.",
           "type": "string"
         },
         "summary": {

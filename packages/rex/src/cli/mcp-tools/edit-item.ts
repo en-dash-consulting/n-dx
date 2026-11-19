@@ -140,7 +140,7 @@ export const editItemTool = defineTool({
   schema: {
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
-    shortTitle: z.string().optional().describe("New short name the dashboard shows in place of the title. Refused when an open item (pending, in_progress, blocked, deferred) already shows that name; completed items may share it. An empty string removes it."),
+    shortTitle: z.string().optional().describe("New short name the dashboard shows in place of the title. Refused when an open item (pending, in_progress, failing, blocked, deferred) already shows that name; completed items may share it. An empty string removes it."),
     summary: z.string().optional().describe("New plain-language summary: 1-2 sentences for a non-coder on what the work does and why it is worth doing. An empty string removes it."),
     description: z.string().optional().describe("New description"),
     acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"),

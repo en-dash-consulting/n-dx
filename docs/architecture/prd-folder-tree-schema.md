@@ -80,7 +80,7 @@ commands and MCP tools also accept display ids and aliases.
 Changes, tasks and subtasks also take an optional `summary` and an
 optional `shortTitle`: the name the dashboard shows in place of the title.
 The shown name (short title, else title) is unique among open items
-(pending, in_progress, blocked, deferred); writers refuse a short title
+(pending, in_progress, failing, blocked, deferred); writers refuse a short title
 that collides with one and name it (`core/short-title.ts`).
 
 Capability criteria are `{ id, text }` objects: their stable criterion ids
