@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parsePhpIncludeConfig } from "../../src/php-includes.js";
 
 const values = (kind: Parameters<typeof parsePhpIncludeConfig>[1], text: string): string[] =>
-  parsePhpIncludeConfig("x", kind, text).map((c) => c.value);
+  parsePhpIncludeConfig("x", kind, text).settings.map((c) => c.value);
 
 describe("parsePhpIncludeConfig", () => {
   it("reads quoted and unquoted ini values, without their comments", () => {

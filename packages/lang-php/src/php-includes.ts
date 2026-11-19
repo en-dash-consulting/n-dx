@@ -50,8 +50,9 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PHP_DOCROOT_DIRECTORIES, type WrittenImport } from "@n-dx/lang-kit";
+import { PHP_DOCROOT_DIRECTORIES, trimTrailing, type WrittenImport } from "@n-dx/lang-kit";
 import { contains, innermost, type Capture, type PackSourceFile } from "@n-dx/lang-runtime";
+import { isOverlongLine, overlongLinesNotice } from "./php-line-cap.js";
 
 // ── Values ──────────────────────────────────────────────────────────────────
 
@@ -73,12 +74,12 @@ const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** PHP's `dirname()` on a computed path. */
 function dirname(path: string): string {
-  const trimmed = path.length > 1 ? path.replace(/\/+$/, "") : path;
+  const trimmed = path.length > 1 ? trimTrailing(path, "/") : path;
   if (trimmed === REPO || trimmed.startsWith(OUTSIDE)) return OUTSIDE;
   const slash = trimmed.lastIndexOf("/");
   if (slash < 0) return ".";
   if (slash === 0) return "/";
-  return trimmed.slice(0, slash).replace(/\/+$/, "") || "/";
+  return trimTrailing(trimmed.slice(0, slash), "/") || "/";
 }
 
 /** `base/rel` with `.` and `..` folded; undefined when it climbs above the repository. */
@@ -556,25 +557,92 @@ const unquote = (value: string): string => {
   return quoted ? quoted[2]! : v;
 };
 
-/** `include_path` settings in one configuration file's text, in order. */
-export function parsePhpIncludeConfig(file: string, kind: PhpIncludeConfigKind, text: string): PhpIncludeConfig[] {
-  const out: PhpIncludeConfig[] = [];
+const isSpace = (c: string): boolean => /\s/.test(c);
+const hasLineTerminator = (text: string): boolean => /[\n\r\u2028\u2029]/.test(text);
+
+/** The length of the white space run at `from`. */
+function spaceRun(text: string, from: number): number {
+  let i = from;
+  while (i < text.length && isSpace(text[i]!)) i += 1;
+  return i - from;
+}
+
+/** `text` from `from` starts with `word`, ASCII letters in either case when `anyCase`. */
+const startsWithWord = (text: string, from: number, word: string, anyCase: boolean): boolean => {
+  const found = text.slice(from, from + word.length);
+  return anyCase ? found.length === word.length && found.toLowerCase() === word && /^[\x00-\x7f]*$/.test(found) : found === word;
+};
+
+/**
+ * An `.htaccess` line's `php_value include_path <value>` value as written,
+ * trimmed; both names in any letter case. White space alone after the name
+ * (two characters or more) is a blank value, `" "`.
+ */
+function htaccessIncludePath(line: string): string | undefined {
+  let i = spaceRun(line, 0);
+  if (!startsWithWord(line, i, "php_value", true)) return undefined;
+  i += "php_value".length;
+  const gap = spaceRun(line, i);
+  if (gap === 0) return undefined;
+  i += gap;
+  if (!startsWithWord(line, i, "include_path", true)) return undefined;
+  i += "include_path".length;
+  const rest = line.slice(i);
+  if (rest === "" || !isSpace(rest[0]!)) return undefined;
+  const value = rest.trim();
+  if (value !== "") return hasLineTerminator(value) ? undefined : value;
+  // White space alone: the separator is the first character, the value one of the rest that is not a line terminator.
+  return /[^\n\r\u2028\u2029]/.test(rest.slice(1)) ? " " : undefined;
+}
+
+/** An ini line's `include_path = <value>` value as written: quotes dropped, else up to a `;` comment. */
+function iniIncludePath(line: string): string | undefined {
+  let i = spaceRun(line, 0);
+  if (!startsWithWord(line, i, "include_path", false)) return undefined;
+  i += "include_path".length;
+  i += spaceRun(line, i);
+  if (line[i] !== "=") return undefined;
+  i += 1;
+  i += spaceRun(line, i);
+  const raw = line.slice(i);
+  if (hasLineTerminator(raw)) return undefined;
+  const value = raw.trim();
+  // A quoted value ends at its closing quote; an unquoted one at a `;` comment (https://www.php.net/manual/en/function.parse-ini-file.php).
+  const quote = value[0];
+  if (quote === '"' || quote === "'") {
+    const close = value.indexOf(quote, 1);
+    if (close >= 0) return value.slice(1, close);
+  }
+  const comment = value.indexOf(";");
+  return comment < 0 ? value : value.slice(0, comment).trimEnd();
+}
+
+/**
+ * `include_path` settings in one configuration file's text, in order, and a
+ * notice when lines longer than 64 KiB were skipped. Read by index scans, not
+ * regexes: the text is the repository's.
+ */
+export function parsePhpIncludeConfig(
+  file: string,
+  kind: PhpIncludeConfigKind,
+  text: string,
+): { settings: PhpIncludeConfig[]; notices: string[] } {
+  const settings: PhpIncludeConfig[] = [];
+  let overlong = 0;
   for (const line of text.split(/\r?\n/)) {
-    if (kind === ".htaccess") {
-      // Apache directive names are case-insensitive; the PHP setting's name is not.
-      const m = /^\s*php_value\s+include_path\s+(.+?)\s*$/i.exec(line);
-      if (m) out.push({ file, kind, value: unquote(m[1]!) });
+    if (isOverlongLine(line)) {
+      overlong += 1;
       continue;
     }
-    const m = /^\s*include_path\s*=\s*(.*)$/.exec(line);
-    if (!m) continue;
-    const raw = m[1]!.trim();
-    // An unquoted value ends at a `;` comment (https://www.php.net/manual/en/function.parse-ini-file.php).
-    const quoted = /^(["'])(.*?)\1/.exec(raw);
-    const value = quoted ? quoted[2]! : raw.replace(/\s*;.*$/, "");
-    out.push({ file, kind, value });
+    if (kind === ".htaccess") {
+      const value = htaccessIncludePath(line);
+      if (value !== undefined) settings.push({ file, kind, value: unquote(value) });
+      continue;
+    }
+    const value = iniIncludePath(line);
+    if (value !== undefined) settings.push({ file, kind, value });
   }
-  return out;
+  return { settings, notices: overlong > 0 ? [overlongLinesNotice(file, overlong, "include_path settings")] : [] };
 }
 
 /** The `include_path` settings of every php.ini, `.user.ini` and `.htaccess` among `listed` (project-relative), by path. */
@@ -591,7 +659,9 @@ export async function readPhpIncludeConfigs(projectDir: string, listed: readonly
       notices.push(`could not read ${file} (${(error as NodeJS.ErrnoException).code ?? "error"}); its include_path is not used.`);
       continue;
     }
-    configs.push(...parsePhpIncludeConfig(file, kind, text));
+    const parsed = parsePhpIncludeConfig(file, kind, text);
+    configs.push(...parsed.settings);
+    notices.push(...parsed.notices);
   }
   return { configs, notices };
 }
