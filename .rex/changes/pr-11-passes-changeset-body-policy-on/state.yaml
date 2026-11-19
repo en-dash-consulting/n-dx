@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "82a167fd-2f86-49b6-ac28-43f1bcb0c95c":
+    status: "completed"
+    startedAt: "2026-11-19T03:55:23.500Z"
+    completedAt: "2026-11-19T03:55:23.500Z"
+    endedAt: "2026-11-19T03:55:23.500Z"
+    activeIntervals: [{"end":"2026-11-19T03:55:23.500Z","start":"2026-11-19T03:55:23.500Z"}]
+    appliedAt: "2026-11-19T03:55:23.500Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T03:54:11.029Z"
-    lastModified: "2026-11-19T03:54:15.957Z"
+    lastModified: "2026-11-19T03:55:23.500Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "92dec474-92cc-43b3-aae6-196960f4458f":
-    lastModified: "2026-11-19T03:54:15.957Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:54:46.244Z"
+    completedAt: "2026-11-19T03:55:23.500Z"
+    endedAt: "2026-11-19T03:55:23.500Z"
+    activeIntervals: [{"end":"2026-11-19T03:55:23.500Z","start":"2026-11-19T03:54:46.244Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ported 612011bd3's shortened changeset lead verbatim; file identical to 612011bd3; changeset-body-policy 7/7 passed."
+    lastModified: "2026-11-19T03:55:23.500Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

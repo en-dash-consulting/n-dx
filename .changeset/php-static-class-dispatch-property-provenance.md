@@ -2,7 +2,9 @@
 "@n-dx/lang-php": patch
 ---
 
-`ndx analyze` with the PHP pack now reports a static call on a class held in a variable, and no longer marks an object field as database-driven because a different field of the same object was.
+`ndx analyze` with the PHP pack now reports a static call on a class held in a variable, and tracks database provenance per object field.
+
+Before, an object field was marked database-driven because a different field of the same object was.
 
 `$class::run()` is now a dispatch site (construct `variable-static-class`), and it counts as database-driven when the class name comes from a query. This is the routing-table pattern, where a controller class is read from a row. Calls through `self::`, `static::`, `parent::` and `$this::` are still not reported.
 
