@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "process" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -121,7 +121,7 @@ export interface StageTile {
    */
   embedsView?: boolean;
   /**
-   * A strip of links (Plan's lifecycle strip): full width above the grid, sized
+   * A strip of links (Plan's process steps and lifecycle strip): full width above the grid, sized
    * by its content rather than a grid row, with no header or full-screen. It
    * places no view; `view` is only where it belongs.
    */
@@ -232,6 +232,9 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     // the PRD tree and the Product page as tabs.
     sections: [{ view: "analysis", plain: true }],
     tiles: [
+      // How planning works, step by step, with the step to do next. A v1 tree
+      // has no Inbox, placement or apply, so it draws no steps.
+      { view: "changes", panel: "process", title: "How planning works", band: true, v2Only: true, requiresServer: true },
       // On both layouts: a v1 tree reads Pending, In progress and Next.
       { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
       // No product area map: readers could not tell what its blocks meant. The
