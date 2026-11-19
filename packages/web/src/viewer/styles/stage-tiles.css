@@ -7,24 +7,25 @@
  * bar, like the Commands sheet. */
 
 /* Rows are a fine 4px track with no row gap: each tile spans as many as it
-   needs and keeps the 16px gap as its own bottom margin. A configured size
-   (r1 = 232px, r2 = 480px, r3 = 728px, each plus the gap) is the most a tile
-   takes; stage-tiles.ts shrinks one whose content is shorter
-   (`useFitTracks`). Fixed px, not --space-4: the density toggle must not shift
-   the arithmetic. */
+   needs and keeps the 20px gap as its own bottom margin, matching the
+   column gap. A configured size (r1 = 232px, r2 = 484px, r3 = 736px, each
+   plus the gap) is the most a tile takes; stage-tiles.ts shrinks one whose
+   content is shorter (`useFitTracks`). Fixed px, not --space-5: the density
+   toggle must not shift the arithmetic. TILE_GAP_PX and TRACKS_PER_ROW in
+   stage-tiles.ts mirror these numbers. */
 .stage-tiles {
   --tile-unit: 4px;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-auto-rows: var(--tile-unit);
   grid-auto-flow: row dense;
-  column-gap: var(--space-4);
+  column-gap: var(--space-5);
   row-gap: 0;
 }
 
 .stage-tile {
   position: relative;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -39,9 +40,9 @@
 .stage-tile--c6 { grid-column: span 6; }
 .stage-tile--c8 { grid-column: span 8; }
 .stage-tile--c12 { grid-column: span 12; }
-.stage-tile--r1 { grid-row: span 62; }
-.stage-tile--r2 { grid-row: span 124; }
-.stage-tile--r3 { grid-row: span 186; }
+.stage-tile--r1 { grid-row: span 63; }
+.stage-tile--r2 { grid-row: span 126; }
+.stage-tile--r3 { grid-row: span 189; }
 
 /* Two tiles a row on mid widths; the map takes the full row. */
 @media (max-width: 1180px) {
@@ -54,7 +55,7 @@
 @media (max-width: 700px) {
   .stage-tiles { grid-template-columns: minmax(0, 1fr); }
   .stage-tile--c4, .stage-tile--c6, .stage-tile--c8, .stage-tile--c12 { grid-column: auto; }
-  .stage-tile--r3 { grid-row: span 124; }
+  .stage-tile--r3 { grid-row: span 126; }
 }
 
 /* The codebase map draws its own card, header and full-screen, and fills
@@ -1169,7 +1170,7 @@
 
 /* Bands (Plan's lifecycle strip): full width above the grid, as tall as
    their content. */
-.stage-bands { margin-bottom: var(--space-4); }
+.stage-bands { margin-bottom: var(--space-5); }
 
 .stage-band {
   min-width: 0;

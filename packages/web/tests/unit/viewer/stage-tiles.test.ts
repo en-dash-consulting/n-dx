@@ -4,7 +4,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { TileGrid, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
+import { TileGrid, TILE_GAP_PX, TILE_UNIT_PX, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
 import type { StageTile } from "../../../src/viewer/views/stages.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
@@ -256,11 +256,11 @@ describe("a tile with more than it shows", () => {
 });
 
 describe("fitTracks", () => {
-  it("spans the 4px tracks a tile's chrome, content and 16px gap need", () => {
-    // 46px head and borders + 162px content + 16px gap = 224px = 56 tracks.
-    expect(fitTracks(46, 162, TRACKS_PER_ROW)).toBe(56);
+  it("spans the 4px tracks a tile's chrome, content and 20px gap need", () => {
+    // 46px head and borders + 162px content + 20px gap = 228px = 57 tracks.
+    expect(fitTracks(46, 162, TRACKS_PER_ROW)).toBe(57);
     // Rounds up: never clips its own content.
-    expect(fitTracks(46, 163, TRACKS_PER_ROW)).toBe(57);
+    expect(fitTracks(46, 163, TRACKS_PER_ROW)).toBe(58);
   });
 
   it("keeps the configured size (null) once content reaches it, and when nothing is measured", () => {
@@ -270,7 +270,17 @@ describe("fitTracks", () => {
   });
 
   it("one configured row is 232px of tile plus the gap", () => {
-    expect(TRACKS_PER_ROW * 4 - 16).toBe(232);
+    expect(TRACKS_PER_ROW * TILE_UNIT_PX - TILE_GAP_PX).toBe(232);
+  });
+
+  it("tiles sit 20px apart both ways: the column gap and each tile's bottom margin", () => {
+    const css = readFileSync(resolve(__dirname, "../../../src/viewer/styles/stage-tiles.css"), "utf-8");
+    const grid = /\.stage-tiles\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(grid).toMatch(/column-gap:\s*var\(--space-5\)/);
+    expect(grid).toMatch(/row-gap:\s*0/);
+    const tile = /\.stage-tile\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(Number(/margin-bottom:\s*(\d+)px/.exec(tile)?.[1])).toBe(TILE_GAP_PX);
+    expect(TILE_GAP_PX).toBe(20);
   });
 
   it("the stylesheet's row spans are TRACKS_PER_ROW per configured row", () => {
