@@ -16,7 +16,7 @@ import {
   appendLog, API_SETTABLE_STATUSES, loadPRDOr404, broadcastPrdChanged,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
-import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError, assertShortTitleAvailable } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -143,7 +143,7 @@ export function routeItems(
  * added and changed by `move_item`, never by an edit.
  */
 const PATCHABLE_FIELDS = new Set([
-  "status", "failureReason", "priority", "tags", "title",
+  "status", "failureReason", "priority", "tags", "title", "shortTitle",
   "summary", "description", "acceptanceCriteria", "requirements",
 ]);
 
@@ -169,7 +169,7 @@ function validateItemPatch(body: unknown): string | null {
     && !(typeof patch.priority === "string" && isPriority(patch.priority))) {
     return `Invalid priority: ${String(patch.priority)}`;
   }
-  for (const key of ["title", "summary", "description", "failureReason"] as const) {
+  for (const key of ["title", "shortTitle", "summary", "description", "failureReason"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
   if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;
@@ -260,12 +260,19 @@ async function handleItemPatch(
     if (completing) delete fieldUpdates.status;
     // A cleared summary is removed, as `rex update --summary=` and edit_item remove it.
     if (typeof fieldUpdates.summary === "string" && !fieldUpdates.summary.trim()) fieldUpdates.summary = undefined;
+    // A short title is kept trimmed, and a cleared one removed, as `rex update --short-title=` and edit_item do.
+    if (typeof fieldUpdates.shortTitle === "string") fieldUpdates.shortTitle = fieldUpdates.shortTitle.trim() || undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
     if (Object.keys(fieldUpdates).length > 0 || !completing) {
       try {
         await store.withTransaction(async (doc) => {
+          if (typeof fieldUpdates.shortTitle === "string") {
+            const self = findItemById(doc.items, itemId);
+            // Refused naming the open item that already shows the name; checked under the lock the write holds.
+            if (self) assertShortTitleAvailable(doc.items, fieldUpdates.shortTitle, { id: itemId, status: (updates.status as string | undefined) ?? self.status });
+          }
           if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
             throw new ItemNotFoundError(`Item "${itemId}" not found`);
           }

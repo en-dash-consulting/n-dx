@@ -205,6 +205,8 @@ export interface ChangeRow {
   id: string;
   displayId?: string;
   title: string;
+  /** Short name, shown in place of the title when present. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders; shown in place of the title when present. */
   summary?: string;
   intent?: string;
@@ -258,6 +260,8 @@ export interface GlanceChange {
   id: string;
   displayId?: string;
   title: string;
+  /** Short name, shown in place of the title when present. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders; shown in place of the title when present. */
   summary?: string;
   stage: OpenChangeStage;

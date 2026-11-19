@@ -93,6 +93,12 @@ export { draftChangePlacement } from "@n-dx/rex";
 export { findDuplicateItem } from "@n-dx/rex";
 export type { DuplicateItemMatch } from "@n-dx/rex";
 
+// ---- Rex short-title rule ---------------------------------------------------
+// The detail panel's short-title edit is refused, naming the item, when an
+// open item already shows that name: the rule add_item, edit_item and the rex
+// CLI refuse by.
+export { assertShortTitleAvailable } from "@n-dx/rex";
+
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it
 // completes, so a tree this build would re-slug must stop the run before it

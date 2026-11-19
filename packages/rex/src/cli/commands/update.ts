@@ -10,6 +10,7 @@ import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { cascadeParentCompletion } from "../../core/parent-completion.js";
 import { validateDAG } from "../../core/dag.js";
+import { assertShortTitleAvailable } from "../../core/short-title.js";
 import { findItem, resolveItem } from "../../core/tree.js";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { openClaimsStore, resolveClaimHolder } from "../../store/index.js";
@@ -155,6 +156,7 @@ export async function cmdUpdate(
   if (flags.description) updates.description = flags.description;
   // Empty removes it (undefined is not serialized).
   if (flags.summary !== undefined) updates.summary = flags.summary.trim() || undefined;
+  if (flags["short-title"] !== undefined) updates.shortTitle = flags["short-title"].trim() || undefined;
 
   if (flags.blockedBy !== undefined) {
     const raw = flags.blockedBy.trim();
@@ -224,8 +226,13 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
+      "Use --status, --priority, --title, --short-title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
     );
+  }
+
+  // Before any write, completion included: a refused short title writes nothing.
+  if (updates.shortTitle) {
+    assertShortTitleAvailable((await store.loadDocument()).items, updates.shortTitle, { id: resolvedId, status: updates.status ?? existing.status });
   }
 
   // Validate dependencies before persisting

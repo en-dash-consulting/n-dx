@@ -112,6 +112,7 @@ const VALUE_KEYS = new Set([
   "relation",
   "under",
   "summary",
+  "short-title",
   "migration",
   "cut-at",
   "before",

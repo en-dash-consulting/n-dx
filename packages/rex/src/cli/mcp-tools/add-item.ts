@@ -16,6 +16,7 @@ import { getAllLevels } from "../../schema/index.js";
 import { validateDAG } from "../../core/dag.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { addChangeNode } from "../../core/change-add.js";
+import { assertShortTitleAvailable } from "../../core/short-title.js";
 import { FileStore, resolvePRDFile } from "../../store/index.js";
 import { prdLayout } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
@@ -37,6 +38,8 @@ export interface AddItemArgs {
   /** v2; on v1 only a type with a v1 level. */
   type?: string;
   parentId?: string;
+  /** Short name the dashboard shows in place of the title; unique among open items. */
+  shortTitle?: string;
   /** Plain-language summary for a non-coder: what the work does and why it is worth doing. */
   summary?: string;
   description?: string;
@@ -114,6 +117,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
         type,
         title: args.title,
         parentId: args.parentId,
+        shortTitle: args.shortTitle,
         summary: args.summary,
         description: args.description,
         acceptanceCriteria: args.acceptanceCriteria,
@@ -162,6 +166,7 @@ async function addV1(
     level: args.level,
     status: "pending",
   };
+  if (args.shortTitle?.trim()) item.shortTitle = args.shortTitle.trim();
   if (args.summary?.trim()) item.summary = args.summary.trim();
   if (args.description) item.description = args.description;
   if (args.priority) item.priority = args.priority as Priority;
@@ -171,6 +176,8 @@ async function addV1(
   if (args.assignee?.trim()) item.assignee = args.assignee.trim();
   if (args.blockedBy) item.blockedBy = args.blockedBy;
   if (run) item.run = run;
+
+  if (item.shortTitle) assertShortTitleAvailable((await store.loadDocument()).items, item.shortTitle);
 
   // Validate dependencies before persisting
   if (item.blockedBy && item.blockedBy.length > 0) {
@@ -214,6 +221,7 @@ export const addItemTool = defineTool({
     type: z.enum(ADD_TYPES).optional().describe("v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level"),
     level: z.enum(getAllLevels() as [string, ...string[]]).optional().describe("v1 only: item level. Refused on a v2 PRD, which takes type"),
     parentId: z.string().optional().describe("Parent item ID"),
+    shortTitle: z.string().optional().describe("Optional short name the dashboard shows in place of the title, which stays the full name. Refused when an open item (pending, in_progress, blocked, deferred) already shows that name; completed items may share it"),
     summary: z.string().optional().describe("Plain-language summary for a product owner or team lead who does not write code: 1-2 sentences on what the work does and why it is worth doing. No file paths or code identifiers. Shown in place of the title on the dashboard"),
     description: z.string().optional().describe("Item description (a v2 change's intent)"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("Priority"),

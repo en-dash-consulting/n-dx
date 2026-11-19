@@ -15,7 +15,7 @@ import { h, Fragment } from "preact";
 import { useState } from "preact/hooks";
 import { ApplyAllBar } from "./apply-all.js";
 import type { NavigateTo } from "../types.js";
-import { BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../components/index.js";
+import { BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle, titleTooltip, useItemImpacts, type ItemImpact } from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
@@ -116,15 +116,15 @@ function Change({ change, onSelect, impact }: {
   },
     h("div", { class: "ch-change-head" },
       change.displayId ? h("span", { class: "ch-display-id" }, change.displayId) : null,
-      // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
+      // The short title or plain-language summary leads; the full title is the tooltip and the detail panel's heading.
       onSelect
         ? h("button", {
             type: "button",
             class: "ch-change-link",
-            title: change.summary ? change.title : undefined,
+            title: titleTooltip(change),
             onClick: () => onSelect(change.id),
           }, displayTitle(change))
-        : h("span", { class: "ch-change-title", title: change.summary ? change.title : undefined }, displayTitle(change)),
+        : h("span", { class: "ch-change-title", title: titleTooltip(change) }, displayTitle(change)),
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       isAppliedStage(change.stage) ? null : h(DescribeInSidecarButton, { changeId: change.id }),

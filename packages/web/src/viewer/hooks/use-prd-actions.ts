@@ -223,7 +223,10 @@ export function usePRDActions({
           body: JSON.stringify(updates),
         });
         if (!res.ok) {
-          console.error("Failed to update item:", await res.text());
+          const message = await errorOrHttpStatus(res, "Failed to update item");
+          console.error("Failed to update item:", message);
+          // A refused edit (a short title an open item already shows, say) says why rather than silently reverting.
+          showToast(`Not saved: ${message}`, "error");
           await fetchPRDData();
           return;
         }
@@ -234,7 +237,7 @@ export function usePRDActions({
         await fetchPRDData();
       }
     },
-    [setData, fetchPRDData, fetchTaskUsage],
+    [setData, fetchPRDData, fetchTaskUsage, showToast],
   );
 
   // ── Add child (from detail panel) ────────────────────────────────

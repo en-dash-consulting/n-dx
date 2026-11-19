@@ -1191,6 +1191,7 @@
 }
 
 .task-title-display.editable:hover .task-edit-icon,
+.task-short-title.editable:hover .task-edit-icon,
 .task-description.editable:hover .task-edit-icon {
   opacity: 1;
 }
@@ -1220,6 +1221,30 @@
   outline: none;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
   box-sizing: border-box;
+}
+
+/* Short title: the name rows show in place of the full title */
+.task-short-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.task-short-title.editable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+}
+
+.task-short-title.editable:hover {
+  background: var(--bg-hover);
+}
+
+.task-short-title-input {
+  font-size: var(--font-base);
 }
 
 /* Description */
@@ -1308,7 +1333,8 @@
 }
 
 .task-add-description-btn,
-.task-add-summary-btn {
+.task-add-summary-btn,
+.task-add-short-title-btn {
   padding: var(--space-1-5) var(--space-2-5);
   background: transparent;
   border: 1px dashed var(--border);
@@ -1321,7 +1347,8 @@
 }
 
 .task-add-description-btn:hover,
-.task-add-summary-btn:hover {
+.task-add-summary-btn:hover,
+.task-add-short-title-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }

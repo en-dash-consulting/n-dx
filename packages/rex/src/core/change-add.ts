@@ -14,8 +14,9 @@
  * Product nodes are not added here: they are created by a change's `added`
  * amendment when the change applies.
  *
- * The new node is checked against the v2 rules; an error finding about it
- * refuses the add (an unresolved `blockedBy`, `touches` or amendment target,
+ * A short title another open item already shows as its name is refused
+ * (`core/short-title.ts`). The new node is checked against the v2 rules; an
+ * error finding about it refuses the add (an unresolved `blockedBy`, `touches` or amendment target,
  * for instance). Findings about other nodes are not this add's to report.
  * A change with amends is also dry-run through apply
  * ({@link applyAmendmentsProblems}) and refused with apply's problems: no
@@ -33,12 +34,15 @@ import type { Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings } from
 import { checkV2Rules, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { applyAmendmentsProblems, freeSlug, NO_PROBLEMS, pendingWarnings } from "./apply-amendments.js";
 import { addTask, closedState, ClosedChangeError, type ChangeSplit } from "./change-completion.js";
+import { findNameCollision, ShortTitleCollisionError } from "./short-title.js";
 
 export interface AddChangeNodeInput {
   type: ChangeNodeType;
   title: string;
   /** Id, display id or alias of the parent: a change for a change or task, a task for a subtask. */
   parentId?: string;
+  /** Short name shown in place of the title; refused when an open item already shows it (`core/short-title.ts`). */
+  shortTitle?: string;
   /** Plain-language summary for a reader who does not write code. */
   summary?: string;
   /** A change's `intent`; a task's or subtask's `description`. */
@@ -109,6 +113,9 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
   const { type } = input;
   const uncarried = UNCARRIED[type].filter((field) => input[field] !== undefined);
   if (uncarried.length) throw new AddChangeNodeError(`A ${type} does not carry ${uncarried.join(", ")}`);
+  const shortTitle = input.shortTitle?.trim();
+  const clash = shortTitle ? findNameCollision(tree.changes, shortTitle) : undefined;
+  if (clash) throw new AddChangeNodeError(new ShortTitleCollisionError(shortTitle!, clash).message);
 
   const want = PARENT_TYPE[type];
   if (want.required && input.parentId === undefined) throw new AddChangeNodeError(`A ${type} needs parentId: the ${want.type} it belongs to`);
@@ -171,6 +178,7 @@ function refuseClosedChange(tree: V2Tree, parentId: string | undefined, type: Ch
 /** The intent fields `input` sets, named as `input.type` stores them, plus Inbox placement for an untargeted change. */
 function fields(input: AddChangeNodeInput): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  if (input.shortTitle?.trim()) out.shortTitle = input.shortTitle.trim();
   if (input.summary?.trim()) out.summary = input.summary.trim();
   if (input.description) out[input.type === "change" ? "intent" : "description"] = input.description;
   if (input.acceptanceCriteria?.length) out.acceptanceCriteria = input.acceptanceCriteria;

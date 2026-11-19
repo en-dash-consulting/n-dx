@@ -15,6 +15,7 @@ import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js"
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 
 import { cascadeParentReset } from "../../core/parent-reset.js";
+import { assertShortTitleAvailable } from "../../core/short-title.js";
 import { parseCsvList } from "../parse-utils.js";
 import { CLIError } from "../errors.js";
 import { info, result, warn } from "../output.js";
@@ -161,6 +162,7 @@ export async function cmdAdd(
     level: resolvedLevel as ItemLevel,
   };
 
+  if (flags["short-title"]?.trim()) item.shortTitle = flags["short-title"].trim();
   if (flags.summary?.trim()) item.summary = flags.summary.trim();
   if (flags.description) item.description = flags.description;
   if (flags.priority) item.priority = flags.priority as Priority;
@@ -175,6 +177,8 @@ export async function cmdAdd(
       item.blockedBy = deps;
     }
   }
+
+  if (item.shortTitle) assertShortTitleAvailable((await store.loadDocument()).items, item.shortTitle, item);
 
   // Validate dependencies before persisting
   if (item.blockedBy && item.blockedBy.length > 0) {

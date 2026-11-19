@@ -4,6 +4,7 @@ import { validateDAG } from "../../core/dag.js";
 import { validateRunSettings, RunSettingsSchema } from "../../schema/validate.js";
 import type { PRDItem, Priority } from "../../schema/index.js";
 import { changeLayerType } from "../../core/layer-projection.js";
+import { assertShortTitleAvailable } from "../../core/short-title.js";
 import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -15,6 +16,8 @@ export async function handleEditItem(
   args: {
     id: string;
     title?: string;
+    /** Empty string removes it. */
+    shortTitle?: string;
     /** Empty string removes it. */
     summary?: string;
     description?: string;
@@ -43,6 +46,10 @@ export async function handleEditItem(
     const VALID_LEVELS = ["epic", "feature", "task", "subtask"];
     const updates: Partial<PRDItem> = {};
     if (args.title !== undefined) updates.title = args.title;
+    if (args.shortTitle !== undefined) {
+      updates.shortTitle = args.shortTitle.trim() || undefined;
+      assertShortTitleAvailable((await store.loadDocument()).items, updates.shortTitle, existing);
+    }
     // Empty clears it, as assignee does.
     if (args.summary !== undefined) updates.summary = args.summary.trim() || undefined;
     if (args.description !== undefined) updates.description = args.description;
@@ -99,7 +106,7 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, summary, description, acceptanceCriteria, priority, tags, source, assignee, blockedBy, run).",
+        "No fields to update. Provide at least one field (title, shortTitle, summary, description, acceptanceCriteria, priority, tags, source, assignee, blockedBy, run).",
         true,
       );
     }
@@ -129,10 +136,11 @@ export async function handleEditItem(
 
 export const editItemTool = defineTool({
   name: "edit_item",
-  description: "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+  description: "Edit content fields of a PRD item (title, short title, plain-language summary, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
   schema: {
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
+    shortTitle: z.string().optional().describe("New short name the dashboard shows in place of the title. Refused when an open item (pending, in_progress, blocked, deferred) already shows that name; completed items may share it. An empty string removes it."),
     summary: z.string().optional().describe("New plain-language summary: 1-2 sentences for a non-coder on what the work does and why it is worth doing. An empty string removes it."),
     description: z.string().optional().describe("New description"),
     acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"),

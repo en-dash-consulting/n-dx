@@ -23,6 +23,7 @@ import {
   ImpactFlags,
   TrackerChip,
   displayTitle,
+  titleTooltip,
   sizeCell,
   ghostChanges,
   useItemImpacts,
@@ -94,8 +95,8 @@ function Row({ change, navigateTo, tracker, onTrackerChanged, impact }: { change
   const size = sizeCell(impact);
   return h("tr", { class: "cg-row", "data-change": change.id },
     h("td", { class: "cg-name" },
-      // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
-      h("button", { type: "button", class: "cg-open", title: change.summary ? change.title : undefined, onClick: () => navigateTo("prd", { taskId: change.id }) },
+      // The short title or plain-language summary leads; the full title is the tooltip and the detail panel's heading.
+      h("button", { type: "button", class: "cg-open", title: titleTooltip(change), onClick: () => navigateTo("prd", { taskId: change.id }) },
         h("span", { class: "cg-title" }, displayTitle(change)),
       ),
       h(ImpactFlags, { impact }),

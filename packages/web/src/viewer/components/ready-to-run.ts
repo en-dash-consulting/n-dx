@@ -18,7 +18,7 @@ import { appUrl } from "../base-path.js";
 import { itemTypeLabel, workCommandArgs } from "../external.js";
 import { shellWord } from "./prepare-task-model.js";
 import { QueuedNotice } from "./queued-notice.js";
-import { ImpactTags, displayTitle, useItemImpacts } from "./impact-tags.js";
+import { ImpactTags, displayTitle, titleTooltip, useItemImpacts } from "./impact-tags.js";
 import type { QueuedReply } from "./prepare-task-model.js";
 
 /** Rows shown before "Show all N": the next few picks, not the whole queue. */
@@ -31,6 +31,8 @@ const TOAST_MS = 8000;
 export interface ReadyTask {
   id: string;
   title: string;
+  /** Short name, shown in place of the title when present. */
+  shortTitle?: string;
   /** Plain-language summary, shown in place of the title when present. */
   summary?: string;
   /** The start of the description, already cut short by the server. */
@@ -78,7 +80,7 @@ export function filterReady(tasks: ReadyTask[], f: ReadyFilters): ReadyTask[] {
     if (f.change && changeKey(t) !== f.change) return false;
     if (f.tag && !(t.tags ?? []).includes(f.tag)) return false;
     if (!q) return true;
-    return [t.summary ?? "", t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
+    return [t.shortTitle ?? "", t.summary ?? "", t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
   });
 }
 
@@ -345,11 +347,11 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
                   : null,
               ),
             ),
-            // The plain-language summary leads; the technical title is the tooltip and the modal's heading.
+            // The short title or plain-language summary leads; the full title is the tooltip and the modal's heading.
             h("button", {
               type: "button",
               class: "ready-title rex-dash-next-link",
-              title: task.summary ? task.title : undefined,
+              title: titleTooltip(task),
               onClick: () => onPrepare(task.id),
             },
               displayTitle(task),

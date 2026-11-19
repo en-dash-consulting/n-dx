@@ -12,8 +12,8 @@
  * {@link STALE_MS} is also refreshed the next time a row mounts. A refetch that
  * fails keeps the impacts already shown.
  *
- * Also home to {@link displayTitle}: the plain-language summary a row shows in
- * place of an item's technical title.
+ * Also home to {@link displayTitle}: the short title or plain-language summary
+ * a row shows in place of an item's full title, and {@link titleTooltip}.
  *
  * @module viewer/components/impact-tags
  */
@@ -167,12 +167,25 @@ export function useItemImpacts(): ImpactMap {
   return data;
 }
 
+/** The fields {@link displayTitle} reads. */
+export interface TitledItem {
+  title: string;
+  shortTitle?: string | null;
+  summary?: string | null;
+}
+
 /**
- * What a row shows for an item: its plain-language summary when it has one,
- * else its title. The technical title stays on the full item view.
+ * What a row shows for an item: its short title when it has one, else its
+ * plain-language summary, else its title. The full title stays on the item's
+ * detail panel and is the row's tooltip ({@link titleTooltip}).
  */
-export function displayTitle(item: { title: string; summary?: string | null }): string {
-  return item.summary?.trim() || item.title;
+export function displayTitle(item: TitledItem): string {
+  return item.shortTitle?.trim() || item.summary?.trim() || item.title;
+}
+
+/** The full title, as a tooltip, wherever a row shows something else in its place. */
+export function titleTooltip(item: TitledItem): string | undefined {
+  return displayTitle(item) === item.title ? undefined : item.title;
 }
 
 const plural = (n: number, [one, many]: readonly [string, string]) => `${n} ${n === 1 ? one : many}`;

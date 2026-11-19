@@ -134,6 +134,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--level=<level>", description: "Item level (alternative to positional level)" },
       { flag: "--parent=<id>", description: "Parent item ID to nest under" },
       { flag: "--priority=<p>", description: "Priority: critical, high, medium, low" },
+      { flag: "--short-title=\"...\"", description: "Short name the dashboard shows in place of the title, manual mode only; refused when an open item already shows that name" },
       { flag: "--summary=\"...\"", description: "Plain-language summary for a non-coder: what the work does and why it is worth doing (manual mode, or a v2 description add)" },
       { flag: "--summarize", description: "v2 JSON preview of a description add: draft each change's plain-language summary with the light-tier model" },
       { flag: "--description=\"...\"", description: "Item description" },
@@ -256,12 +257,13 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "update an existing PRD item",
     usage: "rex update <id> [options] [dir]",
     description:
-      "Modify the status, priority, title, summary, description, acceptance criteria, source, or assignee of a PRD item.\n" +
+      "Modify the status, priority, title, short title, summary, description, acceptance criteria, source, or assignee of a PRD item.\n" +
       "Status transitions are validated (e.g. completed → pending requires --force).",
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },
       { flag: "--priority=<p>", description: "New priority: critical, high, medium, low" },
       { flag: "--title=\"...\"", description: "New title" },
+      { flag: "--short-title=\"...\"", description: "New short name shown in place of the title; refused when an open item already shows that name; --short-title= removes it" },
       { flag: "--summary=\"...\"", description: "New plain-language summary (what the work does and why it is worth doing); --summary= removes it" },
       { flag: "--description=\"...\"", description: "New description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion; repeat per criterion. Replaces the whole list; --criterion= on its own clears it" },

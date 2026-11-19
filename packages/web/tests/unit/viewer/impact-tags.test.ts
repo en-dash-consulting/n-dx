@@ -13,6 +13,7 @@ import {
   ImpactTags,
   displayTitle,
   kindsText,
+  titleTooltip,
   resetImpactCacheForTests,
   sizeText,
   useItemImpacts,
@@ -55,6 +56,21 @@ describe("displayTitle", () => {
     expect(displayTitle({ title: "Refactor x.ts", summary: "  Faster checkout  " })).toBe("Faster checkout");
     expect(displayTitle({ title: "Refactor x.ts", summary: "  " })).toBe("Refactor x.ts");
     expect(displayTitle({ title: "Refactor x.ts" })).toBe("Refactor x.ts");
+  });
+
+  it("puts the short title first, then the summary, then the title", () => {
+    expect(displayTitle({ title: "Refactor x.ts", shortTitle: " Checkout ", summary: "Faster checkout" })).toBe("Checkout");
+    expect(displayTitle({ title: "Refactor x.ts", shortTitle: "  ", summary: "Faster checkout" })).toBe("Faster checkout");
+    expect(displayTitle({ title: "Refactor x.ts", shortTitle: null })).toBe("Refactor x.ts");
+  });
+});
+
+describe("titleTooltip", () => {
+  it("is the full title wherever a row shows something else, and absent otherwise", () => {
+    expect(titleTooltip({ title: "Refactor x.ts", shortTitle: "Checkout" })).toBe("Refactor x.ts");
+    expect(titleTooltip({ title: "Refactor x.ts", summary: "Faster checkout" })).toBe("Refactor x.ts");
+    expect(titleTooltip({ title: "Refactor x.ts" })).toBeUndefined();
+    expect(titleTooltip({ title: "Checkout", shortTitle: "Checkout" })).toBeUndefined();
   });
 });
 

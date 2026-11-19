@@ -28,7 +28,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import { appendLog } from "./rex-route-helpers.js";
-import { summaryField } from "../prd-io.js";
+import { shortTitleField, summaryField } from "../prd-io.js";
 import {
   prdLayout,
   loadPrdModel,
@@ -116,6 +116,8 @@ export interface ChangeRowWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Short name shown in place of the title, when the change has one. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders, when the change has one. */
   summary?: string;
   intent?: string;
@@ -165,6 +167,8 @@ export interface GlanceChangeWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Short name shown in place of the title, when the change has one. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders; the viewer shows it in place of the title when present. */
   summary?: string;
   stage: OpenChangeStageWire;
@@ -375,6 +379,7 @@ export interface AwaitingApplyRef {
   id: string;
   displayId?: string;
   title: string;
+  shortTitle?: string;
   summary?: string;
 }
 
@@ -388,6 +393,7 @@ export function awaitingApplyChanges(tree: V2Tree): AwaitingApplyRef[] {
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
       title: change.title,
+      ...shortTitleField(change),
       ...summaryField(change),
     }));
 }
@@ -588,6 +594,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
       title: change.title,
+      ...shortTitleField(change),
       ...summaryField(change),
       stage,
       ...(change.priority ? { priority: change.priority } : {}),
@@ -656,6 +663,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         id: change.id,
         ...(change.displayId ? { displayId: change.displayId } : {}),
         title: change.title,
+        ...shortTitleField(change),
         ...summaryField(change),
         ...(change.intent ? { intent: change.intent } : {}),
         stage: stageOf(change),
