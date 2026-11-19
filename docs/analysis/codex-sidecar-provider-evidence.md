@@ -91,3 +91,37 @@ Three listener-dependent tests did not pass in this sandbox. Host execution,
 fresh independent review and final acceptance remain coordinator work. No
 task status transition, PRD mutation, staging, commit or publication was done
 by this executor; the saved run context assigns those to Hench/coordinator.
+
+## Protocol retry (run 921d5d5a)
+
+Host acceptance remains **INCOMPLETE**. The retained retry instructions report
+88 passing host listener tests across five files, but the actual CLI provider
+probe failed to execute its shell check. Those host tests were not rerun here.
+The earlier probe looked only at root `tools` and emitted `function_call`.
+The installed CLI instead advertises `functions.exec` under developer
+`additional_tools` input items and uses `custom_tool_call` / `custom_tool_call_output`.
+The retained `pr9-browser-cli-boundary-custom-tools.json` confirms the call has
+name `exec`, no namespace field, JavaScript input, and text-block output.
+
+The standalone probe now discovers both advertisement formats, emits the
+matching call and SSE item lifecycle, and checks unrelated namespace/leaf names
+in both locations. Its shell command uses literal shell quoting and disables
+login startup for `exec_command`. Shell evidence must come from the current
+call id's textual output; historical markers, call inputs and non-text output
+metadata cannot satisfy it. Production provider selection, admission, sandbox,
+registry, broker, model pins and operator approvals were not changed.
+
+Retry validation:
+
+- Protocol tests: baseline 1 passed; new regressions initially 9 failed; final 10 passed.
+- Protocol, required CLI startup/scheduler and changeset-policy run: 31 tests passed across four files.
+- Web build and source/test typecheck passed.
+- Standalone script syntax and whitespace checks passed.
+
+These are synthetic protocol tests, not an actual installed-CLI acceptance run.
+The coordinator must run the standalone command above natively after execution
+and mandatory fresh distinct review. No nested models, subagents, paid provider
+calls or native host probe were launched in this retry. Fresh review remains
+pending; the executor cannot supply an independent review of its own patch.
+Retain all prior failed artifacts and complete this same task only after the
+fresh/resume/restart/model/auth/error/isolation phase checks pass on the host.

@@ -1,7 +1,7 @@
 // Standalone coordinator-run host acceptance. Real selected CLI + production
 // hub admission/registry/broker; local scripted Responses service, no paid model.
 // node packages/web/scripts/probe-sidecar-custom-provider.mjs <absolute-binary> <output-dir>
-import { shellCheckPassed, threadContinued } from "./sidecar-provider-probe-checks.mjs";
+import { shellCheckPassed, threadContinued, advertisedTools, shellCall, responseEvents } from "./sidecar-provider-probe-checks.mjs";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -56,24 +56,18 @@ const server = createServer((req, res) => {
         res.end(JSON.stringify({ error: { message: phase.name === "rejected-auth" ? "Unauthorized" : "Service unavailable" } }));
         return;
       }
-      if ((request.tools ?? []).some(tool => /unrelated/.test(tool.name ?? ""))) throw new Error("Unrelated tool loaded");
+      if (advertisedTools(request).some(tool => /unrelated/.test(tool.qualifiedName))) throw new Error("Unrelated tool loaded");
       if (shellCheckPassed(request.input, issuedCall)) shellHidden = true;
       let item;
       if (!issuedCall) {
-        const tool = (request.tools ?? []).find(tool => ["exec_command", "shell_command", "shell"].includes(tool.name));
-        if (!tool) throw new Error("Selected CLI did not advertise a supported shell tool; protocol fixture needs review");
-        const command = `/bin/sh ${JSON.stringify(join(dir, `${id}.hub-context.txt`))}`;
-        const args = tool.name === "exec_command" ? { cmd: command } : tool.name === "shell_command" ? { command } : { command: ["/bin/sh", "-c", command] };
-        item = { id: `fc_${randomUUID()}`, type: "function_call", call_id: `call_${randomUUID()}`, name: tool.name, arguments: JSON.stringify(args), status: "completed" };
+        const script = join(dir, `${id}.hub-context.txt`);
+        const command = `/bin/sh '${script.replaceAll("'", "'\\''")}'`;
+        item = shellCall(request, command, `call_${randomUUID()}`);
         issuedCall = item.call_id;
       } else item = { id: `msg_${randomUUID()}`, type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "Disposable provider probe complete.", annotations: [] }] };
       const response = { id: `resp_${randomUUID()}`, object: "response", model: request.model, status: "completed", output: [item], usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } };
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-      const event = (type, payload) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...payload })}\n\n`);
-      event("response.created", { response: { ...response, status: "in_progress", output: [] } });
-      event("response.output_item.added", { output_index: 0, item });
-      event("response.output_item.done", { output_index: 0, item });
-      event("response.completed", { response });
+      for (const event of responseEvents(response)) res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
       res.end();
     } catch (error) { phaseError = error.message; res.writeHead(500); res.end("Disposable protocol fixture failed"); }
   });

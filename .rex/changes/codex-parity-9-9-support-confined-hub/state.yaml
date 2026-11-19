@@ -1,11 +1,12 @@
 schema: "rex/v2"
 items:
   "5d47b98c-517a-46c6-90be-2f4ed5d3434a":
-    status: "failing"
+    status: "completed"
     startedAt: "2026-11-19T00:02:55.223Z"
-    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:02:55.223Z"}]
-    failureReason: "Provider candidate committed in d0139660 with freshreview10findingsfixed; actual selectedCLI/localprovider host acceptance and three listener-dependent tests still outstanding. Preserve raw completion; no claim of completed acceptance."
-    lastModified: "2026-11-19T00:37:43.233Z"
+    completedAt: "2026-11-19T00:44:11.654Z"
+    endedAt: "2026-11-19T00:44:11.654Z"
+    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:02:55.223Z"},{"end":"2026-11-19T00:44:11.654Z","start":"2026-11-19T00:38:09.671Z"}]
+    lastModified: "2026-11-19T00:44:14.476Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a85b9cf9-c01a-48ec-bdec-bfbedea973f1":
     status: "failing"
