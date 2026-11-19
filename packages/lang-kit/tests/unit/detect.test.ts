@@ -16,6 +16,7 @@ import {
   isFallbackSourceFile,
   javaConfig,
   javaSecondaryConfig,
+  mergeLanguageConfigs,
   phpConfig,
   terraformConfig,
   typescriptConfig,
@@ -282,6 +283,65 @@ describe("PHP detection", () => {
       expect(await detectLanguages(dir, recordingSearch(0))).toEqual([typescriptConfig]);
     },
   );
+
+  /** `n` files named `<i><suffix>` under `sub`. */
+  async function files(sub: string, suffix: string, n: number): Promise<void> {
+    await mkdir(join(dir, sub), { recursive: true });
+    for (let i = 0; i < n; i++) await writeFile(join(dir, sub, `${i}${suffix}`), "\n");
+  }
+
+  /** The merged config keeps TypeScript's skips, test and generated patterns. */
+  function expectTypeScriptRules(configs: LanguageConfig[]): void {
+    const merged = mergeLanguageConfigs(configs);
+    expect(merged.skipDirectories.has("node_modules")).toBe(true);
+    expect(merged.skipDirectories.has("dist")).toBe(true);
+    expect(merged.testFilePatterns.some((p) => p.test("frontend/src/App.test.tsx"))).toBe(true);
+    expect(merged.generatedFilePatterns.some((p) => p.test("frontend/src/types.d.ts"))).toBe(true);
+  }
+
+  it("adds PHP beside TypeScript for frontend/package.json and backend/composer.json", async () => {
+    await files("frontend/src", ".tsx", 40);
+    await writeFile(join(dir, "frontend", "package.json"), "{}\n");
+    await files("backend/src", ".php", 5);
+    await writeFile(join(dir, "backend", "composer.json"), "{}\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+    const configs = await detectLanguages(dir, recordingSearch(0));
+    expect(configs).toEqual([typescriptConfig, phpConfig]);
+    expectTypeScriptRules(configs);
+  });
+
+  it("keeps TypeScript beside PHP when the PHP side has more source", async () => {
+    await files("frontend/src", ".tsx", 3);
+    await writeFile(join(dir, "frontend", "package.json"), "{}\n");
+    await files("backend/src", ".php", 10);
+    await writeFile(join(dir, "backend", "composer.json"), "{}\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(phpConfig);
+    const configs = await detectLanguages(dir, recordingSearch(0));
+    expect(configs).toEqual([phpConfig, typescriptConfig]);
+    expectTypeScriptRules(configs);
+  });
+
+  it("adds PHP beside TypeScript for app/package.json and api/index.php", async () => {
+    await files("app/src", ".ts", 6);
+    await writeFile(join(dir, "app", "package.json"), "{}\n");
+    await files("api", ".php", 2);
+    await writeFile(join(dir, "api", "index.php"), "<?php\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+    const configs = await detectLanguages(dir, recordingSearch(0));
+    expect(configs).toEqual([typescriptConfig, phpConfig]);
+    expectTypeScriptRules(configs);
+  });
+
+  it("adds PHP beside the fallback for a Rust repository with tools/composer.json", async () => {
+    await writeFile(join(dir, "Cargo.toml"), "[package]\n");
+    await files("src", ".rs", 8);
+    await files("tools", ".php", 1);
+    await writeFile(join(dir, "tools", "composer.json"), "{}\n");
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+    const all = recordingSearch(2);
+    expect(await detectLanguages(dir, all)).toEqual([typescriptConfig, phpConfig, terraformConfig]);
+    expect(all.calls).toEqual([{ others: [typescriptConfig, phpConfig], count: false }]);
+  });
 
   it("lets a Java root outrank a composer.json one level down", async () => {
     await writeFile(join(dir, "pom.xml"), "<project/>\n");

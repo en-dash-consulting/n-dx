@@ -17,6 +17,10 @@
  * 5. No other marker, a `.php` file at the root or an `index.php` in a
  *    direct child directory (a docroot such as `public/`, or an app folder
  *    such as `catalog/`) → PHP
+ *    A PHP marker one level down (step 2's or step 5's) adds PHP beside the
+ *    TypeScript fallback when a direct child directory holds `package.json`
+ *    or the repository has source of a language with no config; the two are
+ *    ordered by source count (see `phpOneDownLanguages`)
  * 6. No marker at the root or one level down → the language with the most
  *    source files (PHP included), unless that is TypeScript or Terraform
  *    files match or outnumber it
@@ -208,20 +212,44 @@ async function hasChildPhpMarker(rootDir: string): Promise<boolean> {
 }
 
 /**
- * The weak PHP marker: a `.php` file at the root (`index.php`, or any other),
- * or an `index.php` directly inside a direct child directory (a docroot such
- * as `public/`, or an app folder such as osCommerce's `catalog/`).
- * Consulted only when no other language's marker matched, so a TypeScript
- * repository with a few PHP files keeps its detection. Never walks deeper.
+ * The weak PHP marker at the root: a `.php` file there (`index.php`, or any
+ * other). Consulted only when no other language's marker matched, so a
+ * TypeScript repository with a few PHP files keeps its detection.
  */
-async function hasWeakPhpMarker(rootDir: string): Promise<boolean> {
+async function hasRootPhpFile(rootDir: string): Promise<boolean> {
   try {
     const entries = await readdir(rootDir, { withFileTypes: true });
-    if (entries.some((e) => e.isFile() && e.name.endsWith(".php"))) return true;
+    return entries.some((e) => e.isFile() && e.name.endsWith(".php"));
   } catch {
     return false; // Unreadable — no marker.
   }
+}
+
+/**
+ * The weak PHP marker one level down: an `index.php` directly inside a direct
+ * child directory (a docroot such as `public/`, or an app folder such as
+ * osCommerce's `catalog/`). Consulted only after {@link hasRootPhpFile}.
+ */
+async function hasChildPhpEntry(rootDir: string): Promise<boolean> {
   return childHolds(rootDir, "index.php");
+}
+
+/**
+ * The languages of a repository whose only marker is PHP's one folder down
+ * (`composer.json` or `index.php` in a direct child directory). That marker
+ * says PHP is there, not that nothing else is: with a `package.json` in a
+ * direct child directory, or source of a language with no config here
+ * (`.rs`, `.rb`, …), the TypeScript fallback the repository would otherwise
+ * get is kept beside PHP, so its skip directories and test and generated
+ * patterns still apply. The two are ordered by source count, ties to the
+ * fallback. Otherwise PHP alone: a site whose app sits one folder down, its
+ * `.js` files included. Only PHP's marker is read one level down, so a
+ * child `package.json` never changes a repository that has no PHP marker.
+ */
+async function phpOneDownLanguages(rootDir: string): Promise<LanguageConfig[]> {
+  const [childPackageJson, counts] = await Promise.all([childHolds(rootDir, "package.json"), countSourceFiles(rootDir)]);
+  if (!childPackageJson && counts.other === 0) return [phpConfig];
+  return counts.ts + counts.other >= counts.php ? [typescriptConfig, phpConfig] : [phpConfig, typescriptConfig];
 }
 
 /**
@@ -316,11 +344,12 @@ async function walkBounded(rootDir: string, visit: (fileName: string) => boolean
  * `src/<Project>/<Folder>/` is weighed by that code, not by the root's
  * tooling scripts; bounded so detection stays cheap on a large tree.
  * Minified JavaScript is library code, not authored code, and is not counted.
+ * `other` is source of a language with no config here.
  */
 async function countSourceFiles(
   rootDir: string,
-): Promise<{ go: number; ts: number; swift: number; py: number; cs: number; php: number }> {
-  const counts = { go: 0, ts: 0, swift: 0, py: 0, cs: 0, php: 0 };
+): Promise<{ go: number; ts: number; swift: number; py: number; cs: number; php: number; other: number }> {
+  const counts = { go: 0, ts: 0, swift: 0, py: 0, cs: 0, php: 0, other: 0 };
   // Extensions other ecosystems share are PHP only once the repository is PHP.
   const phpExtensions = new Set([...phpConfig.extensions].filter((ext) => !PHP_REPOSITORY_ONLY_EXTENSIONS.has(ext)));
   const families: Array<[keyof typeof counts, ReadonlySet<string>]> = [
@@ -330,6 +359,7 @@ async function countSourceFiles(
     ["py", pythonConfig.extensions],
     ["cs", csharpConfig.extensions],
     ["php", phpExtensions],
+    ["other", FALLBACK_LANGUAGE_EXTENSIONS],
   ];
   await walkBounded(rootDir, (name) => {
     if (name.endsWith(".min.js")) return false;
@@ -431,7 +461,8 @@ async function markerlessMajority(
 /**
  * Every language marker both detectors weigh. `hasPhp` is a root
  * `composer.json`, or one in a direct child directory when the root has no
- * other language's marker (Java's included).
+ * other language's marker (Java's included); `phpOneDown` says it was the
+ * latter, for {@link phpOneDownLanguages} to decide.
  */
 async function detectMarkers(rootDir: string) {
   const [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasRootPhp, hasJava] = await Promise.all([
@@ -444,8 +475,9 @@ async function detectMarkers(rootDir: string) {
     hasJavaMarker(rootDir),
   ]);
   const hasOther = hasGoMod || hasPackageJson || hasSwift || hasPython || hasCSharp || hasJava;
-  const hasPhp = hasRootPhp || (!hasOther && (await hasChildPhpMarker(rootDir)));
-  return { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava };
+  const phpOneDown = !hasRootPhp && !hasOther && (await hasChildPhpMarker(rootDir));
+  const hasPhp = hasRootPhp || phpOneDown;
+  return { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava, phpOneDown };
 }
 
 // ── Detection ───────────────────────────────────────────────────────────────
@@ -475,7 +507,9 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   }
 
   // Step 2 & 3: Check for language markers
-  const { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava } = await detectMarkers(rootDir);
+  const { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava, phpOneDown } =
+    await detectMarkers(rootDir);
+  if (phpOneDown) return (await phpOneDownLanguages(rootDir))[0];
 
   // Single-marker fast path.
   const markers = [hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp].filter(Boolean).length;
@@ -510,7 +544,8 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   if (hasJava) return javaConfig;
 
   // Step 6: Then the weak PHP marker, which outranks Terraform too.
-  if (await hasWeakPhpMarker(rootDir)) return phpConfig;
+  if (await hasRootPhpFile(rootDir)) return phpConfig;
+  if (await hasChildPhpEntry(rootDir)) return (await phpOneDownLanguages(rootDir))[0];
 
   // Step 7: No marker at all → the language with the most source files.
   const majority = await markerlessMajority(rootDir, options.searchProjectFiles);
@@ -539,7 +574,9 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
 export async function detectLanguages(rootDir: string, options: DetectLanguagesOptions): Promise<LanguageConfig[]> {
   // Check for language markers (Swift adds Package.swift / .xcodeproj /
   // .xcworkspace; only one needs to be present).
-  const { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava } = await detectMarkers(rootDir);
+  const { hasGoMod, hasPackageJson, hasSwift, hasPython, hasCSharp, hasPhp, hasJava, phpOneDown } =
+    await detectMarkers(rootDir);
+  if (phpOneDown) return withTerraform(await phpOneDownLanguages(rootDir), options.searchProjectFiles);
   const present: Array<{ config: LanguageConfig; count: number }> = [];
 
   // When any markers are present, count source files so we can order by
@@ -560,11 +597,9 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
   // is no fallback source at all (never beside Java or PHP). Searched with
   // the skip set of the result (see markerlessTerraform).
   if (present.length === 0) {
-    const markerless = hasJava ? javaConfig : (await hasWeakPhpMarker(rootDir)) ? phpConfig : undefined;
-    if (markerless) {
-      const { terraform } = await options.searchProjectFiles([markerless], { count: false });
-      return terraform > 0 ? [markerless, terraformConfig] : [markerless];
-    }
+    if (hasJava) return withTerraform([javaConfig], options.searchProjectFiles);
+    if (await hasRootPhpFile(rootDir)) return withTerraform([phpConfig], options.searchProjectFiles);
+    if (await hasChildPhpEntry(rootDir)) return withTerraform(await phpOneDownLanguages(rootDir), options.searchProjectFiles);
     const majority = await markerlessMajority(rootDir, options.searchProjectFiles);
     if (majority) return majority.terraform > 0 ? [majority.config, terraformConfig] : [majority.config];
     const terraform = await markerlessTerraform(options.searchProjectFiles);
@@ -583,8 +618,12 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
   // secondary variant keeps Java from skipping or flagging the primary
   // language's `out/` and `generated/` files.
   if (hasJava) configs.push(javaSecondaryConfig);
-  if ((await options.searchProjectFiles(configs, { count: false })).terraform > 0) configs.push(terraformConfig);
-  return configs;
+  return withTerraform(configs, options.searchProjectFiles);
+}
+
+/** `configs`, with Terraform appended when the search, as `configs`, finds a Terraform file. */
+async function withTerraform(configs: LanguageConfig[], search: ProjectFileSearch): Promise<LanguageConfig[]> {
+  return (await search(configs, { count: false })).terraform > 0 ? [...configs, terraformConfig] : configs;
 }
 
 /**

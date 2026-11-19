@@ -128,7 +128,10 @@ project file search as arguments (`detectLanguage(rootDir, { override,
 searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
 the search being the inventory's own walk. With no other marker at the root,
 a `composer.json` or `index.php` in a direct child directory (`phpBB/`,
-`catalog/`) marks PHP; markers are never read deeper (C#'s aside). A
+`catalog/`) marks PHP; markers are never read deeper (C#'s aside). Such a
+marker adds PHP beside the TypeScript fallback, ordered by source count,
+when a direct child holds `package.json` or the repository has source of a
+language with no config (`phpOneDownLanguages`). A
 repository with no marker is the language with the most source files when
 that is not TypeScript and the walk's Terraform count is lower; otherwise it
 is Terraform alone only when that walk finds Terraform files and no
