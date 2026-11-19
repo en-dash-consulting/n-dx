@@ -121,6 +121,21 @@ function psr0Path(qualified: string): string {
   return `${namespace}${qualified.slice(sep + 1).replace(/_/g, "/")}.php`;
 }
 
+/**
+ * Whether an autoload `prefix` (PSR-0, or PSR-4, whose prefixes end in `\`)
+ * claims `name` as its package's or the project's when no file holds it. A
+ * prefix ending in `\` or `_` (or empty) is a plain prefix; any other covers
+ * the name only when it is the name or is followed by `\` or `_`, so `Acme`
+ * does not claim `AcmeCorp\Sdk`. File lookup (`findClass`) keeps Composer's
+ * boundary-free match.
+ */
+function prefixCovers(name: string, prefix: string): boolean {
+  if (!name.startsWith(prefix)) return false;
+  if (prefix === "" || /[\\_]$/.test(prefix) || name.length === prefix.length) return true;
+  const next = name[prefix.length];
+  return next === "\\" || next === "_";
+}
+
 // ── References ──────────────────────────────────────────────────────────────
 
 /** Where a reference stands: a `use` import's form, or the place of a class name in code. */
@@ -530,6 +545,9 @@ class Index {
       const target = m.paths.map((p) => joinPath(p, rest)).find((f) => this.files.has(f));
       if (target !== undefined) return { kind: "internal", target, via: "psr-4" };
     }
+    // Composer's ClassLoader tries a PSR-0 directory for any class the prefix
+    // starts (`strpos($class, $prefix) === 0`, no boundary) and loads the file
+    // if it exists, so a file found here is what PHP would load.
     const logical = psr0Path(qualified);
     for (const m of scope.psr0) {
       if (!qualified.startsWith(m.prefix)) continue;
@@ -573,7 +591,7 @@ class Index {
 
   /** The composer.lock package, of a project in `fromFile`'s scope, whose autoload prefix covers the name. */
   lockModule(qualified: string, fromFile: string): ExternalModule | undefined {
-    return this.scopeOf(fromFile).lock.find((l) => qualified.startsWith(l.prefix))?.module;
+    return this.scopeOf(fromFile).lock.find((l) => prefixCovers(qualified, l.prefix))?.module;
   }
 
   /**
@@ -590,7 +608,7 @@ class Index {
     return (
       this.ownNamespaces.has(namespaceOf(lower)) ||
       this.ownNamespacePrefixes.has(lower) ||
-      this.ownPrefixes.some((p) => lower.startsWith(p))
+      this.ownPrefixes.some((p) => prefixCovers(lower, p))
     );
   }
 }

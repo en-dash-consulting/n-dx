@@ -1,0 +1,8 @@
+{
+    "name": "example/legacy-app",
+    "autoload": {
+        "psr-0": {
+            "Acme": "src/"
+        }
+    }
+}
