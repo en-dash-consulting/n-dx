@@ -74,3 +74,25 @@ describe("markMirrors", () => {
     expect(files[0]).not.toHaveProperty("mirrorOf");
   });
 });
+
+describe("markMirrors cost", () => {
+  it("reads each file's path a bounded number of times, however many candidate pairs there are", () => {
+    // 10 families of 10 roots with the same 12 files each: 45 candidate pairs per family, 1200 files.
+    let reads = 0;
+    const counted = (path: string, hash: string): FileEntry => {
+      const e = entry(path, hash);
+      Object.defineProperty(e, "path", { enumerable: true, get: () => (reads++, path) });
+      return e;
+    };
+    const files: FileEntry[] = [];
+    for (let family = 0; family < 10; family++) {
+      for (let root = 0; root < 10; root++) {
+        for (const n of NAMES) files.push(counted(`f${family}r${root}/${n}`, `h-${family}-${n}`));
+      }
+    }
+    const { pairs } = markMirrors(files);
+    expect(pairs.length).toBeGreaterThan(0);
+    // Per-pair scans read every path (about 450 pairs x 4 x 1200); the indexes read each a few times.
+    expect(reads).toBeLessThan(files.length * 30);
+  });
+});

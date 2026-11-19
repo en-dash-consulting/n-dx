@@ -11,7 +11,11 @@
  * (`isOutsideStructure`). A file that differs from its counterpart, or has
  * none, stays first-party: it is where the copy diverged.
  *
- * Detection, linear in the inventory:
+ * Detection. The inventory is indexed once (by hash, by path, and by every
+ * ancestor folder), so the cost is O(files × path depth) for the indexes, plus
+ * O(files in a hash group)² per hash group of at most {@link MAX_GROUP} for
+ * candidate pairs, plus, per candidate pair, the size of its smaller root;
+ * nothing rescans the inventory per pair:
  *
  * 1. Group files by hash; within a group, each pair of files with the same
  *    name gives a candidate pair of roots: the two paths with their common
@@ -97,10 +101,20 @@ export function markMirrors(files: readonly FileEntry[], config: MirrorConfig = 
   }
 
   // 2. Score each candidate: files of one root identical to the same relative path under the other.
-  const countUnder = (root: string) => files.reduce((n, f) => n + (under(f.path, root) ? 1 : 0), 0);
+  //    The inventory is indexed once by every ancestor folder, so a root's files are one lookup.
+  const byRoot = new Map<string, FileEntry[]>();
+  for (const f of files) {
+    for (let slash = f.path.indexOf("/"); slash !== -1; slash = f.path.indexOf("/", slash + 1)) {
+      const root = f.path.slice(0, slash);
+      let list = byRoot.get(root);
+      if (list === undefined) byRoot.set(root, (list = []));
+      list.push(f);
+    }
+  }
+  const NONE: readonly FileEntry[] = [];
+  const countUnder = (root: string) => (byRoot.get(root) ?? NONE).length;
   const matchedFiles = (mirror: string, source: string): FileEntry[] =>
-    files.filter((f) => {
-      if (!under(f.path, mirror)) return false;
+    (byRoot.get(mirror) ?? NONE).filter((f) => {
       const counterpart = byPath.get(`${source}/${f.path.slice(mirror.length + 1)}`);
       return counterpart !== undefined && counterpart.hash === f.hash;
     });
@@ -108,8 +122,10 @@ export function markMirrors(files: readonly FileEntry[], config: MirrorConfig = 
   for (const { a, b } of candidates.values()) {
     const aFiles = countUnder(a);
     const bFiles = countUnder(b);
-    const aMatched = matchedFiles(a, b).length; // a's files found in b
-    const bMatched = bFiles === 0 ? 0 : matchedFiles(b, a).length;
+    // A file of `a` matches one of `b` at the same relative path and hash exactly when that file
+    // of `b` matches it back, so both sides match the same count: walk the smaller root.
+    const aMatched = aFiles <= bFiles ? matchedFiles(a, b).length : matchedFiles(b, a).length;
+    const bMatched = aMatched;
     const aShare = aFiles === 0 ? 0 : aMatched / aFiles;
     const bShare = bFiles === 0 ? 0 : bMatched / bFiles;
     const bothCopies = aShare >= MIN_SHARE && bShare >= MIN_SHARE;

@@ -1,11 +1,25 @@
 schema: "rex/v2"
 items:
   "21554731-0146-4337-8707-67268fbebad1":
+    status: "completed"
+    startedAt: "2026-11-19T00:11:42.145Z"
+    completedAt: "2026-11-19T00:11:42.145Z"
+    endedAt: "2026-11-19T00:11:42.145Z"
+    activeIntervals: [{"end":"2026-11-19T00:11:42.145Z","start":"2026-11-19T00:11:42.145Z"}]
+    appliedAt: "2026-11-19T00:11:42.145Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T22:32:45.191Z"
-    lastModified: "2026-11-18T22:33:09.105Z"
+    lastModified: "2026-11-19T00:11:42.145Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2fb45c65-85c0-42bb-8b5b-b31a62c70c1c":
-    lastModified: "2026-11-18T22:33:09.105Z"
+    status: "completed"
+    startedAt: "2026-11-19T00:08:57.026Z"
+    completedAt: "2026-11-19T00:11:42.145Z"
+    endedAt: "2026-11-19T00:11:42.145Z"
+    activeIntervals: [{"end":"2026-11-19T00:11:42.145Z","start":"2026-11-19T00:08:57.026Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "mirrors.ts indexes by ancestor folder and walks the smaller root per pair; third-party header reads use a 16-wide pool and skip glob/flag-marked files."
+    lastModified: "2026-11-19T00:11:42.145Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e08596a6-1754-42e7-bee1-c830ed9c3810":
     status: "completed"

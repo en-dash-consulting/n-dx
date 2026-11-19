@@ -39,6 +39,9 @@ import type { FileEntry } from "../schema/index.js";
 /** How many bytes of each file the banner rules read. */
 export const HEADER_BYTES = 2048;
 
+/** Most headers read at once: bounds open file handles. */
+export const HEADER_READS = 16;
+
 /** A library recognised by its own header text. */
 interface LibraryBanner {
   readonly name: string;
@@ -236,16 +239,20 @@ export async function markThirdParty(
 
   const marks = new Map<string, FileMark>();
   const bannerOf = new Map<string, string>();
+  // A glob or flag mark is final, so only the rest can still be changed by a header rule. A file
+  // a deny glob will clear is still read: its banner counts toward its folder's share and evidence.
+  const unmarked: FileEntry[] = [];
   for (const file of files) {
     const glob = allow.find((g) => g.re.test(file.path));
     if (glob !== undefined) {
       marks.set(file.path, { stored: `${glob.source} ${glob.glob}`, reason: glob.source === "cli" ? "flag" : "config", where: glob.glob });
-      continue;
-    }
-    const header = await readHeader(file.path).catch(() => "");
-    const banner = LIBRARY_BANNERS.find((b) => b.pattern.test(header));
-    if (banner !== undefined) bannerOf.set(file.path, banner.name);
+    } else unmarked.push(file);
   }
+  const headerTexts = await mapConcurrently(unmarked, HEADER_READS, (file) => readHeader(file.path).catch(() => ""));
+  unmarked.forEach((file, i) => {
+    const banner = LIBRARY_BANNERS.find((b) => b.pattern.test(headerTexts[i]));
+    if (banner !== undefined) bannerOf.set(file.path, banner.name);
+  });
 
   // A library-named folder is the library's only with its banner or entry file under (or beside) it.
   const evidence = libraryFolderEvidence(files, bannerOf);
@@ -291,6 +298,20 @@ export async function markThirdParty(
     return { ...rest, thirdParty: mark.stored };
   });
   return { files: marked, marks: groupMarks(kept) };
+}
+
+/** `items` mapped by `fn` with at most `limit` calls in flight; results in input order. */
+async function mapConcurrently<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 /** The outermost folder of a path named as a library, if any. */

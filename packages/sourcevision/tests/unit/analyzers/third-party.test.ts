@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  HEADER_READS,
   describeThirdPartyMark,
   markOutboundThirdParty,
   markThirdParty,
@@ -191,6 +192,30 @@ describe("markThirdParty", () => {
   it("clears a stale mark from a cached entry", async () => {
     const { files: marked } = await markThirdParty("/x", [entry("app/a.php", { thirdParty: "config old/**" })], { readHeader: headers({}) });
     expect(marked[0]).not.toHaveProperty("thirdParty");
+  });
+});
+
+describe("markThirdParty header reads", () => {
+  it("reads headers concurrently, capped at HEADER_READS, and not for files a glob already marked", async () => {
+    const paths = Array.from({ length: 100 }, (_, i) => `src/f${i}.js`);
+    const files = [...paths, "lib/Mine/a.js", "lib/Mine/b.js"].map((p) => entry(p));
+    let inFlight = 0;
+    let peak = 0;
+    const read: string[] = [];
+    const readHeader = async (path: string) => {
+      read.push(path);
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 1));
+      inFlight--;
+      return path === "src/f7.js" ? "/*! jQuery v3.6.0 | (c) */" : "";
+    };
+    const { files: marked } = await markThirdParty("/unused", files, { globs: [{ glob: "lib/Mine/**", source: "config" }], readHeader });
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(HEADER_READS);
+    expect(read.sort()).toEqual([...paths].sort());
+    expect(marked.map((f) => f.path)).toEqual(files.map((f) => f.path));
+    expect(marked.filter((f) => f.thirdParty).map((f) => f.path)).toEqual(["src/f7.js", "lib/Mine/a.js", "lib/Mine/b.js"]);
   });
 });
 
