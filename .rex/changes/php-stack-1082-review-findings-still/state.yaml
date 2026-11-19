@@ -155,7 +155,14 @@ items:
     lastModified: "2026-11-19T02:33:20.765Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d4da1efe-89b4-4d06-ad10-382baa25d3a2":
-    lastModified: "2026-11-19T03:17:33.037Z"
+    status: "completed"
+    startedAt: "2026-11-19T16:24:07.413Z"
+    completedAt: "2026-11-19T16:26:35.536Z"
+    endedAt: "2026-11-19T16:26:35.536Z"
+    activeIntervals: [{"end":"2026-11-19T16:26:35.536Z","start":"2026-11-19T16:24:07.413Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixture cases and expectations pin parenthesised subscript base, write target and $this receiver (commit 17cf77e3c); test run pending the hench gate."
+    lastModified: "2026-11-19T16:26:35.536Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dcd473b7-2b77-42f1-8720-e1cd223a4562":
     status: "completed"

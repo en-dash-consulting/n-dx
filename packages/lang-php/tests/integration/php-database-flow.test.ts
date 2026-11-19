@@ -98,6 +98,13 @@ describe("php database-driven dynamic code", () => {
       "eval 67 [blocks] [blocks.body] [properties.php:62]",
       "call_user_func 76 -",
       "eval 77 [blocks] [blocks.body] [properties.php:71]",
+      // Nor around an array base, a written object or a method receiver.
+      "call_user_func 86 -",
+      "call_user_func 87 -",
+      "eval 88 [blocks] [blocks.body] [properties.php:82]",
+      "call_user_func 96 -",
+      "eval 97 [blocks] [blocks.body] [properties.php:92]",
+      "call_user_func 108 [pages] [pages.handler] [properties.php:103]",
     ]);
   });
 
@@ -142,10 +149,10 @@ describe("php database-driven dynamic code", () => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const notices = (await analyze()).notices ?? [];
     expect(notices.filter((n) => n.includes(`[${PHP_DB_EXEC}]`))).toEqual([
-      `PHP: [${PHP_DB_EXEC}] 4 sites run code read from a database: blocks.php:7, properties.php:9, properties.php:67, properties.php:77; table blocks.`,
+      `PHP: [${PHP_DB_EXEC}] 6 sites run code read from a database: blocks.php:7, properties.php:9, properties.php:67, properties.php:77, properties.php:88, and 1 more; table blocks.`,
     ]);
     expect(notices.filter((n) => n.includes(`[${PHP_DB_DISPATCH}]`))).toEqual([
-      `PHP: [${PHP_DB_DISPATCH}] 12 sites choose what to run from database data: drupal/menu.php:26, front.php:5, front.php:6, lib/PageRepository.php:18, lib/PageRepository.php:24, and 7 more; tables menu_router, pages, routes.`,
+      `PHP: [${PHP_DB_DISPATCH}] 13 sites choose what to run from database data: drupal/menu.php:26, front.php:5, front.php:6, lib/PageRepository.php:18, lib/PageRepository.php:24, and 8 more; tables menu_router, pages, routes.`,
     ]);
   });
 });
