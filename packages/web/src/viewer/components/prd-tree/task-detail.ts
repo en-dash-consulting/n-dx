@@ -31,7 +31,7 @@ import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
 import { placementTab } from "../../route-state.js";
 import { ImpactDetail, useItemImpacts } from "../impact-tags.js";
-import { AssigneePicker, usePeople } from "../assignee.js";
+import { AssigneePicker, saveAssignee, usePeople } from "../assignee.js";
 import { pickerChoices } from "../assignee-model.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -1351,7 +1351,12 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
             assignee: item.assignee,
             people: pickerChoices(peopleRead?.people ?? [], [item.assignee]),
             me: peopleRead?.me ?? null,
-            onSave: (assignee: string) => onUpdate(item.id, { assignee }),
+            // Its own PATCH, not onUpdate: onUpdate swallows a refused write, and
+            // the picker must show the server's reason and keep the old value.
+            onSave: async (assignee: string) => {
+              await saveAssignee(item.id, assignee);
+              onPrdChanged?.();
+            },
           }),
         )
       : item.assignee
