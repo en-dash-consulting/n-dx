@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { applyRepoTrust, formatTrustWarningForRun, trustSummaryForRun } from "../../../src/store/trust.js";
 import { guardBaselineForLanguage, recordRepoTrust, resolveVendorCliEnv } from "../../../src/prd/llm-gateway.js";
 import { GuardError, validatePath } from "../../../src/guard/paths.js";
-import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import { DEFAULT_HENCH_CONFIG, PROJECT_LANGUAGES } from "../../../src/schema/v1.js";
 import { HenchConfigSchema } from "../../../src/schema/index.js";
 import { loadConfig } from "../../../src/store/config.js";
 import { resolveApiKey } from "../../../src/store/project-config.js";
@@ -506,7 +506,7 @@ describe("repository trust under project overrides", () => {
     const defaults = DEFAULT_HENCH_CONFIG() as unknown as Record<string, unknown>;
     const samples: unknown[] = [
       0, 1, -1, 1.5, true, null, "", "x", "claude", "/opt/claude", [], ["x"], {}, { futureKnob: true },
-      "default", "acceptEdits", "bypassPermissions", "plan", "cli", "api", "typescript", "javascript", "go", "swift",
+      "default", "acceptEdits", "bypassPermissions", "plan", "cli", "api", ...PROJECT_LANGUAGES,
     ];
 
     it.each(Object.keys(HENCH_OVERRIDE_FIELD_CHECKS))("%s", (field) => {

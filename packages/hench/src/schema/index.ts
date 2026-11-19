@@ -2,6 +2,8 @@ export {
   HENCH_SCHEMA_VERSION,
   DEFAULT_HENCH_CONFIG,
   guardDefaultsForLanguage,
+  PROJECT_LANGUAGES,
+  isProjectLanguage,
   normalizeRunTokens,
   PERMISSION_MODES,
   isPermissionMode,

@@ -1,5 +1,5 @@
 import { z, ZodError } from "zod";
-import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MAX_REVIEW_ROUNDS, MIN_PRUNE_PAIRS, MIN_REVIEW_ROUNDS } from "./v1.js";
+import { DEFAULT_HENCH_CONFIG, PROJECT_LANGUAGES, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MAX_REVIEW_ROUNDS, MIN_PRUNE_PAIRS, MIN_REVIEW_ROUNDS } from "./v1.js";
 import { DEFAULT_WRITE_SHRINK_MIN_BYTES, DEFAULT_WRITE_SHRINK_RATIO } from "./v1.js";
 import type { HenchConfig } from "./v1.js";
 import { guardBaselineForLanguage } from "../prd/llm-gateway.js";
@@ -111,10 +111,10 @@ const PruneConfigSchema = z
       "how many turns of cache-friendly growth follow each prune",
   });
 
-// Must list every member of `ProjectLanguage`: `DEFAULT_HENCH_CONFIG(language)`
-// writes the value straight into `.hench/config.json`, so a language this enum
-// omits produces a config hench itself then refuses to load. "swift" was missing.
-const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go", "swift", "php"]).optional();
+// Every member of `ProjectLanguage`: `DEFAULT_HENCH_CONFIG(language)` writes the
+// value straight into `.hench/config.json`, so a language this enum omitted
+// would produce a config hench itself then refuses to load.
+const ProjectLanguageSchema = z.enum(PROJECT_LANGUAGES).optional();
 
 export const HenchConfigSchema = z.object({
   schema: z.string(),
