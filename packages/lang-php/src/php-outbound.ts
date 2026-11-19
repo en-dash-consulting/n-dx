@@ -59,7 +59,8 @@
  * ends inside a scheme or a host (`'http' . $s . '://x'`, `'https://api.' . $d`,
  * {@link endsInsideHost}), or a connection string's host value
  * (`'mysql:host=db-' . $env`, {@link openHostValue}), is not a target: the
- * argument is `unknown`, as written; a variable takes the target of its last
+ * argument is `unknown`, as written (a connection string's password values
+ * replaced); a variable takes the target of its last
  * plain assignment before the call in its scope; a constant or configuration
  * key no definition computes is `config` with its name; anything else is
  * `unknown`, with the argument as written (credentials dropped) as target, or
@@ -345,6 +346,15 @@ const asWritten = (text: string): Target => {
   return { target: written.length > MAX_WRITTEN ? `${written.slice(0, MAX_WRITTEN - 1)}…` : written, targetSource: "unknown" };
 };
 
+/** A connection string's password entry in source text: the key, `=`, and a quoted value or one up to a `;`, white space or quote. */
+const PASSWORD_ENTRY = /(?<![A-Za-z])(password|passwd|pwd|pass)(\s*=\s*)(?:'[^']*'|"[^"]*"|[^;\s'"]+)/gi;
+/** Source text read for password entries: well past {@link MAX_WRITTEN}, so the scan is bounded. */
+const MAX_SCRUBBED = 2000;
+
+/** A connection string as written, each password value replaced: the target of one whose host is not computable. */
+const connectionAsWritten = (text: string): Target =>
+  asWritten(text.replace(/\s+/g, " ").trim().slice(0, MAX_SCRUBBED).replace(PASSWORD_ENTRY, "$1$2REDACTED"));
+
 const literal = (target: string): Target => (target === "" ? UNKNOWN : { target: withoutCredentials(target), targetSource: "literal" });
 
 /**
@@ -485,7 +495,7 @@ class TargetReader {
       const parsed = connectionTarget(written, form);
       const host = openHostValue(written);
       // The host continues past the computable text (`'mysql:host=db-' . $env`): as written.
-      if (host) return { ...parsed, target: asWritten(t) };
+      if (host) return { ...parsed, target: connectionAsWritten(t) };
       if (parsed.target.targetSource !== "unknown" || host === undefined) return parsed;
       const filled = ends === undefined ? this.of(operand, at, depth + 1) : UNKNOWN;
       return { ...parsed, target: filled.targetSource === "literal" ? UNKNOWN : filled };
@@ -829,7 +839,9 @@ export function readFileOutbound(file: PackSourceFile, constant: ConstantLookup,
         if (url) add("http", "curl", targets.of(url.value.text, at), at);
       } else if (STREAM_FUNCTIONS.has(name)) {
         const url = target(argumentAt(call, 0, "filename"));
-        if (url.targetSource === "literal" && HTTP_URL.test(url.target)) add("http", name, url, at);
+        // Literal, or as written from an http URL whose host may continue (`'https://api.' . $d`).
+        const written = url.targetSource === "literal" ? url.target : url.targetSource === "unknown" ? url.target.replace(/^['"]/, "") : "";
+        if (HTTP_URL.test(written)) add("http", name, url, at);
       } else if (name === "fsockopen") {
         add("http", "fsockopen", target(argumentAt(call, 0, "hostname")), at);
       } else if (name === "getenv") {

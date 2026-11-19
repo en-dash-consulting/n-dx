@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-18T22:35:17.288Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "132dbb84-f95a-4c01-98e7-bb0fdfd395d6":
-    lastModified: "2026-11-18T22:35:15.727Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:06:18.933Z"
+    completedAt: "2026-11-19T03:12:26.858Z"
+    endedAt: "2026-11-19T03:12:26.858Z"
+    activeIntervals: [{"end":"2026-11-19T03:12:26.858Z","start":"2026-11-19T03:06:18.933Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ff1bd7601: endsInsideHost/openHostValue in php-outbound.ts make partial scheme/host prefixes and open DSN host values unknown, as written."
+    lastModified: "2026-11-19T03:12:26.858Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "135ce8f7-f173-4382-8d6b-71308fec7f75":
     status: "completed"

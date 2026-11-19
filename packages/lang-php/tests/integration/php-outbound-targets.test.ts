@@ -40,6 +40,10 @@ const FILES: Record<string, string> = {
     "$f = new PDO('mysql:host=db.internal;dbname=' . $db);",
     "$g = new PDO('mysql:host=' . DB_HOST . ';dbname=shop');",
     "$h = curl_init('https://api.example.test/' . $path);",
+    "$i = pg_connect('host=pg-' . $region . ' user=etl password=hunter2');",
+    "$j = new PDO(\"mysql:host=db{$n};Pwd='hunter 2';dbname=shop\");",
+    "$k = file_get_contents('https://api.example.test' . $path);",
+    "$l = file_get_contents('/var/data/' . $name);",
     "",
   ].join("\n"),
 };
@@ -84,6 +88,11 @@ describe("php outbound targets through constants and configuration", () => {
       "8 pdo_mysql db.internal (literal)",
       "9 pdo_mysql db.internal (literal)",
       "10 curl https://api.example.test/ (literal)",
+      // A connection string as written never keeps a password.
+      "11 pgsql 'host=pg-' . $region . ' user=etl password=REDACTED' (unknown)",
+      "12 pdo_mysql \"mysql:host=db{$n};Pwd=REDACTED;dbname=shop\" (unknown)",
+      // A stream call on an http URL whose host may continue is still reported; a file path is not.
+      "13 file_get_contents 'https://api.example.test' . $path (unknown)",
     ]);
   });
 });
