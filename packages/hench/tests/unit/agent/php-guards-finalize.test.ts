@@ -64,6 +64,28 @@ describe("runPhpGuardsIfNeeded", () => {
     expect(gate?.detail).toContain("composer is not on PATH");
   });
 
+  it("says a check was skipped, with its reason, when one check passed and another was skipped", async () => {
+    await writeFile(join(projectDir, "ok.php"), "<?php echo 1;");
+    await writeFile(join(projectDir, "composer.json"), "{}");
+    const events: RunEvent[] = [];
+    setActiveRunEvents({ append: (e: RunEvent) => events.push(e) } as unknown as RunEventWriter);
+    try {
+      const run = completedRun(["ok.php", "composer.json"]);
+      await runPhpGuardsIfNeeded(run, projectDir, php, { ...deps(0), onPath: (bin: string) => bin === "php" });
+      expect(run.status).toBe("completed");
+    } finally {
+      setActiveRunEvents(null);
+    }
+    const gate = events.find((e) => e.kind === "gate");
+    expect(gate).toMatchObject({
+      summary: "PHP guards passed — 1 check(s) skipped",
+      ok: true,
+      counts: { checks: 1, failed: 0, skipped: 1 },
+    });
+    expect(gate?.detail).toContain("composer is not on PATH");
+    expect(gate?.detail).not.toContain("php is not on PATH");
+  });
+
   it("leaves a passing PHP run completed", async () => {
     await writeFile(join(projectDir, "ok.php"), "<?php echo 1;");
     await writeFile(join(projectDir, "composer.json"), "{}");

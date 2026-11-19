@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "009f879d-64a5-4bbc-8c67-dd2f8dafa7da":
-    lastModified: "2026-11-19T03:43:43.308Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:47:44.568Z"
+    completedAt: "2026-11-19T03:49:12.718Z"
+    endedAt: "2026-11-19T03:49:12.718Z"
+    activeIntervals: [{"end":"2026-11-19T03:49:12.718Z","start":"2026-11-19T03:47:44.568Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ec5d959c9: partial skip now emits \"PHP guards passed — N check(s) skipped\" with skip reasons as detail, ok true. Test added in php-guards-finalize.test.ts. Tests not run in session (vitest/tsc refused); hench gate must run them."
+    lastModified: "2026-11-19T03:49:12.718Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "03468932-0d88-42ed-a764-c25c654a20f5":
     status: "completed"
