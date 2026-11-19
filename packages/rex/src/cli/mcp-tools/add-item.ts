@@ -226,7 +226,7 @@ export const addItemTool = defineTool({
     summary: z.string().optional().describe("Plain-language summary for a product owner or team lead who does not write code: 1-2 sentences on what the work does and why it is worth doing. No file paths or code identifiers. Shown in place of the title on the dashboard"),
     description: z.string().optional().describe("Item description (a v2 change's intent)"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("Priority"),
-    prioritized: z.boolean().optional().describe("v2 change (v1 epic) only: list it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. Does not change task selection"),
+    prioritized: z.boolean().optional().describe("v2: a change only, listed first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. v1: an epic only, and only stored; nothing orders by it. Does not change task selection"),
     acceptanceCriteria: z.array(z.string()).optional().describe("Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"),
     tags: z.array(z.string()).optional().describe("Tags"),
     source: z.string().optional().describe("Source of this item"),

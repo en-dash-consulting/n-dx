@@ -145,7 +145,7 @@ export const editItemTool = defineTool({
     description: z.string().optional().describe("New description"),
     acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),
-    prioritized: z.boolean().optional().describe("v2 change (v1 epic) only: true lists it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority; false removes the flag. Does not change task selection"),
+    prioritized: z.boolean().optional().describe("v2: a change only; true lists it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. v1: an epic only, and only stored; nothing orders by it. false removes the flag. Does not change task selection"),
     level: z.enum(["epic", "feature", "task", "subtask"]).optional().describe("New level (epic, feature, task, subtask)"),
     tags: z.array(z.string()).optional().describe("New tags"),
     source: z.string().optional().describe("New source"),

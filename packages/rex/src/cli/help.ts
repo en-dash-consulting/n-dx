@@ -262,7 +262,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },
       { flag: "--priority=<p>", description: "New priority: critical, high, medium, low" },
-      { flag: "--prioritized[=false]", description: "A change (v1 epic) only: list it first in the Inbox and Open changes; --prioritized=false removes it" },
+      { flag: "--prioritized[=false]", description: "A change only: listed first in the Inbox and Open changes. On a v1 PRD an epic takes it, but it is only stored there and orders nothing; --prioritized=false removes it" },
       { flag: "--title=\"...\"", description: "New title" },
       { flag: "--summary=\"...\"", description: "New plain-language summary (what the work does and why it is worth doing); --summary= removes it" },
       { flag: "--description=\"...\"", description: "New description" },
@@ -281,7 +281,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex update abc123 --status=completed", description: "Mark a task as done" },
       { command: "rex update abc123 --status=in_progress", description: "Start working on a task" },
       { command: "rex update abc123 --priority=critical --title=\"Urgent fix\"", description: "Update priority and title" },
-      { command: "rex update CH-12 --prioritized", description: "List a change first in the Inbox and Open changes" },
+      { command: "rex update CH-12 --prioritized", description: "List a v2 change first in the Inbox and Open changes" },
       { command: "rex update abc123 --assignee=\"Sterling H\"", description: "Assign a task so 'ndx work --mine' selects it" },
     ],
     related: ["add", "next"],

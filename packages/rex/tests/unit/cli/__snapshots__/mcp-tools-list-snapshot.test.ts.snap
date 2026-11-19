@@ -189,7 +189,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           ]
         },
         "prioritized": {
-          "description": "v2 change (v1 epic) only: list it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. Does not change task selection",
+          "description": "v2: a change only, listed first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. v1: an epic only, and only stored; nothing orders by it. Does not change task selection",
           "type": "boolean"
         },
         "acceptanceCriteria": {
@@ -487,7 +487,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           ]
         },
         "prioritized": {
-          "description": "v2 change (v1 epic) only: true lists it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority; false removes the flag. Does not change task selection",
+          "description": "v2: a change only; true lists it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. v1: an epic only, and only stored; nothing orders by it. false removes the flag. Does not change task selection",
           "type": "boolean"
         },
         "level": {
