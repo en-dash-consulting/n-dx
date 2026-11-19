@@ -546,6 +546,7 @@ describe("web → rex gateway contract", () => {
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
     "estimateCostFromTotals",
+    "extractRexTokenEvents",
     "parseFolderTree",
     "resolveSiblingSlugs",
     "resolveStore",
@@ -1025,7 +1026,7 @@ describe("gateway export auto-detection", () => {
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",
-        "estimateCostFromTotals", "validateRunSettings",
+        "estimateCostFromTotals", "extractRexTokenEvents", "validateRunSettings",
         // rex-owned project settings the Workflow page edits, validated with
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.
