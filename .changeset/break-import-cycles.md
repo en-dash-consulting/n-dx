@@ -4,7 +4,7 @@
 "@n-dx/llm-client": patch
 ---
 
-Internal: the codebase has no import cycles left, so the dashboard's Codebase health page reads 0 circular dependencies after the next `ndx analyze`.
+Internal: the codebase has no import cycles left, so the Analyze page's Circular deps card reads 0 after the next `ndx analyze`.
 
 Each cycle is broken by moving a shared type or helper to its own module, or by inverting a dependency, so no behaviour changes:
 
