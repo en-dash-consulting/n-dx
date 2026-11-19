@@ -194,6 +194,23 @@ describe("skipsDirectory — PHP", () => {
     expect(skipsDirectory(phpConfig, name, (marker) => markerMatches("page.html", marker))).toBe(true);
   });
 
+  it.each(["node_modules", "dist"])("skips a nested %s, as the TypeScript config does", (name) => {
+    expect(skipsDirectory(phpConfig, name, holdsNothing, at(`web/themes/t/${name}`))).toBe(true);
+  });
+
+  it("reuses the TypeScript skip directories and generated patterns, not copies", () => {
+    expect(phpConfig.skipDirectories).toBe(typescriptConfig.skipDirectories);
+    expect(phpConfig.generatedFilePatterns).toBe(typescriptConfig.generatedFilePatterns);
+  });
+
+  it("labels minified JS generated and leaves first-party JS source", () => {
+    const generated = (path: string) => phpConfig.generatedFilePatterns.some((p) => p.test(path));
+    expect(generated("js/jquery.min.js")).toBe(true);
+    expect(generated("js/app.bundle.js")).toBe(true);
+    expect(generated("js/app.js")).toBe(false);
+    expect(generated("src/Page.php")).toBe(false);
+  });
+
   it("merged with TypeScript, cache and tmp are kept by TypeScript source too", () => {
     const merged = mergeLanguageConfigs([typescriptConfig, phpConfig]);
     const holdsTs = (marker: string) => markerMatches("index.ts", marker);
