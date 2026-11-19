@@ -288,6 +288,14 @@ describe("v2 product reads", () => {
     });
   });
 
+  it("GET /changes and /changes/summary carry a change's prioritized flag, and only when set", async () => {
+    expect((await get("changes")).body.changes[0]).not.toHaveProperty("prioritized");
+    const indexPath = join(rexDir, "changes", "add-apple-pay", "index.md");
+    writeFileSync(indexPath, readFileSync(indexPath, "utf-8").replace('priority: "high"\n', 'priority: "high"\nprioritized: true\n'));
+    expect((await get("changes")).body.changes[0]).toMatchObject({ prioritized: true });
+    expect((await get("changes/summary")).body.summary.open[0]).toMatchObject({ prioritized: true });
+  });
+
   it("GET /changes marks a change runsAsOneTask only once it has no tasks", async () => {
     const before = (await get("changes")).body.changes[0] as ChangeRowWire;
     expect(before).not.toHaveProperty("runsAsOneTask");

@@ -509,7 +509,8 @@ describe("isolation", () => {
     // (core/stats.ts, core/analytics.ts), and the store entry, which resolves
     // a v2 tree to the change-layer store (store/index.ts), and the change
     // attachments, which live in a v2 change's folder that only the reader can
-    // locate (core/change-attachments.ts); the merge-state
+    // locate (core/change-attachments.ts), and the prioritized flag, which
+    // reads an item's change-layer type to know a change (core/prioritized.ts); the merge-state
     // driver, export / import-bundle, next and get_next_task, and prune,
     // reorganize and reshape are the exceptions named above. Every module in
     // migrations/v1-to-v2/ counts as a v2 module.
@@ -617,6 +618,7 @@ describe("isolation", () => {
         "cli/commands/reshape.ts",
         "core/change-inbox.ts",
         "core/change-attachments.ts",
+        "core/prioritized.ts",
         ...readdirSync(join(srcRoot, "migrations/v1-to-v2"))
           .filter((f) => f.endsWith(".ts"))
           .map((f) => `migrations/v1-to-v2/${f}`),

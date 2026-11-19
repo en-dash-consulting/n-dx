@@ -399,6 +399,12 @@ export interface PRDItem {
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;
+  /**
+   * Leads the Inbox and the Open changes list ahead of unflagged items, on top
+   * of `priority`. Carried by a v2 change (intent) or a v1 epic (an unknown
+   * field there); see `core/prioritized.ts`. Written only as `true`.
+   */
+  prioritized?: boolean;
   tags?: string[];
   source?: string;
   blockedBy?: string[];

@@ -1511,6 +1511,17 @@
 .task-priority-select.prd-priority-medium { color: var(--text-dim); }
 .task-priority-select.prd-priority-low { color: var(--text-dim); opacity: 0.8; }
 
+/* Prioritized flag, under the priority selector on a change */
+.task-prioritized-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-top: var(--space-2);
+  font-size: var(--font-base);
+  color: var(--text);
+  cursor: pointer;
+}
+
 /* Tag editor */
 .task-tag-editor {
   display: flex;

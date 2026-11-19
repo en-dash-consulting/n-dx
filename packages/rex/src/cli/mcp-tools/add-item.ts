@@ -16,6 +16,7 @@ import { getAllLevels } from "../../schema/index.js";
 import { validateDAG } from "../../core/dag.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { addChangeNode } from "../../core/change-add.js";
+import { prioritizedRefusal } from "../../core/prioritized.js";
 import { FileStore, resolvePRDFile } from "../../store/index.js";
 import { prdLayout } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
@@ -41,6 +42,8 @@ export interface AddItemArgs {
   summary?: string;
   description?: string;
   priority?: string;
+  /** A change (a v1 epic) only; false is the default and stores nothing. */
+  prioritized?: boolean;
   acceptanceCriteria?: string[];
   tags?: string[];
   source?: string;
@@ -122,6 +125,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
         assignee: args.assignee?.trim() || undefined,
         blockedBy: args.blockedBy,
         priority: args.priority as Priority | undefined,
+        prioritized: args.prioritized ? true : undefined,
         run,
         amends: args.amends,
         touches: args.touches,
@@ -165,6 +169,11 @@ async function addV1(
   if (args.summary?.trim()) item.summary = args.summary.trim();
   if (args.description) item.description = args.description;
   if (args.priority) item.priority = args.priority as Priority;
+  if (args.prioritized) {
+    const refusal = prioritizedRefusal(item);
+    if (refusal) return textResult(refusal, true);
+    item.prioritized = true;
+  }
   if (args.acceptanceCriteria) item.acceptanceCriteria = args.acceptanceCriteria;
   if (args.tags) item.tags = args.tags;
   if (args.source) item.source = args.source;
@@ -217,6 +226,7 @@ export const addItemTool = defineTool({
     summary: z.string().optional().describe("Plain-language summary for a product owner or team lead who does not write code: 1-2 sentences on what the work does and why it is worth doing. No file paths or code identifiers. Shown in place of the title on the dashboard"),
     description: z.string().optional().describe("Item description (a v2 change's intent)"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("Priority"),
+    prioritized: z.boolean().optional().describe("v2: a change only, listed first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. v1: an epic only, and only stored; nothing orders by it. Does not change task selection"),
     acceptanceCriteria: z.array(z.string()).optional().describe("Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"),
     tags: z.array(z.string()).optional().describe("Tags"),
     source: z.string().optional().describe("Source of this item"),

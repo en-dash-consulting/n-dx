@@ -422,6 +422,7 @@ async function readNode(
     return null;
   }
   dropNonObjectRun(fm, path, warnings);
+  dropNonBooleanPrioritized(fm, path, warnings);
   dropStateFields(fm, path, warnings);
   const body = bodyOf(text);
   const intent = NodeIntentSchema.safeParse(body ? { ...fm, body } : fm);
@@ -450,6 +451,20 @@ function dropNonObjectRun(fm: Record<string, unknown>, path: string, warnings: P
   if (run === undefined || (typeof run === "object" && run !== null && !Array.isArray(run))) return;
   delete fm.run;
   if (run !== null) warnings.push({ path, message: `Ignoring run on item id=${String(fm.id)}: expected an object` });
+}
+
+/**
+ * Remove a `prioritized` that is not a boolean before intent validation, for
+ * the reason {@link dropNonObjectRun} gives: a hand-edited `prioritized: True`
+ * (a string in YAML), `"true"`, `1` or an empty value would otherwise fail the
+ * whole change and hide it with its tasks. Each warns; none is coerced, so a
+ * typo reads as unflagged rather than as a guess.
+ */
+function dropNonBooleanPrioritized(fm: Record<string, unknown>, path: string, warnings: ParseWarning[]): void {
+  if (!Object.hasOwn(fm, "prioritized") || typeof fm.prioritized === "boolean") return;
+  const value = fm.prioritized;
+  delete fm.prioritized;
+  warnings.push({ path, message: `Ignoring prioritized on item id=${String(fm.id)}: expected true or false, got ${JSON.stringify(value)}` });
 }
 
 /**

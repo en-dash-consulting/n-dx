@@ -143,9 +143,12 @@ export function routeItems(
  * added and changed by `move_item`, never by an edit.
  */
 const PATCHABLE_FIELDS = new Set([
-  "status", "failureReason", "priority", "tags", "title",
+  "status", "failureReason", "priority", "prioritized", "tags", "title",
   "summary", "description", "acceptanceCriteria", "requirements",
 ]);
+
+/** The types that carry `prioritized`, as rex's `canBePrioritized`: a v2 change, a v1 epic. */
+const PRIORITIZABLE_TYPES: ReadonlySet<ItemType> = new Set(["change", "epic"]);
 
 const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((s) => typeof s === "string");
@@ -169,6 +172,7 @@ function validateItemPatch(body: unknown): string | null {
     && !(typeof patch.priority === "string" && isPriority(patch.priority))) {
     return `Invalid priority: ${String(patch.priority)}`;
   }
+  if (patch.prioritized !== undefined && typeof patch.prioritized !== "boolean") return `"prioritized" must be a boolean`;
   for (const key of ["title", "summary", "description", "failureReason"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
@@ -260,12 +264,18 @@ async function handleItemPatch(
     if (completing) delete fieldUpdates.status;
     // A cleared summary is removed, as `rex update --summary=` and edit_item remove it.
     if (typeof fieldUpdates.summary === "string" && !fieldUpdates.summary.trim()) fieldUpdates.summary = undefined;
+    // Stored only as true; false removes it, as `rex update --prioritized=false` does.
+    if (fieldUpdates.prioritized === false) fieldUpdates.prioritized = undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
     if (Object.keys(fieldUpdates).length > 0 || !completing) {
       try {
         await store.withTransaction(async (doc) => {
+          const target = "prioritized" in fieldUpdates ? findItemById(doc.items, itemId) : null;
+          if (target && !PRIORITIZABLE_TYPES.has(itemTypeOf(target))) {
+            throw new Error(`Only a change (an epic on a v1 PRD) can be prioritized; "${target.title}" is a ${itemTypeOf(target)}`);
+          }
           if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
             throw new ItemNotFoundError(`Item "${itemId}" not found`);
           }
@@ -812,7 +822,8 @@ async function handleBulkUpdate(
 
     // The same field rules as the single PATCH, so the bulk route cannot write
     // what that one refuses (`run`, ids, timestamps, an empty title).
-    const problem = validateItemPatch(input.updates);
+    const problem = validateItemPatch(input.updates)
+      ?? ("prioritized" in input.updates ? `"prioritized" is set per change, through PATCH /api/rex/items/:id` : null);
     if (problem) {
       errorResponse(res, 400, problem);
       return true;

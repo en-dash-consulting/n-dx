@@ -134,6 +134,20 @@ function PrioritySelector({
   );
 }
 
+/** The prioritized flag: lists the change first in the Inbox and Open changes. Unchecking sends false, which removes it. */
+function PrioritizedToggle({ on, onChange }: { on: boolean; onChange: (prioritized: boolean) => void }) {
+  return h(
+    "label",
+    { class: "task-prioritized-toggle", title: "List it first in the Inbox and Open changes, ahead of every unflagged change" },
+    h("input", {
+      type: "checkbox",
+      checked: on,
+      onChange: (e: Event) => onChange((e.target as HTMLInputElement).checked),
+    }),
+    " Prioritized",
+  );
+}
+
 /** Inline tag editor. */
 function TagEditor({
   tags,
@@ -1420,11 +1434,14 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         )
       : null,
 
-    // Priority selector
+    // Priority selector, and the prioritized flag on a change (a v1 epic)
     h(
       TaskSection,
       { label: "Priority" },
       h(PrioritySelector, { current: item.priority, onChange: handlePriorityChange }),
+      (itemType === "change" || itemType === "epic") && onUpdate
+        ? h(PrioritizedToggle, { on: item.prioritized === true, onChange: (prioritized: boolean) => onUpdate(item.id, { prioritized }) })
+        : null,
     ),
 
     // Tags editor
