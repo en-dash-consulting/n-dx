@@ -186,6 +186,9 @@ describe("placement routes on a v2 project", () => {
     expect(status).toBe(200);
     expect(body.refused).toEqual([]);
     expect(body.placed.map((p: { change: string; target: string }) => [p.change, p.target])).toEqual([[inboxId, CAPABILITY_ID], [second, CAPABILITY_ID]]);
+    expect(body.placed[1].changeTitle).toBe("Gift cards can be refunded");
+    // The fixture is not a git repository: the placement stands, and the answer says why nothing was committed.
+    expect(body.commit).toEqual({ skipped: "the project is not a git repository" });
     const index = indexTree((await loadModel(rexDir)).tree);
     for (const id of [inboxId, second]) {
       expect(index.resolve(id)).toMatchObject({ touches: [CAPABILITY_ID] });

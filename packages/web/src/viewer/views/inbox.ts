@@ -118,8 +118,10 @@ export function tickedByDefault(pick: BestGuessPick): boolean {
 }
 
 export interface PlaceBestResult {
-  placed: Array<{ change: string; target: string; title: string }>;
+  placed: Array<{ change: string; changeTitle?: string; target: string; title: string }>;
   refused: Array<{ change: string; target: string; error: string; kind?: string }>;
+  /** The server's commit of what it placed: a short sha, or why there was none. */
+  commit?: { sha: string } | { skipped: string };
 }
 
 /** `POST /api/rex/changes/place-best`: each pair as a touches, in one write. */
@@ -134,7 +136,7 @@ export async function placeBestGuesses(pairs: ReadonlyArray<{ change: string; ta
     if (!res.ok || !body.placed || !body.refused) {
       return { error: typeof body.error === "string" ? body.error : `HTTP ${res.status}` };
     }
-    return { placed: body.placed, refused: body.refused };
+    return { placed: body.placed, refused: body.refused, ...(body.commit ? { commit: body.commit } : {}) };
   } catch (err) {
     return { error: errorMessage(err) };
   }
@@ -144,7 +146,11 @@ export async function placeBestGuesses(pairs: ReadonlyArray<{ change: string; ta
 export function placeBestLine(result: PlaceBestResult | { error: string }): string {
   if ("error" in result) return `Nothing placed: ${result.error}`;
   const placed = `Placed ${result.placed.length} change${result.placed.length === 1 ? "" : "s"}`;
-  return result.refused.length ? `${placed}; ${result.refused.length} refused` : placed;
+  const refused = result.refused.length ? `; ${result.refused.length} refused` : "";
+  const commit = !result.commit ? ""
+    : "sha" in result.commit ? ` · committed ${result.commit.sha}`
+    : ` · not committed: ${result.commit.skipped}`;
+  return `${placed}${refused}${commit}`;
 }
 
 /** Set by the Plan tile's button; the Inbox page opens with the review showing. */
@@ -224,7 +230,7 @@ export function PlaceBestGuesses({ rows, applied = [], onPlaced, onOpenReview }:
             },
           }, `Place best guesses (${picks.length})`),
       result
-        ? h("span", { class: `inbox-best-result${"error" in result || result.refused.length ? " is-warning" : ""}`, role: "status" }, placeBestLine(result))
+        ? h("span", { class: `inbox-best-result${"error" in result || result.refused.length || (result.commit && "skipped" in result.commit) ? " is-warning" : ""}`, role: "status" }, placeBestLine(result))
         : null,
     ),
     result && !("error" in result) && result.refused.length

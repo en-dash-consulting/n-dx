@@ -396,6 +396,11 @@ describe("best-guess picks", () => {
     expect(placeBestLine({ placed: [{ change: "a", target: "t", title: "T" }], refused: [] })).toBe("Placed 1 change");
     expect(placeBestLine({ placed: [], refused: [{ change: "a", target: "t", error: "no" }] })).toBe("Placed 0 changes; 1 refused");
     expect(placeBestLine({ error: "HTTP 500" })).toBe("Nothing placed: HTTP 500");
+    // And whether the server committed what it placed.
+    const placed = [{ change: "a", target: "t", title: "T" }, { change: "b", target: "t", title: "T" }];
+    expect(placeBestLine({ placed, refused: [], commit: { sha: "abc1234" } })).toBe("Placed 2 changes · committed abc1234");
+    expect(placeBestLine({ placed, refused: [], commit: { skipped: "the project is not a git repository" } }))
+      .toBe("Placed 2 changes · not committed: the project is not a git repository");
   });
 });
 
