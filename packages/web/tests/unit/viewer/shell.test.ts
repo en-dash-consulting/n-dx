@@ -393,7 +393,8 @@ describe("StagePage", () => {
   });
 
   it("shows each stage's lead section in the page itself, with no dropdown", async () => {
-    for (const stage of STAGE_ORDER) {
+    // Plan has no lead: its capture is a tile.
+    for (const stage of STAGE_ORDER.filter((s) => s !== "plan")) {
       const lead = STAGES[stage].sections[0];
       expect(lead.plain, `${stage} lead is plain`).toBe(true);
       expect(STAGES[stage].sections.filter((s) => s.plain)).toHaveLength(1);
@@ -502,12 +503,14 @@ describe("StagePage", () => {
 
   const planTiles = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
 
-  it("renders Plan as the capture bar, then Inbox, Open changes, Plan health and Specs to tighten tiles", async () => {
+  it("renders Plan as tiles, capture first, with no lead section across the top", async () => {
+    stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v2" } });
     await mount(page("plan"));
-    expect(sectionViews()).toEqual(["analysis"]);
-    expect(planTiles()).toEqual(["inbox", "changes-glance", "plan-health", "spec-gaps"]);
+    expect(sectionViews()).toEqual([]);
+    expect(planTiles()).toEqual(["capture", "changes-glance", "inbox", "plan-health", "spec-gaps"]);
     const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
-    expect(spans).toEqual(["stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c4 stage-tile--r1"]);
+    expect(spans).toEqual(["stage-tile--c4 stage-tile--r1", "stage-tile--c8 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c4 stage-tile--r1"]);
+    expect(root.querySelector('.stage-tile[data-tile="capture"] .stage-tile-title')?.textContent).toBe("Describe a change");
     expect(root.querySelector('.stage-tile[data-tile="changes-glance"] .stage-tile-title')?.textContent).toBe("Open changes");
   });
 
@@ -525,7 +528,8 @@ describe("StagePage", () => {
   it("a v1 project shows Tasks and Product tiles in place of the Inbox and Open changes tiles", async () => {
     stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v1" } });
     await mount(page("plan"));
-    expect(planTiles()).toEqual(["prd", "product", "plan-health"]);
+    expect(planTiles()).toEqual(["capture", "prd", "product", "plan-health"]);
+    expect(root.querySelector('.stage-tile[data-tile="capture"] .stage-tile-title')?.textContent).toBe("Add Items");
     const tasks = root.querySelector<HTMLElement>('.stage-tile[data-tile="prd"]')!;
     expect(tasks.className).toContain("stage-tile--c8 stage-tile--r2");
     expect(tasks.querySelector(".stage-tile-title")?.textContent).toBe("Tasks");

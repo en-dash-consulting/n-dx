@@ -190,6 +190,10 @@ export const VIEW_META = {
     glyph: "✚",
     product: "rex",
     blurb: "Describe work, import a document, or turn analysis into proposals.",
+    v2: {
+      label: "Describe a change",
+      blurb: "Describe a change for the Inbox, import a document, or scan the project.",
+    },
   },
   prd: {
     label: "Tasks",

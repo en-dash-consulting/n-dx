@@ -19,7 +19,9 @@
  * A working tile (`opensPage`, Plan's Inbox) is neither: its body takes
  * clicks, and its header goes to its view's own page.
  * A chromeless tile (the codebase map) is its panel alone: the panel
- * brings its own header, controls and full-screen.
+ * brings its own header, controls and full-screen. A panel can open its own
+ * tile through `TileGridApi.openTile` (Plan capture's More); focus returns to
+ * whatever had it when the modal opened.
  *
  * Views render through `renderView` and panels through `renderPanel`, both
  * passed in by the registry — nothing is re-implemented here, and this module
@@ -321,7 +323,8 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
   const tileRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const overflowing = useOverflowing(bodyRef);
-  const fit = useFitTracks(tileRef, bodyRef, TRACKS_PER_ROW * (tile.rows ?? 1));
+  // A growing tile has no ceiling: it always spans what its content needs.
+  const fit = useFitTracks(tileRef, bodyRef, tile.grow ? Number.POSITIVE_INFINITY : TRACKS_PER_ROW * (tile.rows ?? 1));
 
   if (tile.band && tile.panel) {
     return h("section", { class: "stage-band", "data-tile": key, "aria-label": title },

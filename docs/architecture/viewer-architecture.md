@@ -29,19 +29,20 @@ The dashboard is a loop of four stages, `STAGE_ORDER = ["analyze", "plan", "work
 
 | Field | Effect |
 |-------|--------|
-| `plain` | Lead section, rendered in the page with no header and never collapsible. One per stage, first |
+| `plain` | Lead section, rendered in the page with no header and never collapsible. At most one per stage, first (Plan has none) |
 | `open` | Expanded when the page first opens; the open state is remembered after that |
 | `scroll`, `fill` | Bounded scroll region with an Expand control; full-height body for views that size themselves |
 | `featureGate` | Hidden when the toggle is off (same keys as `useFeatureToggle`) |
 | `requiresServer` | Absent from a static export |
 
-A stage may instead be a dashboard: when `STAGES[stage].tiles` is set, the page renders its plain lead section and then a grid of `StageTile`s (`views/stage-tiles.ts`) in place of the other sections. A tile names a `view` (what it shows when opened), and may set:
+A stage may instead be a dashboard: when `STAGES[stage].tiles` is set, the page renders its plain lead section, if it has one, and then a grid of `StageTile`s (`views/stage-tiles.ts`) in place of the other sections. A tile names a `view` (what it shows when opened), and may set:
 
 | Field | Effect |
 |-------|--------|
 | `cols`, `rows` | Columns of 12 (4, 6, 8, 12; default 4) and fixed-height rows (1–3; default 1) the tile spans |
 | `panel`, `title` | Render a stage panel (`renderPanel`: `map`, `health`, `next-steps`, `languages`) instead of the view, named by `title` |
 | `chromeless` | The panel brings its own header and full-screen (the codebase map), so the tile draws none |
+| `grow` | The tile spans whatever its content needs instead of clipping at `rows` (Plan's capture, whose preview opens beneath the input) |
 | `tabs` | Further views shown as tabs when the tile is opened |
 | `featureGate`, `requiresServer`, `hiddenWhenDeployed` | As for sections |
 
@@ -50,7 +51,7 @@ The grid has twelve columns and fixed-height rows; a tile spans `cols` × `rows`
 Current composition:
 
 - **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line and controls); tiles `map` (8 × 3, chromeless, `iso-map`, dropped in static exports), `health` (the stats), `next-steps` (4 × 2), then `problems`, `suggestions`, `zones`, `architecture` (tab `routes`), `files`, `languages`, `ask` (6 wide, gate `sourcevision.ask`, requires server). Owns `graph` off-page.
-- **Plan:** `analysis` (plain); `inbox` (requires server); `prd`; `product` (requires server); `changes` (requires server); `validation`. Owns `requirements` off-page: it is a tab of Product, and its route still opens that tab.
+- **Plan (tiles):** no lead section. The lifecycle band, then a `capture` tile (`analysis`, 4 wide, `grow`, requires server): one input row whose More, like the tile header, opens the tile's modal with the whole Add Items form; the row, the modal and the Add Items page share one draft, text and images (`CaptureDraftProvider`, mounted in `main.ts` above the router); a capture from one drops the others' preview. Then Open changes (8 × 2, tabs `prd`, `product`), `inbox` (4 × 2) beneath capture, Plan health and Specs to tighten. Owns `requirements` off-page: it is a tab of Product, and its route still opens that tab.
 - **Work:** `rex-dashboard` (plain); `hench-audit`; `workspaces` (requires server).
 - **Tune (tiles):** lead `tune` (the stage's question, "how should this project's workflow change?": fit the workflow to the project and the tools it has); tiles `hench-runs` (Runs, 8 × 2, tab `activity` = Execution Log), `token-usage` (titled Spend), `hench-optimization` (titled Suggestions, tab `hench-adaptive`; never "Tuning", so the page does not read Tune › Tuning) and `merge-graph` (titled Shipped). Tile titles override view labels because labels are unique.
 
@@ -135,7 +136,7 @@ Layering and barrel rules for `src/shared/` and the viewer are in `packages/web/
 | Test | Covers |
 |------|--------|
 | `packages/web/tests/e2e-ui/navigation.spec.ts` | **Required test** (see `TESTING.md`). Deep-links every view in `VIEW_META` with no console errors, and checks each redirect alias lands on its target |
-| `packages/web/tests/unit/viewer/navigation-model.test.ts` | `VIEW_META` coverage and completeness, unique labels, each view placed once, one lead section per stage, rendered surfaces (`document.title`, top nav, Home, stage pages, settings overlay, guide) using the model's labels, and the Analysis stage composition |
+| `packages/web/tests/unit/viewer/navigation-model.test.ts` | `VIEW_META` coverage and completeness, unique labels, each view placed once, at most one lead section per stage, rendered surfaces (`document.title`, top nav, Home, stage pages, settings overlay, guide) using the model's labels, and the Analysis stage composition |
 | `packages/web/tests/unit/shared/view-routing.test.ts` | Scope view lists, Live views in every scope, and alias resolution including the rex-scoped `rex-dashboard` exception |
 | `packages/web/tests/unit/viewer/navigation-a11y.test.ts` | Keyboard and screen-reader access to the navigation surfaces (`pnpm --filter @n-dx/web test:a11y`) |
 | `packages/web/tests/unit/viewer/shell.test.ts` | `stages.ts` ordering and registry coverage, `TopNav`, `StageLinks`, `StagePage` and `HomeView` |

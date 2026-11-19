@@ -129,11 +129,12 @@ describe("navigation model: placement", () => {
     expect((STAGES.tune.tiles ?? []).length).toBeGreaterThan(0);
   });
 
-  it("gives each stage exactly one lead section, first", () => {
+  it("gives each stage at most one lead section, first; only Plan, whose capture is a tile, has none", () => {
     for (const stage of STAGE_ORDER) {
       const sections = STAGES[stage].sections;
-      expect(sections.filter((s) => s.plain), stage).toHaveLength(1);
-      expect(sections[0].plain, stage).toBe(true);
+      const leads = sections.filter((s) => s.plain);
+      expect(leads.length, stage).toBe(stage === "plan" ? 0 : 1);
+      if (leads.length) expect(sections[0].plain, stage).toBe(true);
     }
   });
 });
@@ -536,14 +537,15 @@ describe("the Analysis stage is a tile dashboard", () => {
   it("marks the server-built views so static exports hide them", () => {
     // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Changes, Inbox
     // and Workspaces by `requiresServer` (Changes and Inbox read rex's v2 model
-    // per request; Product, a tab of Open changes, goes with its tile). A panel
+    // per request; Product, a tab of Open changes, goes with its tile), and
+    // Plan's capture tile (Add Items), since an export cannot add. A panel
     // that only links to its view (the lifecycle strip) is not that view's
     // placement.
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
       ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
       ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
     ]);
-    expect(serverBuilt.sort()).toEqual(["ask", "changes", "inbox", "workspaces"]);
+    expect(serverBuilt.sort()).toEqual(["analysis", "ask", "changes", "inbox", "workspaces"]);
   });
 });
 

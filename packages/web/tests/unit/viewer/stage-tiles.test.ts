@@ -5,7 +5,7 @@ import { act } from "preact/test-utils";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { TileGrid, TILE_GAP_PX, TILE_UNIT_PX, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
-import type { StageTile } from "../../../src/viewer/views/stages.js";
+import { STAGES, type StageTile } from "../../../src/viewer/views/stages.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
 const TILES: StageTile[] = [
@@ -252,6 +252,44 @@ describe("a tile with more than it shows", () => {
     } finally {
       restore();
     }
+  });
+});
+
+describe("a growing tile (Plan's capture)", () => {
+  // jsdom has no layout: give the tile 50px of chrome over a 200px body whose
+  // content is 1,000px tall, far past one configured row.
+  beforeEach(() => {
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 1; });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    vi.spyOn(window, "getComputedStyle").mockImplementation(() => ({ paddingTop: "0px", paddingBottom: "0px", marginBottom: "0px" }) as CSSStyleDeclaration);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const box = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+      if (this.classList.contains("stage-tile-body")) return box(50, 200);
+      // The body measures its children: the content wrapper around the panel.
+      if (this.classList.contains("stage-tile-content") && this.querySelector(".tall")) return box(50, 1000);
+      if (this.classList.contains("stage-tile")) return box(0, 250);
+      return box(0, 0);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const capture = STAGES.plan.tiles!.find((t) => t.panel === "capture")!;
+  const span = () => tile("capture").style.gridRow;
+
+  it("spans past its configured row to fit its content", () => {
+    mount({ stage: "plan", tiles: [capture], renderPanel: () => h("div", { class: "tall" }) });
+    // 50px chrome + 1,000px content + the tile gap, in 4px tracks.
+    expect(span()).toBe(`span ${Math.ceil((50 + 1000 + TILE_GAP_PX) / TILE_UNIT_PX)}`);
+    expect(Math.ceil((50 + 1000 + TILE_GAP_PX) / TILE_UNIT_PX)).toBeGreaterThan(TRACKS_PER_ROW * (capture.rows ?? 1));
+  });
+
+  it("would keep its configured size without the flag", () => {
+    mount({ stage: "plan", tiles: [{ ...capture, grow: undefined }], renderPanel: () => h("div", { class: "tall" }) });
+    expect(span()).toBe("");
   });
 });
 

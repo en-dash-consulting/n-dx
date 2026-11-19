@@ -116,9 +116,10 @@ afterEach(() => {
 // ── Placement on Plan ────────────────────────────────────────────────
 
 describe("the Plan tile", () => {
-  it("leads the grid, server-backed, with the Inbox badge", () => {
+  it("sits beneath the capture tile and beside Open changes, server-backed, with the Inbox badge", () => {
     // The lifecycle strip leads, above the grid; it is a band, not a view tile.
-    expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["inbox", "changes", "validation", "changes"]);
+    // Open changes is listed before the Inbox so dense packing puts the Inbox beneath capture.
+    expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["analysis", "changes", "inbox", "validation", "changes"]);
     expect(STAGES.plan.tiles!.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true });
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
@@ -137,7 +138,7 @@ describe("the Plan tile", () => {
     expect(tile.classList.contains("stage-tile--r2")).toBe(true);
     expect(tile.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
     expect(tile.querySelector(".stage-tile-blurb")?.textContent).toBe("Changes with no place on the product map yet. ndx work skips their tasks until each is placed.");
-    expect(tile.nextElementSibling?.getAttribute("data-tile")).toBe("changes-glance");
+    expect(tile.previousElementSibling?.getAttribute("data-tile")).toBe("changes-glance");
   });
 });
 
