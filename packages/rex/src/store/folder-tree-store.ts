@@ -177,8 +177,9 @@ export class FolderTreeStore implements PRDStore {
     return entry ? (entry.item as PRDItem) : null;
   }
 
-  async addItem(item: PRDItem, parentId?: string, _options?: WriteOptions): Promise<void> {
+  async addItem(item: PRDItem, parentId?: string, options?: WriteOptions): Promise<void> {
     await this.withTransaction(async (doc) => {
+      options?.assertBeforeWrite?.(doc.items);
       const stamped = await stampModified(item);
       if (parentId) {
         if (!insertChild(doc.items, parentId, stamped)) {
@@ -200,6 +201,7 @@ export class FolderTreeStore implements PRDStore {
         if (!entry) {
           throw new Error(`Item "${id}" not found`);
         }
+        options?.assertBeforeWrite?.(doc.items);
         const merged = await stampUpdatedItem(entry.item, updates, options);
         if (!updateInTree(doc.items, id, merged)) {
           throw new Error(`Item "${id}" not found`);

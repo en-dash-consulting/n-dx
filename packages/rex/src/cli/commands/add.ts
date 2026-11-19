@@ -178,8 +178,6 @@ export async function cmdAdd(
     }
   }
 
-  if (item.shortTitle) assertShortTitleAvailable((await store.loadDocument()).items, item.shortTitle, item);
-
   // Validate dependencies before persisting
   if (item.blockedBy && item.blockedBy.length > 0) {
     const doc = await store.loadDocument();
@@ -194,7 +192,12 @@ export async function cmdAdd(
     }
   }
 
-  await store.addItem(item, parentId, { applyAttribution: true, projectDir: dir });
+  await store.addItem(item, parentId, {
+    applyAttribution: true,
+    projectDir: dir,
+    // Checked under the lock the write holds, so two writers cannot both take a name.
+    assertBeforeWrite: item.shortTitle ? (items) => assertShortTitleAvailable(items, item.shortTitle, item) : undefined,
+  });
 
   // Reset completed ancestors when adding under a completed parent
   const { resetItems } = await cascadeParentReset(store, parentId, {

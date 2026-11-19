@@ -760,6 +760,7 @@ export class FileStore implements PRDStore {
       }
       const attributedItem = this.applyWriteAttribution(stamped, owner, options);
       await this.withFileTransaction(owner, async (doc) => {
+        options?.assertBeforeWrite?.(doc.items);
         if (!insertChild(doc.items, parentId, attributedItem)) {
           throw new Error(`Parent "${parentId}" not found`);
         }
@@ -771,6 +772,7 @@ export class FileStore implements PRDStore {
 
     const attributedItem = this.applyWriteAttribution(stamped, this.currentBranchFile, options);
     await this.withFileTransaction(this.currentBranchFile, async (doc) => {
+      options?.assertBeforeWrite?.(doc.items);
       doc.items.push(attributedItem);
     });
     this.itemToFile.set(attributedItem.id, this.currentBranchFile);
@@ -785,6 +787,7 @@ export class FileStore implements PRDStore {
       // applies an `Object.assign` onto the existing item. Resolved inside the
       // transaction because `preserveModifiedBy` needs the item's current
       // author (see WriteOptions).
+      options?.assertBeforeWrite?.(doc.items);
       const existing = findItem(doc.items, id);
       const stampedUpdates = await stampUpdatedFields(existing?.item, attributedUpdates, options);
       if (!updateInTree(doc.items, id, stampedUpdates)) {

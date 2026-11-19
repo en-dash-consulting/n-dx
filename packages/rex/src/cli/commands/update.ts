@@ -230,10 +230,14 @@ export async function cmdUpdate(
     );
   }
 
-  // Before any write, completion included: a refused short title writes nothing.
-  if (updates.shortTitle) {
-    assertShortTitleAvailable((await store.loadDocument()).items, updates.shortTitle, { id: resolvedId, status: updates.status ?? existing.status });
-  }
+  // Before any write, completion included, so a refused short title writes
+  // nothing; checked again under the lock the field write holds, so two
+  // writers cannot both take a name.
+  const shortTitleSelf = { id: resolvedId, status: updates.status ?? existing.status };
+  if (updates.shortTitle) assertShortTitleAvailable((await store.loadDocument()).items, updates.shortTitle, shortTitleSelf);
+  const assertBeforeWrite = updates.shortTitle
+    ? (items: readonly PRDItem[]) => assertShortTitleAvailable(items, updates.shortTitle, shortTitleSelf)
+    : undefined;
 
   // Validate dependencies before persisting
   if (updates.blockedBy && updates.blockedBy.length > 0) {
@@ -269,7 +273,7 @@ export async function cmdUpdate(
     for (const key of V2_COMPLETION_FIELDS) delete fieldUpdates[key];
   }
   if (Object.keys(fieldUpdates).length > 0) {
-    await store.updateItem(resolvedId, fieldUpdates, { applyAttribution: true, projectDir: dir });
+    await store.updateItem(resolvedId, fieldUpdates, { applyAttribution: true, projectDir: dir, assertBeforeWrite });
   }
 
   // Log the update

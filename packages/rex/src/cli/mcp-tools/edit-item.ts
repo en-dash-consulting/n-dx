@@ -46,10 +46,7 @@ export async function handleEditItem(
     const VALID_LEVELS = ["epic", "feature", "task", "subtask"];
     const updates: Partial<PRDItem> = {};
     if (args.title !== undefined) updates.title = args.title;
-    if (args.shortTitle !== undefined) {
-      updates.shortTitle = args.shortTitle.trim() || undefined;
-      assertShortTitleAvailable((await store.loadDocument()).items, updates.shortTitle, existing);
-    }
+    if (args.shortTitle !== undefined) updates.shortTitle = args.shortTitle.trim() || undefined;
     // Empty clears it, as assignee does.
     if (args.summary !== undefined) updates.summary = args.summary.trim() || undefined;
     if (args.description !== undefined) updates.description = args.description;
@@ -111,7 +108,11 @@ export async function handleEditItem(
       );
     }
 
-    await store.updateItem(args.id, updates, { applyAttribution: true, projectDir });
+    // Checked under the lock the write holds, so two writers cannot both take a name.
+    const assertBeforeWrite = updates.shortTitle
+      ? (items: readonly PRDItem[]) => assertShortTitleAvailable(items, updates.shortTitle, findItem(items as PRDItem[], args.id)?.item ?? existing)
+      : undefined;
+    await store.updateItem(args.id, updates, { applyAttribution: true, projectDir, assertBeforeWrite });
 
     const changedFields = Object.keys(updates);
     await store.appendLog({

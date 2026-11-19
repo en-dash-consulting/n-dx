@@ -130,6 +130,17 @@ describe("shortTitle on a v2 tree", () => {
     await expect(cmdAddChange(tmp, "task", { title: "Another", parent: FIXTURE_CHANGE, "short-title": "styling" })).rejects.toThrow(/Style the button/);
   });
 
+  it("two concurrent writes of one name on different open items: exactly one succeeds", async () => {
+    const results = await Promise.allSettled([
+      edit({ id: FIXTURE_CHANGE, shortTitle: "Wallets" }),
+      cmdUpdate(tmp, FIXTURE_TASK, { "short-title": "Wallets", quiet: "true" }).then(() => ({ isError: false })),
+    ]);
+    const ok = results.filter((r) => r.status === "fulfilled" && !(r.value as { isError?: boolean }).isError);
+    expect(ok).toHaveLength(1);
+    const named = [await nodeById(FIXTURE_CHANGE), await nodeById(FIXTURE_TASK)].filter((n) => n?.shortTitle === "Wallets");
+    expect(named).toHaveLength(1);
+  });
+
   it("survives the v1 projection both ways", async () => {
     const model = await loadPrdModel(rexDir, quiet);
     const tree = structuredClone(model.tree);
@@ -193,6 +204,26 @@ describe("shortTitle on a v1 folder tree", () => {
     const cleared = await handleEditItem(store, tmp, { id: "task-a", shortTitle: "" });
     expect(cleared.isError).toBeFalsy();
     expect(find("task-a")).not.toHaveProperty("shortTitle");
+  });
+
+  it("two concurrent edit_item writes of one name on different open items: exactly one succeeds", async () => {
+    const store = await resolveStore(resolveRexPaths(tmp).rexDir);
+    const results = await Promise.all([
+      handleEditItem(store, tmp, { id: "task-a", shortTitle: "Credit" }),
+      handleEditItem(store, tmp, { id: "task-b", shortTitle: "credit" }),
+    ]);
+    expect(results.filter((r) => !r.isError)).toHaveLength(1);
+    expect([find("task-a")?.shortTitle, find("task-b")?.shortTitle].filter(Boolean)).toHaveLength(1);
+  });
+
+  it("two concurrent add_item writes of one name: exactly one succeeds", async () => {
+    const { rexDir } = resolveRexPaths(tmp);
+    const store = await resolveStore(rexDir);
+    const results = await Promise.all([
+      handleAddItem(store, tmp, rexDir, { title: "One", level: "task", parentId: "feature-1", shortTitle: "Twin" }),
+      handleAddItem(store, tmp, rexDir, { title: "Two", level: "task", parentId: "feature-1", shortTitle: "Twin" }),
+    ]);
+    expect(results.filter((r) => !r.isError)).toHaveLength(1);
   });
 
   it("add_item stores it and refuses an open item's name", async () => {

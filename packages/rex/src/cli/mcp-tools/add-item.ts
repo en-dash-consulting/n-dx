@@ -177,8 +177,6 @@ async function addV1(
   if (args.blockedBy) item.blockedBy = args.blockedBy;
   if (run) item.run = run;
 
-  if (item.shortTitle) assertShortTitleAvailable((await store.loadDocument()).items, item.shortTitle);
-
   // Validate dependencies before persisting
   if (item.blockedBy && item.blockedBy.length > 0) {
     const doc = await store.loadDocument();
@@ -192,7 +190,12 @@ async function addV1(
     }
   }
 
-  await store.addItem(item, args.parentId, { applyAttribution: true, projectDir });
+  await store.addItem(item, args.parentId, {
+    applyAttribution: true,
+    projectDir,
+    // Checked under the lock the write holds, so two writers cannot both take a name.
+    assertBeforeWrite: item.shortTitle ? (items) => assertShortTitleAvailable(items, item.shortTitle, item) : undefined,
+  });
 
   // Reset completed ancestors when adding under a completed parent
   const { resetItems } = await cascadeParentReset(store, args.parentId, {
