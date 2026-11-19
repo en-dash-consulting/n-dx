@@ -25,9 +25,13 @@ export interface AssigneeFilterOption {
   label: string;
 }
 
-/** A row the filter judges: its assignee, and whether it is still open work. */
+/**
+ * A row the filter judges: everyone it is assigned to (a change's own assignee
+ * and its open tasks', each of which `ndx work --mine` selects by), and
+ * whether it is still open work.
+ */
 export interface AssignableRow {
-  assignee?: string;
+  assignees: readonly string[];
   open: boolean;
 }
 
@@ -52,16 +56,17 @@ export function mineButNotForCli(assignee: string | undefined, me: string | null
   return isMine(assignee, me) && assignee!.trim() !== me!.trim();
 }
 
-/** Mine when the current user has an open item assigned, otherwise All. */
+/** Mine when the current user is assigned an open row (or an open task in one), otherwise All. */
 export function defaultAssigneeFilter(rows: readonly AssignableRow[], me: string | null): AssigneeFilterValue {
-  return rows.some((r) => r.open && isMine(r.assignee, me)) ? "mine" : "all";
+  return rows.some((r) => r.open && r.assignees.some((a) => isMine(a, me))) ? "mine" : "all";
 }
 
-/** Whether a row with `assignee` shows under `filter`. All shows every row. */
-export function matchesAssigneeFilter(assignee: string | undefined, filter: AssigneeFilterValue, me: string | null): boolean {
+/** Whether a row assigned to `assignees` shows under `filter`: any one of them matching is enough. All shows every row. */
+export function matchesAssigneeFilter(assignees: readonly string[], filter: AssigneeFilterValue, me: string | null): boolean {
   if (filter === "all") return true;
-  if (filter === "mine") return isMine(assignee, me);
-  return !!assignee && identityKey(assignee) === filter.slice("person:".length);
+  if (filter === "mine") return assignees.some((a) => isMine(a, me));
+  const key = filter.slice("person:".length);
+  return assignees.some((a) => !!a.trim() && identityKey(a) === key);
 }
 
 /**
@@ -76,10 +81,12 @@ export function assigneeFilterOptions(
 ): AssigneeFilterOption[] {
   const names = new Map(known.filter((p) => p.name).map((p) => [identityKey(p.id), p.name!]));
   const people = new Map<string, string>();
-  for (const { assignee } of rows) {
-    if (!assignee?.trim()) continue;
-    const key = identityKey(assignee);
-    if (!people.has(key)) people.set(key, names.get(key) ?? personLabel(assignee));
+  for (const { assignees } of rows) {
+    for (const assignee of assignees) {
+      if (!assignee.trim()) continue;
+      const key = identityKey(assignee);
+      if (!people.has(key)) people.set(key, names.get(key) ?? personLabel(assignee));
+    }
   }
   const persons = [...people.entries()]
     .sort(([, a], [, b]) => a.localeCompare(b))

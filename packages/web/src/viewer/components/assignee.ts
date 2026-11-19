@@ -188,8 +188,8 @@ export interface AssigneeFilterState {
   value: AssigneeFilterValue;
   options: AssigneeFilterOption[];
   pick: (value: AssigneeFilterValue) => void;
-  /** Whether a row with this assignee shows under the current value. */
-  shows: (assignee: string | undefined) => boolean;
+  /** Whether a row assigned to these people shows under the current value. */
+  shows: (assignees: readonly string[]) => boolean;
 }
 
 /**
@@ -206,7 +206,7 @@ export function useAssigneeFilter(rows: readonly AssignableRow[], read: PeopleRe
     value,
     options,
     pick: setPicked,
-    shows: (assignee) => matchesAssigneeFilter(assignee, value, me),
+    shows: (assignees) => matchesAssigneeFilter(assignees, value, me),
   };
 }
 

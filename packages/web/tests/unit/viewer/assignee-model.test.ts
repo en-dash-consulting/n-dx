@@ -25,33 +25,40 @@ const BO: KnownPerson = { id: "Bo Chen <bo@shop.io>", name: "Bo Chen", email: "b
 
 describe("defaultAssigneeFilter", () => {
   it("is Mine when the current user has an open item assigned, in any spelling", () => {
-    expect(defaultAssigneeFilter([{ assignee: "ANN@shop.io", open: true }, { open: true }], ME)).toBe("mine");
+    expect(defaultAssigneeFilter([{ assignees: ["ANN@shop.io"], open: true }, { assignees: [], open: true }], ME)).toBe("mine");
+  });
+
+  it("is Mine when the current user is assigned only an open task in a row", () => {
+    // The change is Bo's; a task in it is Ann's, and `ndx work --mine` would run that task.
+    expect(defaultAssigneeFilter([{ assignees: [BO.id, ME], open: true }], ME)).toBe("mine");
   });
 
   it("is All when the user's only items are closed", () => {
-    expect(defaultAssigneeFilter([{ assignee: ME, open: false }, { assignee: BO.id, open: true }], ME)).toBe("all");
+    expect(defaultAssigneeFilter([{ assignees: [ME], open: false }, { assignees: [BO.id], open: true }], ME)).toBe("all");
   });
 
   it("is All when nothing is assigned to the user, or the user is unknown", () => {
-    expect(defaultAssigneeFilter([{ assignee: BO.id, open: true }], ME)).toBe("all");
-    expect(defaultAssigneeFilter([{ assignee: ME, open: true }], null)).toBe("all");
+    expect(defaultAssigneeFilter([{ assignees: [BO.id], open: true }], ME)).toBe("all");
+    expect(defaultAssigneeFilter([{ assignees: [ME], open: true }], null)).toBe("all");
   });
 });
 
 describe("matchesAssigneeFilter", () => {
   it("All matches every row, assigned or not", () => {
-    for (const assignee of [undefined, ME, BO.id]) expect(matchesAssigneeFilter(assignee, "all", ME)).toBe(true);
+    for (const assignees of [[], [ME], [BO.id]]) expect(matchesAssigneeFilter(assignees, "all", ME)).toBe(true);
   });
 
-  it("Mine matches the current user by email", () => {
-    expect(matchesAssigneeFilter("ann@shop.io", "mine", ME)).toBe(true);
-    expect(matchesAssigneeFilter(BO.id, "mine", ME)).toBe(false);
-    expect(matchesAssigneeFilter(undefined, "mine", ME)).toBe(false);
+  it("Mine matches the current user by email, on the change or any of its tasks", () => {
+    expect(matchesAssigneeFilter(["ann@shop.io"], "mine", ME)).toBe(true);
+    expect(matchesAssigneeFilter([BO.id, "ann@shop.io"], "mine", ME)).toBe(true);
+    expect(matchesAssigneeFilter([BO.id], "mine", ME)).toBe(false);
+    expect(matchesAssigneeFilter([], "mine", ME)).toBe(false);
   });
 
-  it("a person option matches that person by email", () => {
-    expect(matchesAssigneeFilter("bo@shop.io", "person:bo@shop.io", ME)).toBe(true);
-    expect(matchesAssigneeFilter(ME, "person:bo@shop.io", ME)).toBe(false);
+  it("a person option matches that person by email, on the change or any of its tasks", () => {
+    expect(matchesAssigneeFilter(["bo@shop.io"], "person:bo@shop.io", ME)).toBe(true);
+    expect(matchesAssigneeFilter([ME, BO.id], "person:bo@shop.io", ME)).toBe(true);
+    expect(matchesAssigneeFilter([ME], "person:bo@shop.io", ME)).toBe(false);
   });
 
   it("isMine is false without both sides", () => {
@@ -63,10 +70,11 @@ describe("matchesAssigneeFilter", () => {
 describe("assigneeFilterOptions", () => {
   it("offers Mine, All, then each assigned person once, by name", () => {
     const options = assigneeFilterOptions([
-      { assignee: BO.id, open: true },
-      { assignee: "bo@shop.io", open: false },
-      { assignee: ME, open: true },
-      { open: true },
+      { assignees: [BO.id], open: true },
+      { assignees: ["bo@shop.io"], open: false },
+      // Ann is assigned only a task here; she is still an option.
+      { assignees: [BO.id, ME], open: true },
+      { assignees: [], open: true },
     ], ME);
     expect(options).toEqual([
       { value: "mine", label: "Mine" },
@@ -77,7 +85,7 @@ describe("assigneeFilterOptions", () => {
   });
 
   it("labels an assignee saved by email with the name the repository knows", () => {
-    const options = assigneeFilterOptions([{ assignee: "bo@shop.io", open: true }], null, [ANN, BO]);
+    const options = assigneeFilterOptions([{ assignees: ["bo@shop.io"], open: true }], null, [ANN, BO]);
     expect(options).toContainEqual({ value: "person:bo@shop.io", label: "Bo Chen" });
   });
 
@@ -86,7 +94,7 @@ describe("assigneeFilterOptions", () => {
   });
 
   it("falls back to All for a pick that is no longer an option", () => {
-    const options = assigneeFilterOptions([{ assignee: ME, open: true }], ME);
+    const options = assigneeFilterOptions([{ assignees: [ME], open: true }], ME);
     expect(knownFilter("person:bo@shop.io", options)).toBe("all");
     expect(knownFilter("mine", options)).toBe("mine");
   });

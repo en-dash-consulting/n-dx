@@ -178,8 +178,10 @@ removing it. `GET /api/rex/people` answers `{ me, people }`: `me` is rex's
 exact string `ndx work --mine` compares; a row assigned to your email under
 another spelling is marked "not matched by ndx work --mine". The Inbox, its own page and the Changes page share an
 "Assigned to" filter — Mine, All or one person, matched by email — that opens on
-Mine when the current user has open work assigned there and on All otherwise. It
-hides rows only.
+Mine when the current user has open work assigned there and on All otherwise. A
+change matches when it or any of its open tasks is assigned to the person (change
+rows carry `taskAssignees`, the open tasks' and subtasks' assignees), as
+`ndx work --mine` selects a task by its own assignee. It hides rows only.
 
 ## Tune tiles: Outcomes by tier and Your tooling
 

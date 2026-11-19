@@ -105,6 +105,14 @@ export function isAppliedStage(stage: ChangeStage): boolean {
 /** Heading for changes with no `plannedRelease`. */
 export const UNSCHEDULED_RELEASE_LABEL = "Unscheduled";
 
+/**
+ * Everyone a change row is assigned to: the change's own assignee, then its
+ * open tasks' — the identities `ndx work --mine` could select the work by.
+ */
+export function changeAssignees(change: { assignee?: string; taskAssignees?: string[] }): string[] {
+  return [...(change.assignee ? [change.assignee] : []), ...(change.taskAssignees ?? [])];
+}
+
 /** A change's id as change lists show it: its display id, else the first eight characters of its id. */
 export function shortChangeId(change: { id: string; displayId?: string }): string {
   return change.displayId ?? change.id.slice(0, 8);
@@ -214,6 +222,8 @@ export interface ChangeRow {
   loe?: number;
   spike?: boolean;
   assignee?: string;
+  /** Distinct assignees of the change's open tasks and subtasks; `ndx work --mine` selects by them too. */
+  taskAssignees?: string[];
   plannedRelease?: string;
   shippedIn?: string;
   /** When the change was applied; set on applied history. */

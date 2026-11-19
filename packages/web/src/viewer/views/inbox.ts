@@ -41,7 +41,7 @@ import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
-import { shortChangeId } from "./product-model.js";
+import { changeAssignees, shortChangeId } from "./product-model.js";
 import { errorMessage } from "../utils/format.js";
 
 /** Rows the Plan section shows before linking to the full page. */
@@ -411,9 +411,9 @@ export interface InboxViewProps {
   onAssigned?: () => void;
 }
 
-/** The filter's view of Inbox rows: every one is open work. */
+/** The filter's view of Inbox rows: every one is open work, assigned by the change or its open tasks. */
 export function assignableInboxRows(rows: readonly InboxRow[]): AssignableRow[] {
-  return rows.map((r) => ({ assignee: r.change.assignee, open: true }));
+  return rows.map((r) => ({ assignees: changeAssignees(r.change), open: true }));
 }
 
 export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced, onAssigned }: InboxViewProps) {
@@ -427,7 +427,7 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
   );
   const sorted = sortInbox(rows);
   // The filter hides rows only; All shows every one.
-  const visible = sorted.filter((row) => filter.shows(row.change.assignee));
+  const visible = sorted.filter((row) => filter.shows(changeAssignees(row.change)));
   const shown = limit === undefined ? visible : visible.slice(0, limit);
   const hidden = visible.length - shown.length;
 

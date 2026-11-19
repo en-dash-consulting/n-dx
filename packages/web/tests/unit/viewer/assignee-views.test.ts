@@ -182,6 +182,19 @@ describe("the backlog (Changes view)", () => {
     expect(ids()).toEqual(["open-mine", "open-none", "open-other"]);
   });
 
+  it("counts a change as Mine when only one of its open tasks is assigned to the user", async () => {
+    serve({ me: ME, people: PEOPLE });
+    await mount(h(ChangesView, { changes: [
+      change("task-mine", { stage: "in-progress", awaitsPlacement: false, inbox: false, taskAssignees: [ME] }),
+      ...backlog.slice(1),
+    ] }));
+    // The default follows the task: Mine, showing the change that holds it.
+    expect(filterSelect().value).toBe("mine");
+    expect(ids()).toEqual(["task-mine"]);
+    // The change itself stays unassigned.
+    expect(root.querySelector('.ch-change[data-change-id="task-mine"] .assignee-button')?.textContent).toBe("Assign");
+  });
+
   it("defaults to All when the user's only assigned change is applied", async () => {
     serve({ me: ME, people: PEOPLE });
     await mount(h(ChangesView, { changes: [

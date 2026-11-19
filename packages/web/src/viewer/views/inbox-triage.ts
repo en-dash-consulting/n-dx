@@ -31,7 +31,7 @@ import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
 import { AppliedHistory, PlaceBestGuesses, assignableInboxRows, bestGuess, takeInboxSelection, useInbox, type InboxRow } from "./inbox.js";
 import { Pending, StaleNotice } from "./product-pages.js";
-import { shortChangeId } from "./product-model.js";
+import { changeAssignees, shortChangeId } from "./product-model.js";
 
 // ── Shortcuts ────────────────────────────────────────────────────────
 
@@ -199,7 +199,7 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
     [peopleRead, allRows],
   );
   // The queue is the filtered Inbox: J/K, Skip and the first pick follow it.
-  const rows = useMemo(() => allRows.filter((r) => filter.shows(r.change.assignee)), [allRows, filter.value, peopleRead]);
+  const rows = useMemo(() => allRows.filter((r) => filter.shows(changeAssignees(r.change))), [allRows, filter.value, peopleRead]);
   // A row's Place on the Plan tile asked for this change.
   const [selected, setSelected] = useState<string | null>(() => takeInboxSelection());
   const [placed, setPlaced] = useState<ReadonlySet<string>>(new Set());

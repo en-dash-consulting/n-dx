@@ -26,6 +26,7 @@ import {
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
+  changeAssignees,
   groupChangesByRelease,
   isAppliedStage,
   type ChangeRow,
@@ -342,7 +343,7 @@ function AreaChip({ title, count, onRemove }: { title: string; count: number; on
 
 /** The assignee filter's view of the backlog: open unless applied or shipped. */
 export function assignableChanges(changes: readonly ChangeRow[]): AssignableRow[] {
-  return changes.map((c) => ({ assignee: c.assignee, open: !isAppliedStage(c.stage) }));
+  return changes.map((c) => ({ assignees: changeAssignees(c), open: !isAppliedStage(c.stage) }));
 }
 
 export function ChangesView({ changes: allChanges, onSelectChange, area = null, onClearArea, navigateTo, onAssigned }: {
@@ -368,7 +369,7 @@ export function ChangesView({ changes: allChanges, onSelectChange, area = null, 
     onAssign: async (id, assignee) => { await saveAssignee(id, assignee); onAssigned?.(); },
   };
   // The assignee filter hides rows only: every count and group below is of what it shows.
-  const changes = allChanges.filter((c) => assigneeFilter.shows(c.assignee));
+  const changes = allChanges.filter((c) => assigneeFilter.shows(changeAssignees(c)));
   const groups = groupChangesByRelease(changes);
   const appliedTotal = groups.reduce((n, g) => n + g.appliedCount, 0);
   const openTotal = changes.length - appliedTotal;
