@@ -12,6 +12,7 @@
  * @module rex/analyze/llm-bridge
  */
 
+import { randomUUID } from "node:crypto";
 import type {
   ClaudeConfig,
   ClaudeClient,
@@ -56,6 +57,8 @@ let _llmClient: ClaudeClient | undefined;
  * directory.
  */
 let _projectDir: string | undefined;
+let _usageCommand: string | undefined;
+let _usageScope: string | undefined;
 
 function resolveVendor(): LLMVendor {
   return _llmConfig?.vendor ?? DEFAULT_LLM_VENDOR;
@@ -130,9 +133,16 @@ export function setClaudeClient(client: ClaudeClient): void {
  * being analyzed — not `process.cwd()`. Resets the cached client so the
  * next call spawns in the new directory.
  */
-export function setProjectDir(dir: string): void {
+export function setProjectDir(dir: string, command?: string): void {
   _projectDir = dir;
+  _usageCommand = command;
+  _usageScope = randomUUID();
   _llmClient = undefined;
+}
+
+/** Identifies the command-owned aggregate for this invocation's diagnostics. */
+export function getUsageScope(): string | undefined {
+  return _usageScope;
 }
 
 /**
@@ -223,14 +233,18 @@ export async function spawnClaude(
     : getClient();
 
   const resolution = resolveRoute(model, route);
+  const projectDir = _projectDir;
+  const command = _usageCommand;
+  const usageScope = _usageScope;
+  const vendor = resolveVendor();
   try {
     const result = await client.complete({ prompt, ...resolution });
-    if (_projectDir && result.usageStatus && (result.usageStatus !== "measured"
+    if (projectDir && result.usageStatus && (result.usageStatus !== "measured"
       || (result.tokenUsage?.input === 0 && result.tokenUsage.output === 0 && !result.tokenUsage.cacheReadInput))) {
       // Diagnostic only: the command still owns successful token totals.
-      await recordUsageEntry(_projectDir, {
+      await recordUsageEntry(projectDir, {
         timestamp: new Date().toISOString(), event: "llm_usage_diagnostic",
-        detail: JSON.stringify({ usageStatus: result.usageStatus, vendor: resolveVendor(), model: resolution.model }),
+        detail: JSON.stringify({ usageStatus: result.usageStatus, command, usageScope, vendor, model: resolution.model }),
       });
     }
     return result;
@@ -239,12 +253,12 @@ export async function spawnClaude(
     // that aggregation; record their measured spend here exactly once.
     const failure: (Error & Pick<CompletionResult, "tokenUsage" | "usageStatus">) | undefined =
       error instanceof Error ? error : undefined;
-    if (_projectDir && failure?.usageStatus) {
-      await recordUsageEntry(_projectDir, {
+    if (projectDir && failure?.usageStatus) {
+      await recordUsageEntry(projectDir, {
         timestamp: new Date().toISOString(), event: "analyze_token_usage",
         detail: JSON.stringify({
-          calls: 1, outcome: "failed", usageStatus: failure.usageStatus,
-          vendor: resolveVendor(), model: resolution.model,
+          calls: 1, outcome: "failed", usageStatus: failure.usageStatus, command,
+          vendor, model: resolution.model,
           inputTokens: failure.tokenUsage?.input ?? 0,
           outputTokens: failure.tokenUsage?.output ?? 0,
           cacheReadInputTokens: failure.tokenUsage?.cacheReadInput ?? 0,
