@@ -15,6 +15,8 @@
  * @module lang-kit/pack-contract
  */
 
+import { trimChar, trimLeading } from "./text-trim.js";
+
 // ── Positions ───────────────────────────────────────────────────────────────
 
 /** A position in a file. */
@@ -392,9 +394,9 @@ const FLAG_PREFIXES = ["features_", "feature_", "ff_"] as const;
  * that is only a prefix keeps it (`feature` stays `feature`).
  */
 export function normalizeFlagName(name: string): string {
-  const unified = name.toLowerCase().replace(/[\s./:\-_]+/g, "_").replace(/^_+|_+$/g, "");
+  const unified = trimChar(name.toLowerCase().replace(/[\s./:\-_]+/g, "_"), "_");
   const prefix = FLAG_PREFIXES.find((p) => unified.startsWith(p) && unified.length > p.length);
-  return prefix === undefined ? unified : unified.slice(prefix.length).replace(/^_+/, "");
+  return prefix === undefined ? unified : trimLeading(unified.slice(prefix.length), "_");
 }
 
 // ── Resources (produced) ────────────────────────────────────────────────────

@@ -5,7 +5,14 @@ items:
     lastModified: "2026-11-19T03:42:10.838Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6867a04d-1768-4a5c-b71b-bbb13d2dd183":
-    lastModified: "2026-11-19T03:42:08.247Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:42:48.560Z"
+    completedAt: "2026-11-19T03:44:27.894Z"
+    endedAt: "2026-11-19T03:44:27.894Z"
+    activeIntervals: [{"end":"2026-11-19T03:44:27.894Z","start":"2026-11-19T03:42:48.560Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ported 87292366a's normalizeFlagName linear trim, its test block, changeset and docs bullet; identical to restack/pr11."
+    lastModified: "2026-11-19T03:44:27.894Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b6a4afb3-252c-4e5f-a6d1-c30c4cb85fc5":
     lastModified: "2026-11-19T03:42:10.838Z"

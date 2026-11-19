@@ -147,6 +147,13 @@ paths. `bundle` never follows a symbolic link in the installed prefix; it
 leaves each one out and names it. Reading refuses links, bad checksums, truncation and any path that is
 absolute or contains `..`.
 
+### PHP pack rules
+
+Detail for `@n-dx/lang-php`'s framework rules; `packages/lang-php/AGENTS.md`
+keeps the summary.
+
+- **Linear scans**: repository text (`.htaccess` words and `include_path`, ini `include_path`, DSN `key=value` pairs, `PHP_SAPI` comparisons) is read by index scans, never by a regex that can backtrack, and trailing-character trims use lang-kit's `trimTrailing`. A `.htaccess`, `php.ini` or `.user.ini` line longer than 64 KiB (`MAX_CONFIG_LINE_LENGTH`, `src/php-line-cap.ts`) is skipped and counted in a notice. Pathological-input tests: `tests/unit/php-linear-scans.test.ts`.
+
 ## Output Files
 
 All output is written to `.sourcevision/`:
