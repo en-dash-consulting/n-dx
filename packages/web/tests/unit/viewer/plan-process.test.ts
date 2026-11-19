@@ -2,10 +2,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { PlanProcess, PROCESS_STEPS, processFocus } from "../../../src/viewer/views/plan-process.js";
 import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
-import { STAGES, tilesForLayout } from "../../../src/viewer/views/stages.js";
+import { STAGES, tilesForLayout, type StageTile } from "../../../src/viewer/views/stages.js";
+import { TileGrid } from "../../../src/viewer/views/stage-tiles.js";
 import type { ChangeSummary } from "../../../src/viewer/views/product-model.js";
 
 const EMPTY: ChangeSummary = {
@@ -226,6 +229,58 @@ describe("PlanProcess", () => {
     await mount(EMPTY);
     click("capture");
     expect(navigateTo).toHaveBeenCalledWith("analysis");
+  });
+});
+
+describe("the process band while the summary is not there", () => {
+  // The one rule, from the stylesheet itself: jsdom computes it, where the
+  // whole sheet's modern syntax would not parse.
+  const css = readFileSync(resolve(__dirname, "../../../src/viewer/styles/stage-tiles.css"), "utf8");
+  const emptyRule = css.match(/\.stage-band:empty\s*\{[^}]*\}/)?.[0];
+  let style: HTMLStyleElement;
+
+  beforeEach(() => {
+    style = document.createElement("style");
+    style.textContent = emptyRule ?? "";
+    document.head.appendChild(style);
+  });
+  afterEach(() => style.remove());
+
+  async function mountBand(fetchImpl: () => Promise<unknown>) {
+    vi.stubGlobal("fetch", vi.fn(fetchImpl));
+    const tile: StageTile = { view: "changes", panel: "process", title: "How planning works", band: true };
+    await act(async () => {
+      render(h(ChangesSummaryProvider, null, h(TileGrid, {
+        stage: "plan",
+        tiles: [tile],
+        tabsOf: (t) => [{ view: t.view }],
+        renderView: () => null,
+        renderPanel: () => h(PlanProcess, { navigateTo }),
+        renderSummary: () => null,
+      })), root);
+    });
+    await act(async () => {});
+    return root.querySelector<HTMLElement>(".stage-band[data-tile='process']")!;
+  }
+
+  it("hides the band, border and label included, while the summary loads", async () => {
+    expect(emptyRule).toBeDefined();
+    const band = await mountBand(() => new Promise(() => {}));
+    expect(band.childNodes).toHaveLength(0);
+    expect(band.matches(":empty")).toBe(true);
+    expect(getComputedStyle(band).display).toBe("none");
+  });
+
+  it("hides the band after the summary read fails", async () => {
+    const band = await mountBand(async () => ({ ok: false, status: 500, json: async () => ({ error: "boom" }) }));
+    expect(band.childNodes).toHaveLength(0);
+    expect(getComputedStyle(band).display).toBe("none");
+  });
+
+  it("shows the band once the summary is in", async () => {
+    const band = await mountBand(async () => ({ ok: true, json: async () => ({ layout: "v2", summary: EMPTY }) }));
+    expect(band.querySelector(".plan-process")).not.toBeNull();
+    expect(getComputedStyle(band).display).not.toBe("none");
   });
 });
 

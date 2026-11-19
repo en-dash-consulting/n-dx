@@ -1183,6 +1183,10 @@
   background: var(--bg-surface);
 }
 
+/* A panel with nothing to show yet (the process steps while the summary loads
+   or after it fails) leaves no bordered sliver and no empty labelled region. */
+.stage-band:empty { display: none; }
+
 .lifecycle-strip {
   display: flex;
   flex-wrap: wrap;
