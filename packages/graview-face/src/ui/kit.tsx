@@ -9,6 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { current, glance, label, raw, said, statusOf, tokens, toneOfStatus, when, type Node, type Of, type Tone } from "../model/graph.js";
 import { areaStanding } from "../model/work.js";
+import { markOf } from "../model/code.js";
 
 export type Ctx = PageContext<AnySchema>;
 
@@ -147,6 +148,27 @@ export function Rows({ children }: { children: ReactNode }) {
   return <div className="ndx-rows">{children}</div>;
 }
 
+/**
+ * The Analysis page's mark on a record, wherever it is drawn: a "!" when one
+ * of its recommended next steps names it, a hollow ring when it is only
+ * flagged for attention, nothing otherwise. The words are for a screen reader
+ * and a hover; the shape is what tells the two apart at a glance.
+ */
+export function Mark({ node }: { node: Node }) {
+  const mark = markOf(node);
+  if (!mark) return null;
+  if (mark === "highlighted") {
+    return <span className="ndx-mark highlighted" data-mark="highlighted" role="img" aria-label="Flagged for attention" title="Flagged for attention on the Analysis page" />;
+  }
+  const why = (node as { readonly recommendation?: string }).recommendation;
+  const words = `Needs work${why ? `: ${why}` : ""}`;
+  return (
+    <span className="ndx-mark needs-work" data-mark="needs-work" role="img" aria-label={words} title={words}>
+      !
+    </span>
+  );
+}
+
 /** One record as a row: its kind's icon, its label, a glance, its status. */
 export function RecordRow({ context, node, i = 0, sub, end, depth = 0 }: { context: Ctx; node: Node; i?: number; sub?: ReactNode; end?: ReactNode; depth?: number }) {
   const { store } = context;
@@ -162,7 +184,10 @@ export function RecordRow({ context, node, i = 0, sub, end, depth = 0 }: { conte
     >
       <KindIcon context={context} kind={node.kind} />
       <span style={{ minWidth: 0, display: "grid" }}>
-        <span className="ndx-title">{label(store, node)}</span>
+        <span className="ndx-title">
+          <Mark node={node} />
+          {label(store, node)}
+        </span>
         <span className="ndx-sub">{sub ?? seen.map((f) => `${f.label}: ${f.value}`).join(" · ")}</span>
       </span>
       <span className="ndx-row-end">{end ?? <StatusBadge status={statusOf(node)} />}</span>
@@ -176,13 +201,17 @@ export function RecordCard({ context, node, i = 0, children }: { context: Ctx; n
   const seen = glance(store, node, 3);
   const status = statusOf(node);
   const tone = ("health" in node && node.health === "defective") || status === "blocked" || status === "failing" ? " bad" : "";
+  const mark = markOf(node);
   return (
-    <Link to={recordPath(store.schema, node.kind, node.id)} className={`ndx-card ndx-rise${tone}`} style={at(i)}>
+    <Link to={recordPath(store.schema, node.kind, node.id)} className={`ndx-card ndx-rise${tone}${mark ? ` ${mark}` : ""}`} style={at(i)}>
       <span className="ndx-kindline">
         <KindIcon context={context} kind={node.kind} />
         {store.schema.tryDefinition(node.kind)?.noun ?? node.kind}
       </span>
-      <h3>{label(store, node)}</h3>
+      <h3>
+        <Mark node={node} />
+        {label(store, node)}
+      </h3>
       {children ?? (node.kind === "area" ? <AreaBadges context={context} area={node as Of<"area">} /> : (
         <div className="ndx-badges">
           {seen.map((f) => (

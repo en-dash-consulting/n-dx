@@ -52,6 +52,8 @@ describe("buildSnapshot", () => {
     const kinds = new Set(snapshot.nodes.map((n) => n.kind));
     for (const kind of ["area", "capability", "change", "zone", "component", "run", "commit"]) expect(kinds.has(kind), kind).toBe(true);
     expect(counts.zone).toBe(3);
+    // Every zone says whether the Analysis page recommends work on it and whether it is otherwise flagged; this analysis has no findings and healthy zones.
+    for (const z of snapshot.nodes.filter((n) => n.kind === "zone")) expect(z, z.id).toMatchObject({ needsWork: false, highlighted: false });
     expect(counts.component).toBe(2);
     expect(counts.run).toBe(2);
     expect(counts.file).toBe(2);

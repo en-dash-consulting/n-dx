@@ -950,6 +950,21 @@
           "type": "list",
           "of": "string",
           "label": "Entry points"
+        },
+        "needsWork": {
+          "type": "boolean",
+          "label": "Needs work",
+          "description": "One of the next steps the Analysis page recommends is scoped to this zone"
+        },
+        "highlighted": {
+          "type": "boolean",
+          "label": "Flagged for attention",
+          "description": "Not recommended work, but the Analysis page counts it among the zones needing attention: cohesion under 40% or coupling over 50%"
+        },
+        "recommendation": {
+          "type": "string",
+          "label": "Recommended",
+          "description": "The first next step the Analysis page recommends for this zone"
         }
       },
       "edges": {
@@ -985,6 +1000,14 @@
             "fields": [
               "entryPoints",
               "description"
+            ]
+          },
+          {
+            "title": "Analysis",
+            "fields": [
+              "needsWork",
+              "recommendation",
+              "highlighted"
             ]
           }
         ]
@@ -1572,6 +1595,16 @@
         "empty": "No change waits to start. ndx capture . or ndx plan . adds one."
       },
       {
+        "title": "Needs work",
+        "key": "needs-work"
+      },
+      {
+        "list": "all('zone') where needsWork == true",
+        "sort": "name",
+        "as": "row",
+        "empty": "The Analysis page recommends no work on any zone."
+      },
+      {
         "title": "Recent runs",
         "key": "recent-runs"
       },
@@ -1866,6 +1899,26 @@
           "title": "{name}"
         },
         {
+          "when": "needsWork == true",
+          "show": [
+            {
+              "badge": "!",
+              "tone": "bad",
+              "key": "needs-work"
+            }
+          ]
+        },
+        {
+          "when": "highlighted == true",
+          "show": [
+            {
+              "badge": "needs attention",
+              "tone": "warn",
+              "key": "highlighted"
+            }
+          ]
+        },
+        {
           "progress": {
             "value": "cohesion",
             "max": "1"
@@ -1883,6 +1936,26 @@
           "title": "{name}"
         },
         {
+          "when": "needsWork == true",
+          "show": [
+            {
+              "badge": "!",
+              "tone": "bad",
+              "key": "needs-work"
+            }
+          ]
+        },
+        {
+          "when": "highlighted == true",
+          "show": [
+            {
+              "badge": "needs attention",
+              "tone": "warn",
+              "key": "highlighted"
+            }
+          ]
+        },
+        {
           "field": "cohesion",
           "as": "percent",
           "label": "Cohesion"
@@ -1896,6 +1969,30 @@
       "page": [
         {
           "headline": "{name}"
+        },
+        {
+          "when": "needsWork == true",
+          "show": [
+            {
+              "badge": "!",
+              "tone": "bad",
+              "key": "needs-work"
+            },
+            {
+              "text": "Needs work: {recommendation}",
+              "tone": "bad"
+            }
+          ]
+        },
+        {
+          "when": "highlighted == true",
+          "show": [
+            {
+              "badge": "needs attention",
+              "tone": "warn",
+              "key": "highlighted"
+            }
+          ]
         },
         {
           "when": "description != null",

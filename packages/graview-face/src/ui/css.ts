@@ -143,6 +143,13 @@ a.ndx-card:hover { transform: translateY(-1px); }
 .ndx-badge.accent { background: color-mix(in oklab, var(--graview-accent) 16%, transparent); } .ndx-badge.accent::before { background: var(--graview-accent); }
 .ndx-badge.plain::before { display: none; }
 
+/* The Analysis page's two treatments: a filled "!" for needs work, a hollow ring for only flagged. */
+.ndx-mark { display: inline-grid; place-items: center; flex: none; width: 1.1rem; height: 1.1rem; margin-right: 0.4rem; border-radius: 999px; vertical-align: -0.15em; }
+.ndx-mark.needs-work { background: var(--graview-bad); color: var(--graview-panel); font: 800 0.74rem/1 var(--graview-font-body, inherit); }
+.ndx-mark.highlighted { width: 0.7rem; height: 0.7rem; border: 2px solid var(--graview-warn); background: transparent; }
+.ndx-card.needs-work { border-color: color-mix(in oklab, var(--graview-bad) 55%, var(--graview-edge)); }
+.ndx-card.highlighted { border-style: dashed; border-color: color-mix(in oklab, var(--graview-warn) 65%, var(--graview-edge)); }
+
 .ndx-rows { display: grid; gap: 0.35rem; }
 .ndx-row {
   display: grid; grid-template-columns: 1.15rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; min-height: 2.75rem;
