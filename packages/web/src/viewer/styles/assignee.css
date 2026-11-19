@@ -37,12 +37,52 @@
 
 .assignee-input {
   min-width: 14em;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-surface);
   font: inherit;
   color: var(--text);
+}
+
+/* Save, Unassign and Cancel take the small size of the detail panel's other
+   edit buttons (.task-edit-save, .task-edit-cancel), not .btn's full size. */
+.assignee-form .btn {
+  padding: var(--space-1) var(--space-2-5);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  font-size: var(--font-sm);
+  line-height: var(--leading-normal);
+}
+
+.assignee-form .assignee-clear,
+.assignee-form .assignee-cancel {
+  border-color: var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+}
+
+.assignee-form .assignee-clear:hover,
+.assignee-form .assignee-cancel:hover {
+  border-color: var(--text-dim);
+  opacity: 1;
+}
+
+/* In the detail panel the field takes the whole row, so "Name <email>" reads
+   in full; the buttons wrap beneath it, and nothing scrolls sideways at phone
+   width. */
+.task-assignee-section .assignee-picker,
+.task-assignee-section .assignee-form {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.task-assignee-section .assignee-input {
+  flex: 1 1 100%;
+  min-width: 0;
 }
 
 .assignee-mismatch {
