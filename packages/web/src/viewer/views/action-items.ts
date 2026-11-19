@@ -1,20 +1,22 @@
 /**
- * What to do, as the Analyze dashboard lists it: the Codebase health tile's
- * next steps, problems and suggestions, and the Infrastructure & architecture
- * tile's readiness gaps and architecture findings. One item model, one list
- * component, two builders.
+ * The Analyze dashboard's recommended fixes: next steps, readiness gaps,
+ * problems, suggestions, architecture findings and files to move, as one list
+ * in the Recommended fixes tile. One item model, one list component, and
+ * {@link buildRecommendations} — a pure function of the analysis, the next
+ * steps and the readiness score — deciding what is recommended.
  *
- * Health: next steps come from `/api/sv/next-steps`, which derives them from
- * the same zone findings the Problems and Suggestions views read, and each
- * step names the findings it groups (`relatedFindings`). A finding a listed
- * step already covers is not listed again. Problems, Suggestions and
- * Architecture keep their views' enrichment gates: below the pass a view
- * needs, the list says which pass unlocks them.
+ * Next steps come from `/api/sv/next-steps`, which derives them from the same
+ * zone findings the Problems and Suggestions views read, and each step names
+ * the findings it groups (`relatedFindings`). A finding a listed step already
+ * covers is not listed again. Problems, Suggestions and Architecture keep
+ * their views' enrichment gates: below the pass a view needs, the list says
+ * which pass unlocks them.
  *
  * Every item is tagged with what it concerns (cohesion, coupling, readiness,
  * boundaries) and the zones it touches — its scope, and the zones and files
- * its text names. A tile's stat cards highlight the items a concern tags while
- * hovered and filter the list to them when pressed (`useConcernFocus`).
+ * its text names. The highlighted elements of the visuals tile — the stat
+ * cards and the zones marked "!" — highlight the items they concern while
+ * hovered and filter the list to them when pressed (`RecommendationFilter`).
  * Hovering an item lights its zones on the codebase map; an item whose remedy
  * adds files the map cannot draw yet carries a `note` the map shows beside it
  * (analyze-actions-context.ts).
@@ -61,7 +63,7 @@ export interface ActionList {
   items: ActionItem[];
   /** Parts still behind an enrichment pass, named, with the pass each needs. */
   gated: Array<{ label: string; pass: number }>;
-  /** The listed next steps, for copy and capture. Empty outside the health tile. */
+  /** The listed next steps, for copy and capture. */
   steps: readonly NextStep[];
 }
 
@@ -172,7 +174,7 @@ function indexed(findings: readonly Finding[], keep: (f: Finding) => boolean): A
 }
 
 /**
- * The Codebase health list: next steps, then the problems and suggestions no
+ * The health half of the recommendations: next steps, then the problems and suggestions no
  * listed step covers, each kind most severe first. Tagged with cohesion and
  * coupling, the two metrics its stat cards show.
  */
@@ -228,14 +230,19 @@ export function buildHealthActions(data: LoadedData, steps: readonly NextStep[] 
 const BAND_LEVEL = { poor: "high", fair: "medium", good: "low" } as const;
 
 /**
- * The Infrastructure & architecture list: readiness gaps, weakest practice
+ * The infrastructure half of the recommendations: readiness gaps, weakest practice
  * first — none is on the map, so each carries its remedy as the map's note —
  * then the architecture findings (relationships and patterns, behind
  * Architecture's enrichment gate) and the files the analysis would move to
  * another zone. Relationships, moves and any finding about crossings or
- * coupling concern boundaries.
+ * coupling concern boundaries. Findings in `covered` (a listed next step's)
+ * are left out.
  */
-export function buildInfraActions(data: LoadedData, readiness: Readiness | null): ActionList {
+export function buildInfraActions(
+  data: LoadedData,
+  readiness: Readiness | null,
+  covered: ReadonlySet<number> = new Set(),
+): ActionList {
   const findings: readonly Finding[] = data.zones?.findings ?? [];
   const index = zoneIndex(data);
   const pass = effectiveEnrichmentPass(data.zones, data.manifest);
@@ -274,12 +281,42 @@ export function buildInfraActions(data: LoadedData, readiness: Readiness | null)
     gated.push({ label: "architecture findings", pass: ENRICHMENT_THRESHOLDS.architecture });
   } else {
     for (const { f, i } of indexed(findings, (x) => x.type === "relationship" || x.type === "pattern")) {
-      items.push(findingItem(f.type === "relationship" ? "relationship" : "pattern", f, i));
+      if (!covered.has(i)) items.push(findingItem(f.type === "relationship" ? "relationship" : "pattern", f, i));
     }
   }
-  for (const { f, i } of indexed(findings, (x) => x.type === "move-file")) items.push(findingItem("move", f, i));
+  for (const { f, i } of indexed(findings, (x) => x.type === "move-file")) {
+    if (!covered.has(i)) items.push(findingItem("move", f, i));
+  }
 
   return { items, gated, steps: [] };
+}
+
+/** The order kinds are listed in: next steps, then readiness gaps, then the findings, files to move last. */
+const KIND_ORDER: readonly ActionKind[] = ["step", "gap", "problem", "suggestion", "relationship", "pattern", "move"];
+
+/**
+ * What the Analyze dashboard recommends fixing — the one decision of which
+ * analysis items need work. Next steps first, then readiness gaps weakest
+ * practice first, then problems, suggestions and architecture findings most
+ * severe first, then files to move. A finding a listed step covers appears
+ * only as that step. Pure: the same analysis, steps and readiness give the
+ * same list, so any surface showing the needs-work set can call it.
+ */
+export function buildRecommendations(
+  data: LoadedData,
+  steps: readonly NextStep[] | null,
+  readiness: Readiness | null,
+): ActionList {
+  const health = buildHealthActions(data, steps);
+  const covered = new Set((steps ?? []).flatMap((s) => s.relatedFindings ?? []));
+  const infra = buildInfraActions(data, readiness, covered);
+  const rank = (kind: ActionKind) => KIND_ORDER.indexOf(kind);
+  // A stable sort by kind keeps each kind's own order (severity, weakest gap first).
+  const items = [...health.items, ...infra.items]
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => rank(a.item.kind) - rank(b.item.kind) || a.i - b.i)
+    .map(({ item }) => item);
+  return { items, gated: [...health.gated, ...infra.gated], steps: health.steps };
 }
 
 /** A "!" on the map: "crit" for critical or high, "warn" for warning or medium. */
@@ -302,33 +339,61 @@ export function zoneIssues(data: LoadedData, items: readonly ActionItem[]): Reco
   return marks;
 }
 
-/** How many items each concern tags — shown on the stat cards. */
-export function concernCounts(items: readonly ActionItem[], concerns: readonly ActionConcern[]): Record<string, number> {
-  return Object.fromEntries(concerns.map((c) => [c, items.filter((a) => a.concerns.includes(c)).length]));
+// ── Focus: highlighted elements over the list ──────────────────
+
+/**
+ * What a highlighted element on the page stands for: a stat card's concern,
+ * or a zone marked "!". Hovered, it highlights the recommendations it
+ * matches; pressed, it filters the list to them.
+ */
+export type RecommendationFilter =
+  | { kind: "concern"; concern: ActionConcern }
+  | { kind: "zone"; zone: string; label: string };
+
+export function sameFilter(a: RecommendationFilter | null, b: RecommendationFilter | null): boolean {
+  if (!a || !b) return a === b;
+  return a.kind === "concern" ? b.kind === "concern" && a.concern === b.concern : b.kind === "zone" && a.zone === b.zone;
 }
 
-// ── Focus: the stat cards over a list ──────────────────────────
+/** The filter's name, as the list's filter chip shows it. */
+export function filterLabel(filter: RecommendationFilter): string {
+  return filter.kind === "concern" ? CONCERN_LABEL[filter.concern] : filter.label;
+}
 
-/** The concern hovered over (highlights) and the one pressed (filters). */
-export interface ConcernFocus {
-  hover: ActionConcern | null;
-  filter: ActionConcern | null;
-  setHover: (concern: ActionConcern | null) => void;
-  /** Press a concern: filter to it, or clear the filter if it is the one applied. */
-  toggle: (concern: ActionConcern) => void;
+/** The filter's name inside a sentence: a concern in lower case, a zone as named. */
+function filterInText(filter: RecommendationFilter): string {
+  return filter.kind === "concern" ? CONCERN_LABEL[filter.concern].toLowerCase() : filter.label;
+}
+
+export function matchesFilter(item: ActionItem, filter: RecommendationFilter): boolean {
+  return filter.kind === "concern" ? item.concerns.includes(filter.concern) : item.zones.includes(filter.zone);
+}
+
+/** The items a filter keeps; every item when there is none. */
+export function filterRecommendations(items: readonly ActionItem[], filter: RecommendationFilter | null): ActionItem[] {
+  return filter ? items.filter((a) => matchesFilter(a, filter)) : [...items];
+}
+
+/** The element hovered over (highlights) and the one pressed (filters). */
+export interface RecommendationFocus {
+  hover: RecommendationFilter | null;
+  filter: RecommendationFilter | null;
+  setHover: (filter: RecommendationFilter | null) => void;
+  /** Press an element: filter to it, or clear the filter if it is the one applied. */
+  toggle: (filter: RecommendationFilter) => void;
   clear: () => void;
 }
 
-export function useConcernFocus(): ConcernFocus {
-  const [hover, setHover] = useState<ActionConcern | null>(null);
-  const [filter, setFilter] = useState<ActionConcern | null>(null);
-  const toggle = useCallback((concern: ActionConcern) => setFilter((f) => (f === concern ? null : concern)), []);
+export function useRecommendationFocus(): RecommendationFocus {
+  const [hover, setHover] = useState<RecommendationFilter | null>(null);
+  const [filter, setFilter] = useState<RecommendationFilter | null>(null);
+  const toggle = useCallback((next: RecommendationFilter) => setFilter((f) => (sameFilter(f, next) ? null : next)), []);
   const clear = useCallback(() => setFilter(null), []);
   return { hover, filter, setHover, toggle, clear };
 }
 
-/** What a stat card takes to drive a list's focus: press filters, hover highlights. */
-export interface ConcernCardProps {
+/** What a highlighted element takes to drive the list: press filters, hover highlights. */
+export interface FilterControlProps {
   onOpen: () => void;
   pressed: boolean;
   onHover: (over: boolean) => void;
@@ -336,16 +401,21 @@ export interface ConcernCardProps {
   hint: string;
 }
 
-export function concernCardProps(focus: ConcernFocus, counts: Record<string, number>, concern: ActionConcern): ConcernCardProps {
-  const n = counts[concern] ?? 0;
-  const items = `${n} item${n === 1 ? "" : "s"}`;
+export function filterControlProps(focus: RecommendationFocus, items: readonly ActionItem[], filter: RecommendationFilter): FilterControlProps {
+  const n = filterRecommendations(items, filter).length;
+  const fixes = `${n} recommended fix${n === 1 ? "" : "es"}`;
   return {
-    onOpen: () => focus.toggle(concern),
-    pressed: focus.filter === concern,
-    onHover: (over: boolean) => focus.setHover(over ? concern : null),
-    action: `show the ${items} it concerns`,
-    hint: `${items} below concern ${CONCERN_LABEL[concern].toLowerCase()}: hover to highlight, click to filter`,
+    onOpen: () => focus.toggle(filter),
+    pressed: sameFilter(focus.filter, filter),
+    onHover: (over: boolean) => focus.setHover(over ? filter : null),
+    action: `show the ${fixes} it concerns`,
+    hint: `${fixes} concern ${filterInText(filter)}: hover to highlight, click to filter`,
   };
+}
+
+/** A stat card's controls for a concern. */
+export function concernCardProps(focus: RecommendationFocus, items: readonly ActionItem[], concern: ActionConcern): FilterControlProps {
+  return filterControlProps(focus, items, { kind: "concern", concern });
 }
 
 // ── Adding recommendations to the PRD ──────────────────────────
@@ -482,7 +552,7 @@ function AddAllToPrd({ items, capture }: { items: readonly ActionItem[]; capture
 
 interface ActionListProps {
   list: ActionList;
-  focus: ConcernFocus;
+  focus: RecommendationFocus;
   /** Unique per tile: the base of the heading's id. */
   idBase: string;
   /** In the opened tile: every item with its detail, plus copy and capture. */
@@ -497,15 +567,15 @@ interface ActionListProps {
   capture?: RecommendationCapture | null;
 }
 
-/** "What to do": a tile's items, each tagged with its kind, under the tile's stats. */
+/** The recommended fixes, each tagged with its kind, filtered by what was pressed on the page. */
 export function ActionItemList({
   list, focus, idBase, opened = false, limit = 25, links = [], onItemHover, capture,
 }: ActionListProps): ComponentChild {
   const [copied, setCopied] = useState(false);
   const { items, gated, steps } = list;
-  const filtered = focus.filter ? items.filter((a) => a.concerns.includes(focus.filter!)) : items;
+  const filtered = filterRecommendations(items, focus.filter);
   const shown = opened ? filtered : filtered.slice(0, limit);
-  const lit = focus.hover ?? null;
+  const lit = focus.hover;
   const kinds = [...new Set(items.map((a) => a.kind))];
   const titleId = `${idBase}-title`;
 
@@ -519,11 +589,11 @@ export function ActionItemList({
   return h("section", {
     class: `health-actions${lit ? " health-actions--lit" : ""}`,
     "aria-labelledby": titleId,
-    "data-lit": lit ?? undefined,
+    "data-lit": lit ? (lit.kind === "concern" ? lit.concern : lit.zone) : undefined,
     onMouseLeave: onItemHover ? () => onItemHover(null) : undefined,
   },
     h("div", { class: "health-actions-head" },
-      h("h3", { id: titleId }, "What to do", h("span", { class: "health-count" }, String(items.length))),
+      h("h3", { id: titleId }, "Recommended", h("span", { class: "health-count" }, String(items.length))),
       h("span", { class: "health-actions-kinds" },
         kinds.map((kind) =>
           h("span", { key: kind, class: `health-kind health-kind--${kind}` },
@@ -534,20 +604,20 @@ export function ActionItemList({
             type: "button",
             class: "health-actions-filter",
             onClick: focus.clear,
-            "aria-label": `Showing ${CONCERN_LABEL[focus.filter].toLowerCase()} items only — show everything`,
-          }, `${CONCERN_LABEL[focus.filter]} · ${filtered.length}`, h("span", { "aria-hidden": "true" }, " ×"))
+            "aria-label": `Showing the fixes for ${filterInText(focus.filter)} only — show everything`,
+          }, `${filterLabel(focus.filter)} · ${filtered.length}`, h("span", { "aria-hidden": "true" }, " ×"))
         : null,
     ),
     items.length === 0 && gated.length === 0
       ? h("p", { class: "stage-tile-empty" }, "Nothing to act on.")
       : null,
     focus.filter && filtered.length === 0
-      ? h("p", { class: "stage-tile-empty" }, `No item concerns ${CONCERN_LABEL[focus.filter].toLowerCase()}.`)
+      ? h("p", { class: "stage-tile-empty" }, `No recommended fix concerns ${filterInText(focus.filter)}.`)
       : null,
     shown.length > 0
       ? h("ul", { class: "health-actions-list", role: "list" },
           shown.map((a) => {
-            const isLit = lit !== null && a.concerns.includes(lit);
+            const isLit = lit !== null && matchesFilter(a, lit);
             return h("li", {
               key: a.key,
               class: `health-action health-action--${a.kind}${isLit ? " health-action--lit" : ""}`,

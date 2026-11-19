@@ -6,7 +6,6 @@ import {
   BarChart,
   PatternBadge,
   getZoneColorByIndex,
-  zoneConcerns,
   zoneNeedsAttention,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
@@ -18,14 +17,8 @@ import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { ActionIcon, AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { NextStepsCapture, copyText, stepsToMarkdown, useNextSteps, type NextStep } from "./next-steps.js";
-import {
-  ActionItemList,
-  concernCardProps,
-  concernCounts,
-  useConcernFocus,
-  type ConcernFocus,
-} from "./action-items.js";
-import { WithAnalyzeActions, useAnalyzeActions } from "./analyze-actions-context.js";
+import { concernCardProps, type ActionItem, type RecommendationFocus } from "./action-items.js";
+import { useAnalyzeActions } from "./analyze-actions-context.js";
 
 const NEXT_STEPS_OPEN_KEY = "ndx.overview.next-steps-open";
 
@@ -457,9 +450,9 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
  * space and leaves the title and Expand to the modal.
  *
  * Under the dashboard's provider the map carries the tiles' recommendations:
- * a "!" on every zone with issues, and while the pointer is over an item in
- * either list, that item's zones lit and a note beside the map naming them —
- * or saying the item is not on the map, or adds files the map cannot draw yet.
+ * a "!" on every zone with issues, and while the pointer is over a
+ * recommended fix, that fix's zones lit and a note beside the map naming them
+ * — or saying it is not on the map, or adds files the map cannot draw yet.
  */
 export function MapPanel({ data, navigateTo, opened = false, onExpand }: {
   data: LoadedData;
@@ -623,18 +616,20 @@ interface CodebaseStatsProps {
   data: LoadedData;
   onStat?: (stat: StatKey) => void;
   /**
-   * Ties Avg cohesion and Avg coupling to the list beneath: hovering one
-   * highlights the items it concerns, pressing it filters the list to them.
+   * Ties Avg cohesion and Avg coupling to the recommended fixes: hovering one
+   * highlights the fixes it concerns, pressing it filters the list to them.
    * Takes over `onStat` for those two cards.
    */
-  focus?: { concern: ConcernFocus; counts: Record<string, number> };
+  focus?: { focus: RecommendationFocus; items: readonly ActionItem[] };
+  /** Further cards after these, in the same list (the dashboard's infrastructure cards). */
+  extra?: ComponentChild[];
 }
 
-/** Headline numbers and architecture health: Overview's stats row, and the dashboard's health tile. */
-export function CodebaseStats({ data, onStat, focus }: CodebaseStatsProps): ComponentChild {
+/** Headline numbers and architecture health: Overview's stats row, and the dashboard's visuals tile. */
+export function CodebaseStats({ data, onStat, focus, extra = [] }: CodebaseStatsProps): ComponentChild {
   const open = (stat: StatKey) => (onStat ? () => onStat(stat) : undefined);
   const concernCard = (concern: "cohesion" | "coupling") =>
-    focus ? concernCardProps(focus.concern, focus.counts, concern) : { onOpen: open(concern) };
+    focus ? concernCardProps(focus.focus, focus.items, concern) : { onOpen: open(concern) };
   const { inventory, imports, zones } = data;
   const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
   const attentionCount = useMemo(
@@ -691,6 +686,7 @@ export function CodebaseStats({ data, onStat, focus }: CodebaseStatsProps): Comp
             info: h(InfoTip, { term: "coupling" }),
           })
         : null,
+      ...extra,
       healthMetrics && (healthMetrics.patterns.length > 0 || healthMetrics.antipatterns.length > 0)
         ? h("div", { class: "overview-stat overview-stat--signals", role: "listitem" },
             h("span", { class: "overview-stat-label" }, "Signals"),
@@ -758,60 +754,25 @@ function computeHealthMetrics(zones: LoadedData["zones"], imports: LoadedData["i
     return { avgCohesion, avgCoupling, patterns, antipatterns };
 }
 
-// ── Codebase health ──────────────────────────────────────────
+// ── Codebase at a glance, opened ─────────────────────────────
 
-/** The health list's items and the metric focus shared by the stats and the list. */
-function useHealthActions() {
-  const shared = useAnalyzeActions()!;
-  const counts = useMemo(() => concernCounts(shared.health.items, ["cohesion", "coupling"]), [shared.health]);
-  const concern = useConcernFocus();
-  return { list: shared.health, onItemHover: shared.setHovered, capture: shared.capture, concern, statsFocus: { concern, counts } };
-}
-
-/**
- * The Codebase health tile: the stats, then what to do about them — next
- * steps, problems and suggestions as one list. Hovering Avg cohesion or Avg
- * coupling highlights the items that metric concerns; pressing it filters
- * the list to them. Hovering an item lights its zones on the codebase map.
- */
-export function HealthSummary({ data }: { data: LoadedData }): ComponentChild {
-  return h(WithAnalyzeActions, { data }, h(HealthSummaryBody, { data }));
-}
-
-function HealthSummaryBody({ data }: { data: LoadedData }): ComponentChild {
-  const { list, onItemHover, capture, concern, statsFocus } = useHealthActions();
-  return h("div", { class: "health-summary" },
-    h(CodebaseStats, { data, focus: statsFocus }),
-    h(ActionItemList, { list, focus: concern, idBase: "health-actions", onItemHover, capture }),
-  );
-}
-
-// ── Codebase health, opened ──────────────────────────────────
+/** Element ids the opened visuals tile's stat cards scroll to. */
+export const HEALTH_ATTENTION_ID = "health-attention";
+export const HEALTH_CYCLES_ID = "health-cycles";
 
 interface HealthDetailProps {
   data: LoadedData;
-  /** Switch the open tile to another of the stage's tiles. */
-  openTile: (key: string) => void;
   /** Show a zone or file in the detail panel beside the modal. */
   setDetail: (item: DetailItem) => void;
-  /** Leads the list's "All problems" and "All suggestions" to their views. */
-  navigateTo?: NavigateTo;
 }
 
 /**
- * The opened Codebase health tile: the stats, then the whole list of what to
- * do about them, then what they summarise — the zones needing attention, the
- * import cycles and the hub files — each zone and file opening its detail.
- * Files, Zones and Circular deps lead to what explains them; Avg cohesion and
- * Avg coupling highlight and filter the list, and light the zones they flag.
+ * What the opened visuals tile's health cards summarise: the zones needing
+ * attention, the hub files and the import cycles, each zone and file opening
+ * its detail.
  */
-export function HealthDetail(props: HealthDetailProps): ComponentChild {
-  return h(WithAnalyzeActions, { data: props.data }, h(HealthDetailBody, props));
-}
-
-function HealthDetailBody({ data, openTile, setDetail, navigateTo }: HealthDetailProps): ComponentChild {
+export function HealthDetail({ data, setDetail }: HealthDetailProps): ComponentChild {
   const { zones, imports, inventory } = data;
-  const { list, onItemHover, capture, concern, statsFocus } = useHealthActions();
   const files = useMemo(() => new Map((inventory?.files ?? []).map((f) => [f.path, f])), [inventory]);
   const attention = useMemo(
     () => (zones?.zones ?? [])
@@ -832,43 +793,17 @@ function HealthDetailBody({ data, openTile, setDetail, navigateTo }: HealthDetai
   const fileButton = (path: string) =>
     h("button", { type: "button", class: "health-link health-file", onClick: () => showFile(path), title: path }, path);
 
-  return h("div", { class: "health-detail" },
-    h(CodebaseStats, {
-      data,
-      onStat: (stat) => {
-        if (stat === "files") openTile("files");
-        else if (stat === "cycles") document.getElementById("health-cycles")?.scrollIntoView({ block: "start", behavior: "smooth" });
-        else openTile("zones");
-      },
-      focus: statsFocus,
-    }),
-    h(ActionItemList, {
-      list,
-      focus: concern,
-      idBase: "health-actions-opened",
-      opened: true,
-      onItemHover,
-      capture,
-      links: navigateTo
-        ? [
-            { label: "All problems ↗", onClick: () => navigateTo("problems") },
-            { label: "All suggestions ↗", onClick: () => navigateTo("suggestions") },
-          ]
-        : [],
-    }),
+  return h(Fragment, null,
     h("div", { class: "health-columns" },
-      h("section", { class: "health-section", "aria-labelledby": "health-attention" },
-        h("h3", { id: "health-attention" }, `Zones needing attention`, h("span", { class: "health-count" }, String(attention.length))),
+      h("section", { class: "health-section", id: HEALTH_ATTENTION_ID, "aria-labelledby": "health-attention-title" },
+        h("h3", { id: "health-attention-title" }, `Zones needing attention`, h("span", { class: "health-count" }, String(attention.length))),
         attention.length === 0
           ? h("p", { class: "stage-tile-empty" }, "Every zone holds together and keeps to itself.")
           : h("table", { class: "languages-table health-table" },
               h("thead", null, h("tr", null,
                 h("th", null, "Zone"), h("th", { class: "num" }, "Files"),
                 h("th", { class: "num" }, "Cohesion"), h("th", { class: "num" }, "Coupling"))),
-              h("tbody", null, attention.map((z) => h("tr", {
-                key: z.id,
-                class: concern.hover && (zoneConcerns(z) as string[]).includes(concern.hover) ? "health-row--lit" : undefined,
-              },
+              h("tbody", null, attention.map((z) => h("tr", { key: z.id },
                 h("td", null, h("button", {
                   type: "button",
                   class: "health-link",
@@ -892,7 +827,7 @@ function HealthDetailBody({ data, openTile, setDetail, navigateTo }: HealthDetai
               h("li", { key: hub.path }, fileButton(hub.path), h("span", { class: "health-meta" }, `${hub.count} importers`)))),
       ),
     ),
-    h("section", { class: "health-section", id: "health-cycles", "aria-labelledby": "health-cycles-title" },
+    h("section", { class: "health-section", id: HEALTH_CYCLES_ID, "aria-labelledby": "health-cycles-title" },
       h("h3", { id: "health-cycles-title" }, "Import cycles", h("span", { class: "health-count" }, String(imports?.summary.circularCount ?? 0))),
       cycles.length === 0
         ? h("p", { class: "stage-tile-empty" }, "No import cycles.")

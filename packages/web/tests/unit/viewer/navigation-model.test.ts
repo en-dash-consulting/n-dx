@@ -484,19 +484,26 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("leads with Overview and lays every SourceVision view out as tiles", () => {
     expect(STAGES.analyze.sections.map((s) => s.view)).toEqual(["overview"]);
-    expect(tiles.map((t) => t.panel ?? t.view)).toEqual(["health", "infra-arch", "summary", "map", "ask"]);
-    expect(placed).toEqual(["architecture", "routes", "zones", "files", "iso-map", "ask"]);
+    expect(tiles.map((t) => t.panel ?? t.view)).toEqual(["glance", "recommendations", "map", "ask"]);
+    expect(placed).toEqual(["zones", "files", "architecture", "routes", "iso-map", "ask"]);
   });
 
-  it("puts health, infrastructure & architecture and the summary across the top row", () => {
-    expect(tiles.slice(0, 3).map((t) => [t.panel, t.cols ?? 4])).toEqual([["health", 4], ["infra-arch", 4], ["summary", 4]]);
-    // Opened, the two merged tiles lead with their own panel, then the views they hold.
-    expect(tiles[1]).toMatchObject({ view: "architecture", panelTab: "Overview", tabs: [{ view: "routes" }] });
-    expect(tiles[2]).toMatchObject({ view: "zones", panelTab: "Overview", tabs: [{ view: "files" }] });
+  it("puts two tiles across the top row: visuals on the left, recommended fixes on the right", () => {
+    expect(tiles.slice(0, 2).map((t) => [t.panel, t.title, t.cols, t.rows])).toEqual([
+      ["glance", "Codebase at a glance", 6, 2],
+      ["recommendations", "Recommended fixes", 6, 2],
+    ]);
+    // Opened, the visuals tile leads with its own panel, then the views it holds.
+    expect(tiles[0]).toMatchObject({
+      view: "zones", panelTab: "Overview",
+      tabs: [{ view: "files" }, { view: "architecture" }, { view: "routes" }],
+    });
+    // The fixes tile links to Suggestions through "Open" but does not place it.
+    expect(tilePlacesView(tiles[1]!)).toBe(false);
   });
 
   it("puts the codebase map across the full row below, chromeless, dropped in a static export", () => {
-    expect(tiles[3]).toMatchObject({ view: "iso-map", panel: "map", cols: 12, rows: 3, chromeless: true, hiddenWhenDeployed: true });
+    expect(tiles[2]).toMatchObject({ view: "iso-map", panel: "map", cols: 12, rows: 3, chromeless: true, hiddenWhenDeployed: true });
   });
 
   it("drops the flat repository map from the page but keeps it in the stage", () => {
@@ -505,8 +512,8 @@ describe("the Analysis stage is a tile dashboard", () => {
     expect(stageForView("graph")).toBe("analyze");
   });
 
-  it("shows Routes as a tab of the Infrastructure & architecture tile", () => {
-    expect(tiles.find((t) => t.view === "architecture")!.tabs?.map((t) => t.view)).toEqual(["routes"]);
+  it("shows Architecture and Routes as tabs of the visuals tile", () => {
+    expect(tiles[0]!.tabs?.map((t) => t.view)).toEqual(expect.arrayContaining(["architecture", "routes"]));
   });
 
   it("names the repository map and isometric map as the navigation model has them", () => {

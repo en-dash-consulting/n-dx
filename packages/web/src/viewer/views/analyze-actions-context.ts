@@ -1,14 +1,15 @@
 /**
- * What the Analyze dashboard's tiles share about what to do: the Codebase
- * health list, the Infrastructure & architecture list, the zones the map marks
- * with a "!", and the item the pointer is over.
+ * What the Analyze dashboard's tiles share about what to fix: the recommended
+ * fixes, the zones the map marks with a "!", the element pressed or hovered on
+ * the page (`focus`) and the item the pointer is over.
  *
  * The provider reads next steps and the delivery artifacts once for the grid.
- * Hovering an item in either list sets `hovered`; the codebase map lights that
- * item's zones and, when it touches none it can draw or its remedy adds files,
- * shows its note beside the map. A panel rendered on its own (a test, the
- * opened tile of a stage without the provider) gets a provider of its own
- * through `WithAnalyzeActions`.
+ * The visuals tile's highlighted elements set `focus`, which filters and
+ * highlights the Recommended fixes tile's list. Hovering an item there sets
+ * `hovered`; the codebase map lights that item's zones and, when it touches
+ * none it can draw or its remedy adds files, shows its note beside the map. A
+ * panel rendered on its own (a test, the opened tile of a stage without the
+ * provider) gets a provider of its own through `WithAnalyzeActions`.
  *
  * @module viewer/views/analyze-actions-context
  */
@@ -21,24 +22,27 @@ import { deliveryAnalysisStamp, useDeliveryData, type DeliveryData } from "./del
 import { useNextSteps } from "./next-steps.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import {
-  buildHealthActions,
-  buildInfraActions,
+  buildRecommendations,
   zoneIssues,
   useRecommendationCapture,
+  useRecommendationFocus,
   type ActionItem,
   type RecommendationCapture,
+  type RecommendationFocus,
   type ActionList,
   type ZoneMark,
 } from "./action-items.js";
 
 export interface AnalyzeActions {
-  health: ActionList;
-  infra: ActionList;
+  /** Every recommended fix: next steps, readiness gaps, findings and files to move. */
+  recommendations: ActionList;
   /** The readiness score and infrastructure scan; null while loading. */
   delivery: DeliveryData | null;
   /** Zone id → its "!" on the map. */
   issues: Record<string, ZoneMark>;
-  /** The item the pointer is over in either list. */
+  /** The page element hovered or pressed: highlights or filters the recommendations. */
+  focus: RecommendationFocus;
+  /** The item the pointer is over in the list. */
   hovered: ActionItem | null;
   setHovered: (item: ActionItem | null) => void;
   /** Adds recommendations to the PRD; null in a static export, which has no server. */
@@ -47,24 +51,27 @@ export interface AnalyzeActions {
 
 const AnalyzeActionsContext = createContext<AnalyzeActions | null>(null);
 
-/** Reads next steps and the delivery artifacts once and shares both lists with the tiles beneath. */
+/** Reads next steps and the delivery artifacts once and shares the recommendations with the tiles beneath. */
 export function AnalyzeActionsProvider({ data, children }: { data: LoadedData; children?: ComponentChildren }) {
   const steps = useNextSteps(5);
   const delivery = useDeliveryData(deliveryAnalysisStamp(data.manifest));
   const [hovered, setHovered] = useState<ActionItem | null>(null);
+  const focus = useRecommendationFocus();
   const recommendationCapture = useRecommendationCapture();
   const capture = isDeployedMode() ? null : recommendationCapture;
-  const health = useMemo(() => buildHealthActions(data, steps), [data.zones, data.manifest, steps]);
-  const infra = useMemo(() => buildInfraActions(data, delivery?.readiness ?? null), [data.zones, data.manifest, delivery]);
-  const issues = useMemo(() => zoneIssues(data, [...health.items, ...infra.items]), [data.zones, health, infra]);
+  const recommendations = useMemo(
+    () => buildRecommendations(data, steps, delivery?.readiness ?? null),
+    [data.zones, data.manifest, steps, delivery],
+  );
+  const issues = useMemo(() => zoneIssues(data, recommendations.items), [data.zones, recommendations]);
   const value = useMemo(
-    () => ({ health, infra, delivery, issues, hovered, setHovered, capture }),
-    [health, infra, delivery, issues, hovered, capture],
+    () => ({ recommendations, delivery, issues, focus, hovered, setHovered, capture }),
+    [recommendations, delivery, issues, focus.hover, focus.filter, hovered, capture],
   );
   return h(AnalyzeActionsContext.Provider, { value }, children);
 }
 
-/** The shared lists, or null outside a provider. */
+/** The shared recommendations, or null outside a provider. */
 export function useAnalyzeActions(): AnalyzeActions | null {
   return useContext(AnalyzeActionsContext);
 }

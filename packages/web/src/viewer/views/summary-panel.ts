@@ -1,14 +1,14 @@
 /**
- * The Analyze dashboard's Summary tile: what the codebase is made of — its
- * files and lines, its languages as a pie, its largest zones and its files by
- * role — in one tile where Zones, Languages and Files used to be three.
+ * What the codebase is made of — its files and lines, its languages as a pie,
+ * its largest zones and its files by role — the lower half of the Analyze
+ * dashboard's visuals tile (glance.ts).
  *
  * It reads only the analysis already loaded into `LoadedData` and uses the
  * selections the Zones and Files views use, so the tile and the views it opens
  * to never disagree about a count. A zone with issues carries the same "!" the
- * codebase map puts on it, when the dashboard's provider has marked it.
- * Opened, the tile's first tab shows every language and every role; Zones and
- * Files follow as tabs of their own.
+ * codebase map puts on it, when the dashboard's provider has marked it; on the
+ * page that "!" is a control that filters the recommended fixes to the zone.
+ * Opened, it shows every language and every role.
  */
 
 import { h } from "preact";
@@ -16,7 +16,8 @@ import type { ComponentChild } from "preact";
 import type { LoadedData } from "../types.js";
 import { zoneNeedsAttention } from "../visualization/metrics.js";
 import { LanguagesPanel } from "./overview.js";
-import { useAnalyzeActions } from "./analyze-actions-context.js";
+import { useAnalyzeActions, type AnalyzeActions } from "./analyze-actions-context.js";
+import { filterControlProps } from "./action-items.js";
 
 function empty(text: string): ComponentChild {
   return h("p", { class: "tile-sum-empty" }, text);
@@ -49,25 +50,50 @@ function headline(data: LoadedData): ComponentChild {
     parts.flatMap((p, i) => (i > 0 ? [" · ", ...p!] : p!)));
 }
 
-function zonesSummary(data: LoadedData, issues: Readonly<Record<string, string>> | null): ComponentChild {
+/**
+ * A zone marked "!" as a control over the recommended fixes: hovering it
+ * highlights the fixes that touch the zone, pressing it filters the list to
+ * them. Only on the page — the opened tile and a panel outside the dashboard
+ * keep the mark alone.
+ */
+function zoneFilter(shared: AnalyzeActions, z: { id: string; name: string }): ComponentChild {
+  const control = filterControlProps(shared.focus, shared.recommendations.items, { kind: "zone", zone: z.id, label: z.name });
+  return h("button", {
+    type: "button",
+    class: `summary-zone-filter${control.pressed ? " summary-zone-filter--pressed" : ""}`,
+    onClick: control.onOpen,
+    onMouseEnter: () => control.onHover(true),
+    onMouseLeave: () => control.onHover(false),
+    onFocus: () => control.onHover(true),
+    onBlur: () => control.onHover(false),
+    "aria-pressed": String(control.pressed),
+    "aria-label": `${z.name} has issues — ${control.action}`,
+    title: control.hint,
+  },
+    h("span", { class: "summary-issue", "aria-hidden": "true" }, "!"),
+    z.name);
+}
+
+function zonesSummary(data: LoadedData, shared: AnalyzeActions | null): ComponentChild {
   const zones = data.zones?.zones ?? [];
   if (zones.length === 0) return empty("No zones loaded.");
   const attention = zones.filter(zoneNeedsAttention).length;
   const files = zones.reduce((n, z) => n + z.files.length, 0);
   const largest = [...zones].sort((a, b) => b.files.length - a.files.length).slice(0, 4);
   const circular = data.imports?.summary.circularCount ?? 0;
-  const flagged = (id: string, z: (typeof zones)[number]) => (issues ? !!issues[id] : zoneNeedsAttention(z));
-  return h("section", { class: "summary-block", "aria-label": "Zones" },
+  const flagged = (z: (typeof zones)[number]) => (shared ? !!shared.issues[z.id] : zoneNeedsAttention(z));
+  return h("section", { class: "summary-block summary-block--zones", "aria-label": "Zones" },
     chips([["zones", zones.length], ["need attention", attention, "warning"], ["import cycles", circular, "warning"]]),
     h("ul", { class: "tile-sum-list tile-sum-bars", role: "list", "aria-label": "Largest zones" },
       largest.map((z) => {
         const share = files > 0 ? z.files.length / files : 0;
         const tone = z.cohesion >= 0.7 ? "good" : z.cohesion >= 0.4 ? "fair" : "poor";
-        const issue = flagged(z.id, z);
+        const issue = flagged(z);
         return h("li", { key: z.id, class: "tile-sum-bar" },
           h("span", { class: "tile-sum-bar-label" },
-            issue ? h("span", { class: "summary-issue", title: "Has issues — marked ! on the map" }, "!") : null,
-            z.name),
+            issue && shared
+              ? zoneFilter(shared, z)
+              : [issue ? h("span", { class: "summary-issue", title: "Has issues — marked ! on the map" }, "!") : null, z.name]),
           h("span", { class: "tile-sum-bar-track", "aria-hidden": "true" },
             h("span", { class: `tile-sum-bar-fill tile-sum-bar-fill--${tone}`, style: `width: ${Math.max(2, Math.round(share * 100))}%` }),
           ),
@@ -100,12 +126,12 @@ function rolesSummary(data: LoadedData, limit: number): ComponentChild {
 }
 
 /**
- * The Summary tile: the totals, the languages as a pie, the largest zones and
- * the files by role. Opened (its first tab): every language with its share,
+ * What the codebase is made of: the totals, the languages as a pie, the
+ * largest zones and the files by role. Opened: every language with its share,
  * lines and import analysis, and every role.
  */
 export function SummaryPanel({ data, opened = false }: { data: LoadedData; opened?: boolean }): ComponentChild {
-  const issues = useAnalyzeActions()?.issues ?? null;
+  const shared = useAnalyzeActions();
   if (opened) {
     return h("div", { class: "summary-panel summary-panel--opened" },
       headline(data),
@@ -122,7 +148,7 @@ export function SummaryPanel({ data, opened = false }: { data: LoadedData; opene
   return h("div", { class: "summary-panel" },
     headline(data),
     h(LanguagesPanel, { data }),
-    zonesSummary(data, issues),
-    h("section", { class: "summary-block", "aria-label": "Files by role" }, rolesSummary(data, 4)),
+    zonesSummary(data, shared),
+    h("section", { class: "summary-block summary-block--roles", "aria-label": "Files by role" }, rolesSummary(data, 4)),
   );
 }

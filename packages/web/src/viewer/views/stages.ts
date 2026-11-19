@@ -89,10 +89,10 @@ export type StageSectionBadge = "inbox";
 
 /**
  * A part of the page that is not a view of its own — a panel the stage page
- * renders through the registry (`renderPanel`): the Analyze tiles' health,
- * infrastructure & architecture and summary, Plan's strips and glances.
+ * renders through the registry (`renderPanel`): the Analyze tiles' visuals
+ * and recommended fixes, Plan's strips and glances.
  */
-export type StagePanelId = "map" | "health" | "infra-arch" | "summary" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
+export type StagePanelId = "map" | "glance" | "recommendations" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -146,7 +146,7 @@ export interface StageTile {
   tabLabel?: string;
   /**
    * Opened, the panel is a tab of its own, named this, ahead of `view` and
-   * `tabs` (Summary: its overview, then Zones and Files).
+   * `tabs` (Codebase at a glance: its overview, then Zones, Files, Architecture and Routes).
    */
   panelTab?: string;
   /** A live count in the tile header, read from project status like a section's. */
@@ -188,7 +188,7 @@ export interface StageDef {
 /**
  * Whether a tile puts its view on the page. A view tile does, and so does a
  * chromeless panel, which is its view's embedded form (the map); a panel that
- * only links to its view through "Open" (Codebase health) does not.
+ * only links to its view through "Open" (Recommended fixes) does not.
  */
 export function tilePlacesView(tile: StageTile): boolean {
   return !tile.panel || !!tile.chromeless || !!tile.embedsView;
@@ -214,25 +214,23 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     id: "analyze",
     // A dashboard: the analysis line and its controls, then tiles.
     sections: [{ view: "overview", plain: true }],
-    // Three tiles across the top — health, infrastructure & architecture,
-    // and the summary — then the codebase map across the full row below. The
-    // first two list what to do; hovering an item lights its zones on the map,
-    // which marks every zone with issues "!".
+    // Two tiles across the top — the visuals and basic numbers on the left,
+    // the recommended fixes on the right — then the codebase map across the
+    // full row below. Pressing a highlighted element on the left filters the
+    // fixes; hovering a fix lights its zones on the map, which marks every
+    // zone with issues "!".
     tiles: [
-      { view: "overview", panel: "health", title: "Codebase health", rows: 2 },
       {
-        view: "architecture", panel: "infra-arch", title: "Infrastructure & architecture", rows: 2,
-        embedsView: true, panelTab: "Overview", tabs: [{ view: "routes" }],
+        view: "zones", panel: "glance", title: "Codebase at a glance", cols: 6, rows: 2,
+        embedsView: true, panelTab: "Overview",
+        tabs: [{ view: "files" }, { view: "architecture" }, { view: "routes" }],
       },
-      {
-        view: "zones", panel: "summary", title: "Summary", rows: 2,
-        embedsView: true, panelTab: "Overview", tabs: [{ view: "files" }],
-      },
+      { view: "suggestions", panel: "recommendations", title: "Recommended fixes", cols: 6, rows: 2 },
       { view: "iso-map", panel: "map", title: "Codebase map", cols: 12, rows: 3, chromeless: true, hiddenWhenDeployed: true },
       { view: "ask", cols: 6, featureGate: "sourcevision.ask", requiresServer: true },
     ],
-    // Problems and Suggestions are listed in the health tile, which links to
-    // them; the flat Graph gave way to the codebase map.
+    // Problems and Suggestions are listed in the Recommended fixes tile, which
+    // links to them; the flat Graph gave way to the codebase map.
     alsoOwns: ["graph", "problems", "suggestions"],
   },
   plan: {

@@ -276,7 +276,7 @@
   outline-offset: 1px;
 }
 
-/* ── Codebase health tile: Overview's stat row, compacted ── */
+/* ── Stat cards in a tile: Overview's stat row, compacted ── */
 
 .stage-tile .overview-stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -645,7 +645,7 @@
 .overview-stat--action > :not(.overview-stat-open) { position: relative; pointer-events: none; }
 .overview-stat--action .info-tip { pointer-events: auto; }
 
-/* ── Codebase health, opened (HealthDetail) ── */
+/* ── Codebase at a glance, opened (glance.ts, HealthDetail) ── */
 
 .health-detail {
   display: flex;
@@ -718,15 +718,70 @@
 
 .health-arrow { color: var(--text-dim); }
 
-/* ── Codebase health: the stats, then what to do (health-actions.ts) ── */
+/* ── Codebase at a glance (glance.ts): the cards, then the summary in two columns ── */
 
-.health-summary {
+.glance-panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-/* Avg cohesion / Avg coupling, pressed: the list below is filtered to them. */
+.stage-tile .glance-panel > .overview-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.glance-panel > .summary-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "headline headline"
+    "pie zones"
+    "roles zones";
+  gap: var(--space-3) var(--space-5);
+  align-items: start;
+}
+
+.glance-panel > .summary-panel > .tile-sum-headline { grid-area: headline; }
+.glance-panel > .summary-panel > .lang-pie { grid-area: pie; }
+.glance-panel > .summary-panel > .summary-block--zones { grid-area: zones; }
+.glance-panel > .summary-panel > .summary-block--roles { grid-area: roles; }
+
+@media (max-width: 960px) {
+  .stage-tile .glance-panel > .overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .glance-panel > .summary-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "headline" "pie" "zones" "roles";
+  }
+}
+
+/* A zone marked "!": pressing it filters the recommended fixes to the zone. */
+.summary-zone-filter {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: -1px 0 -1px calc(-1 * var(--space-1));
+  padding: 1px var(--space-1);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-zone-filter:hover { background: color-mix(in srgb, var(--orange) 12%, transparent); }
+.summary-zone-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.summary-zone-filter--pressed {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+}
+
+/* A stat card pressed: the recommended fixes are filtered to what it concerns. */
 .overview-stat--pressed {
   border-color: var(--stat-tone, var(--accent));
   background: color-mix(in srgb, var(--stat-tone, var(--accent)) 10%, var(--bg-surface));
@@ -870,7 +925,6 @@
 .health-actions-foot .next-steps-footer { margin: 0; padding: 0; }
 
 /* The opened tile's zones table lights the zones the hovered metric flags. */
-.health-row--lit td { background: color-mix(in srgb, var(--orange) 10%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
   .health-action { transition: none; }

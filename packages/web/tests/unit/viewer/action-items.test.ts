@@ -6,14 +6,16 @@ import {
   NEW_FILES_NOTE,
   buildHealthActions,
   buildInfraActions,
-  concernCounts,
+  buildRecommendations,
+  filterRecommendations,
   zoneIssues,
   recommendationPayload,
 } from "../../../src/viewer/views/action-items.js";
-import { InfraArchPanel } from "../../../src/viewer/views/infra-arch.js";
 import type { NextStep } from "../../../src/viewer/views/next-steps.js";
 import type { Readiness } from "../../../src/viewer/views/delivery.js";
-import { HealthDetail, HealthSummary, MapPanel } from "../../../src/viewer/views/overview.js";
+import { MapPanel } from "../../../src/viewer/views/overview.js";
+import { GlancePanel } from "../../../src/viewer/views/glance.js";
+import { RecommendationsPanel } from "../../../src/viewer/views/recommendations-panel.js";
 import { AnalyzeActionsProvider } from "../../../src/viewer/views/analyze-actions-context.js";
 import { ENRICHMENT_THRESHOLDS } from "../../../src/viewer/views/enrichment-thresholds.js";
 import type { LoadedData } from "../../../src/viewer/types.js";
@@ -35,7 +37,12 @@ const FINDINGS = [
 
 function data(pass = 4): LoadedData {
   return {
-    manifest: null, inventory: null, components: null,
+    manifest: null,
+    inventory: {
+      files: [],
+      summary: { totalFiles: 3, totalLines: 300, byLanguage: { TypeScript: 3 }, byRole: { source: 3 }, byCategory: {} },
+    },
+    components: null,
     imports: null,
     zones: {
       // core: loosely held together; admin: healthy; web-viewer: tied to everything.
@@ -79,7 +86,6 @@ describe("buildHealthActions", () => {
     expect(concerns["Split the god page"]).toEqual(["cohesion"]);
     expect(concerns["Bidirectional imports between web and rex"]).toEqual(["coupling"]);
     expect(concerns["Extract a base handler"]).toEqual([]);
-    expect(concernCounts(items, ["cohesion", "coupling"])).toEqual({ cohesion: 1, coupling: 1 });
   });
 
   it("names the zones an item touches, and notes a remedy that adds files", () => {
@@ -130,15 +136,77 @@ describe("buildInfraActions", () => {
   });
 });
 
-describe("zoneIssues", () => {
-  it("marks zones needing attention, and every zone an item at warning or above touches, critical winning", () => {
-    const d = data();
-    const items = [...buildHealthActions(d, [STEP]).items, ...buildInfraActions(d, READINESS).items];
-    expect(zoneIssues(d, items)).toEqual({ core: "crit", "web-viewer": "warn", admin: "warn" });
+describe("buildRecommendations", () => {
+  it("lists next steps, then readiness gaps, then the findings, with files to move last", () => {
+    const { items, steps } = buildRecommendations(data(), [STEP], READINESS);
+    expect(items.map((a) => [a.kind, a.title])).toEqual([
+      ["step", "Split the god page"],
+      ["gap", "Testing: No test command"],
+      ["gap", "CI: CI skips tests"],
+      ["problem", "Bidirectional imports between web and rex"],
+      ["suggestion", "Rename the admin helpers"],
+      ["suggestion", "Extract a base handler"],
+      ["relationship", "web-viewer imports admin/a.ts across a boundary"],
+      ["pattern", "Gateway modules everywhere"],
+      ["move", "Move admin/a.ts into web-viewer"],
+    ]);
+    expect(steps).toEqual([STEP]);
+    // Every item has its own key, so "+ PRD" state never crosses between them.
+    expect(new Set(items.map((a) => a.key)).size).toBe(items.length);
+  });
+
+  it("lists a finding a next step covers only as that step, whatever its kind", () => {
+    const step: NextStep = { ...STEP, relatedFindings: [0, 5, 7] };
+    const kinds = buildRecommendations(data(), [step], null).items.map((a) => a.kind);
+    expect(kinds).not.toContain("relationship");
+    expect(kinds).not.toContain("move");
+  });
+
+  it("carries both sets of enrichment gates", () => {
+    const { gated } = buildRecommendations(data(ENRICHMENT_THRESHOLDS.architecture - 1), null, null);
+    expect(gated.map((g) => g.label)).toEqual(["problems", "suggestions", "architecture findings"]);
   });
 });
 
-describe("HealthSummary", () => {
+describe("filterRecommendations", () => {
+  const items = buildRecommendations(data(), [STEP], READINESS).items;
+  it("keeps the items a concern tags, or a zone touches, and every item without a filter", () => {
+    expect(filterRecommendations(items, null)).toHaveLength(items.length);
+    expect(filterRecommendations(items, { kind: "concern", concern: "readiness" }).map((a) => a.kind)).toEqual(["gap", "gap"]);
+    expect(filterRecommendations(items, { kind: "zone", zone: "admin", label: "ADMIN" }).map((a) => a.title)).toEqual([
+      "Rename the admin helpers",
+      "web-viewer imports admin/a.ts across a boundary",
+      "Move admin/a.ts into web-viewer",
+    ]);
+  });
+});
+
+describe("zoneIssues", () => {
+  it("marks zones needing attention, and every zone an item at warning or above touches, critical winning", () => {
+    const d = data();
+    expect(zoneIssues(d, buildRecommendations(d, [STEP], READINESS).items)).toEqual({ core: "crit", "web-viewer": "warn", admin: "warn" });
+  });
+});
+
+// ── The top row: visuals on the left, recommended fixes on the right ──
+
+function stubFetch(extra?: (url: string, init?: RequestInit) => unknown) {
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    const handled = extra?.(url, init);
+    if (handled) return handled;
+    if (url.startsWith("/api/sv/next-steps")) return { ok: true, json: async () => ({ steps: [STEP] }) };
+    if (url === "/data/readiness.json") return { ok: true, json: async () => READINESS };
+    return { ok: false, json: async () => ({}) };
+  }));
+}
+
+/** The dashboard's top row and map, under one provider, as the stage page draws them. */
+const topRow = (d: LoadedData) => h(AnalyzeActionsProvider, { data: d },
+  h("div", { class: "left" }, h(GlancePanel, { data: d })),
+  h("div", { class: "right" }, h(RecommendationsPanel, { data: d })),
+  h("div", { class: "map" }, h(MapPanel, { data: d })));
+
+describe("the Analyze top row", () => {
   let root: HTMLElement | undefined;
   afterEach(() => {
     if (root) { act(() => { render(null, root!); }); root.remove(); }
@@ -146,10 +214,7 @@ describe("HealthSummary", () => {
   });
 
   async function show(tree: (d: LoadedData) => ReturnType<typeof h>): Promise<HTMLElement> {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
-      url.startsWith("/api/sv/next-steps")
-        ? { ok: true, json: async () => ({ steps: [STEP] }) }
-        : { ok: false, json: async () => ({}) }));
+    stubFetch();
     root = document.createElement("div");
     document.body.appendChild(root);
     await act(async () => { render(tree(data()), root!); });
@@ -157,43 +222,94 @@ describe("HealthSummary", () => {
     return root;
   }
 
+  const left = (el: HTMLElement) => el.querySelector<HTMLElement>(".left")!;
+  const right = (el: HTMLElement) => el.querySelector<HTMLElement>(".right")!;
   const card = (el: HTMLElement, label: string) =>
     [...el.querySelectorAll<HTMLButtonElement>(".overview-stat-open")].find((c) => c.getAttribute("aria-label")!.startsWith(label))!;
+  const zoneButton = (el: HTMLElement, name: string) =>
+    [...el.querySelectorAll<HTMLButtonElement>(".summary-zone-filter")].find((b) => b.textContent === `!${name}`)!;
   const titles = (el: HTMLElement) => [...el.querySelectorAll(".health-action-title")].map((t) => t.textContent);
 
-  it("puts the combined list, each item tagged by kind, under the stats", async () => {
-    const el = await show((d) => h(HealthSummary, { data: d }));
-    expect(el.querySelector(".health-summary > .overview-stats + .health-actions")).not.toBeNull();
-    expect([...el.querySelectorAll(".health-action-row .health-kind")].map((k) => k.textContent))
-      .toEqual(["Next step", "Problem", "Suggestion", "Suggestion"]);
+  it("puts only visuals and numbers on the left, and every recommended fix on the right", async () => {
+    const el = await show(topRow);
+    // Left: the stat cards, the language pie, the zone and role bars — no list.
+    const statLabels = left(el).querySelectorAll(".overview-stat:not(.overview-stat--signals) .overview-stat-label");
+    expect([...statLabels].map((l) => l.firstChild?.textContent)).toEqual([
+      "Files", "Zones", "Avg cohesion", "Avg coupling", "SDLC readiness", "Cross-zone imports",
+    ]);
+    expect(left(el).querySelector(".lang-pie-chart")).not.toBeNull();
+    expect(left(el).querySelector('[aria-label="Largest zones"]')).not.toBeNull();
+    expect(left(el).querySelector(".health-actions, .health-action")).toBeNull();
+    expect(left(el).textContent).not.toContain("What to do");
+    // Right: one list holding every kind, each with "+ PRD".
+    expect([...right(el).querySelectorAll(".health-action-row .health-kind")].map((k) => k.textContent)).toEqual([
+      "Next step", "Readiness", "Readiness", "Problem", "Suggestion", "Suggestion", "Boundary", "Pattern", "Move file",
+    ]);
+    expect(right(el).querySelectorAll(".health-action-add")).toHaveLength(9);
   });
 
-  it("highlights the items a metric concerns while its card is hovered or focused", async () => {
-    const el = await show((d) => h(HealthSummary, { data: d }));
-    act(() => { card(el, "Avg coupling").focus(); });
-    expect(el.querySelector(".health-actions")?.className).toContain("health-actions--lit");
-    expect([...el.querySelectorAll(".health-action--lit .health-action-title")].map((t) => t.textContent))
+  it("keeps the '!' on zones with issues, on the left", async () => {
+    const el = await show(topRow);
+    const zoneLabels = left(el).querySelectorAll('[aria-label="Largest zones"] .tile-sum-bar-label');
+    expect([...zoneLabels].map((l) => l.textContent)).toEqual(["!CORE", "!ADMIN", "!WEB-VIEWER"]);
+  });
+
+  it("filters the fixes to a '!' zone when it is pressed, and clears the filter", async () => {
+    const el = await show(topRow);
+    act(() => zoneButton(el, "ADMIN").click());
+    expect(zoneButton(el, "ADMIN").getAttribute("aria-pressed")).toBe("true");
+    expect(titles(right(el))).toEqual([
+      "Rename the admin helpers",
+      "web-viewer imports admin/a.ts across a boundary",
+      "Move admin/a.ts into web-viewer",
+    ]);
+    expect(right(el).querySelector(".health-actions-filter")?.textContent).toBe("ADMIN · 3 ×");
+    act(() => right(el).querySelector<HTMLButtonElement>(".health-actions-filter")!.click());
+    expect(titles(right(el))).toHaveLength(9);
+    expect(zoneButton(el, "ADMIN").getAttribute("aria-pressed")).toBe("false");
+    // Pressing it twice clears it too.
+    act(() => zoneButton(el, "CORE").click());
+    expect(titles(right(el))).toEqual(["Split the god page"]);
+    act(() => zoneButton(el, "CORE").click());
+    expect(titles(right(el))).toHaveLength(9);
+  });
+
+  it("filters the fixes to what a stat card concerns, and a second element replaces the first", async () => {
+    const el = await show(topRow);
+    act(() => card(left(el), "SDLC readiness").click());
+    expect(titles(right(el))).toEqual(["Testing: No test command", "CI: CI skips tests"]);
+    act(() => card(left(el), "Avg cohesion").click());
+    expect(card(left(el), "SDLC readiness").getAttribute("aria-pressed")).toBe("false");
+    expect(titles(right(el))).toEqual(["Split the god page"]);
+  });
+
+  it("highlights the fixes a hovered element concerns", async () => {
+    const el = await show(topRow);
+    act(() => { card(left(el), "Avg coupling").focus(); });
+    expect(right(el).querySelector(".health-actions")?.className).toContain("health-actions--lit");
+    expect([...right(el).querySelectorAll(".health-action--lit .health-action-title")].map((t) => t.textContent))
       .toEqual(["Bidirectional imports between web and rex"]);
-    act(() => { card(el, "Avg coupling").blur(); });
-    expect(el.querySelector(".health-actions--lit")).toBeNull();
+    act(() => { card(left(el), "Avg coupling").blur(); });
+    expect(right(el).querySelector(".health-actions--lit")).toBeNull();
+    act(() => { zoneButton(el, "CORE").dispatchEvent(new MouseEvent("mouseenter")); });
+    expect([...right(el).querySelectorAll(".health-action--lit .health-action-title")].map((t) => t.textContent))
+      .toEqual(["Split the god page"]);
   });
 
-  it("filters the list to a metric's items when its card is clicked, and clears it", async () => {
-    const el = await show((d) => h(HealthSummary, { data: d }));
-    act(() => card(el, "Avg cohesion").click());
-    expect(card(el, "Avg cohesion").getAttribute("aria-pressed")).toBe("true");
-    expect(titles(el)).toEqual(["Split the god page"]);
-    act(() => el.querySelector<HTMLButtonElement>(".health-actions-filter")!.click());
-    expect(titles(el)).toHaveLength(4);
-    act(() => card(el, "Avg cohesion").click());
-    act(() => card(el, "Avg cohesion").click());
-    expect(titles(el)).toHaveLength(4);
-  });
-
-  it("names a hovered item's zones beside the map, or says it adds files the map cannot show", async () => {
+  it("does not filter from inside the opened visuals tile", async () => {
     const el = await show((d) => h(AnalyzeActionsProvider, { data: d },
-      h(HealthSummary, { data: d }),
-      h("div", { class: "map" }, h(MapPanel, { data: d }))));
+      h("div", { class: "left" }, h(GlancePanel, { data: d, opened: true, setDetail: vi.fn() })),
+      h("div", { class: "right" }, h(RecommendationsPanel, { data: d }))));
+    expect(left(el).querySelector(".summary-zone-filter")).toBeNull();
+    const cohesion = card(left(el), "Avg cohesion");
+    expect(cohesion.getAttribute("aria-pressed")).toBeNull();
+    act(() => cohesion.click());
+    expect(titles(right(el))).toHaveLength(9);
+    expect(right(el).querySelector(".health-actions-filter")).toBeNull();
+  });
+
+  it("names a hovered fix's zones beside the map, or says it adds files the map cannot show", async () => {
+    const el = await show(topRow);
     const item = (title: string) => [...el.querySelectorAll<HTMLElement>(".health-action")]
       .find((li) => li.querySelector(".health-action-title")?.textContent === title)!;
     const note = () => el.querySelector(".map .map-note")?.textContent ?? null;
@@ -220,25 +336,22 @@ describe("adding recommendations to the PRD", () => {
     delete (window as { __NDX_DEPLOYED__?: unknown }).__NDX_DEPLOYED__;
   });
 
-  async function show(tree: (d: LoadedData) => ReturnType<typeof h>): Promise<HTMLElement> {
+  async function show(opened = false): Promise<HTMLElement> {
     posted = [];
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-      if (url.startsWith("/api/sv/next-steps")) return { ok: true, json: async () => ({ steps: [STEP] }) };
-      if (url === "/api/rex/capture-recommendations") {
-        const body = JSON.parse(String(init?.body)) as { items: Array<Record<string, unknown>> };
-        posted.push(body);
-        // The first item of any request is already in the PRD; the rest are added.
-        const results = body.items.map((_, i) => (i === 0 && body.items.length > 1 ? "exists" : "created"));
-        return {
-          ok: true,
-          json: async () => ({ ok: true, destination: "Inbox", results, created: results.filter((r) => r === "created").length, skipped: results.filter((r) => r === "exists").length }),
-        };
-      }
-      return { ok: false, json: async () => ({}) };
-    }));
+    stubFetch((url, init) => {
+      if (url !== "/api/rex/capture-recommendations") return undefined;
+      const body = JSON.parse(String(init?.body)) as { items: Array<Record<string, unknown>> };
+      posted.push(body);
+      // The first item of any request is already in the PRD; the rest are added.
+      const results = body.items.map((_, i) => (i === 0 && body.items.length > 1 ? "exists" : "created"));
+      return {
+        ok: true,
+        json: async () => ({ ok: true, destination: "Inbox", results, created: results.filter((r) => r === "created").length, skipped: results.filter((r) => r === "exists").length }),
+      };
+    });
     root = document.createElement("div");
     document.body.appendChild(root);
-    await act(async () => { render(tree(data()), root!); });
+    await act(async () => { render(h(RecommendationsPanel, { data: data(), opened }), root!); });
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     return root;
   }
@@ -247,7 +360,7 @@ describe("adding recommendations to the PRD", () => {
     .find((li) => li.querySelector(".health-action-title")?.textContent === title)!;
 
   it("adds one recommendation from its row, sending what it found, then says it was added", async () => {
-    const el = await show((d) => h(HealthSummary, { data: d }));
+    const el = await show();
     const add = row(el, "Rename the admin helpers").querySelector<HTMLButtonElement>(".health-action-add")!;
     expect(add.textContent).toBe("+ PRD");
     act(() => add.click());
@@ -258,37 +371,36 @@ describe("adding recommendations to the PRD", () => {
     expect(el.querySelector(".health-actions-captured")?.textContent).toBe("✓ Added 1 to the Inbox");
   });
 
-  it("opened, adds every item shown after a confirm, and marks each as the server reports", async () => {
-    const el = await show((d) => h(HealthDetail, { data: d, openTile: vi.fn(), setDetail: vi.fn() }));
+  it("opened, shows each fix and adds every item shown after a confirm, marking each as the server reports", async () => {
+    const el = await show(true);
+    expect(row(el, "Testing: No test command").querySelector(".health-action-detail")?.textContent).toBe("A `test` script");
     const addAll = el.querySelector<HTMLButtonElement>(".health-actions-add-all")!;
-    expect(addAll.textContent).toBe("+ Add 4 recommendations to PRD");
+    expect(addAll.textContent).toBe("+ Add 9 recommendations to PRD");
     act(() => addAll.click());
     expect(posted).toHaveLength(0);
     act(() => el.querySelector<HTMLButtonElement>(".health-actions-add-confirm")!.click());
     await settle();
-    expect(posted[0]!.items.map((i) => i.title)).toEqual([
-      "Split the god page", "Bidirectional imports between web and rex", "Rename the admin helpers", "Extract a base handler",
-    ]);
-    expect([...el.querySelectorAll(".health-action-add")].map((b) => b.textContent)).toEqual(["✓ In PRD", "✓ Added", "✓ Added", "✓ Added"]);
-    expect(el.querySelector(".health-actions-captured")?.textContent).toBe("✓ Added 3 to the Inbox (1 already in the PRD)");
+    expect(posted[0]!.items[0]!.title).toBe("Split the god page");
+    expect(posted[0]!.items).toHaveLength(9);
+    const states = [...el.querySelectorAll(".health-action-add")].map((b) => b.textContent);
+    expect(states[0]).toBe("✓ In PRD");
+    expect(states.slice(1).every((s) => s === "✓ Added")).toBe(true);
+    expect(el.querySelector(".health-actions-captured")?.textContent).toBe("✓ Added 8 to the Inbox (1 already in the PRD)");
     // Nothing left to add: the bulk control goes away.
     expect(el.querySelector(".health-actions-add-all")).toBeNull();
   });
 
-  it("sends a readiness gap's remedy as its acceptance criterion", async () => {
-    const el = await show((d) => h(AnalyzeActionsProvider, { data: d }, h(InfraArchPanel, { data: d })));
-    // The delivery read failed in this stub, so the list holds the findings; a gap is checked directly.
+  it("sends a readiness gap's remedy as its acceptance criterion", () => {
     const gap = buildInfraActions(data(), READINESS).items[0]!;
     expect(recommendationPayload(gap)).toEqual({
       title: "Testing: No test command", detail: "A `test` script", kind: "gap", level: "high", zones: [],
       note: "Not on the map — closing it adds files: A `test` script", acceptanceCriteria: ["A `test` script"],
     });
-    expect(el.querySelectorAll(".health-action-add").length).toBeGreaterThan(0);
   });
 
   it("offers no add in a static export, which has no server to write the PRD", async () => {
     window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
-    const el = await show((d) => h(HealthSummary, { data: d }));
+    const el = await show();
     expect(el.querySelectorAll(".health-action")).not.toHaveLength(0);
     expect(el.querySelector(".health-action-add")).toBeNull();
   });

@@ -23,8 +23,6 @@ import type { JobTray } from "../hooks/index.js";
 import {
   Overview,
   AnalysisStatus,
-  HealthSummary,
-  HealthDetail,
   MapPanel,
   Graph,
   IsoMapView,
@@ -71,8 +69,8 @@ import { PlanHealth } from "./plan-health.js";
 import { SpecGapsPanel } from "./spec-gaps.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
-import { SummaryPanel } from "./summary-panel.js";
-import { InfraArchPanel } from "./infra-arch.js";
+import { GlancePanel } from "./glance.js";
+import { RecommendationsPanel } from "./recommendations-panel.js";
 import { AnalyzeActionsProvider } from "./analyze-actions-context.js";
 import { SpendSummary } from "./spend-summary.js";
 import type { TileGridApi } from "./stage-tiles.js";
@@ -195,11 +193,8 @@ function stage(id: StageId): ViewRenderer {
 function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ctx: ViewRenderContext): ComponentChild {
   switch (panel) {
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
-    case "health": return opened
-      ? h(HealthDetail, { data: ctx.data, openTile: grid.openTile, setDetail: ctx.setDetail, navigateTo: ctx.navigateTo })
-      : h(HealthSummary, { data: ctx.data });
-    case "infra-arch": return h(InfraArchPanel, { data: ctx.data, opened });
-    case "summary": return h(SummaryPanel, { data: ctx.data, opened });
+    case "glance": return h(GlancePanel, { data: ctx.data, opened, setDetail: ctx.setDetail });
+    case "recommendations": return h(RecommendationsPanel, { data: ctx.data, opened, navigateTo: ctx.navigateTo });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
