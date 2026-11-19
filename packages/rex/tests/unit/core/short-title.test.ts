@@ -59,6 +59,20 @@ describe("findNameCollision", () => {
     expect(findNameCollision(items, "Refunds")).toBeUndefined();
   });
 
+  it("treats names that differ only in Unicode normalization form as equal", () => {
+    const open = [item("n", "Caf\u00e9 menu", "pending")]; // NFC: precomposed é
+    expect(findNameCollision(open, "Cafe\u0301 menu")?.id).toBe("n"); // NFD: e + combining acute
+    expect(findNameCollision([item("w", "\uFF37allets", "pending")], "Wallets")?.id).toBe("w"); // fullwidth W (NFKC)
+  });
+
+  it("treats names that differ only by zero-width characters as equal", () => {
+    const open = [item("z", "Wallets", "pending")];
+    for (const zw of ["\u200B", "\u200C", "\u200D", "\uFEFF"]) {
+      expect(findNameCollision(open, `Wal${zw}lets`)?.id).toBe("z");
+    }
+    expect(findNameCollision([item("z2", "Wal\u200Blets", "pending")], "Wallets")?.id).toBe("z2");
+  });
+
   it("skips the item itself", () => {
     expect(findNameCollision(items, "Apple Pay", "a")).toBeUndefined();
   });

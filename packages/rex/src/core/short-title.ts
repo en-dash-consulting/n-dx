@@ -7,6 +7,7 @@
  * a short title that matches another open item's shown name is refused,
  * naming that item. Items in any other status (completed above all) are
  * exempt, so a follow-up to finished work may reuse its name. Names compare
+ * as people see them: NFKC-normalized, zero-width characters removed,
  * trimmed, with runs of whitespace collapsed and case ignored.
  *
  * Works on v1 items and v2 change-layer nodes alike: both carry `id`,
@@ -45,7 +46,11 @@ export function holdsName(status: string | undefined): boolean {
   return NAME_HOLDING_STATUSES.has(status ?? "pending");
 }
 
-const nameKey = (name: string): string => name.trim().replace(/\s+/g, " ").toLowerCase();
+/** Zero-width space, non-joiner and joiner, and the byte-order mark: invisible, so never part of a name. */
+const ZERO_WIDTH = /[\u200B-\u200D\uFEFF]/g;
+
+const nameKey = (name: string): string =>
+  name.normalize("NFKC").replace(ZERO_WIDTH, "").trim().replace(/\s+/g, " ").toLowerCase();
 
 /** The open item, other than `selfId`, whose shown name matches `name`. */
 export function findNameCollision(items: readonly NamedItem[], name: string, selfId?: string): NamedItem | undefined {
