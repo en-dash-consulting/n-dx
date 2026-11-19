@@ -3039,10 +3039,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         ? "not-consulted"
         : config.sessionStrategy === "cold"
           ? "configured-cold"
-          // `resolveSessionStrategy` degrades to cold for any vendor or
-          // provider that cannot resume a session by id. Saying so is the
-          // difference between "forking is off" and "forking was asked for and
-          // this vendor cannot do it".
+          // Forking needs a supported CLI surface and a reusable identity;
+          // resume support alone does not make a warm parent safe to fork.
           : forkCapability?.supported && !forkCapability.reusable
             ? "identity-unavailable"
             : "fork-unsupported",
@@ -3083,13 +3081,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   }
 
   if (sessionStrategy === "fork") {
-    // Hash values without logging/storing credentials. A changed child environment
-    // invalidates orientation even if model and source analysis are unchanged.
-    const identityHash = createHash("sha256").update(JSON.stringify([
+    // Codex binds orientation to the full execution identity without persisting
+    // credentials. Preserve Claude's historical parent admission checks.
+    const identityHash = vendor === "codex" ? createHash("sha256").update(JSON.stringify([
       run.worktreeRoot ?? projectDir, chainRefIdentity(run), policyFingerprint(policy),
       cliBinary, forkCapability?.version, forkCapability?.identity, config.permissionMode,
       Object.entries(cliEnv ?? process.env).sort(([a], [b]) => a.localeCompare(b)),
-    ])).digest("hex");
+    ])).digest("hex") : undefined;
     const decision = await ensureWarmParent({
       identityHash,
       codexOrientationFlags: forkCapability?.orientationFlags,
