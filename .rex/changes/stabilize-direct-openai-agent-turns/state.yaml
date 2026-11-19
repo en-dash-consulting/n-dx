@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "c310c598-8a67-4fbb-b8ea-42adeed7f90e":
+    status: "completed"
+    startedAt: "2026-11-19T16:55:43.443Z"
+    completedAt: "2026-11-19T17:14:37.732Z"
+    endedAt: "2026-11-19T17:14:37.732Z"
+    activeIntervals: [{"end":"2026-11-19T17:14:37.732Z","start":"2026-11-19T16:55:43.443Z"}]
+    appliedAt: "2026-11-19T17:14:37.732Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-19T16:51:50.185Z"
+    lastModified: "2026-11-19T17:14:37.732Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

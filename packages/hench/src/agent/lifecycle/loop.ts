@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { setTimeout as delay } from "node:timers/promises";
 import { OpenAiFailover } from "./openai-failover.js";
 import { OpenAiAgentTurn } from "./openai-agent-turn.js";
 import type { PRDStore } from "../../prd/rex-gateway.js";
@@ -157,20 +158,25 @@ async function rejectUnvalidatedCompletion(args: {
 async function callWithRetry(
   client: Anthropic,
   params: Anthropic.MessageCreateParamsNonStreaming,
+  signal: AbortSignal,
 ): Promise<Anthropic.Message> {
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    signal.throwIfAborted();
     try {
-      return await client.messages.create(params);
+      const response = await client.messages.create(params, { signal });
+      signal.throwIfAborted();
+      return response;
     } catch (err) {
+      signal.throwIfAborted();
       lastError = err as Error;
       const status = (err as { status?: number }).status;
 
       if (status && RETRY_STATUS_CODES.has(status) && attempt < MAX_RETRIES) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
+        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delayMs}ms`);
+        await delay(delayMs, undefined, { signal });
         continue;
       }
 
@@ -206,14 +212,16 @@ async function callWithFailover(
   taskId: string,
   testCommand: string | undefined,
   startingHead: string | undefined,
+  signal: AbortSignal,
 ): Promise<Anthropic.Message> {
   let client = currentClient;
   let currentVendor = originalVendor;
   let currentModel = originalModel;
 
   try {
-    return await callWithRetry(client, params);
+    return await callWithRetry(client, params, signal);
   } catch (originalError) {
+    signal.throwIfAborted();
     // If failover is disabled, rethrow immediately (no-op path)
     if (!llmConfig.autoFailover) {
     throw originalError;
@@ -234,6 +242,7 @@ async function callWithFailover(
     let attemptNumber = 1;
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      signal.throwIfAborted();
       const failoverResult = getNextFailoverAttempt(attemptNumber, originalVendor as any, llmConfig);
 
       if (failoverResult.isExhausted) {
@@ -261,7 +270,7 @@ async function callWithFailover(
         // Only the client is taken; the loop's own tool context keeps its backstop.
         const apiResources = await initApiResources(
           provider, config, henchDir, projectDir, store, taskId,
-          testCommand, startingHead, undefined, undefined,
+          testCommand, startingHead, undefined, signal,
         );
         client = apiResources.client;
         currentVendor = apiResources.vendor;
@@ -275,8 +284,9 @@ async function callWithFailover(
         if (nextEffort) updatedParams.output_config = { effort: nextEffort };
 
         // Try the call with the new client/model
-        return await callWithRetry(client, updatedParams);
+        return await callWithRetry(client, updatedParams, signal);
       } catch (failoverError) {
+        signal.throwIfAborted();
         // This failover attempt failed; continue to next in chain
         attemptNumber++;
       }
@@ -2193,11 +2203,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       // Check if cancellation was requested
-      if (cancelled || signal.aborted) {
-        run.status = "cancelled";
-        stream("Cancelled", "Run interrupted by user");
-        break;
-      }
+      signal.throwIfAborted();
       if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
       run.turns = turn + 1;
@@ -2267,6 +2273,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
           taskId,
           brief.project.testCommand,
           startingHead,
+          signal,
         ),
       );
       const _latencyMs = Date.now() - _t0;
@@ -2290,7 +2297,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, turnVendor, turnModel);
       }
       signal.throwIfAborted();
-      if (response.stop_reason === "refusal") throw new Error("OpenAI refused the agent request");
+      if (response.stop_reason === "refusal") throw new Error(`${turnVendor === "codex" ? "OpenAI" : "Claude"} refused the agent request`);
 
       // Emit tok/s metric — parsed by the web server for live dashboard display
       {
@@ -2312,7 +2319,11 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       // Process response content
       const assistantContent = response.content;
-      messages.push({ role: "assistant", content: assistantContent });
+      // A reasoning-only token limit leaves no assistant content for either
+      // provider to replay. Claude rejects an empty message in its history.
+      if (assistantContent.length || response.stop_reason !== "max_tokens") {
+        messages.push({ role: "assistant", content: assistantContent });
+      }
 
       streamAssistantText(assistantContent, formatModelLabel(turnModel));
 
@@ -2397,6 +2408,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       // Process tool calls
       const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run, livelock, signal);
+      signal.throwIfAborted();
       if (await failOnLivelock(livelock, run, store, taskId)) break;
       messages.push({ role: "user", content: toolResults });
 
@@ -2406,6 +2418,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     }
 
     if (run.status === "running") {
+      signal.throwIfAborted();
       run.status = "timeout";
       run.error = `Exceeded max turns (${maxTurns})`;
 
@@ -2416,12 +2429,13 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       run.vendor = openAi.selection.vendor;
       run.model = openAi.selection.model;
     }
-    if (run.status !== "budget_exceeded") {
+    if (signal.aborted || run.status !== "budget_exceeded") {
       run.status = signal.aborted ? "cancelled" : "failed";
       run.error = signal.aborted ? "Run interrupted by user" : (err as Error).message;
       console.error(`[Error] ${run.error}`);
 
-      await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
+      await handleRunFailure(store, taskId, signal.aborted || openAi ? "pending" : "deferred",
+        signal.aborted ? "task_cancelled" : "task_failed", run.error);
     }
   } finally {
     // Remove SIGINT handler to restore default behavior
