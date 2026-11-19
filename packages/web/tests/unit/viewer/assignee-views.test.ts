@@ -106,6 +106,17 @@ describe("the Inbox assignee filter", () => {
     expect([...filterSelect().options].map((o) => o.textContent)).toEqual(["Mine", "All", "Ann Lee", "Bo Chen"]);
   });
 
+  it("flags a row that is the current user by email but not in the spelling ndx work --mine matches", async () => {
+    serve({ me: ME, people: PEOPLE });
+    await mount(h(InboxView, { rows: rows([change("loose", { assignee: "ann@shop.io" }), change("exact", { assignee: ME })]), appliedUnplaced: 0, onOpenChange: vi.fn() }));
+    // Both count as Mine here; only the exact spelling is one the CLI selects.
+    expect(ids()).toEqual(["loose", "exact"]);
+    const flag = (id: string) => root.querySelector(`.inbox-row[data-change-id="${id}"] .assignee-mismatch`)?.textContent;
+    // The project's CLI name fills the command; this harness serves no /api/project.
+    expect(flag("loose")).toMatch(/^not matched by \S+ work --mine$/);
+    expect(flag("exact")).toBeUndefined();
+  });
+
   it("opens on All when nothing here is assigned to the current user", async () => {
     serve({ me: "Cy <cy@shop.io>", people: PEOPLE });
     await mount(h(InboxView, { rows: rows(inbox), appliedUnplaced: 0, onOpenChange: vi.fn() }));

@@ -52,6 +52,28 @@ describe("mergePeople", () => {
     expect(people).toEqual([{ id: "Bo Chen <bo@shop.io>", name: "Bo Chen", email: "bo@shop.io", sources: ["steward", "git"] }]);
   });
 
+  it("gives the current user's exact identity to their email over every shortlog spelling", () => {
+    // Shortlog lists the most commits first; `me` is the spelling `ndx work --mine` matches.
+    const people = mergePeople([
+      { id: "Ann Lee <ann@shop.io>", source: "me" },
+      { id: "ann lee <ann@shop.io>", source: "git" },
+      { id: "ann@shop.io <ann@shop.io>", source: "git" },
+      { id: "ann@shop.io", source: "steward" },
+    ]);
+    expect(people).toEqual([
+      { id: "Ann Lee <ann@shop.io>", name: "Ann Lee", email: "ann@shop.io", sources: ["me", "git", "steward"] },
+    ]);
+  });
+
+  it("lets the current user's spelling win even when it is read last", () => {
+    const people = mergePeople([
+      { id: "A <ann@shop.io>", source: "git" },
+      { id: "ann@shop.io", source: "me" },
+      { id: "Ann Lee <ann@shop.io>", source: "git" },
+    ]);
+    expect(people.map((p) => p.id)).toEqual(["ann@shop.io"]);
+  });
+
   it("keeps team handles and sorts by name", () => {
     const people = mergePeople([
       { id: "Zed <z@shop.io>", source: "git" },
@@ -86,7 +108,8 @@ describe("GET /api/rex/people", () => {
     const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "ignore" });
     git("init", "-q", "-b", "main");
     git("config", "commit.gpgsign", "false");
-    for (const [name, email] of [["Ann Lee", "ann@shop.io"], ["Bo Chen", "bo@shop.io"]]) {
+    // Ann commits as "ann lee"; her git config (the pinned actor) says "Ann Lee".
+    for (const [name, email] of [["ann lee", "ann@shop.io"], ["Bo Chen", "bo@shop.io"]]) {
       writeFileSync(join(dir, `${name}.txt`), name);
       git("add", "-A");
       git("-c", `user.name=${name}`, "-c", `user.email=${email}`, "commit", "-q", "-m", `work by ${name}`);
@@ -101,21 +124,21 @@ describe("GET /api/rex/people", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("lists git authors and stewards, deduplicated by email, with the current user", async () => {
+  it("lists the current user, git authors and stewards, deduplicated by email, in the CLI's spelling", async () => {
     const res = await fetch(`${started.baseUrl}/api/rex/people`);
     expect(res.status).toBe(200);
     const body = await res.json() as PeopleAnswer;
     expect(body.me).toBe("Ann Lee <ann@shop.io>");
     expect(body.people).toEqual([
       { id: "@shop/core", name: "@shop/core", sources: ["steward"] },
-      { id: "Ann Lee <ann@shop.io>", name: "Ann Lee", email: "ann@shop.io", sources: ["git", "steward"] },
+      { id: "Ann Lee <ann@shop.io>", name: "Ann Lee", email: "ann@shop.io", sources: ["me", "git", "steward"] },
       { id: "Bo Chen <bo@shop.io>", name: "Bo Chen", email: "bo@shop.io", sources: ["git"] },
     ]);
   });
 
-  it("answers with the stewards alone outside a git repository", async () => {
+  it("lists the current user even without a commit, outside a git repository", async () => {
     rmSync(join(dir, ".git"), { recursive: true, force: true });
     const body = await (await fetch(`${started.baseUrl}/api/rex/people`)).json() as PeopleAnswer;
-    expect(body.people.map((p) => p.id)).toEqual(["@shop/core", "ann@shop.io"]);
+    expect(body.people.map((p) => p.id)).toEqual(["@shop/core", "Ann Lee <ann@shop.io>"]);
   });
 });

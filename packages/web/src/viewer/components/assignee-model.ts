@@ -42,6 +42,16 @@ export function isMine(assignee: string | undefined, me: string | null): boolean
   return !!assignee && !!me && identityKey(assignee) === identityKey(me);
 }
 
+/**
+ * Whether `assignee` is the current user by email but not in the exact
+ * spelling `ndx work --mine` matches (`Ann <ann@x.io>` against `Ann Lee
+ * <ann@x.io>`, or a bare email). The dashboard counts it as Mine; the CLI
+ * never selects it, so the row says so.
+ */
+export function mineButNotForCli(assignee: string | undefined, me: string | null): boolean {
+  return isMine(assignee, me) && assignee!.trim() !== me!.trim();
+}
+
 /** Mine when the current user has an open item assigned, otherwise All. */
 export function defaultAssigneeFilter(rows: readonly AssignableRow[], me: string | null): AssigneeFilterValue {
   return rows.some((r) => r.open && isMine(r.assignee, me)) ? "mine" : "all";

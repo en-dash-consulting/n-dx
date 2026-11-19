@@ -13,6 +13,7 @@ import {
   isMine,
   knownFilter,
   matchesAssigneeFilter,
+  mineButNotForCli,
   personLabel,
   pickerChoices,
 } from "../../../src/viewer/components/assignee-model.js";
@@ -98,7 +99,26 @@ describe("pickerChoices", () => {
   });
 });
 
+describe("mineButNotForCli", () => {
+  it("flags the current user's email under another spelling, which ndx work --mine never selects", () => {
+    expect(mineButNotForCli("ann@shop.io", ME)).toBe(true);
+    expect(mineButNotForCli("Ann L <ann@shop.io>", ME)).toBe(true);
+  });
+
+  it("does not flag the exact identity, someone else, or an unknown user", () => {
+    expect(mineButNotForCli(ME, ME)).toBe(false);
+    expect(mineButNotForCli(BO.id, ME)).toBe(false);
+    expect(mineButNotForCli("ann@shop.io", null)).toBe(false);
+  });
+});
+
 describe("assigneeFromInput", () => {
+  it("saves the current user's exact identity when they type their own email", () => {
+    // The people list leads with `me` (the server merges it first), even with no commits.
+    const me: KnownPerson = { id: ME, name: "Ann Lee", email: "ann@shop.io", sources: ["me"] };
+    expect(assigneeFromInput("ann@shop.io", [me, BO])).toBe(ME);
+  });
+
   it("saves a known person's id when their email is typed", () => {
     expect(assigneeFromInput(" bo@shop.io ", [ANN, BO])).toBe(BO.id);
   });

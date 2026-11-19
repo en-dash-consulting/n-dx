@@ -111,9 +111,10 @@ function Intent({ intent }: { intent: string }) {
   );
 }
 
-/** What a row needs to assign its change: the picker's suggestions, and a save. */
+/** What a row needs to assign its change: the picker's suggestions, the current user, and a save. */
 interface Assigning {
   people: readonly KnownPerson[];
+  me: string | null;
   onAssign: (id: string, assignee: string) => Promise<void>;
 }
 
@@ -126,6 +127,7 @@ function Assignee({ change, assigning }: { change: ChangeRow; assigning: Assigni
     itemId: change.id,
     assignee: change.assignee,
     people: assigning.people,
+    me: assigning.me,
     onSave: (assignee: string) => assigning.onAssign(change.id, assignee),
   });
 }
@@ -362,6 +364,7 @@ export function ChangesView({ changes: allChanges, onSelectChange, area = null, 
   const assigneeFilter = useAssigneeFilter(assignable, peopleRead);
   const assigning: Assigning = {
     people: useMemo(() => pickerChoices(peopleRead?.people ?? [], allChanges.map((c) => c.assignee)), [peopleRead, allChanges]),
+    me: peopleRead?.me ?? null,
     onAssign: async (id, assignee) => { await saveAssignee(id, assignee); onAssigned?.(); },
   };
   // The assignee filter hides rows only: every count and group below is of what it shows.

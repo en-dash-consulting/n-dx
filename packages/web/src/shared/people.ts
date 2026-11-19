@@ -11,8 +11,12 @@
  * @module shared/people
  */
 
-/** Where the repository knows a person from. */
-export type PersonSource = "git" | "steward";
+/**
+ * Where the repository knows a person from. `me` is the current user, as
+ * rex's `resolveActor` gives them: that spelling is the one `ndx work --mine`
+ * matches exactly, so it wins over every other spelling of the same email.
+ */
+export type PersonSource = "me" | "git" | "steward";
 
 /** One entry of `GET /api/rex/people`. */
 export interface KnownPerson {

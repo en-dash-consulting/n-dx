@@ -45,6 +45,11 @@
   color: var(--text);
 }
 
+.assignee-mismatch {
+  color: var(--orange);
+  font-size: var(--font-xs);
+}
+
 .assignee-error {
   color: var(--red);
   font-size: var(--font-xs);

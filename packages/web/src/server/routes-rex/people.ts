@@ -35,8 +35,10 @@ export function parseShortlog(out: string): string[] {
 
 /**
  * One entry per person, keyed by email. A person seen as a git author and as a
- * steward is one entry with both sources; the git `Name <email>` id wins, since
- * it is the identity `resolveActor` reports. Sorted by name, then email.
+ * steward is one entry with both sources. The current user's (`me`) spelling
+ * wins outright: it is the exact string `ndx work --mine` matches, so picking
+ * or typing yourself must save it, not the shortlog's spelling of the same
+ * email. Otherwise the first `Name <email>` seen wins. Sorted by name, then email.
  */
 export function mergePeople(entries: ReadonlyArray<{ id: string; source: PersonSource }>): KnownPerson[] {
   const byKey = new Map<string, KnownPerson>();
@@ -50,7 +52,13 @@ export function mergePeople(entries: ReadonlyArray<{ id: string; source: PersonS
       byKey.set(key, { id, ...(name ? { name } : {}), ...(email ? { email } : {}), sources: [source] });
       continue;
     }
+    const isMe = known.sources.includes("me");
     if (!known.sources.includes(source)) known.sources.push(source);
+    if (source === "me") {
+      byKey.set(key, { id, ...(name ? { name } : {}), ...(email ? { email } : {}), sources: known.sources });
+      continue;
+    }
+    if (isMe) continue;
     if (!known.name && name) {
       known.name = name;
       // A name and an email together are the form `resolveActor` gives.
@@ -111,9 +119,13 @@ export function routePeople(
       productStewards(ctx.rexDir),
       resolveActor(ctx.projectDir),
     ]);
+    const me = actor && actor !== "unknown" ? actor : null;
     const answer: PeopleAnswer = {
-      me: actor && actor !== "unknown" ? actor : null,
+      me,
+      // The current user leads, so their exact identity is the one saved for
+      // their email even when they have no commits yet.
       people: mergePeople([
+        ...(me ? [{ id: me, source: "me" as const }] : []),
         ...authors.map((id) => ({ id, source: "git" as const })),
         ...stewards.map((id) => ({ id, source: "steward" as const })),
       ]),

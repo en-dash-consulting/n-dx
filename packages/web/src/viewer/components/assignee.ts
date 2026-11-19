@@ -14,12 +14,14 @@ import { h } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { KnownPerson } from "../external.js";
 import { errorMessage } from "../utils/format.js";
+import { resolveCliLabel, useCliName } from "../hooks/index.js";
 import {
   assigneeFilterOptions,
   assigneeFromInput,
   defaultAssigneeFilter,
   knownFilter,
   matchesAssigneeFilter,
+  mineButNotForCli,
   personLabel,
   type AssignableRow,
   type AssigneeFilterOption,
@@ -93,7 +95,12 @@ export interface AssigneePickerProps {
   people: readonly KnownPerson[];
   /** Write the value; empty clears. A rejection is shown beside the picker. */
   onSave: (assignee: string) => Promise<void> | void;
+  /** The current user; flags an assignee that is them by email but not to `ndx work --mine`. */
+  me?: string | null;
 }
+
+/** Shown beside an assignee that is the current user by email but not in the CLI's spelling. */
+export const NOT_MATCHED_BY_MINE = "not matched by {cli} work --mine";
 
 /**
  * The assignee and a control to change it. Closed, it is one button naming
@@ -101,7 +108,8 @@ export interface AssigneePickerProps {
  * suggestions. Clicks and keys stay inside it, so a row that opens on click
  * does not open when the picker is used.
  */
-export function AssigneePicker({ itemId, assignee, people, onSave }: AssigneePickerProps) {
+export function AssigneePicker({ itemId, assignee, people, onSave, me = null }: AssigneePickerProps) {
+  const cliName = useCliName();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -164,6 +172,12 @@ export function AssigneePicker({ itemId, assignee, people, onSave }: AssigneePic
           "aria-label": shown ? `Assignee: ${shown}. Change` : "Assign",
           onClick: open,
         }, shown ? personLabel(shown) : "Assign"),
+    !editing && mineButNotForCli(shown, me)
+      ? h("span", {
+          class: "tag assignee-mismatch",
+          title: `Saved as "${shown}"; ${cliName} work --mine selects only "${me}". Pick yourself again to save that spelling.`,
+        }, resolveCliLabel(NOT_MATCHED_BY_MINE, cliName))
+      : null,
     error ? h("span", { class: "assignee-error", role: "alert" }, error) : null,
   );
 }

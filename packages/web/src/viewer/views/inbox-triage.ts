@@ -301,6 +301,7 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
                   itemId: current.id,
                   assignee: current.assignee,
                   people,
+                  me: peopleRead?.me ?? null,
                   onSave: async (assignee: string) => { await saveAssignee(current.id, assignee); refetch(); },
                 }),
                 navigateTo

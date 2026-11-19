@@ -1350,6 +1350,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
             itemId: item.id,
             assignee: item.assignee,
             people: pickerChoices(peopleRead?.people ?? [], [item.assignee]),
+            me: peopleRead?.me ?? null,
             onSave: (assignee: string) => onUpdate(item.id, { assignee }),
           }),
         )

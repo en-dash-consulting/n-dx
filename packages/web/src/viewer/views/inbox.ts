@@ -313,11 +313,12 @@ function ageOf(row: InboxRow): string | null {
   return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
-function Row({ row, onOpen, onPlace, people, onAssigned, onAccepted }: {
+function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted }: {
   row: InboxRow;
   onOpen: (id: string) => void;
   onPlace?: (id: string) => void;
   people: readonly KnownPerson[];
+  me: string | null;
   onAssigned?: () => void;
   /** After Accept wrote: read the Inbox again. Absent, no Accept. */
   onAccepted?: () => void;
@@ -355,6 +356,7 @@ function Row({ row, onOpen, onPlace, people, onAssigned, onAccepted }: {
         itemId: change.id,
         assignee: change.assignee,
         people,
+        me,
         onSave: async (assignee: string) => { await saveAssignee(change.id, assignee); onAssigned?.(); },
       }),
     ),
@@ -442,7 +444,7 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
         ? h("div", { class: "empty-state inbox-empty inbox-filtered-empty", role: "status" },
             h("p", null, "No Inbox changes match this filter."))
         : h("ul", { class: "inbox-list" },
-            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, onAssigned, onAccepted: onPlaced })),
+            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, me: peopleRead?.me ?? null, onAssigned, onAccepted: onPlaced })),
           ),
     hidden > 0 && onOpenAll
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
