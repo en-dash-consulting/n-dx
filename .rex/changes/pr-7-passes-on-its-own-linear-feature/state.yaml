@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "1b008b11-912e-4eeb-b291-b5c8201daea0":
+    status: "completed"
+    startedAt: "2026-11-19T03:45:11.280Z"
+    completedAt: "2026-11-19T03:45:11.280Z"
+    endedAt: "2026-11-19T03:45:11.280Z"
+    activeIntervals: [{"end":"2026-11-19T03:45:11.280Z","start":"2026-11-19T03:45:11.280Z"}]
+    appliedAt: "2026-11-19T03:45:11.280Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T03:42:03.579Z"
-    lastModified: "2026-11-19T03:42:10.838Z"
+    lastModified: "2026-11-19T03:45:11.280Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6867a04d-1768-4a5c-b71b-bbb13d2dd183":
     status: "completed"
@@ -15,5 +22,12 @@ items:
     lastModified: "2026-11-19T03:44:27.894Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b6a4afb3-252c-4e5f-a6d1-c30c4cb85fc5":
-    lastModified: "2026-11-19T03:42:10.838Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:44:37.199Z"
+    completedAt: "2026-11-19T03:45:11.280Z"
+    endedAt: "2026-11-19T03:45:11.280Z"
+    activeIntervals: [{"end":"2026-11-19T03:45:11.280Z","start":"2026-11-19T03:44:37.199Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Regenerated .claude/skills/iso-map/scripts/iso-map.mjs via scripts/build-iso-skill.mjs (adds config: \"config.json\"); iso-skill-drift 14/14 pass. Commit 92fae99ac."
+    lastModified: "2026-11-19T03:45:11.280Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

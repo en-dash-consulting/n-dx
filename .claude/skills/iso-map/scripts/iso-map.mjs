@@ -2808,7 +2808,9 @@ var DATA_FILES = {
   sdlcProfile: "sdlc-profile.json",
   readiness: "readiness.json",
   infrastructure: "infrastructure.json",
-  outbound: "outbound.json"
+  outbound: "outbound.json",
+  /** Written only when a language pack produced config reads or flag checks. */
+  config: "config.json"
 };
 var ALL_DATA_FILES = Object.values(DATA_FILES);
 
