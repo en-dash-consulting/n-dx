@@ -75,11 +75,13 @@ describe("php docroot routes", () => {
     const files = [...new Set(lines.map((l) => l.split(" ")[2]))];
     // Left out, each guard followed only by declarations, use and require lines:
     // system/Model.php (`defined('BASEPATH') OR exit(...)`), components/com_shop/ShopController.php
-    // (`\defined('_JEXEC') or die`), plugins/acme/acme.php and notice.php (`if (!defined('ABSPATH')) exit`).
+    // (`\defined('_JEXEC') or die`), plugins/acme/acme.php and notice.php (`if (!defined('ABSPATH')) exit`),
+    // and com_shop/CartView.php and router.php, whose guard follows a `use` line or a function.
     expect(files).toEqual([
       "admin/index.php",
       "admin/status/ping.php",
       "admin/users.php",
+      "components/com_shop/checkout.php", // declarations, guard, then output
       "index.php",
       "lib/not-a-guard.php", // `or define(...)` is no guard
       "plugins/acme/settings.php", // guarded, then output

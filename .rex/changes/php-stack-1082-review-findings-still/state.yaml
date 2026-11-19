@@ -126,7 +126,14 @@ items:
     lastModified: "2026-11-19T03:44:07.844Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bd91778d-ccce-4732-a205-581368648413":
-    lastModified: "2026-11-19T02:32:52.342Z"
+    status: "completed"
+    startedAt: "2026-11-19T16:13:33.424Z"
+    completedAt: "2026-11-19T16:15:46.154Z"
+    endedAt: "2026-11-19T16:15:46.154Z"
+    activeIntervals: [{"end":"2026-11-19T16:15:46.154Z","start":"2026-11-19T16:13:33.424Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "isFragment accepts any run of declarations before the direct-access guard; fixtures CartView.php, router.php, checkout.php and test expectation added (bc9aee947)."
+    lastModified: "2026-11-19T16:15:46.154Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c2d2a6aa-f957-4cd5-9395-d278659e514b":
     status: "completed"

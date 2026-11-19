@@ -21,12 +21,12 @@
  *   `use`, `const`, `declare`, comments; blank inline text), which is an
  *   included fragment, a fragment behind a direct-access guard (below), and
  *   a file `.htaccess` denies (`php-htaccess.ts`).
- * - `direct-access-guard`: a file whose first statement after `namespace`
- *   and `declare` exits when a constant is not defined (`defined('BASEPATH')
+ * - `direct-access-guard`: a file whose first statement that is not a
+ *   declaration exits when a constant is not defined (`defined('BASEPATH')
  *   OR exit;`, `defined('_JEXEC') or die;`, `if (!defined('ABSPATH')) exit;`,
  *   a block that exits) and whose other statements are declarations or
  *   include/require statements is a fragment: requested directly, it ends
- *   before declaring anything. One with any other top-level statement (output,
+ *   having output nothing. One with any other top-level statement (output,
  *   a call) is a page and stays a route.
  * - `htaccess-access`: a directory's nearest `.htaccess` at or below the
  *   docroot setting directory access decides it; `<Files>`/`<FilesMatch>`
@@ -94,17 +94,15 @@ const DECLARATIONS: ReadonlySet<string> = new Set([
 /** Inline text outside `<?php … ?>` that outputs nothing visible: whitespace, around the tags. */
 const isBlankText = (text: string): boolean => text.replace(/\?>|<\?(php)?/gi, "").trim() === "";
 
-/** Statements that may come before a direct-access guard: PHP requires `declare` first, and a namespace may precede it. */
-const BEFORE_GUARD: ReadonlySet<string> = new Set(["namespace_definition", "declare_statement"]);
-
 const at = (c: Capture): string => `${c.start.line}:${c.start.column}`;
 
 /**
  * An included fragment, never a page: a file whose every top-level statement
- * only declares, or one whose first statement (after `namespace` and
- * `declare`) is a direct-access guard (`defined('X') or exit;`,
- * `if (!defined('X')) exit;`) followed only by declarations and include or
- * require statements. A guarded file with any other top-level statement is a page.
+ * only declares, or one whose first statement that is not a declaration is a
+ * direct-access guard (`defined('X') or exit;`, `if (!defined('X')) exit;`)
+ * followed only by declarations and include or require statements. Requested
+ * directly, declarations before the guard output nothing, so the file still
+ * exits unseen. A guarded file with any other top-level statement is a page.
  */
 function isFragment(file: PackSourceFile): boolean {
   const captures = file.captures[DOCROOT_QUERY] ?? [];
@@ -118,7 +116,7 @@ function isFragment(file: PackSourceFile): boolean {
       !((c.nodeType === "text" || c.nodeType === "text_interpolation") && isBlankText(c.text)),
   );
   if (statements.every((c) => DECLARATIONS.has(c.nodeType))) return true;
-  const first = statements.findIndex((c) => !BEFORE_GUARD.has(c.nodeType));
+  const first = statements.findIndex((c) => !DECLARATIONS.has(c.nodeType));
   if (!guards.has(at(statements[first]!))) return false;
   return statements.slice(first + 1).every((c) => DECLARATIONS.has(c.nodeType) || includes.has(at(c)));
 }
