@@ -98,6 +98,29 @@ describe("placePreview — amends", () => {
     ]);
   });
 
+  it("names another open change amending the target, and marks the after-state uncertain", () => {
+    const model = place({
+      relation: "amends",
+      target: { ...REFUNDS, amendedBy: ["C-12"] },
+      amendment: { added: 1, replaced: 0, removed: 0 },
+    });
+    expect(model.why).toContain("Also amended by C-12");
+    expect(model.after).toEqual([
+      { text: "C-12 also amends it: the first to apply wins, and the other may be refused", caution: true },
+      { text: "Statement: Refund an order (unchanged)" },
+      { text: "3 criteria (+1 added)", caution: true },
+      { text: "Amended by Partial refunds when it is applied", caution: true },
+    ]);
+    // No line is drawn as a plain change.
+    expect(model.after.some((l) => l.changed)).toBe(false);
+  });
+
+  it("says nothing about other amenders for a touches", () => {
+    const model = place({ target: { ...REFUNDS, amendedBy: ["C-12"] } });
+    expect(model.why.some((w) => w.includes("C-12"))).toBe(false);
+    expect(model.after.some((l) => l.caution)).toBe(false);
+  });
+
   it("counts no criteria on a constraint", () => {
     const model = place({ relation: "amends", target: { title: "PCI scope", type: "constraint", area: "" } });
     expect(model.target).toEqual({ title: "PCI scope", kind: "constraint" });
@@ -156,6 +179,12 @@ describe("PlacementPreview", () => {
     expect(root.querySelector<HTMLElement>(".pp-why .inbox-strength")?.dataset.strength).toBe("strong");
     expect([...root.querySelectorAll(".pp-why li")].map((li) => li.textContent)).toContain("Shares the words refund, order");
     expect(root.querySelector(".pp-after li.is-changed")?.textContent).toBe("Touched by Partial refunds");
+  });
+
+  it("draws a cautioned line apart from a plain change", () => {
+    const root = draw(place({ relation: "amends", target: { ...REFUNDS, amendedBy: ["C-12"] } }));
+    expect(root.querySelectorAll(".pp-after li.is-changed")).toHaveLength(0);
+    expect(root.querySelector(".pp-after li.is-caution")?.textContent).toContain("C-12 also amends it");
   });
 
   it("asks for a relation in place of the after", () => {

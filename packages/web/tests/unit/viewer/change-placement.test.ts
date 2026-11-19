@@ -334,6 +334,18 @@ describe("an Inbox change's panel", () => {
     expect(posts).toEqual([]);
   });
 
+  it("warns in the Amends preview when another open change already amends the target", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", { amendedBy: ["C-12"] })])]);
+    await mountSection("a");
+    await pick("cap-1");
+    // A touches is untouched by another amender.
+    expect($(".pp-after .is-caution")).toBeNull();
+    await click($('.cp-relation input[value="amends"]'));
+    expect($(".pp-why")?.textContent).toContain("Also amended by C-12");
+    expect($(".pp-after li.is-caution")?.textContent).toBe("C-12 also amends it: the first to apply wins, and the other may be refused");
+    expect($(".pp-after li.is-changed")).toBeNull();
+  });
+
   it("says a search pick is the person's own", async () => {
     serve([change("a")], [placement("a", [candidate("cap-1")])]);
     await mountSection("a");

@@ -31,10 +31,15 @@ export interface PreviewEnd {
   detail?: string;
 }
 
-/** One line of the before/after; `changed` marks what the write alters. */
+/**
+ * One line of the before/after. `changed` marks what the write alters;
+ * `caution` marks an alteration that may not happen (another open change
+ * amends the same target, and the first to apply wins).
+ */
 export interface PreviewLine {
   text: string;
   changed?: boolean;
+  caution?: boolean;
 }
 
 export interface PreviewModel {
@@ -84,6 +89,8 @@ export interface PlacePreviewInput {
     criteria?: ReadonlyArray<{ id: string; text: string }>;
     strength?: PlacementStrength;
     reasons?: readonly string[];
+    /** Other open changes that already amend the target, by label. */
+    amendedBy?: readonly string[];
   };
   relation: PlacementRelation | null;
   /** True when the target is on rex's shortlist (or the model's pick from it). */
@@ -150,6 +157,17 @@ export function placePreview(input: PlacePreviewInput): PreviewModel {
       }
     }
     after.push({ text: `Amended by ${changeTitle} when it is applied`, changed: true });
+    // Another open change amends the same target: whichever applies first moves its spec,
+    // and the other's amendment may then be refused. The after-state is a hope, not a promise.
+    const others = target.amendedBy ?? [];
+    if (others.length) {
+      const names = others.join(", ");
+      why.push(`Also amended by ${names}`);
+      after = [
+        { text: `${names} also ${others.length === 1 ? "amends" : "amend"} it: the first to apply wins, and the other may be refused`, caution: true },
+        ...after.map(({ text, changed }) => (changed ? { text, caution: true } : { text })),
+      ];
+    }
   }
 
   return {
@@ -203,7 +221,7 @@ function End({ end, role }: { end: PreviewEnd; role: "source" | "target" | "from
 function Lines({ label, lines }: { label: string; lines: PreviewLine[] }) {
   return h("div", { class: `pp-side pp-${label.toLowerCase()}` },
     h("div", { class: "pp-side-label" }, label),
-    h("ul", null, lines.map((l, i) => h("li", { key: i, class: l.changed ? "is-changed" : undefined }, l.text))),
+    h("ul", null, lines.map((l, i) => h("li", { key: i, class: l.caution ? "is-caution" : l.changed ? "is-changed" : undefined }, l.text))),
   );
 }
 

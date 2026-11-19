@@ -138,6 +138,8 @@ export interface PlacementTarget {
   criteria?: Array<{ id: string; text: string }>;
   strength?: PlacementStrength;
   reasons?: string[];
+  /** Other open changes that already amend this target (shortlist rows only). */
+  amendedBy?: string[];
 }
 
 /** A target criterion as the Amends form holds it while it is edited. */

@@ -2041,6 +2041,8 @@ a.tracker-link {
 }
 
 .pp-side li.is-changed { font-weight: 600; }
+/* An alteration another open change may pre-empt: italic as well as coloured. */
+.pp-side li.is-caution { font-style: italic; color: var(--orange); }
 
 /* Apply… for a change awaiting apply (change-apply.ts) */
 .ca-effects {
