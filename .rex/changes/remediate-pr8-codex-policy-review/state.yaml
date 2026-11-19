@@ -1,21 +1,19 @@
 schema: "rex/v2"
 items:
   "126b867f-b94d-4976-84f7-7707e0c8f374":
-    status: "completed"
+    status: "failing"
     startedAt: "2026-11-19T17:18:47.550Z"
-    completedAt: "2026-11-19T17:18:47.550Z"
-    endedAt: "2026-11-19T17:18:47.550Z"
     activeIntervals: [{"end":"2026-11-19T17:18:47.550Z","start":"2026-11-19T17:18:47.550Z"}]
+    failureReason: "PR8 remediation still needs the two introduced scratch edge cases repaired and host verification before final completion."
     appliedAt: "2026-11-19T17:18:47.550Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T16:53:02.152Z"
-    lastModified: "2026-11-19T17:18:47.550Z"
+    lastModified: "2026-11-19T17:25:23.332Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "83b0a2a3-1f01-4f64-8e93-920b6a685b7e":
-    status: "completed"
+    status: "failing"
     startedAt: "2026-11-19T16:55:09.287Z"
-    completedAt: "2026-11-19T17:18:47.550Z"
-    endedAt: "2026-11-19T17:18:47.550Z"
     activeIntervals: [{"end":"2026-11-19T17:18:47.550Z","start":"2026-11-19T16:55:09.287Z"}]
-    lastModified: "2026-11-19T17:18:47.550Z"
+    failureReason: "PR8 remediation still needs the two introduced scratch edge cases repaired and host verification before final completion."
+    lastModified: "2026-11-19T17:25:31.630Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
