@@ -7,7 +7,14 @@ items:
     lastModified: "2026-11-18T22:35:15.727Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "135ce8f7-f173-4382-8d6b-71308fec7f75":
-    lastModified: "2026-11-18T22:35:07.904Z"
+    status: "completed"
+    startedAt: "2026-11-19T02:33:29.998Z"
+    completedAt: "2026-11-19T02:52:53.951Z"
+    endedAt: "2026-11-19T02:52:53.951Z"
+    activeIntervals: [{"end":"2026-11-19T02:52:53.951Z","start":"2026-11-19T02:33:29.998Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "readWrittenImports pairs use clauses/names/aliases/types/prefixes and include paths/guards with owners via innermostEach (n log n); fixture imports byte-identical; counted-work test at 2,000 uses."
+    lastModified: "2026-11-19T02:52:53.951Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2116a61e-04a6-4ad9-a5f3-09eb29f47dff":
     status: "completed"
