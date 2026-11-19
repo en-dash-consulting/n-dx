@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "9716d93e-d1bf-4f14-935a-f3caaaeb597d":
+    status: "completed"
+    startedAt: "2026-11-19T03:48:47.371Z"
+    completedAt: "2026-11-19T03:48:47.371Z"
+    endedAt: "2026-11-19T03:48:47.371Z"
+    activeIntervals: [{"end":"2026-11-19T03:48:47.371Z","start":"2026-11-19T03:48:47.371Z"}]
+    appliedAt: "2026-11-19T03:48:47.371Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T03:47:05.788Z"
-    lastModified: "2026-11-19T03:47:10.429Z"
+    lastModified: "2026-11-19T03:48:47.371Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eae785d9-e20f-4247-92a5-2c04c91fbc91":
-    lastModified: "2026-11-19T03:47:10.429Z"
+    status: "completed"
+    startedAt: "2026-11-19T03:47:51.413Z"
+    completedAt: "2026-11-19T03:48:47.371Z"
+    endedAt: "2026-11-19T03:48:47.371Z"
+    activeIntervals: [{"end":"2026-11-19T03:48:47.371Z","start":"2026-11-19T03:47:51.413Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ported call-aware mcpToolRefs and call-form PHP docs from c9ad315f1; docs-command-refs passes."
+    lastModified: "2026-11-19T03:48:47.371Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
