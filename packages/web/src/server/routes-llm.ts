@@ -1027,7 +1027,7 @@ export interface VendorCatalogEntry {
   provenance?: "codex-client-catalog" | "vendor-api" | "built-in";
   /** ISO time of the probe, including failed probes; null when not probed. */
   checkedAt: string | null;
-  /** Why the built-in list is shown. Present only when `source` is `"built-in"`. */
+  /** Why the built-in list is shown, or why live client models were excluded. */
   reason?: string;
   /** Whether the vendor can run as configured, judged for the provider it would run on. */
   readiness: VendorReadiness;
@@ -1137,14 +1137,22 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
     const live = probe.listing.ok;
     const models = probe.listing.ok ? probe.listing.models : builtIn;
     const directOpenAi = vendor === LLM_VENDOR.CODEX && codexProvider === "api";
+    // A client may advertise custom-provider deployment names. Keep the picker
+    // within the same vendor policy as config, saved-run and launch validation.
+    const selectableModels = vendor === LLM_VENDOR.CODEX && !directOpenAi
+      ? models.filter((model) => isModelCompatibleWithVendor(vendor, model))
+      : models;
+    const excludedClientModels = selectableModels.length !== models.length;
     return {
-      models: directOpenAi ? models.filter(supportsOpenAiTurns) : models,
+      models: directOpenAi ? selectableModels.filter(supportsOpenAiTurns) : selectableModels,
       providers: [...VENDOR_PROVIDERS[vendor]],
       defaultModel: defaultModel(vendor),
       source: live ? "live" : "built-in",
       provenance: live ? (vendor === LLM_VENDOR.CODEX && codexProvider === "cli" ? "codex-client-catalog" : "vendor-api") : "built-in",
       checkedAt: probe.checkedAt,
-      ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
+      ...(probe.listing.ok
+        ? excludedClientModels ? { reason: "Custom-provider model IDs outside gpt-*, o<number>* and codex* are excluded because n-dx cannot save them as Codex models. Configure the selected Codex CLI to list supported model IDs, then refresh." } : {}
+        : { reason: probe.listing.reason }),
       readiness,
       ...(!directOpenAi && { cli: probe.cli }),
     };

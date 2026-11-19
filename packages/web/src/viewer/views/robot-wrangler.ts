@@ -1130,7 +1130,7 @@ function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): { label: s
       : { label: "Local server unreachable", detail: entry.reason ?? null };
   }
   if (entry.provenance === "codex-client-catalog") {
-    return { label: "Codex client catalog", detail: `CLI ${entry.cli?.version ?? "unknown"} · Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}. Inference access is not verified.` };
+    return { label: "Codex client catalog", detail: [`CLI ${entry.cli?.version ?? "unknown"} · Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}. Inference access is not verified.`, entry.reason].filter(Boolean).join(" ") };
   }
   return entry.source === "live"
     ? { label: "Live model list", detail: `Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}` }
