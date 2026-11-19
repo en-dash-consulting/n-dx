@@ -301,6 +301,19 @@ describe("Rex item routes on a v2 project", () => {
     expect(body).toEqual({ ok: true });
   });
 
+  it("bulk PATCH refuses shortTitle, naming it, and writes nothing", async () => {
+    for (const shortTitle of ["  Same  ", ""]) {
+      const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID, TASK_ID], updates: { shortTitle } });
+      expect(res.status).toBe(400);
+      const { error } = await res.json() as { error: string };
+      expect(error).toContain("shortTitle");
+      expect(error).toContain("per item");
+    }
+    const store = await resolveStore(rexDir);
+    expect(await store.getItem(CHANGE_ID)).not.toHaveProperty("shortTitle");
+    expect(await store.getItem(TASK_ID)).not.toHaveProperty("shortTitle");
+  });
+
   it("bulk PATCH completed applies the change's amendments through rex", async () => {
     expect((await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed" } })).status).toBe(200);
     const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID, "nope"], updates: { status: "completed" } });

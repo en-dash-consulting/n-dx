@@ -824,6 +824,12 @@ async function handleBulkUpdate(
       errorResponse(res, 400, problem);
       return true;
     }
+    // A short title is unique among open items, so one value set on several
+    // ids always collides: it has no valid bulk use.
+    if ("shortTitle" in input.updates) {
+      errorResponse(res, 400, `Field "shortTitle" cannot be changed through the bulk route: a short title is unique among open items, so edit it per item (PATCH /api/rex/items/:id).`);
+      return true;
+    }
 
     // Use the PRDStore's transaction so writes go to the correct backend
     // (prd_tree/ or prd.md) rather than always writing to prd.md via
