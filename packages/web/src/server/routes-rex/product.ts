@@ -49,8 +49,12 @@ import {
   resolveClaimHolder,
   computeEdges,
   suggestPlacements,
+  DEFAULT_APPLY_ON,
+  parseApplyOn,
 } from "../rex-gateway.js";
-import type { ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
+import type { ApplyOn, ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
+import { readNdxConfig } from "../ndx-config-file.js";
+import { isRecord } from "../../shared/index.js";
 
 // ── Wire types (mirror viewer/views/product-model.ts) ────────────────
 
@@ -208,6 +212,13 @@ export interface ChangeSummaryWire {
   next: NextPickWire | null;
   /** Automated and metric requirements on open changes and their tasks, where `rex ready` reads them, and the open changes that hold none. */
   requirements: { total: number; uncovered: number };
+  /**
+   * The project's `rex.applyOn`: whether an Awaiting apply change waits for a
+   * steward (`complete`, where only a refused apply leaves one, and `review`)
+   * or for the next `rex release` (`release`). Always sent; optional because
+   * the viewer reads its absence as the default, `complete`.
+   */
+  applyOn?: ApplyOn;
 }
 
 export interface CapabilityDetailWire extends Omit<CapabilityRowWire, "criteriaCount"> {
@@ -567,7 +578,7 @@ const tasksOf = (change: ChangeRuleNode): RuleNode[] =>
  * open changes and rex's next pick. `excludeIds` are units another worktree
  * has claimed, passed over as `ndx work` passes over them.
  */
-export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string> = new Set()): ChangeSummaryWire {
+export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string> = new Set(), applyOn: ApplyOn = DEFAULT_APPLY_ON): ChangeSummaryWire {
   const index = indexTree(tree);
   const stages: Record<OpenChangeStageWire, number> = { proposed: 0, ready: 0, "in-progress": 0, "awaiting-apply": 0 };
   const open: GlanceChangeWire[] = [];
@@ -612,7 +623,13 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       summary: pick.explanation.summary,
     }
     : null;
-  return { inbox, inboxInStage, stages, open, next, requirements: requirementCoverage(index) };
+  return { inbox, inboxInStage, stages, open, next, requirements: requirementCoverage(index), applyOn };
+}
+
+/** `rex.applyOn` as the Workflow page reads it from the project config: unset or invalid is the default. */
+function applyOnOf(projectDir: string): ApplyOn {
+  const rex = readNdxConfig(projectDir)["rex"];
+  return parseApplyOn(isRecord(rex) ? rex : {}).applyOn;
 }
 
 /**
@@ -956,7 +973,7 @@ export function routeProductReads(
     } else if (path === "changes/summary") {
       const holder = resolveClaimHolder(ctx.projectDir);
       const claimed = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
-      jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys())) });
+      jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys()), applyOnOf(ctx.projectDir)) });
     } else if (areaRef) {
       const area = buildAreaDetail(model.tree, areaRef);
       if (area) jsonResponse(res, 200, { layout: "v2", area });

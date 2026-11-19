@@ -478,10 +478,19 @@ describe("v2 product reads", () => {
           },
           // The fixture's one open change and its task hold no requirement.
           requirements: { total: 0, uncovered: 1 },
+          // No rex.applyOn in the project config: the default.
+          applyOn: "complete",
         },
       });
       const summary = (body as { summary: ChangeSummary }).summary;
       expect(["in_progress", "ready_to_finalize", "priority"]).toContain(summary.next!.reason);
+    });
+
+    it("carries the project's rex.applyOn, and the default for an invalid one", async () => {
+      writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "release" } }));
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).applyOn).toBe("release");
+      writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "later" } }));
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).applyOn).toBe("complete");
     });
 
     it("counts an Inbox change apart from the stages and leaves it out of the open list", async () => {

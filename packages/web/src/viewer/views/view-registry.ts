@@ -69,6 +69,7 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { LifecycleStrip } from "./lifecycle-strip.js";
+import { PlanProcess } from "./plan-process.js";
 import { ChangesGlance } from "./changes-glance.js";
 import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
@@ -202,6 +203,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "next-steps": return h(NextStepsPanel, { embedded: true });
     case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
     case "delivery": return h(DeliveryPanel, { stamp: deliveryAnalysisStamp(ctx.data.manifest), opened });
+    case "process": return h(PlanProcess, { navigateTo: ctx.navigateTo });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });

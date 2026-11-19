@@ -297,6 +297,12 @@ export interface ChangeSummary {
   next: NextPick | null;
   /** Automated and metric requirements on open changes and their tasks, where `rex ready` reads them, and the open changes that hold none. */
   requirements: { total: number; uncovered: number };
+  /**
+   * The project's `rex.applyOn`: under `release` an Awaiting apply change waits
+   * for the next `rex release`, not a steward. Absent reads as the default,
+   * `complete`.
+   */
+  applyOn?: "complete" | "review" | "release";
 }
 
 // ── Apply ────────────────────────────────────────────────────────────
