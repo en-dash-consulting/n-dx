@@ -118,6 +118,19 @@ describe("php include resolver", () => {
     ]);
   });
 
+  it("expands get_include_path() in place to the php.ini roots, as PHP orders them", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    // php.ini sets ".:inc"; bootstrap.php prepends pear, then appends lib: pear, ., inc, lib.
+    const iniOrder = join(import.meta.dirname, "..", "fixtures", "php-include-path-ini-order");
+    expect(await includeOutcomes("index.php", iniOrder)).toEqual([
+      "'bootstrap.php' bootstrap.php (include-path)",
+      // inc/Mail.php and lib/Mail.php: the appended lib comes after php.ini's inc.
+      "'Mail.php' inc/Mail.php (include-path)",
+      // pear/Log.php and inc/Log.php: the prepended pear comes before php.ini's inc.
+      "'Log.php' pear/Log.php (include-path)",
+    ]);
+  });
+
   it("adds include edges beside class edges, keeps the conditional guard and reports roots outside the repository", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     const { facts, notices } = await analyze();

@@ -179,7 +179,14 @@ items:
     lastModified: "2026-11-19T02:13:41.817Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ec5c180b-a937-4585-afe2-b61c8ad83564":
-    lastModified: "2026-11-19T01:45:25.893Z"
+    status: "completed"
+    startedAt: "2026-11-19T16:28:15.724Z"
+    completedAt: "2026-11-19T16:30:59.965Z"
+    endedAt: "2026-11-19T16:30:59.965Z"
+    activeIntervals: [{"end":"2026-11-19T16:30:59.965Z","start":"2026-11-19T16:28:15.724Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixture php-include-path-ini-order and a test pinning in-place get_include_path() expansion against php.ini roots (commit 5cf874c57)."
+    lastModified: "2026-11-19T16:30:59.965Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2a302a2-bb06-40b9-831a-3916923e0ee7":
     status: "completed"
