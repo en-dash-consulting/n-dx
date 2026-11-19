@@ -313,8 +313,14 @@ export function buildInfraActions(
   return { items, gated, steps: [] };
 }
 
-/** The order kinds are listed in: next steps, then readiness gaps, then the findings, files to move last. */
-const KIND_ORDER: readonly ActionKind[] = ["step", "gap", "problem", "suggestion", "relationship", "pattern", "move"];
+/**
+ * The order kinds are listed in: next steps, then readiness gaps, then the
+ * findings, files to move last. Relationships and patterns share a rank: they
+ * are the architecture findings, already sorted together most severe first.
+ */
+const KIND_RANK: Readonly<Record<ActionKind, number>> = {
+  step: 0, gap: 1, problem: 2, suggestion: 3, relationship: 4, pattern: 4, move: 5,
+};
 
 /**
  * What the Analyze dashboard recommends fixing — the one decision of which
@@ -332,11 +338,10 @@ export function buildRecommendations(
   const health = buildHealthActions(data, steps);
   const covered = new Set((steps ?? []).flatMap((s) => s.relatedFindings ?? []));
   const infra = buildInfraActions(data, readiness, covered);
-  const rank = (kind: ActionKind) => KIND_ORDER.indexOf(kind);
   // A stable sort by kind keeps each kind's own order (severity, weakest gap first).
   const items = [...health.items, ...infra.items]
     .map((item, i) => ({ item, i }))
-    .sort((a, b) => rank(a.item.kind) - rank(b.item.kind) || a.i - b.i)
+    .sort((a, b) => KIND_RANK[a.item.kind] - KIND_RANK[b.item.kind] || a.i - b.i)
     .map(({ item }) => item);
   return { items, gated: [...health.gated, ...infra.gated], steps: health.steps };
 }

@@ -185,6 +185,17 @@ describe("buildRecommendations", () => {
       .toEqual(["Tidy the helpers", "Bidirectional imports between web and rex"]);
   });
 
+  it("keeps the architecture findings together, most severe first", () => {
+    const d = data();
+    d.zones!.findings = [
+      { type: "relationship", pass: 2, scope: "global", text: "web-viewer reads admin/a.ts", severity: "info" },
+      { type: "pattern", pass: 2, scope: "global", text: "Handlers bypass the service layer", severity: "warning" },
+    ] as NonNullable<LoadedData["zones"]>["findings"];
+    const architecture = buildRecommendations(d, [], null).items
+      .filter((a) => a.kind === "relationship" || a.kind === "pattern");
+    expect(architecture.map((a) => [a.kind, a.level])).toEqual([["pattern", "warning"], ["relationship", "info"]]);
+  });
+
   it("carries both sets of enrichment gates", () => {
     const { gated } = buildRecommendations(data(ENRICHMENT_THRESHOLDS.architecture - 1), null, null);
     expect(gated.map((g) => g.label)).toEqual(["problems", "suggestions", "architecture findings"]);
