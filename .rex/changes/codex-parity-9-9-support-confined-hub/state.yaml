@@ -9,14 +9,16 @@ items:
     lastModified: "2026-11-19T00:50:31.095Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a85b9cf9-c01a-48ec-bdec-bfbedea973f1":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-19T00:27:25.939Z"
-    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:27:25.939Z"},{"start":"2026-11-19T00:46:26.784Z"}]
+    completedAt: "2026-11-19T00:52:04.384Z"
+    endedAt: "2026-11-19T00:52:04.384Z"
+    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:27:25.939Z"},{"end":"2026-11-19T00:52:04.384Z","start":"2026-11-19T00:46:26.784Z"}]
     failureReason: "Provider candidate committed in d0139660 with freshreview10findingsfixed; actual selectedCLI/localprovider host acceptance and three listener-dependent tests still outstanding. Preserve raw completion; no claim of completed acceptance."
     appliedAt: "2026-11-19T00:27:25.939Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-11T21:06:47.523Z"
-    lastModified: "2026-11-19T00:46:27.585Z"
+    lastModified: "2026-11-19T00:52:04.384Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b42b3957-511c-42f7-aed8-37980dfe6d13":
     status: "completed"
