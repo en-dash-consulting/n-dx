@@ -55,7 +55,11 @@
  * interpolated string takes its computable leading text as `literal`, else
  * the source of its first part (a database host written as a whole value,
  * not a connection string, never takes partial text: it is the source of
- * its first part that is not computable, never `literal`); a variable takes the target of its last
+ * its first part that is not computable, never `literal`); leading text that
+ * ends inside a scheme or a host (`'http' . $s . '://x'`, `'https://api.' . $d`,
+ * {@link endsInsideHost}), or a connection string's host value
+ * (`'mysql:host=db-' . $env`, {@link openHostValue}), is not a target: the
+ * argument is `unknown`, as written; a variable takes the target of its last
  * plain assignment before the call in its scope; a constant or configuration
  * key no definition computes is `config` with its name; anything else is
  * `unknown`, with the argument as written (credentials dropped) as target, or
@@ -215,6 +219,35 @@ export interface Connection {
 
 /** A connection string that stops right after a host key (`mysql:host=`), the host coming next. */
 const OPEN_HOST_KEY = /(?:^|[;:\s])(?:host|server|hostaddr)\s*=\s*$/i;
+
+/**
+ * The host value a connection string ends inside (`db-` of `mysql:host=db-`,
+ * `""` right after the key or its opening quote); undefined when it does not
+ * end in a host value. A linear scan back over the value, then
+ * {@link OPEN_HOST_KEY} on the text before it.
+ */
+export function openHostValue(written: string): string | undefined {
+  let start = written.length;
+  while (start > 0 && !/[;\s'"=]/.test(written[start - 1]!)) start -= 1;
+  const quoted = start > 0 && (written[start - 1] === "'" || written[start - 1] === '"');
+  return OPEN_HOST_KEY.test(written.slice(0, quoted ? start - 1 : start)) ? written.slice(start) : undefined;
+}
+
+/** What ends a URL's or a host's host part. */
+const HOST_END = /[/:?#;\s]/;
+/** A scheme with its `//` unfinished (`https:/`). */
+const OPEN_SCHEME = /^[A-Za-z][\w+.-]*:\/$/;
+
+/**
+ * Whether leading literal text ends inside a scheme or a host, so a part not
+ * computable continues it (`'http' . $s . '://x'`, `'https://api.' . $d`,
+ * `'redis-' . $n`): nothing after its scheme ends the host.
+ */
+export function endsInsideHost(prefix: string): boolean {
+  if (OPEN_SCHEME.test(prefix)) return true;
+  const rest = prefix.replace(/^[A-Za-z][\w+.-]*:\/\//, "");
+  return rest !== "" && !HOST_END.test(rest);
+}
 
 /** A URI without its user and password: lang-kit's rule, the one sourcevision's redaction applies. */
 export const withoutCredentials = (target: string): string => withoutUrlUserinfo(target);
@@ -406,7 +439,7 @@ class TargetReader {
       const part = this.evaluate(operand, at, depth);
       if (part === undefined || !isPlainValue(part)) {
         prefix += interpolatedEnds(operand)?.head ?? "";
-        if (prefix !== "" && !SCHEME_ONLY.test(prefix)) return { target: prefix, targetSource: "literal" };
+        if (prefix !== "" && !SCHEME_ONLY.test(prefix)) return endsInsideHost(prefix) ? UNKNOWN : { target: prefix, targetSource: "literal" };
         return operands.length > 1 ? this.of(operand, at, depth + 1) : UNKNOWN;
       }
       prefix += part;
@@ -450,7 +483,10 @@ class TargetReader {
         return { target: rest.targetSource === "literal" ? UNKNOWN : rest };
       }
       const parsed = connectionTarget(written, form);
-      if (parsed.target.targetSource !== "unknown" || !OPEN_HOST_KEY.test(written)) return parsed;
+      const host = openHostValue(written);
+      // The host continues past the computable text (`'mysql:host=db-' . $env`): as written.
+      if (host) return { ...parsed, target: asWritten(t) };
+      if (parsed.target.targetSource !== "unknown" || host === undefined) return parsed;
       const filled = ends === undefined ? this.of(operand, at, depth + 1) : UNKNOWN;
       return { ...parsed, target: filled.targetSource === "literal" ? UNKNOWN : filled };
     }

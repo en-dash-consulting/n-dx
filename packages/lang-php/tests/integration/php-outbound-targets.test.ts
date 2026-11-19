@@ -29,6 +29,19 @@ const FILES: Record<string, string> = {
     "class Gateway { private $host; function go() { return new SoapClient(null, array('location' => $this->host . '/soap.php', 'uri' => 'urn:x')); } }",
     "",
   ].join("\n"),
+  "partial.php": [
+    "<?php",
+    "define('DB_HOST', 'db.internal');",
+    "$a = new PDO('mysql:host=db-' . $env . '.internal;dbname=shop');",
+    "$b = new PDO(\"mysql:host=db{$n}.internal;dbname=shop\");",
+    "$c = pg_connect('host=pg-' . $region . ' dbname=warehouse');",
+    "$d = curl_init('http' . ($s ? 's' : '') . '://x.example.test/');",
+    "$e = curl_init('https://api.' . $domain . '/v1');",
+    "$f = new PDO('mysql:host=db.internal;dbname=' . $db);",
+    "$g = new PDO('mysql:host=' . DB_HOST . ';dbname=shop');",
+    "$h = curl_init('https://api.example.test/' . $path);",
+    "",
+  ].join("\n"),
 };
 
 describe("php outbound targets through constants and configuration", () => {
@@ -54,6 +67,23 @@ describe("php outbound targets through constants and configuration", () => {
       "7 curl unset.url (config)",
       // Non-WSDL mode: the location option, as written when it cannot be computed.
       "8 SoapClient $this->host . '/soap.php' (unknown)",
+    ]);
+  });
+
+  it("keeps a host or scheme its literal text ends inside as written, not as a literal target", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const result = await pack.analyzeProject({ projectDir: dir, files: Object.keys(FILES), kinds: ["imports", "outboundCalls"] });
+    const calls = result.facts.find((f) => f.path === "partial.php")?.outboundCalls ?? [];
+    expect(calls.map((c) => `${c.position.line} ${c.client} ${c.target} (${c.targetSource})`)).toEqual([
+      "3 pdo_mysql 'mysql:host=db-' . $env . '.internal;dbname=shop' (unknown)",
+      "4 pdo_mysql \"mysql:host=db{$n}.internal;dbname=shop\" (unknown)",
+      "5 pgsql 'host=pg-' . $region . ' dbname=warehouse' (unknown)",
+      "6 curl 'http' . ($s ? 's' : '') . '://x.example.test/' (unknown)",
+      "7 curl 'https://api.' . $domain . '/v1' (unknown)",
+      // The host ends before the part that is not computable.
+      "8 pdo_mysql db.internal (literal)",
+      "9 pdo_mysql db.internal (literal)",
+      "10 curl https://api.example.test/ (literal)",
     ]);
   });
 });
