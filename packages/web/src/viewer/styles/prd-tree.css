@@ -6616,18 +6616,7 @@ a.tracker-link {
 
 /* ── Narrow screens: tree header and summary ─────────────────── */
 
-@media (max-width: 560px) {
-  /* Smart Add bar: the description gets the full width, buttons beneath. */
-  .smart-add-panel-bar .smart-add-input-area { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-2); }
-  .smart-add-panel-bar .smart-add-textarea { grid-area: 1 / 1 / 2 / -1; }
-  .smart-add-panel-bar .smart-add-btn-generate { grid-area: 2 / 1; }
-  .smart-add-panel-bar .smart-add-input-area > :nth-child(4) { grid-area: 2 / 2; }
-  .smart-add-panel-bar .smart-add-input-status { grid-area: 3 / 1 / 4 / -1; }
-  .smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .smart-add-panel-bar .smart-add-input-area > .smart-add-attach { grid-area: 2 / 1; }
-  .smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) > .smart-add-btn-generate { grid-area: 2 / 2; }
-  .smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) > :nth-child(4) { grid-area: 2 / 3; }
-}
+/* A narrow Smart Add bar (Plan's capture tile) is laid out in analysis.css. */
 
 @media (max-width: 640px) {
   .prd-summary-stats { gap: var(--space-1) var(--space-3); font-size: var(--font-sm); }

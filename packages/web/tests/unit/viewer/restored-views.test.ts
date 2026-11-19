@@ -97,8 +97,8 @@ describe("restored views: navigation entries", () => {
     expect(viewLabel("zones")).toBe("Zones");
   });
 
-  it("analysis is a section of the Plan stage", () => {
-    expect(STAGES.plan.sections.map((s) => s.view)).toContain("analysis");
+  it("analysis is a tile of the Plan stage", () => {
+    expect((STAGES.plan.tiles ?? []).map((t) => t.view)).toContain("analysis");
   });
 });
 

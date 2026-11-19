@@ -269,6 +269,10 @@ describe("fitTracks", () => {
     expect(fitTracks(46, 0, TRACKS_PER_ROW)).toBeNull();
   });
 
+  it("a growing tile (no ceiling) spans whatever its content needs", () => {
+    expect(fitTracks(46, 5000, Number.POSITIVE_INFINITY)).toBe(Math.ceil((46 + 5000 + 16) / 4));
+  });
+
   it("one configured row is 232px of tile plus the gap", () => {
     expect(TRACKS_PER_ROW * 4 - 16).toBe(232);
   });

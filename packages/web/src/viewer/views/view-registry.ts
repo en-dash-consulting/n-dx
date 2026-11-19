@@ -44,6 +44,7 @@ import {
 import {
   PRDView,
   AnalysisView,
+  CaptureDraftProvider,
   RexDashboard,
   TokenUsageView,
   ValidationView,
@@ -186,15 +187,20 @@ function stage(id: StageId): ViewRenderer {
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
   });
-  // Plan's lifecycle strip and open-changes glance share one summary read.
+  // Plan's lifecycle strip and open-changes glance share one summary read;
+  // its capture tile and that tile's modal share one draft.
   return id === "plan"
-    ? (ctx) => h(ChangesSummaryProvider, null, page(ctx))
+    ? (ctx) => h(ChangesSummaryProvider, null, h(CaptureDraftProvider, null, page(ctx)))
     : page;
 }
 
 /** The parts of a stage page that are not views of their own. */
 function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ctx: ViewRenderContext): ComponentChild {
   switch (panel) {
+    // The tile is the capture row; its modal (More, or the header) is the whole view.
+    case "capture": return opened
+      ? h(AnalysisView, { navigateTo: ctx.navigateTo })
+      : h(AnalysisView, { navigateTo: ctx.navigateTo, onMore: () => grid.openTile("capture") });
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
     case "health": return opened
       ? h(HealthDetail, { data: ctx.data, openTile: grid.openTile, setDetail: ctx.setDetail })

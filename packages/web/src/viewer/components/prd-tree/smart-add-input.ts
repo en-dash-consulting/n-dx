@@ -60,6 +60,14 @@ export interface SmartAddInputProps {
    * chosen still lands the change in the Inbox.
    */
   area?: CaptureArea;
+  /**
+   * The description, held by the caller: two instances given the same draft
+   * (Plan's capture tile and its More modal) show one text. Without it the
+   * instance keeps its own.
+   */
+  draft?: string;
+  /** Called with the new description; required with `draft`. */
+  onDraftChange?: (text: string) => void;
 }
 
 /** The area a capture is limited to, as the area read gives it. */
@@ -283,9 +291,12 @@ function areaCopy(area: CaptureArea): PanelCopy {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area, draft, onDraftChange }: SmartAddInputProps) {
   const copy = area ? areaCopy(area) : layout === "v2" ? V2_COPY : V1_COPY;
-  const [input, setInput] = useState("");
+  const [ownInput, setOwnInput] = useState("");
+  const shared = draft !== undefined && onDraftChange !== undefined;
+  const input = shared ? draft : ownInput;
+  const setInput = shared ? onDraftChange : setOwnInput;
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
   const [changes, setChanges] = useState<PreviewChange[]>([]);
@@ -439,7 +450,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
 
   const handleInput = useCallback((text: string) => {
     setInput(text);
-  }, []);
+  }, [setInput]);
 
   /** Explicit submit — only way to trigger proposal generation. */
   const handleSubmit = useCallback(() => {
@@ -523,7 +534,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } finally {
       setAccepting(false);
     }
-  }, [proposals, onPrdChanged, refreshScopes]);
+  }, [proposals, onPrdChanged, refreshScopes, setInput]);
 
   // ── Accept changes (v2 PRD) ──────────────────────────────────────
 
@@ -598,7 +609,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } finally {
       setAccepting(false);
     }
-  }, [changes, choices, images, onPrdChanged, onOpenChange, refreshScopes]);
+  }, [changes, choices, images, onPrdChanged, onOpenChange, refreshScopes, setInput]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
@@ -610,7 +621,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     setState("idle");
     refreshScopes();
     onPrdChanged();
-  }, [onPrdChanged, refreshScopes]);
+  }, [onPrdChanged, refreshScopes, setInput]);
 
   // Scope label for display. Read before the editor's early return, so the
   // hooks run in the same order on every render.

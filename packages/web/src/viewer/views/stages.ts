@@ -53,7 +53,7 @@ export interface StageSection {
   open?: boolean;
   /**
    * The stage's lead section, shown in the page itself with no dropdown
-   * header: always rendered, never collapsible. One per stage, first.
+   * header: always rendered, never collapsible. At most one per stage, first.
    */
   plain?: boolean;
   /**
@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
+export type StagePanelId = "capture" | "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -136,6 +136,11 @@ export interface StageTile {
   cols?: TileCols;
   /** Grid rows spanned (default 1). Every row has the same fixed height. */
   rows?: TileRows;
+  /**
+   * Grow past `rows` to fit the content instead of clipping it (Plan's capture
+   * tile, whose preview opens beneath the input). The tiles below move down.
+   */
+  grow?: boolean;
   /**
    * Further views shown as tabs once the tile is open full-screen (Architecture's
    * Routes). Each tab is still one view, reused unchanged, with its own route
@@ -228,17 +233,22 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
   },
   plan: {
     id: "plan",
-    // The capture bar, then tiles: the Inbox beside Open changes, which carries
-    // the PRD tree and the Product page as tabs.
-    sections: [{ view: "analysis", plain: true }],
+    // No lead section: capture is a tile. The Inbox sits beneath it, beside
+    // Open changes, which carries the PRD tree and the Product page as tabs.
+    sections: [],
     tiles: [
       // On both layouts: a v1 tree reads Pending, In progress and Next.
       { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
+      // One input row. Its More, like the tile's header, opens the whole Add
+      // Items view as the tile's modal. A static export cannot add anything.
+      { view: "analysis", panel: "capture", embedsView: true, cols: 4, grow: true, requiresServer: true },
       // No product area map: readers could not tell what its blocks meant. The
       // Product page is a tab of Open changes, and its routes still open it.
+      // Open changes comes before the Inbox so dense packing puts it beside
+      // the capture tile, and the Inbox in the column beneath capture.
+      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
       // Its rows' Place buttons and "Place best guesses" work in the tile; the header opens the Inbox page.
       { view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true },
-      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
       // The last check as lights; full-screen and "Open" show the whole Validation view.
       // Up to two rows: tiles shrink to their content, so this only lets the check's buttons show.
       { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 4, rows: 2 },
