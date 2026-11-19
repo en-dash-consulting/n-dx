@@ -22,7 +22,7 @@
 
 import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
-import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "preact/hooks";
 import type { Dispatch, StateUpdater } from "preact/hooks";
 import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
@@ -304,6 +304,36 @@ function areaCopy(area: CaptureArea): PanelCopy {
   };
 }
 
+/**
+ * Fit a one-row field to its text: once the description wraps, the field
+ * grows a line at a time, so the wrapped lines keep the field's padding
+ * instead of scrolling flush against its border. Rechecked when the text
+ * changes and when the field's width does (the tile resizes); a height the
+ * stylesheet caps scrolls past that.
+ */
+export function useAutoGrow(ref: { current: HTMLTextAreaElement | null }, enabled: boolean, text: string): void {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    if (!enabled) { el.style.height = ""; return undefined; }
+    const fit = () => {
+      el.style.height = "auto";
+      // scrollHeight holds the text and the padding; the border is the rest of offsetHeight.
+      if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    let width = el.clientWidth;
+    const resize = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    resize.observe(el);
+    return () => resize.disconnect();
+  }, [ref, enabled, text]);
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area, draft, onDraftChange, images: sharedImages, onImagesChange, captureCount, onCaptured }: SmartAddInputProps) {
@@ -331,6 +361,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
   const setImages = imagesShared ? onImagesChange : setOwnImages;
   const imageCountRef = useRef(0);
   imageCountRef.current = images.length;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(textareaRef, !!bar, input);
 
   const addImageFiles = useCallback(async (files: File[]) => {
     const { accepted, problems } = checkImageFiles(files, imageCountRef.current);
@@ -763,6 +795,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     // Input area
     h("div", { class: "smart-add-input-area" },
       h("textarea", {
+        ref: textareaRef,
         class: "smart-add-textarea",
         value: input,
         placeholder: bar ? copy.barPlaceholder : copy.placeholder,

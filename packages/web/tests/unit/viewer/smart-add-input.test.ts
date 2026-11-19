@@ -524,6 +524,42 @@ describe("SmartAddInput", () => {
     expect(area.lastElementChild!.classList.contains("bar-action")).toBe(true);
   });
 
+  it("bar variant grows its one row to wrapped text, so the text keeps its padding", async () => {
+    // jsdom lays nothing out: give the field a wrapped height (text + padding) and a 1px border.
+    const proto = HTMLTextAreaElement.prototype;
+    const lines = (el: HTMLTextAreaElement) => (el.value.length > 40 ? 2 : 1);
+    const spies = [
+      vi.spyOn(proto, "scrollHeight", "get").mockImplementation(function (this: HTMLTextAreaElement) { return lines(this) * 20 + 16; }),
+      vi.spyOn(proto, "clientHeight", "get").mockImplementation(function (this: HTMLTextAreaElement) { return lines(this) * 20 + 16; }),
+      vi.spyOn(proto, "offsetHeight", "get").mockImplementation(function (this: HTMLTextAreaElement) { return lines(this) * 20 + 18; }),
+    ];
+    try {
+      const root = document.createElement("div");
+      render(h(SmartAddInput, { onPrdChanged: vi.fn(), bar: true }), root);
+      await flush();
+      const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+      expect(textarea.style.height).toBe("38px");
+      typeInTextarea(textarea, "Let people pin a change to the top of the Inbox from its row, with a keyboard shortcut");
+      await flush();
+      expect(textarea.style.height).toBe("58px");
+      render(null, root);
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+
+  it("bar variant pads its field like the dashboard's other text inputs, and caps how tall it grows", () => {
+    const decls = (file: string, selector: string) => {
+      const css = readFileSync(join(import.meta.dirname, "../../../src/viewer/styles", file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+      return [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter((m) => m[1]!.split(",").map((s) => s.trim()).includes(selector)).map((m) => m[2]).join("\n");
+    };
+    const padding = (d: string) => /(?:^|[;\s])padding:\s*([^;]+);/.exec(d)?.[1]?.trim();
+    const bar = decls("prd-tree.css", ".smart-add-panel-bar .smart-add-textarea");
+    expect(padding(bar)).toBe(padding(decls("forms.css", ".filter-input")));
+    expect(bar).toMatch(/max-height:\s*12em/);
+    expect(bar).toMatch(/overflow-y:\s*auto/);
+  });
+
   it("keeps typed text when switching out of the bar variant", async () => {
     const root = document.createElement("div");
     render(h(SmartAddInput, { onPrdChanged: vi.fn(), bar: true }), root);

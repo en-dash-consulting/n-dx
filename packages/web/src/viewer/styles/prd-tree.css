@@ -5218,9 +5218,13 @@ a.tracker-link {
   column-gap: var(--space-2);
 }
 
+/* One row that grows with wrapped text (useAutoGrow), keeping the padding of
+   the dashboard's other text inputs (.filter-input) on every side. */
 .smart-add-panel-bar .smart-add-textarea {
   grid-area: 1 / 1;
   min-height: 0;
+  max-height: 12em;
+  overflow-y: auto;
   resize: none;
   padding: var(--space-2) var(--space-3);
 }
