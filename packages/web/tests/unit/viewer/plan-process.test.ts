@@ -92,10 +92,39 @@ describe("processFocus", () => {
     });
   });
 
-  it("asks for making placed changes ready when none can run", () => {
-    expect(processFocus(summary({ stages: { proposed: 1, "in-progress": 1 } }))).toEqual({
+  it("asks for a requirement, then rex ready, while placed changes lack one", () => {
+    expect(processFocus(summary({ stages: { proposed: 3 }, requirements: { total: 1, uncovered: 2 } }))).toEqual({
       step: "ready",
-      cue: "1 change placed but not runnable: add an automated requirement",
+      cue: "3 changes placed but not marked ready: add an automated requirement to the 2 without one, then run rex ready",
+    });
+  });
+
+  it("asks only for rex ready when every placed change has a requirement", () => {
+    expect(processFocus(summary({ stages: { proposed: 1 }, requirements: { total: 2, uncovered: 0 } }))).toEqual({
+      step: "ready",
+      cue: "1 change placed but not marked ready: run rex ready",
+    });
+  });
+
+  it("never says a placed change cannot run", () => {
+    for (const s of [summary({ stages: { proposed: 2 } }), summary({ stages: { proposed: 2 }, requirements: { total: 0, uncovered: 2 } })]) {
+      expect(processFocus(s).cue).not.toMatch(/cannot run|not runnable/);
+    }
+    expect(PROCESS_STEPS.find((s) => s.id === "ready")!.does).not.toMatch(/cannot run|so it can run|not runnable/);
+  });
+
+  it("ranks work in progress ahead of placed changes not marked ready", () => {
+    expect(processFocus(summary({ stages: { proposed: 4, "in-progress": 1 }, requirements: { total: 0, uncovered: 4 } }))).toEqual({
+      step: "work",
+      cue: "1 change in progress: follow it in Work",
+    });
+  });
+
+  it("ranks rex's next pick ahead of placed changes not marked ready", () => {
+    const next = { id: "task-1", title: "Show the total", type: "task", changeId: "c1", changeTitle: "Pay", reason: "priority", summary: "Highest priority" } as const;
+    expect(processFocus(summary({ stages: { proposed: 4 }, requirements: { total: 0, uncovered: 4 }, next }))).toEqual({
+      step: "work",
+      cue: "rex's next pick is waiting: start \"Show the total\" in Work",
     });
   });
 

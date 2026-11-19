@@ -32,7 +32,7 @@ export interface ProcessStep {
 export const PROCESS_STEPS: readonly ProcessStep[] = [
   { id: "capture", label: "Capture", does: "Describe an idea in the capture bar; it lands in the Inbox" },
   { id: "place", label: "Place", does: "Put each Inbox change on the capability it touches" },
-  { id: "ready", label: "Ready", does: "Give a placed change an automated requirement so it can run" },
+  { id: "ready", label: "Ready", does: "Mark a placed change ready: give it an automated requirement, then run rex ready" },
   { id: "work", label: "Work", does: "Run the next pick in Work" },
   { id: "apply", label: "Apply", does: "Apply a finished change to the product map" },
 ];
@@ -45,11 +45,25 @@ export interface ProcessFocus {
 
 const changes = (n: number): string => `${n.toLocaleString()} ${n === 1 ? "change" : "changes"}`;
 
+/** The Ready cue: ask for a requirement only while some open change lacks one. */
+function readyCue(summary: ChangeSummary): string {
+  const placed = `${changes(summary.stages.proposed)} placed but not marked ready`;
+  const { uncovered } = summary.requirements;
+  return uncovered > 0
+    ? `${placed}: add an automated requirement to the ${uncovered.toLocaleString()} without one, then run rex ready`
+    : `${placed}: run rex ready`;
+}
+
 /**
  * The step the project needs most. Finishing beats starting: done work waiting
  * to be applied comes first, then Inbox changes waiting for a place, then work
- * that can run, then placed changes that cannot run yet, then work already
- * running. With nothing open, the next thing to do is capture an idea.
+ * — changes marked ready, work already running, or rex's next pick — and only
+ * then placed changes not marked ready. With nothing open, the next thing to do
+ * is capture an idea.
+ *
+ * Ready is informational: `ndx work` runs a Proposed change too, so it is rex's
+ * next pick whenever one is free. Marking changes ready only ranks first when
+ * there is nothing to run.
  *
  * Inbox changes also counted in a stage have no capability to go on yet, so
  * they do not call for placing.
@@ -66,11 +80,14 @@ export function processFocus(summary: ChangeSummary): ProcessFocus {
   if (stages.ready > 0) {
     return { step: "work", cue: `${changes(stages.ready)} ready to run: start the next pick in Work` };
   }
-  if (stages.proposed > 0) {
-    return { step: "ready", cue: `${changes(stages.proposed)} placed but not runnable: add an automated requirement` };
-  }
   if (stages["in-progress"] > 0) {
     return { step: "work", cue: `${changes(stages["in-progress"])} in progress: follow ${stages["in-progress"] === 1 ? "it" : "them"} in Work` };
+  }
+  if (summary.next) {
+    return { step: "work", cue: `rex's next pick is waiting: start "${summary.next.title}" in Work` };
+  }
+  if (stages.proposed > 0) {
+    return { step: "ready", cue: readyCue(summary) };
   }
   return { step: "capture", cue: "Nothing open: describe the next idea in the capture bar" };
 }
