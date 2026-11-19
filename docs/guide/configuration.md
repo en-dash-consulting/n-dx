@@ -125,8 +125,13 @@ For direct OpenAI tasks, use `n-dx work --provider=api --model=gpt-6-astra .`
 with `llm.vendor=codex` and OpenAI API authentication. The agent codec supports
 `gpt-6.1-sol` and `gpt-6-astra`; other model pins are refused, not replaced.
 `hench.provider=cli` with `llm.codex.auth=api` remains CLI execution authenticated
-with an API key. Direct API runs support diff approval; CLI self/pair review and
-OpenAI model/vendor failover are not supported on this path.
+with an API key. Direct API runs support diff approval and bounded model/vendor
+failover when `llm.autoFailover=true`: the configured light Codex model, then
+Claude standard and light models, with at most three fallback attempts per run.
+Each fallback still needs supported agent-turn models and that vendor's API
+credentials. The dashboard shows this chain even when automatic failover is off;
+Codex CLI does not use it. CLI self/pair review remains unavailable for direct
+API runs.
 
 ## Claude Configuration
 
