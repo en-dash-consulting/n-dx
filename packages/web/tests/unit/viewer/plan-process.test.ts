@@ -154,6 +154,13 @@ describe("processFocus", () => {
     });
   });
 
+  it("with changes ready beside work in progress, points at the ready ones", () => {
+    expect(processFocus(summary({ stages: { ready: 2, "in-progress": 3 } }))).toEqual({
+      step: "work",
+      cue: "2 changes ready to run: start the next pick in Work",
+    });
+  });
+
   it("points at work in progress when that is all that is open", () => {
     expect(processFocus(summary({ stages: { "in-progress": 2 } }))).toEqual({
       step: "work",
@@ -209,6 +216,33 @@ describe("PlanProcess", () => {
     }));
     click("work");
     expect(navigateTo).toHaveBeenCalledWith("work", { taskId: "task-9" });
+  });
+
+  it("links Work to Work with nothing selected when rex has no next pick", async () => {
+    await mount(summary({ stages: { "in-progress": 1 }, next: null }));
+    expect(step("work").classList.contains("pp-step--next")).toBe(true);
+    click("work");
+    expect(navigateTo).toHaveBeenCalledWith("work", undefined);
+  });
+
+  it("renders nothing while the summary loads", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    await act(async () => { render(h(ChangesSummaryProvider, null, h(PlanProcess, { navigateTo })), root); });
+    expect(root.childNodes).toHaveLength(0);
+  });
+
+  it("renders nothing when the summary read fails, leaving the error to the lifecycle strip", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500, json: async () => ({ error: "boom" }) })));
+    await act(async () => { render(h(ChangesSummaryProvider, null, h(PlanProcess, { navigateTo })), root); });
+    await act(async () => {});
+    expect(root.childNodes).toHaveLength(0);
+  });
+
+  it("renders nothing on a v1 tree", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ layout: "v1" }) })));
+    await act(async () => { render(h(ChangesSummaryProvider, null, h(PlanProcess, { navigateTo })), root); });
+    await act(async () => {});
+    expect(root.childNodes).toHaveLength(0);
   });
 
   it("links Capture to the capture bar on the page, focusing it", async () => {
