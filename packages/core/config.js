@@ -1598,6 +1598,9 @@ const TASK_TIERS = new Set(["light", "standard", "heavy", "free"]);
  */
 const EFFORT_LEVELS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
 
+// Review selects its model through reviewModel / saved reviewTier, not routes.
+export const EFFORT_ONLY_TASK_CLASSES = new Set(["agent.review"]);
+
 /**
  * Known task classes and the tier each routes to by default.
  *
@@ -1615,7 +1618,6 @@ const EFFORT_LEVELS = new Set(["none", "minimal", "low", "medium", "high", "xhig
 export const TASK_CLASSES = {
   // hench
   "agent.execute": "standard",
-  "agent.review": "standard",
   "git.commit-message": "light",
   "context.summarize": "light",
   "context.distill": "standard",
@@ -1718,6 +1720,11 @@ export function describeUnknownTaskClass(settingPath) {
 
   const taskClass = settingPath.slice(prefix.length);
   if (!taskClass || taskClass.includes("*")) return null;
+  if (EFFORT_ONLY_TASK_CLASSES.has(taskClass)) {
+    return prefix === "effort." ? null
+      : `Note: "${taskClass}" is effort-only; this route has no effect. ` +
+        "Set llm.<vendor>.reviewModel or the task's reviewTier instead.";
+  }
   if (Object.hasOwn(TASK_CLASSES, taskClass)) return null;
 
   const suggestion = nearestTaskClass(taskClass);
@@ -2684,6 +2691,8 @@ Task routing (which model serves which kind of call):
   they go to TypeSafe Jev, and a route of "typesafe" names that explicitly.
   Setting a route for a class not listed here still works — it may be a glob, or a
   class a newer n-dx defines — but ndx says so, and suggests the closest match.
+
+    Effort-only: agent.review (review model comes from llm.<vendor>.reviewModel)
 
   llm.effort.<class>       string    Thinking effort: none, minimal, low, medium, high, xhigh,
                                     max, or ultra. Uses the same exact-then-glob rules as routes.

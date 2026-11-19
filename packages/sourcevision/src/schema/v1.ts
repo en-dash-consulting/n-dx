@@ -696,6 +696,8 @@ export interface TokenUsage {
 
 /** Aggregated token usage across one or more LLM calls. */
 export interface AnalyzeTokenUsage {
+  /** Measurement completeness, separate from model price attribution. Absent on legacy manifests. */
+  diagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Number of LLM calls made. */
   calls: number;
   /** Total input tokens across all calls. */

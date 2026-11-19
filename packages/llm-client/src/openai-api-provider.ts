@@ -25,7 +25,7 @@
  * @see {@link createCodexCliClient} in `codex-cli-provider.ts` for the CLI alternative
  */
 
-import { resolveOpenAiEffort } from "./codex-effort.js";
+import { resolveOpenAiEffort, usesOpenAiCompletionTokenLimit } from "./codex-effort.js";
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
@@ -228,7 +228,8 @@ export function createOpenAiApiProvider(
             headers,
             body: JSON.stringify({
               model,
-              max_tokens: maxTokens,
+              ...(usesOpenAiCompletionTokenLimit(model)
+                ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
               ...(effort !== undefined ? { reasoning_effort: effort } : {}),
               messages: [{ role: "user", content: request.prompt }],
             }),
@@ -308,7 +309,8 @@ export function createOpenAiApiProvider(
         headers,
         body: JSON.stringify({
           model,
-          max_tokens: maxTokens,
+          ...(usesOpenAiCompletionTokenLimit(model)
+            ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
           ...(effort !== undefined ? { reasoning_effort: effort } : {}),
           messages: [{ role: "user", content: request.prompt }],
           stream: true,

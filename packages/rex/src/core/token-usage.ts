@@ -404,6 +404,7 @@ export async function extractHenchTokenUsage(
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
         for (const turn of run.turnTokenUsage) {
           attributeToModel(buckets, turn.model ?? run.model, {
+            diagnosticStatus: turn.diagnosticStatus ?? run.diagnostics?.tokenDiagnosticStatus,
             inputTokens: turn.input ?? 0,
             outputTokens: turn.output ?? 0,
             cacheCreationTokens: turn.cacheCreationInput ?? 0,
@@ -412,6 +413,7 @@ export async function extractHenchTokenUsage(
         }
       } else {
         attributeToModel(buckets, run.model, {
+          diagnosticStatus: run.diagnostics?.tokenDiagnosticStatus,
           inputTokens: run.tokenUsage.input ?? 0,
           outputTokens: run.tokenUsage.output ?? 0,
           cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
@@ -434,6 +436,7 @@ export async function extractHenchTokenUsage(
 interface SvManifest {
   analyzedAt?: string;
   tokenUsage?: {
+    diagnosticStatus?: UsageStatus;
     calls?: number;
     model?: string;
     inputTokens?: number;
@@ -463,6 +466,7 @@ export async function extractSvTokenUsage(
     if (!manifest.tokenUsage) return usage;
     if (manifest.analyzedAt && !isInRange(manifest.analyzedAt, filter)) return usage;
 
+    carryUsageStatus(usage, manifest.tokenUsage.diagnosticStatus);
     usage.calls += manifest.tokenUsage.calls ?? 0;
     usage.inputTokens += manifest.tokenUsage.inputTokens ?? 0;
     usage.outputTokens += manifest.tokenUsage.outputTokens ?? 0;
@@ -583,9 +587,12 @@ export async function extractHenchTokenEvents(
       const runId = run.id?.trim() || file.replace(/\.json$/, "");
 
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
+        let turnStatus: UsageStatus | undefined;
         for (const turn of run.turnTokenUsage) {
+          const diagnosticStatus = turn.diagnosticStatus ?? run.diagnostics?.tokenDiagnosticStatus;
+          turnStatus = mergeUsageStatus(turnStatus, diagnosticStatus);
           events.push({
-            ...(turn.diagnosticStatus ? { diagnosticStatus: turn.diagnosticStatus } : {}),
+            ...(diagnosticStatus ? { diagnosticStatus } : {}),
             ...(turn.cacheProvenance ? { cacheProvenance: turn.cacheProvenance } : {}),
             timestamp: run.startedAt,
             command: "run",
@@ -598,6 +605,16 @@ export async function extractHenchTokenEvents(
             vendor: turn.vendor,
             model: turn.model ?? run.model,
             runId,
+          });
+        }
+        // The run status normally summarizes its turns. A worse run-only
+        // diagnostic belongs to the aggregate, not every measured model.
+        const diagnosticStatus = mergeUsageStatus(turnStatus, run.diagnostics?.tokenDiagnosticStatus);
+        if (diagnosticStatus !== turnStatus) {
+          events.push({
+            timestamp: run.startedAt, command: "run", package: "hench", runId,
+            diagnosticStatus, calls: 0,
+            inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
           });
         }
         continue;
@@ -646,6 +663,8 @@ export async function extractSvTokenEvents(
       timestamp: manifest.analyzedAt ?? new Date().toISOString(),
       command: "analyze",
       package: "sv",
+      ...(manifest.tokenUsage.diagnosticStatus ? { diagnosticStatus: manifest.tokenUsage.diagnosticStatus } : {}),
+      model: normalizeEventMetadata(manifest.tokenUsage.model),
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
       cacheCreationTokens: manifest.tokenUsage.cacheCreationInputTokens ?? 0,

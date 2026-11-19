@@ -346,6 +346,12 @@ export function finalizeTokenUsage(
       cacheCreationInputTokens: (sum.cacheCreationInputTokens ?? 0) + (bucket.cacheCreationInputTokens ?? 0),
       cacheReadInputTokens: (sum.cacheReadInputTokens ?? 0) + (bucket.cacheReadInputTokens ?? 0),
     }), emptyAnalyzeTokenUsage());
+    const unmeasured = buckets.some(bucket => (bucket.unmeasuredCalls ?? 0) > 0);
+    const hasMeasurement = buckets.some(bucket => (bucket.measuredCalls ?? 0) > 0)
+      || ctx.tokenUsage.inputTokens + ctx.tokenUsage.outputTokens
+        + (ctx.tokenUsage.cacheCreationInputTokens ?? 0) + (ctx.tokenUsage.cacheReadInputTokens ?? 0) > 0;
+    ctx.tokenUsage.diagnosticStatus = unmeasured
+      ? (hasMeasurement ? "partial" : "unavailable") : "complete";
   }
   const usageLine = formatTokenUsage(ctx.tokenUsage);
   if (usageLine) {

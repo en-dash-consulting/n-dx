@@ -467,7 +467,6 @@ function resolveVendorModelWithSource(
 export const DEFAULT_ROUTES: Record<string, TaskTier> = {
   // hench
   "agent.execute": "standard",
-  "agent.review": "standard",
   "git.commit-message": "light",
   "context.summarize": "light",
   "context.distill": "standard",
