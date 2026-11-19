@@ -5,7 +5,9 @@
  * each one with rex's best guess for its home, strongest guesses first (IB7):
  * those are the quickest to confirm. A row opens the change's detail panel in
  * the Tasks tree; its Accept places it on that guess as a touches, and its
- * Place opens the Inbox page on it, where the shortlist and relation are.
+ * Place opens the Inbox page on it, where the shortlist and relation are. A
+ * row's assignee picker saves who it is for, and the assignee filter (Mine by
+ * default when the current user has a row) hides rows.
  *
  * "Place best guesses" reviews every guess at once: each change with its best
  * guess and a checkbox, weak guesses left unticked, then one write
@@ -27,8 +29,12 @@
 
 import { h, Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { PlaceWithSidecarButton, StrengthChip, useProjectStatus } from "../components/index.js";
-import type { GuessStrength } from "../components/index.js";
+import {
+  AssigneeFilter, AssigneePicker, PlaceWithSidecarButton, StrengthChip,
+  pickerChoices, saveAssignee, useAssigneeFilter, usePeople, useProjectStatus,
+} from "../components/index.js";
+import type { AssignableRow, GuessStrength } from "../components/index.js";
+import type { KnownPerson } from "../external.js";
 import { placementDraftNote, prunePlacementDrafts } from "../components/prd-tree/placement-draft.js";
 import { resolveCliLabel, useCliName, useRefetchableProductRead } from "../hooks/index.js";
 import type { Load } from "../hooks/index.js";
@@ -307,10 +313,12 @@ function ageOf(row: InboxRow): string | null {
   return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
-function Row({ row, onOpen, onPlace, onAccepted }: {
+function Row({ row, onOpen, onPlace, people, onAssigned, onAccepted }: {
   row: InboxRow;
   onOpen: (id: string) => void;
   onPlace?: (id: string) => void;
+  people: readonly KnownPerson[];
+  onAssigned?: () => void;
   /** After Accept wrote: read the Inbox again. Absent, no Accept. */
   onAccepted?: () => void;
 }) {
@@ -343,6 +351,12 @@ function Row({ row, onOpen, onPlace, onAccepted }: {
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),
       age ? h("span", { class: "inbox-age", title: "Time in the Inbox" }, age) : null,
+      h(AssigneePicker, {
+        itemId: change.id,
+        assignee: change.assignee,
+        people,
+        onSave: async (assignee: string) => { await saveAssignee(change.id, assignee); onAssigned?.(); },
+      }),
     ),
     h("div", { class: "inbox-row-foot" },
       h(GuessLine, { row }),
@@ -391,25 +405,45 @@ export interface InboxViewProps {
   onOpenAll?: () => void;
   /** After a row's Accept or "Place best guesses" wrote: read again. Absent, neither is offered. */
   onPlaced?: () => void;
+  /** Reads the Inbox again after a row's assignee is saved. */
+  onAssigned?: () => void;
 }
 
-export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced }: InboxViewProps) {
+/** The filter's view of Inbox rows: every one is open work. */
+export function assignableInboxRows(rows: readonly InboxRow[]): AssignableRow[] {
+  return rows.map((r) => ({ assignee: r.change.assignee, open: true }));
+}
+
+export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced, onAssigned }: InboxViewProps) {
   const cliName = useCliName();
+  const peopleRead = usePeople();
+  const assignable = useMemo(() => assignableInboxRows(rows), [rows]);
+  const filter = useAssigneeFilter(assignable, peopleRead);
+  const people = useMemo(
+    () => pickerChoices(peopleRead?.people ?? [], rows.map((r) => r.change.assignee)),
+    [peopleRead, rows],
+  );
   const sorted = sortInbox(rows);
-  const shown = limit === undefined ? sorted : sorted.slice(0, limit);
-  const hidden = sorted.length - shown.length;
+  // The filter hides rows only; All shows every one.
+  const visible = sorted.filter((row) => filter.shows(row.change.assignee));
+  const shown = limit === undefined ? visible : visible.slice(0, limit);
+  const hidden = visible.length - shown.length;
 
   return h("div", { class: "inbox-container" },
     onPlaced
       ? h(PlaceBestGuesses, { rows: sorted, applied: appliedRows, onPlaced, onOpenReview: onOpenAll })
       : null,
+    sorted.length > 0 ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
     sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" },
           h("p", null, "Inbox is empty"),
           h("p", { class: "section-sub" }, resolveCliLabel(HELD_EXPLANATION, cliName)))
-      : h("ul", { class: "inbox-list" },
-          shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, onAccepted: onPlaced })),
-        ),
+      : visible.length === 0
+        ? h("div", { class: "empty-state inbox-empty inbox-filtered-empty", role: "status" },
+            h("p", null, "No Inbox changes match this filter."))
+        : h("ul", { class: "inbox-list" },
+            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, onAssigned, onAccepted: onPlaced })),
+          ),
     hidden > 0 && onOpenAll
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
           `${hidden} more · Open ↗`)
@@ -562,6 +596,7 @@ export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limi
       onPlace: navigateTo ? (id) => { requestInboxSelection(id); navigateTo("inbox"); } : undefined,
       onOpenAll: navigateTo ? () => navigateTo("inbox") : undefined,
       onPlaced: refetch,
+      onAssigned: refetch,
     }),
   );
 }

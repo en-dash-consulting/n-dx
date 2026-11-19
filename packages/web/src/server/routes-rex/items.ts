@@ -144,7 +144,7 @@ export function routeItems(
  */
 const PATCHABLE_FIELDS = new Set([
   "status", "failureReason", "priority", "tags", "title",
-  "summary", "description", "acceptanceCriteria", "requirements",
+  "summary", "description", "acceptanceCriteria", "requirements", "assignee",
 ]);
 
 const isStringArray = (v: unknown): v is string[] =>
@@ -169,7 +169,7 @@ function validateItemPatch(body: unknown): string | null {
     && !(typeof patch.priority === "string" && isPriority(patch.priority))) {
     return `Invalid priority: ${String(patch.priority)}`;
   }
-  for (const key of ["title", "summary", "description", "failureReason"] as const) {
+  for (const key of ["title", "summary", "description", "failureReason", "assignee"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
   if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;
@@ -260,6 +260,9 @@ async function handleItemPatch(
     if (completing) delete fieldUpdates.status;
     // A cleared summary is removed, as `rex update --summary=` and edit_item remove it.
     if (typeof fieldUpdates.summary === "string" && !fieldUpdates.summary.trim()) fieldUpdates.summary = undefined;
+    // An assignee is matched exactly by `ndx work --mine`: trimmed, and empty
+    // removes it, as `rex update --assignee=` and edit_item do.
+    if (typeof fieldUpdates.assignee === "string") fieldUpdates.assignee = fieldUpdates.assignee.trim() || undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
@@ -831,6 +834,8 @@ async function handleBulkUpdate(
     const completing = input.updates.status === "completed" && isChangeLayerStore(store);
     const fieldUpdates = { ...input.updates };
     if (completing) delete fieldUpdates.status;
+    // As the single PATCH: trimmed, and empty removes it.
+    if (typeof fieldUpdates.assignee === "string") fieldUpdates.assignee = fieldUpdates.assignee.trim() || undefined;
     const writeFields = !completing || Object.keys(fieldUpdates).length > 0;
     let updatedDoc: Awaited<ReturnType<typeof store.loadDocument>>;
     let autoCompleteError: string | undefined;

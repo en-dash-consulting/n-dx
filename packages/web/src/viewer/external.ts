@@ -51,6 +51,10 @@ export { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 export type { SidecarChangeSet, SidecarChangeSetEdit, PlannedLane, PlannedTask, QueuePlan } from "../shared/index.js";
 export { laneSteps, stepRunOptions } from "../shared/index.js";
 export { HUB_PATH, detectBasePath, detectViewerBasePath, workspaceKeyFromBasePath, withBasePath, stripBasePath, webSocketUrl } from "../shared/index.js";
+// Who an item is assigned to: the people picker and the Mine filter key a
+// person by email, as the server's people list does (shared/people.ts).
+export type { KnownPerson } from "../shared/index.js";
+export { identityKey } from "../shared/index.js";
 
 // ── Item type (the v1 `level` compatibility shim) ─────────────────────────
 // The viewer reads a node's type through `itemTypeOf`, never `item.level`, and

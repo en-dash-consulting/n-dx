@@ -31,6 +31,8 @@ import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
 import { placementTab } from "../../route-state.js";
 import { ImpactDetail, useItemImpacts } from "../impact-tags.js";
+import { AssigneePicker, usePeople } from "../assignee.js";
+import { pickerChoices } from "../assignee-model.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1121,6 +1123,7 @@ function IndexMdSectionsRenderer({ itemId }: { itemId: string }) {
 
 export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, allItems, onUpdate, onNavigateToItem, onPrdChanged, onAddChild, onRemove, navigateTo }: TaskDetailProps) {
   const impacts = useItemImpacts();
+  const peopleRead = usePeople();
   const [saving, setSaving] = useState(false);
   const [pendingFailStatus, setPendingFailStatus] = useState(false);
   const [failureReason, setFailureReason] = useState("");
@@ -1338,6 +1341,21 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           )
         : null,
     ),
+
+    // Assignee: who the item belongs to, the field `ndx work --mine` selects by
+    onUpdate
+      ? h(TaskSection, { label: "Assignee", class: "task-assignee-section" },
+          h(AssigneePicker, {
+            key: `assignee:${item.id}`,
+            itemId: item.id,
+            assignee: item.assignee,
+            people: pickerChoices(peopleRead?.people ?? [], [item.assignee]),
+            onSave: (assignee: string) => onUpdate(item.id, { assignee }),
+          }),
+        )
+      : item.assignee
+        ? h(TaskSection, { label: "Assignee", class: "task-assignee-section" }, item.assignee)
+        : null,
 
     // Why the latest run did not complete: leads the panel, above the description
     h(RunVerdictBanner, { runs, enabled: verdictEnabled }),

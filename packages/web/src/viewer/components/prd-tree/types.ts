@@ -104,6 +104,8 @@ export interface PRDItemData {
   acceptanceCriteria?: string[];
   priority?: Priority;
   tags?: string[];
+  /** Who the item belongs to; `ndx work --mine` selects by it. Inherited by descendants. */
+  assignee?: string;
   blockedBy?: string[];
   /** @see packages/rex/src/schema/v1.ts — PRDItem.requirements */
   requirements?: RequirementData[];

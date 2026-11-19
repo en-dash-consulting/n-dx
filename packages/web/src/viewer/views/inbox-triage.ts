@@ -10,6 +10,9 @@
  * shortcut presses the control the section renders, so a key does exactly
  * what its button does.
  *
+ * The assignee filter narrows the queue (Mine by default when the current user
+ * has a change here); the selected change's head carries its assignee picker.
+ *
  * Reached from the Plan tile's header, a row's Place (opening on that
  * change) and the bottom-bar Inbox pill. "Place best guesses" above the queue
  * places many at once; the Plan tile's button opens it here.
@@ -19,11 +22,14 @@
 
 import { h } from "preact";
 import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { PlaceWithSidecarContext, StrengthChip, useProjectStatus } from "../components/index.js";
+import {
+  AssigneeFilter, AssigneePicker, PlaceWithSidecarContext, StrengthChip,
+  pickerChoices, saveAssignee, useAssigneeFilter, usePeople, useProjectStatus,
+} from "../components/index.js";
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
 import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
-import { AppliedHistory, PlaceBestGuesses, bestGuess, takeInboxSelection, useInbox, type InboxRow } from "./inbox.js";
+import { AppliedHistory, PlaceBestGuesses, assignableInboxRows, bestGuess, takeInboxSelection, useInbox, type InboxRow } from "./inbox.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import { shortChangeId } from "./product-model.js";
 
@@ -183,8 +189,17 @@ function QueueItem({ row, selected, onSelect }: { row: InboxRow; selected: boole
 // ── Page ─────────────────────────────────────────────────────────────
 
 export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
-  const { load, rows, applied, refetch } = useInbox();
+  const { load, rows: allRows, applied, refetch } = useInbox();
   const status = useProjectStatus();
+  const peopleRead = usePeople();
+  const assignable = useMemo(() => assignableInboxRows(allRows), [allRows]);
+  const filter = useAssigneeFilter(assignable, peopleRead);
+  const people = useMemo(
+    () => pickerChoices(peopleRead?.people ?? [], allRows.map((r) => r.change.assignee)),
+    [peopleRead, allRows],
+  );
+  // The queue is the filtered Inbox: J/K, Skip and the first pick follow it.
+  const rows = useMemo(() => allRows.filter((r) => filter.shows(r.change.assignee)), [allRows, filter.value, peopleRead]);
   // A row's Place on the Plan tile asked for this change.
   const [selected, setSelected] = useState<string | null>(() => takeInboxSelection());
   const [placed, setPlaced] = useState<ReadonlySet<string>>(new Set());
@@ -252,11 +267,12 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
       " › ",
       h("b", null, "Inbox"),
       h("span", { class: "inbox-crumb-counts", role: "status" },
-        ` · ${rows.length} to place · ${placed.size} placed this visit`),
+        ` · ${allRows.length} to place · ${placed.size} placed this visit`),
     ),
     h(PlaceBestGuesses, { rows, applied, onPlaced: refetch }),
     h("div", { class: "inbox-triage" },
       h("div", { class: "inbox-queue" },
+        allRows.length ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
         rows.length
           ? h("ul", {
               ref: listRef,
@@ -266,7 +282,8 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
               "aria-label": "Changes to place",
               "aria-activedescendant": index >= 0 ? optionId(order[index]) : undefined,
             }, rows.map((row) => h(QueueItem, { key: row.change.id, row, selected: row.change.id === selected, onSelect: select })))
-          : h("div", { class: "empty-state inbox-empty", role: "status" }, "Inbox is empty"),
+          : h("div", { class: "empty-state inbox-empty", role: "status" },
+              allRows.length ? "No Inbox changes match this filter." : "Inbox is empty"),
         h(AppliedHistory, {
           count: status?.rex.inbox?.appliedUnplaced ?? null,
           rows: applied,
@@ -279,6 +296,13 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
               h("div", { key: "head", class: "inbox-detail-head" },
                 h("span", { class: "ch-display-id" }, shortChangeId(current)),
                 h("div", { class: "inbox-detail-title" }, current.title),
+                h(AssigneePicker, {
+                  key: `assignee:${current.id}`,
+                  itemId: current.id,
+                  assignee: current.assignee,
+                  people,
+                  onSave: async (assignee: string) => { await saveAssignee(current.id, assignee); refetch(); },
+                }),
                 navigateTo
                   ? h("button", {
                       type: "button", class: "ch-change-link inbox-detail-open",
