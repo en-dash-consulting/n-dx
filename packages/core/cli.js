@@ -42,7 +42,7 @@ import { ensureSourceBuild } from "./source-build.js";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings, loadExtensionConfig } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, ignoredRootConfigWarning, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings, loadExtensionConfig } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -548,6 +548,24 @@ function noteLegacyLayoutOnce(command, dir) {
   process.env.NDX_LEGACY_NOTICE = "off";
 }
 
+/**
+ * Warn, once per process tree, when a `.ndx/` project also has a root
+ * `.n-dx.json` or `.n-dx.local.json` that nothing reads — otherwise a setting
+ * written there (a command timeout, say) silently never applies. Printed even
+ * under `--quiet`: it explains behaviour the operator did not ask for.
+ */
+function noteIgnoredRootConfigOnce(dir) {
+  if (process.env.NDX_IGNORED_CONFIG_NOTICE === "off") return;
+  let warning = null;
+  try {
+    warning = ignoredRootConfigWarning(dir);
+  } catch {
+    // Best-effort, like the config read itself.
+  }
+  if (warning) console.error(warning);
+  process.env.NDX_IGNORED_CONFIG_NOTICE = "off";
+}
+
 /** BETA experimental flags to forward to children. Empty unless opted in. */
 let experimentalEnvFragment = {};
 
@@ -652,6 +670,17 @@ function extractInitGitConsent(args) {
 function stripInitGitFlags(args) {
   return args.filter((a) => a !== "--git" && a !== "--no-git" && a !== "--no-commit");
 }
+
+/**
+ * `ndx init --no-llm`: static-only init for batch runs. No vendor CLI is
+ * spawned, no model is called and nothing goes over the network; init's own
+ * analyze is `--fast` already. The flag is init's, never forwarded.
+ */
+const INIT_NO_LLM_FLAG = "--no-llm";
+
+/** The one line `ndx init --no-llm` prints about what it left out. */
+const INIT_NO_LLM_NOTICE =
+  "--no-llm: skipped the vendor auth check, the claude CLI lookup for MCP registration and the update check.";
 
 function extractInitClaudeModel(args) {
   const flag = args.find((a) => a.startsWith("--claude-model="));
@@ -1303,7 +1332,7 @@ function parseInitFlagSet(rest) {
 function buildInitArgs(rest) {
   return stripInitGitFlags(
     stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest)))),
-  );
+  ).filter((a) => a !== INIT_NO_LLM_FLAG);
 }
 
 /**
@@ -1370,10 +1399,12 @@ function resolveInitAssistants(rest, dir) {
  * @param {string|undefined} effectiveModel
  * @param {boolean} quiet
  * @param {{ providerFromFlag?: string, claudeModelFromFlag?: string, codexModelFromFlag?: string, googleModelFromFlag?: string }} vendorFlags
+ * @param {boolean} [noLlm]  `--no-llm`: never prompt (a local-vendor model
+ *   prompt fetches the server's model list); flags and config decide alone.
  * @returns {Promise<{ selectedProvider: string|undefined, selection: object,
  *   llmSkipped: boolean, providerSource: string, modelSource: string }>}
  */
-async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, vendorFlags = {}) {
+async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, vendorFlags = {}, noLlm = false) {
   const { providerFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag } = vendorFlags;
 
   const existingVendor = readLLMVendor(dir);
@@ -1381,7 +1412,7 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
   const resolution = resolveInitLLMSelection({
     flags: { provider: effectiveProvider, model: effectiveModel },
     existingConfig: { vendor: existingVendor, model: existingModel },
-    isTTY: process.stdin.isTTY === true,
+    isTTY: process.stdin.isTTY === true && !noLlm,
   });
 
   if (!process.stdout.isTTY || quiet) showInitBanner();
@@ -1466,9 +1497,11 @@ async function runSubInitPhase(name, work, detail, quiet) {
  * @param {string} dir
  * @param {{ llmSkipped: boolean, selectedProvider: string|undefined,
  *   selectedModel: string|undefined, claudeModelFromFlag: string|undefined,
- *   codexModelFromFlag: string|undefined, googleModelFromFlag: string|undefined }} opts
+ *   codexModelFromFlag: string|undefined, googleModelFromFlag: string|undefined,
+ *   noLlm?: boolean }} opts  `noLlm` writes the vendor with `--no-preflight`:
+ *   the auth preflight spawns the vendor CLI or calls the vendor's API.
  */
-async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerSource }) {
+async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerSource, noLlm = false }) {
   if (!llmSkipped && selectedProvider) {
     const origLog = console.log;
     console.log = () => {};
@@ -1478,7 +1511,7 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
       // the preflight on every `ndx init` produces noisy auth warnings for
       // vendors the user hasn't configured yet (e.g. codex without login).
       if (providerSource !== "config") {
-        await runConfig(["llm.vendor", selectedProvider, dir, "--soft-preflight"]);
+        await runConfig(["llm.vendor", selectedProvider, dir, noLlm ? "--no-preflight" : "--soft-preflight"]);
       }
       if (selectedModel) {
         await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
@@ -1523,9 +1556,10 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
  * @param {{ dirLabel: Record<string, string>, svExists: boolean,
  *   rexExists: boolean, henchExists: boolean,
  *   llmSkipped: boolean, selectedProvider: string|undefined, selection: object,
- *   providerSource: string, modelSource: string, assistantResults: object }} opts
+ *   providerSource: string, modelSource: string, assistantResults: object,
+ *   noLlm?: boolean }} opts
  */
-function printStaticInitSummary({ dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult, gitCommitResult, skillTrackingHints }) {
+function printStaticInitSummary({ dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult, gitCommitResult, skillTrackingHints, noLlm = false }) {
   const row = (label, exists) =>
     `  ${padInitDirLabel(label, dirLabel)}  ${exists ? "already exists (reused)" : "created"}`;
   console.log("");
@@ -1536,6 +1570,8 @@ function printStaticInitSummary({ dirLabel, svExists, rexExists, henchExists, ll
   console.log("  LLM configuration");
   if (llmSkipped) {
     console.log("    Provider      skipped");
+  } else if (!selectedProvider) {
+    console.log("    Provider      not set");
   } else {
     console.log(`    Provider      ${selectedProvider} (${providerSource})`);
     const selectedModel = selection.model;
@@ -1546,6 +1582,7 @@ function printStaticInitSummary({ dirLabel, svExists, rexExists, henchExists, ll
       console.log("    Model         not set");
     }
   }
+  if (noLlm) console.log("    Model features  not checked (--no-llm)");
   for (const line of formatInitReport(assistantResults, { activeVendor: selectedProvider })) {
     console.log(line);
   }
@@ -1674,15 +1711,18 @@ async function handleInit(rest) {
   // neither --git nor --no-git already answered it.
   const gitResult = await runGitPreflight(dir, { quiet, consent: gitConsent });
 
+  const noLlm = rest.includes(INIT_NO_LLM_FLAG);
   const assistantEnabled = resolveInitAssistants(rest, dir);
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
     providerFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag,
-  });
+  }, noLlm);
   const { selectedProvider, selection, llmSkipped, providerSource, modelSource, providerSourceKey } = llmResult;
+  if (noLlm) console.log(INIT_NO_LLM_NOTICE);
 
   // When no provider is available and it wasn't a user cancellation (e.g.
-  // non-TTY with no flags or config), exit with a clear message.
-  if (!selectedProvider && !llmSkipped) {
+  // non-TTY with no flags or config), exit with a clear message. A `--no-llm`
+  // batch init needs no provider: it leaves the vendor unset.
+  if (!selectedProvider && !llmSkipped && !noLlm) {
     console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex', 'claude', 'google', or 'local'.");
     exitWithCleanup(1);
   }
@@ -1707,8 +1747,9 @@ async function handleInit(rest) {
   // Ink owns sub-package inits, LLM config writes, assistant integrations,
   // and the recap.  When it succeeds, we record the init version and exit.
   // On Ink failure (missing deps, render error) we fall through to the
-  // static path below.
-  const useTUI = !quiet && process.stdout.isTTY === true;
+  // static path below. `--no-llm` always takes the static path: it is for
+  // batch runs, and only that path threads the flag through.
+  const useTUI = !quiet && !noLlm && process.stdout.isTTY === true;
   if (useTUI) {
     let inkResult;
     try {
@@ -1779,6 +1820,7 @@ async function handleInit(rest) {
     llmSkipped, selectedProvider, selectedModel: selection.model,
     claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag,
     providerSource: providerSourceKey,  // raw key ("flag"|"config"|"prompt"), not display label
+    noLlm,
   });
 
   recordInitIdentity(dir);
@@ -1793,7 +1835,7 @@ async function handleInit(rest) {
     // Non-fatal — README generation is a best-effort convenience.
   }
 
-  const assistantResults = setupAssistantIntegrations(dir, assistantEnabled, { mcpScope: extractInitMcpScope(flags) });
+  const assistantResults = setupAssistantIntegrations(dir, assistantEnabled, { mcpScope: extractInitMcpScope(flags), noVendorCli: noLlm });
 
   // Warn if a generated assistant's skill directory is gitignored — its
   // ndx-* skills won't be committed, so cloned checkouts silently lack them
@@ -1808,7 +1850,7 @@ async function handleInit(rest) {
   printStaticInitSummary({
     dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider,
     selection, providerSource, modelSource, assistantResults, readmeResult,
-    gitResult, gitCommitResult, skillTrackingHints,
+    gitResult, gitCommitResult, skillTrackingHints, noLlm,
   });
   await reviewRepoTrustAfterInit(dir, rest, quiet);
   exitWithCleanup(0);
@@ -3829,7 +3871,11 @@ async function main() {
   // A top-level flag (--version, --help) is still n-dx's.
   const builtin = builtinCommandNames().includes(command);
   const extension = Boolean(command) && !builtin;
-  if (!updateCheckQuiet && !(extension && !command.startsWith("-"))) {
+  // The static-only batch path (`ndx init --no-llm`, `ndx analyze --fast`)
+  // makes no network request, the registry included.
+  const staticRun =
+    (command === "init" && rest.includes(INIT_NO_LLM_FLAG)) || (command === "analyze" && rest.includes("--fast"));
+  if (!updateCheckQuiet && !staticRun &&!(extension && !command.startsWith("-"))) {
     try {
       const { version: currentVersion } = JSON.parse(
         readFileSync(join(__dir, "package.json"), "utf-8"),
@@ -3900,6 +3946,7 @@ async function main() {
   }
 
   if (command && !hasHelp) noteLegacyLayoutOnce(command, dir);
+  if (builtin && !hasHelp) noteIgnoredRootConfigOnce(dir);
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {

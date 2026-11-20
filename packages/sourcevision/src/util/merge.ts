@@ -8,12 +8,14 @@ import type {
   FileEntry,
   Inventory,
   InventorySummary,
+  InventoryExcludedSummary,
   ImportEdge,
   ExternalImport,
   Imports,
   FileRole,
 } from "../schema/index.js";
 import { sortInventory, sortImports } from "./sort.js";
+import { mirrorLabel } from "./paths.js";
 
 /** Merge multiple inventory chunks into one */
 export function mergeInventories(chunks: Inventory[]): Inventory {
@@ -46,13 +48,30 @@ export function computeInventorySummary(files: FileEntry[]): InventorySummary {
     totalLines += f.lineCount;
   }
 
+  const thirdParty = countByReason(files.map((f) => f.thirdParty));
+  const mirrored = countByReason(files.map((f) => (f.mirrorOf === undefined ? undefined : mirrorLabel(f.path, f.mirrorOf))));
   return {
     totalFiles: files.length,
     totalLines,
     byLanguage,
     byRole: byRole as Record<FileRole, number>,
     byCategory,
+    ...(thirdParty ? { thirdParty } : {}),
+    ...(mirrored ? { mirrored } : {}),
   };
+}
+
+/** Marked files counted by reason, reasons sorted; `undefined` when none is marked. */
+function countByReason(reasons: readonly (string | undefined)[]): InventoryExcludedSummary | undefined {
+  const byReason: Record<string, number> = {};
+  let files = 0;
+  for (const reason of reasons) {
+    if (reason === undefined) continue;
+    files++;
+    byReason[reason] = (byReason[reason] ?? 0) + 1;
+  }
+  if (files === 0) return undefined;
+  return { files, byReason: Object.fromEntries(Object.entries(byReason).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) };
 }
 
 /** Merge multiple import chunks into one */

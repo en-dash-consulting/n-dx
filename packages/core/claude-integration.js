@@ -323,8 +323,12 @@ function findPinnedLocalEntries(absDir) {
  * reported in `pinned` so the caller can surface them even when they could not
  * be removed (no `claude` on PATH, or a removal that failed).
  *
+ * `{ noVendorCli: true }` (`ndx init --no-llm`) runs no `claude` at all — not
+ * the lookup, the cleanup or the registration — and reports every pinned
+ * entry as left in place.
+ *
  * @param {string} dir
- * @param {{ mcpScope?: "local" }} [opts]
+ * @param {{ mcpScope?: "local", noVendorCli?: boolean }} [opts]
  */
 function registerMcpServers(dir, opts = {}) {
   const useLocalScope = opts.mcpScope === "local";
@@ -334,6 +338,12 @@ function registerMcpServers(dir, opts = {}) {
   // a missing CLI is precisely the case where init cannot clean up and the
   // operator has to be told the command.
   const pinned = findPinnedLocalEntries(absDir);
+
+  if (opts.noVendorCli) {
+    return useLocalScope
+      ? { registered: false, reason: "--no-llm runs no claude CLI", mode: "local", pinned }
+      : { registered: false, reason: "using tracked .mcp.json", mode: "tracked", pinned };
+  }
 
   const discovery = discoverClaudeCli(dir);
   if (!discovery.found) {
@@ -768,9 +778,10 @@ export function formatClaudeCliNotFoundError(searched) {
  * Run the full Claude Code integration setup.
  *
  * @param {string} dir  Project root directory
- * @param {{ mcpScope?: "local" }} [opts]  Pass `{ mcpScope: "local" }` to
- *   register MCP servers via `claude mcp add --scope local` instead of
- *   relying on the tracked `.mcp.json` (the default).
+ * @param {{ mcpScope?: "local", noVendorCli?: boolean }} [opts]  Pass
+ *   `{ mcpScope: "local" }` to register MCP servers via `claude mcp add
+ *   --scope local` instead of relying on the tracked `.mcp.json` (the
+ *   default); `noVendorCli` runs no `claude` (see registerMcpServers).
  * @returns {{ settings: object, skills: object, mcp: object, mcpJson: object, instructions: object }}
  */
 export function setupClaudeIntegration(dir, opts = {}) {

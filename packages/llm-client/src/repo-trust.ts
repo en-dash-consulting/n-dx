@@ -220,6 +220,12 @@ const LANGUAGE_BASELINES: Record<string, Pick<GuardBaseline, "allowedCommands"> 
     allowedCommands: ["swift", "make", "xcodebuild", "xcrun", "git"],
     extraBlocked: [".build/**", "DerivedData/**", "Pods/**", "Carthage/**"],
   },
+  // The project's own tools only; n-dx installs nothing. `phpunit` is what the
+  // allowlist sees of `vendor/bin/phpunit`, which it reduces to a base name.
+  php: {
+    allowedCommands: ["php", "composer", "phpunit", "git"],
+    extraBlocked: ["vendor/**"],
+  },
 };
 
 /**
@@ -256,12 +262,14 @@ export function guardBaselineForLanguage(language?: string | null): GuardBaselin
 }
 
 /** The languages {@link detectRepoLanguage} can report; one per baseline. */
-export type DetectedRepoLanguage = "go" | "swift" | "typescript";
+export type DetectedRepoLanguage = "go" | "swift" | "php" | "typescript";
 
 /**
- * The project language as the host sees it, from marker files alone:
+ * The project language as the host sees it, from marker files:
  * `go.mod` → go; `Package.swift` or a top-level `*.xcodeproj` /
- * `*.xcworkspace` directory → swift; otherwise the JS/TS default.
+ * `*.xcworkspace` directory → swift; a root `composer.json` → php, unless a
+ * root `package.json` sits beside it and {@link phpOutnumbersJsTs} says the
+ * source is not mostly PHP; otherwise the JS/TS default.
  *
  * Mirrors hench init's detection without its config override, because the
  * config is the repository's own claim and this is what checks it.
@@ -278,18 +286,81 @@ export function detectRepoLanguage(projectDir: string): DetectedRepoLanguage {
   const xcode = entries.some(
     (e) => e.isDirectory() && (e.name.endsWith(".xcodeproj") || e.name.endsWith(".xcworkspace")),
   );
-  return xcode ? "swift" : "typescript";
+  if (xcode) return "swift";
+  if (!entries.some((e) => e.isFile() && e.name === "composer.json")) return "typescript";
+  if (!entries.some((e) => e.isFile() && e.name === "package.json")) return "php";
+  return phpOutnumbersJsTs(projectDir) ? "php" : "typescript";
+}
+
+const PHP_SOURCE = /\.(php|phtml|inc)$/;
+const JS_TS_SOURCE = /\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$/;
+
+/** Dependency and build directories the count skips, as lang-kit's `COUNT_SKIP_DIRS`. */
+const COUNT_SKIP_DIRS: ReadonlySet<string> = new Set([
+  "node_modules", "vendor", "venv", "site-packages", "bin", "obj", "dist", "build",
+]);
+
+/** Depth and directory bounds of lang-kit's count, plus a cap on entries read. */
+const COUNT_MAX_DEPTH = 3;
+const COUNT_MAX_DIRS = 2000;
+const COUNT_MAX_ENTRIES = 20000;
+
+/**
+ * Does PHP source outnumber JS/TS source? The tiebreak for a root holding both
+ * `composer.json` and `package.json`; a tie is JS/TS. Mirrors lang-kit's
+ * `detectLanguage` rule 3 (packages/lang-kit/src/detect.ts) without importing
+ * it: a breadth-first walk to three levels below the root, skipping
+ * dot-directories and dependency/build directories, stopping after
+ * {@link COUNT_MAX_DIRS} directories or {@link COUNT_MAX_ENTRIES} entries and
+ * deciding on what it counted. Minified `.min.js` is library code and is not
+ * counted, as in lang-kit; unlike lang-kit, `.inc` counts as PHP, because
+ * this choice only exists once a root `composer.json` says the repository is
+ * PHP. hench init's `phpOutnumbersJsTs` is the same rule; keep them in step.
+ *
+ * The count is repository content, but it only chooses between two baselines
+ * that block the same paths.
+ */
+function phpOutnumbersJsTs(rootDir: string): boolean {
+  let php = 0;
+  let jsTs = 0;
+  let dirs = 0;
+  let seen = 0;
+  let queue = [rootDir];
+  for (let depth = 0; depth <= COUNT_MAX_DEPTH && queue.length > 0; depth++) {
+    const next: string[] = [];
+    for (const dir of queue) {
+      if (dirs++ >= COUNT_MAX_DIRS) return php > jsTs;
+      let entries: Dirent[];
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue; // Unreadable directory: count what the rest holds.
+      }
+      for (const entry of entries) {
+        if (seen++ >= COUNT_MAX_ENTRIES) return php > jsTs;
+        if (entry.isDirectory()) {
+          if (!entry.name.startsWith(".") && !COUNT_SKIP_DIRS.has(entry.name)) next.push(join(dir, entry.name));
+        } else if (entry.isFile()) {
+          if (PHP_SOURCE.test(entry.name)) php++;
+          else if (JS_TS_SOURCE.test(entry.name) && !entry.name.endsWith(".min.js")) jsTs++;
+        }
+      }
+    }
+    queue = next;
+  }
+  return php > jsTs;
 }
 
 /** The baseline a declared language names, or null when it names none. */
 function declaredLanguageFamily(language: string | null): DetectedRepoLanguage | null {
   if (language === "typescript" || language === "javascript") return "typescript";
-  if (language === "go" || language === "swift") return language;
+  if (language === "go" || language === "swift" || language === "php") return language;
   return null;
 }
 
 function languageLabel(language: DetectedRepoLanguage): string {
-  return language === "typescript" ? "JavaScript/TypeScript" : language;
+  if (language === "typescript") return "JavaScript/TypeScript";
+  return language === "php" ? "PHP" : language;
 }
 
 /**

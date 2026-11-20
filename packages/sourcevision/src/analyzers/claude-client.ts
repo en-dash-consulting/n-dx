@@ -12,6 +12,7 @@ import type {
   JudgmentRoute,
 } from "@n-dx/llm-client";
 import {
+  ClaudeClientError,
   DEFAULT_LLM_VENDOR,
   createLLMClient,
   detectLLMAuthMode,
@@ -46,6 +47,24 @@ let _llmClient: ClaudeClient | undefined;
  * directory.
  */
 let _projectDir: string | undefined;
+
+/**
+ * Static-only mode (`sv analyze --fast`): no judgment route resolves and
+ * {@link callClaude} refuses, whatever keys or config exist. Set from the
+ * analyze context's `fastMode`, so every phase is covered by one switch
+ * rather than by each call site remembering to check.
+ */
+let _staticOnly = false;
+
+/** Turn static-only mode on or off. See {@link _staticOnly}. */
+export function setStaticOnly(on: boolean): void {
+  _staticOnly = on;
+}
+
+/** Whether static-only mode is on. */
+export function isStaticOnly(): boolean {
+  return _staticOnly;
+}
 
 function resolveVendor(): LLMVendor {
   return _llmConfig?.vendor ?? DEFAULT_LLM_VENDOR;
@@ -141,9 +160,11 @@ export function getAuthMode(): AuthMode | undefined {
  * Decide whether a task class is answered by a judgment model (TypeSafe Jev)
  * instead of the completion vendor. Thin wrapper over `resolveJudgmentRoute`
  * with the module's config, so call sites never handle `LLMConfig` directly.
- * `undefined` means: call `callClaude` exactly as before.
+ * `undefined` means: call `callClaude` exactly as before. Always `undefined`
+ * in static-only mode.
  */
 export function getJudgmentRoute(taskClass: string): JudgmentRoute | undefined {
+  if (_staticOnly) return undefined;
   const config = _llmConfig ?? {};
   const route = resolveJudgmentRoute(taskClass, config);
   if (route === undefined && !_judgmentFallbackNoticed.has(taskClass)) {
@@ -208,6 +229,13 @@ export async function callClaude(
   model?: string,
   opts?: { taskClass?: string },
 ): Promise<CallClaudeResult> {
+  if (_staticOnly) {
+    throw new ClaudeClientError(
+      `static-only analysis (--fast) makes no model calls (${opts?.taskClass ?? "unclassed"})`,
+      "cli",
+      false,
+    );
+  }
   const client = getClient();
   const resolution = opts?.taskClass
     ? resolveTaskModel(opts.taskClass, _llmConfig ?? {}, {

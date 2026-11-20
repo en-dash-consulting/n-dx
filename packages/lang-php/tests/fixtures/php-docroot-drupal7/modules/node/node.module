@@ -1,0 +1,9 @@
+<?php
+
+/**
+ * The core module that allows content to be submitted to the site.
+ */
+
+function node_menu() {
+  return array();
+}

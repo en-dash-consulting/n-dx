@@ -1,0 +1,7 @@
+# m h dom mon dow command
+MAILTO=ops@example.com
+*/5 * * * * cd /var/www/app && php -q cron/cleanup.php >/dev/null 2>&1
+0 3 * * *   /usr/bin/php /var/www/app/scripts/report.php --daily
+@daily php -d memory_limit=512M -f jobs/nightly.php
+30 2 * * 1 php /var/www/app/cron/missing.php
+15 * * * * curl -s http://localhost/ping

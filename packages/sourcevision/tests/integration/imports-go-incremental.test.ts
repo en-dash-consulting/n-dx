@@ -113,7 +113,12 @@ describe("Go pack in the imports phase", () => {
     const { imports, messages } = await analyze();
     // The pack parses the import prefix and resolves it, rather than leaving the
     // file to the regex parser, and names the structure it skipped.
-    expect(messages).toEqual(["util/zz_generated.go exceeds the parser size limit; imports read from its declaration prefix, structure skipped"]);
+    // The pack also reports, once, how its files parsed.
+    expect(messages).toEqual([
+      "util/zz_generated.go exceeds the parser size limit; imports read from its declaration prefix, structure skipped",
+      "[go-parse] 5 files: 1 over 1 MiB not parsed; listed in imports.json summary.parseIssues.",
+    ]);
+    expect(imports.summary.parseIssues?.go?.oversized).toEqual({ count: 1, examples: ["util/zz_generated.go"] });
     expect(edgeKeys(imports)).toEqual([...EDGES, "util/zz_generated.go -> other [*]"]);
     expect(imports.external.find((e) => e.package === "stdlib:strings")).toEqual({
       package: "stdlib:strings",

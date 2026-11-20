@@ -1,0 +1,2 @@
+<?php
+[$first, $second] = $pair;

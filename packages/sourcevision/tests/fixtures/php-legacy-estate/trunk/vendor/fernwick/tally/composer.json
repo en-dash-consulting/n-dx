@@ -1,0 +1,9 @@
+{
+    "name": "fernwick/tally",
+    "description": "Invented fixture package.",
+    "autoload": {
+        "psr-4": {
+            "Fernwick\\Tally\\": "src/"
+        }
+    }
+}

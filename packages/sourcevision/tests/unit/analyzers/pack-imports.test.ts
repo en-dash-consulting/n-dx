@@ -11,10 +11,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { goConfig, javaConfig, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
+import { goConfig, javaConfig, type FileFacts, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
 import { analyzeImports } from "../../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../../src/analyzers/inventory.js";
-import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts } from "../../../src/analyzers/pack-imports.js";
+import {
+  buildPackImportGraph,
+  isPackFile,
+  noticeListedPacks,
+  packsFor,
+  parseIssuesNotice,
+  parseIssuesOf,
+  readPackFrameworkFacts,
+} from "../../../src/analyzers/pack-imports.js";
 import { KNOWN_PACKS, type InstallablePack, type KnownPack } from "../../../src/language/pack-loader.js";
 import type { Inventory } from "../../../src/schema/v1.js";
 
@@ -60,6 +68,43 @@ describe("packsFor", () => {
   });
 });
 
+describe("parseIssuesNotice", () => {
+  it("leads with the file count when no file has syntax errors, and names a size limit that is not whole MiB", () => {
+    const issues = parseIssuesOf({ files: 1, sizeLimitBytes: 512 * 1024, syntaxErrors: [], oversized: ["a.php"], unreadable: [], notUtf8: [] });
+    expect(issues.clean).toBe(0);
+    expect(parseIssuesNotice("php", issues)).toBe(
+      "[php-parse] 1 file: 1 over 512 KiB not parsed; listed in imports.json summary.parseIssues.",
+    );
+  });
+
+  it("counts legacy-syntax files apart from syntax errors, with construct totals", () => {
+    const issues = parseIssuesOf({
+      files: 4,
+      sizeLimitBytes: 1024 * 1024,
+      syntaxErrors: ["c.php"],
+      oversized: [],
+      unreadable: [],
+      notUtf8: [],
+      legacySyntax: [
+        { path: "b.php", constructs: { "brace-offset": 3 } },
+        { path: "a.php", constructs: { "brace-offset": 1 } },
+      ],
+    });
+    expect(issues.clean).toBe(1);
+    expect(issues.syntaxErrors.count).toBe(1);
+    expect(issues.legacySyntax).toEqual({ count: 2, examples: ["a.php", "b.php"], constructs: { "brace-offset": 4 } });
+    expect(parseIssuesNotice("php", issues)).toBe(
+      "[php-parse] 1 of 4 files has syntax errors (facts read from the partial tree); " +
+        "2 use legacy syntax the grammar cannot parse (4 brace-offset), rewritten in place and parsed; listed in imports.json summary.parseIssues.",
+    );
+  });
+
+  it("has no legacySyntax key when the pack rewrote nothing", () => {
+    const issues = parseIssuesOf({ files: 1, sizeLimitBytes: 1024, syntaxErrors: ["a.php"], oversized: [], unreadable: [], notUtf8: [] });
+    expect(issues).not.toHaveProperty("legacySyntax");
+  });
+});
+
 describe("isPackFile", () => {
   it("matches a pack's extensions case-insensitively", () => {
     const java = [{ config: javaConfig }];
@@ -96,7 +141,7 @@ describe("buildPackImportGraph", () => {
 
   it("loads no pack, and reports nothing, when no file belongs to one", async () => {
     const { graph, messages } = await run(["src/a.ts"], [knownPack(javaConfig, { error: new Error("must not be loaded") })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([]);
   });
 
@@ -115,15 +160,20 @@ describe("buildPackImportGraph", () => {
       produces: ["imports", "routes", "outboundCalls"] as const,
     };
     const collected: unknown[] = [];
+    const asked: unknown[] = [];
     const messages: string[] = [];
     await buildPackImportGraph([file("src/A.java")], "/project", {
       packs: [knownPack(javaConfig, { entry: entry as LanguagePackEntry })],
       loader: { packDir, version: VERSION },
       warn: (m) => messages.push(m),
-      framework: (f) => collected.push(...f),
+      framework: (f, kinds) => {
+        collected.push(...f);
+        asked.push(kinds);
+      },
     });
     expect(requests.map((r) => r.kinds)).toEqual([["imports", "routes", "outboundCalls"]]);
     expect(collected).toEqual(facts);
+    expect(asked).toEqual([["routes", "outboundCalls"]]);
     expect(messages).toEqual(["Spring Boot: 1 skipped."]);
   });
 
@@ -158,20 +208,90 @@ describe("buildPackImportGraph", () => {
       external: [{ package: "java:stdlib:java.util", importedBy: ["src/A.java", "src/B.java"], symbols: ["List", "Map"] }],
       degraded: [],
       unparsed: [],
+      parseIssues: {},
     });
     expect(messages).toEqual([]);
+  });
+
+  describe("PHP's symbol kinds, conditional guard and include candidates", () => {
+    const at = { line: 1, column: 0 };
+    const span = { start: at, end: { line: 9, column: 1 } };
+    const facts: FileFacts[] = [
+      {
+        path: "src/A.java",
+        imports: {
+          files: [{ to: "src/B.java", symbols: [] }],
+          external: [],
+          written: [
+            { specifier: "src/B.java", names: [], position: at, guard: "conditional" },
+            { specifier: "config/", names: [], position: at, guard: "conditional", candidates: ["config/a.php", "config/b.php"] },
+          ],
+        },
+        symbols: [
+          { name: "App", kind: "namespace", position: at, span },
+          { name: "Greets", kind: "trait", position: at, span },
+          { name: "GREETING", kind: "constant", position: at, span, container: "Greets" },
+        ],
+      },
+    ];
+    // Taken before any run, so a sink handed the same objects cannot hide an in-place edit.
+    const expected = structuredClone(facts);
+    const graphOf = async (collected: FileFacts[]) => {
+      const entry = { ...stubEntry(javaConfig, { facts, unparsed: [] }), produces: ["imports", "routes"] as const };
+      return buildPackImportGraph([file("src/A.java"), file("src/B.java"), file("config/a.php"), file("config/b.php")], "/project", {
+        packs: [knownPack(javaConfig, { entry: entry as LanguagePackEntry })],
+        loader: { packDir, version: VERSION },
+        framework: (f) => collected.push(...f),
+      });
+    };
+
+    it("hands the facts over unchanged", async () => {
+      const collected: FileFacts[] = [];
+      await graphOf(collected);
+      expect(collected).toEqual(expected);
+    });
+
+    it("never turns include candidates into import edges", async () => {
+      const graph = await graphOf([]);
+      expect(graph.edges).toEqual([{ from: "src/A.java", to: "src/B.java", type: "static", symbols: [] }]);
+    });
   });
 
   it("lists the files a pack that ran could not parse, for the caller's fallback parser", async () => {
     const entry = stubEntry(goConfig, { facts: [{ path: "a.go" }], unparsed: ["big.go"] });
     const { graph, messages } = await run(["a.go", "big.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
-    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: ["big.go"] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: ["big.go"], parseIssues: {} });
     expect(messages).toEqual([]);
+  });
+
+  it("records a pack's parse report with sorted, capped examples and warns one line for it", async () => {
+    const syntaxErrors = Array.from({ length: 60 }, (_, i) => `src/e${String(i).padStart(2, "0")}.go`).reverse();
+    const entry = stubEntry(goConfig, {
+      facts: [{ path: "a.go" }],
+      unparsed: ["big.go", "gone.go"],
+      parse: { files: 1204, sizeLimitBytes: 1024 * 1024, syntaxErrors, oversized: ["big.go"], unreadable: ["gone.go"], notUtf8: ["z.go", "src/e00.go"] },
+    });
+    const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
+    const issues = graph.parseIssues.go!;
+    expect(issues).toMatchObject({
+      files: 1204,
+      clean: 1204 - 63,
+      sizeLimitBytes: 1024 * 1024,
+      oversized: { count: 1, examples: ["big.go"] },
+      unreadable: { count: 1, examples: ["gone.go"] },
+      notUtf8: { count: 2, examples: ["src/e00.go", "z.go"] },
+    });
+    expect(issues.syntaxErrors.count).toBe(60);
+    expect(issues.syntaxErrors.examples).toEqual([...syntaxErrors].sort().slice(0, 50));
+    expect(messages).toEqual([
+      "[go-parse] 60 of 1,204 files have syntax errors (facts read from the partial tree); 1 over 1 MiB not parsed; " +
+        "1 unreadable; 2 not UTF-8 (parsed with replacement characters); listed in imports.json summary.parseIssues.",
+    ]);
   });
 
   it("only suggests a missing opt-in pack the project does not list: no warning, no edges", async () => {
     const { graph, messages, suggested } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([]);
     expect(suggested).toEqual(["java"]);
   });
@@ -182,7 +302,7 @@ describe("buildPackImportGraph", () => {
       [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })],
       { listed: ["java"] },
     );
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([
       "Java: pack @n-dx/lang-java is not installed; Java files get inventory only. " +
         "Install it with `ndx sv pack add java`.",
@@ -223,7 +343,7 @@ describe("buildPackImportGraph", () => {
     const requests: PackProjectRequest[] = [];
     const entry = { ...stubEntry(goConfig, { facts: [], unparsed: [] }, requests), produces: [] };
     const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"], unparsed: [], parseIssues: {} });
     expect(requests).toEqual([]);
     expect(messages).toEqual(['Go: the pack does not produce "imports"; Go imports come from the regex import parser.']);
   });
@@ -235,7 +355,7 @@ describe("buildPackImportGraph", () => {
       degraded: { reason: "grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm)", remedy: "Build it." },
     });
     const { graph, messages } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { entry })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [], parseIssues: {} });
     expect(messages).toEqual([
       "Java: grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm); Java files get inventory only. Build it.",
     ]);
@@ -321,7 +441,7 @@ describe("sourcevision.packs", () => {
   it("gives one warning listing the known ids for an unknown id", async () => {
     configure(["cobol", "fortran"]);
     const { messages } = await analyze();
-    expect(messages).toEqual(["sourcevision.packs lists unknown packs cobol, fortran; known packs: java, go, terraform, python, sql."]);
+    expect(messages).toEqual(["sourcevision.packs lists unknown packs cobol, fortran; known packs: java, go, terraform, python, php, sql."]);
   });
 
   it("says nothing with no list, an empty list or a non-array, and never changes the output", async () => {
@@ -377,12 +497,12 @@ describe("readPackFrameworkFacts", () => {
     return { facts, messages };
   };
 
-  it("asks only for the framework kinds, on the pack's files", async () => {
+  it("asks only for the framework kinds, on the pack's files, and tags each file's facts with them", async () => {
     const requests: PackProjectRequest[] = [];
     const facts = [{ path: "src/A.java", outboundCalls: [] }];
     const result = await read([knownPack(javaConfig, { entry: framework({ facts, unparsed: [] }, requests) })]);
     expect(requests).toEqual([{ projectDir: "/project", files: ["src/A.java"], kinds: ["routes", "outboundCalls"] }]);
-    expect(result).toEqual({ facts, messages: [] });
+    expect(result).toEqual({ facts: [{ ...facts[0], asked: ["routes", "outboundCalls"] }], messages: [] });
   });
 
   it("passes over quietly a pack that cannot load or produces no framework kinds", async () => {

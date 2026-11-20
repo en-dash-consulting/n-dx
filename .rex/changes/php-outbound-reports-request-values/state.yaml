@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "27c3c72f-f411-408f-a7fa-aa506c0b8b6a":
+    status: "completed"
+    startedAt: "2026-11-16T18:09:19.256Z"
+    completedAt: "2026-11-16T18:09:19.256Z"
+    endedAt: "2026-11-16T18:09:19.256Z"
+    activeIntervals: [{"end":"2026-11-16T18:09:19.256Z","start":"2026-11-16T18:09:19.256Z"}]
+    appliedAt: "2026-11-16T18:09:19.256Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-16T18:04:35.025Z"
+    lastModified: "2026-11-16T18:09:19.256Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e4cf8d82-4f2e-40b7-9e08-517cce1664fd":
+    status: "completed"
+    startedAt: "2026-11-16T18:05:08.110Z"
+    completedAt: "2026-11-16T18:09:19.256Z"
+    endedAt: "2026-11-16T18:09:19.256Z"
+    activeIntervals: [{"end":"2026-11-16T18:09:19.256Z","start":"2026-11-16T18:05:08.110Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "getenv keys filtered by isRequestKey (SSL_* added, SSL_CERT_FILE/DIR kept); plain-form database hosts never take partial literal text; mysqli p: prefix stripped."
+    lastModified: "2026-11-16T18:09:19.256Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
