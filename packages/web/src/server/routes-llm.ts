@@ -1084,6 +1084,7 @@ export async function validateCatalogModel(
   if (vendor !== LLM_VENDOR.GOOGLE) {
     const live = await getLiveVendorProbe(vendor, projectDir);
     if (live.listing.ok && live.listing.models.includes(model)) return null;
+    if (!live.listing.ok) return `Cannot check model "${model}" in the ${vendor} catalog: ${live.listing.reason}`;
   }
   return `Model "${model}" is not in the ${vendor} catalog.`;
 }
