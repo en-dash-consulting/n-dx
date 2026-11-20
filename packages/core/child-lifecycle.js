@@ -77,6 +77,24 @@ export function isLifecycleDebugEnabled(env = process.env) {
   return v === "1" || v === "true" || v === "yes";
 }
 
+/**
+ * Whether `pid` names a live process. EPERM counts as alive: the process
+ * exists but belongs to someone else. Like any `kill(pid, 0)` probe it cannot
+ * tell a live process from a zombie or a recycled PID (see `pidTarget`), so a
+ * caller that owns a pid or lock file keeps its own staleness rules.
+ *
+ * @param {number} pid
+ * @returns {boolean}
+ */
+export function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
+  }
+}
+
 function isChildRunning(child) {
   return child.exitCode === null && child.signalCode === null;
 }
@@ -342,33 +360,6 @@ export function treeKillCommand(pid) {
 }
 
 /**
- * Windows counterpart to a POSIX process-group kill: `taskkill /T /F`.
- *
- * `/T` terminates the whole tree rooted at the PID, which is the closest
- * analogue to signalling a process group. Windows has no equivalent of the
- * POSIX graceful phase:
- *
- * - `process.kill(pid, "SIGTERM")` is `TerminateProcess` on Windows — the
- *   target gets no chance to run cleanup handlers, so a "graceful" SIGTERM pass
- *   buys nothing while still burning the grace period.
- * - `taskkill /T` without `/F` posts WM_CLOSE, which only a process pumping a
- *   window-message loop acts on. Node children do not, so it would time out.
- *
- * So this goes straight to `/F` and the absence of a graceful phase on Windows
- * is a documented limitation, not an oversight.
- *
- * NOT USED: Job Objects are the architecturally correct primitive — a job with
- * `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` reaps its whole tree with semantics
- * exactly analogous to a process group. They are rejected here because they
- * require a native addon, which would put a compiled dependency in the
- * orchestration tier of a pure-JS package.
- *
- * LIMITATION: taskkill is spawned during shutdown. If the ndx process is itself
- * force-killed (`TerminateProcess`, Task Manager "End task", or a parent's own
- * `taskkill /F`), no handler runs and this never executes — the tree then
- * survives unless the host placed it in a Job Object.
- */
-/**
  * Run `taskkill /T /F` against a pid and wait, bounded, for it to report back.
  *
  * Shared by the ChildProcess and PID paths so the Windows tree kill is invoked in
@@ -399,6 +390,33 @@ async function runWindowsTreeKill(pid, forceKillTimeoutMs, spawnCliImpl) {
   }
 }
 
+/**
+ * Windows counterpart to a POSIX process-group kill: `taskkill /T /F`.
+ *
+ * `/T` terminates the whole tree rooted at the PID, which is the closest
+ * analogue to signalling a process group. Windows has no equivalent of the
+ * POSIX graceful phase:
+ *
+ * - `process.kill(pid, "SIGTERM")` is `TerminateProcess` on Windows — the
+ *   target gets no chance to run cleanup handlers, so a "graceful" SIGTERM pass
+ *   buys nothing while still burning the grace period.
+ * - `taskkill /T` without `/F` posts WM_CLOSE, which only a process pumping a
+ *   window-message loop acts on. Node children do not, so it would time out.
+ *
+ * So this goes straight to `/F` and the absence of a graceful phase on Windows
+ * is a documented limitation, not an oversight.
+ *
+ * NOT USED: Job Objects are the architecturally correct primitive — a job with
+ * `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` reaps its whole tree with semantics
+ * exactly analogous to a process group. They are rejected here because they
+ * require a native addon, which would put a compiled dependency in the
+ * orchestration tier of a pure-JS package.
+ *
+ * LIMITATION: taskkill is spawned during shutdown. If the ndx process is itself
+ * force-killed (`TerminateProcess`, Task Manager "End task", or a parent's own
+ * `taskkill /F`), no handler runs and this never executes — the tree then
+ * survives unless the host placed it in a Job Object.
+ */
 async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl, env) {
   if (!isChildRunning(child)) return;
 

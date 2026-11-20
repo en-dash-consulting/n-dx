@@ -15,9 +15,10 @@
  *   node scripts/build-cli-ui-gap.mjs [--check] <file>   # act on another copy of the page
  */
 
-import { readFileSync, writeFileSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { invokedDirectly } from "./lib/invoked-directly.mjs";
 import { getOrchestratorCommands } from "../packages/core/help.js";
 import { COMMAND_EFFECTS, LAYOUT_TOKENS } from "../packages/core/command-effects.js";
 import { resolveLayout, relativeToRoot } from "../packages/core/layout.js";
@@ -125,16 +126,7 @@ export function buildCliUiGap(rawDoc = readFileSync(DOC_PATH, "utf-8")) {
   return eol === "\n" ? built : built.replace(/\n/g, eol);
 }
 
-function isMain() {
-  if (!process.argv[1]) return false;
-  try {
-    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
-  } catch {
-    return false;
-  }
-}
-
-if (isMain()) {
+if (invokedDirectly(import.meta.url)) {
   const target = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? DOC_PATH;
   const current = readFileSync(target, "utf-8");
   const next = buildCliUiGap(current);

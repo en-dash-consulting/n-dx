@@ -34,6 +34,11 @@ const MODELS: Readonly<Record<string, readonly string[]>> = {
   "o1": STANDARD,
 };
 
+/** Models whose Chat Completions limit includes reasoning and visible output. */
+export function usesOpenAiCompletionTokenLimit(model: string): boolean {
+  return Object.hasOwn(MODELS, model.replace(/-\d{4}-\d{2}-\d{2}$/, ""));
+}
+
 /** Validate a configured pin for the selected model and client dialect. */
 export function resolveOpenAiEffort(
   model: string | undefined,

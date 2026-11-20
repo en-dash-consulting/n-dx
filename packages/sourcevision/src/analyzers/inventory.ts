@@ -8,7 +8,7 @@ import { join, extname, basename } from "node:path";
 import { createHash } from "node:crypto";
 import { isVerbose, verbose } from "@n-dx/llm-client";
 import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
-import { sortInventory, toCanonicalJSON } from "../util/sort.js";
+import { sortInventory } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
@@ -646,5 +646,3 @@ export function inventoryFingerprint(langConfig: LanguageConfig, version: string
     .update(JSON.stringify({ version, config: langConfig }, canonicalConfigValue))
     .digest("hex");
 }
-
-export { toCanonicalJSON };

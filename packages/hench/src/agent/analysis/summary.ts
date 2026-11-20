@@ -46,8 +46,12 @@ export function buildRunSummary(toolCalls: ToolCallRecord[]): RunSummaryData {
 
   for (const call of toolCalls) {
     switch (call.tool) {
+      // Codex reports file edits as `str_replace_editor` and new files as
+      // `create_file`; the `path` argument identifies the changed file either way.
       case "write_file":
-      case "edit_file": {
+      case "edit_file":
+      case "str_replace_editor":
+      case "create_file": {
         const path = call.input.path as string | undefined;
         if (path) changedSet.add(path);
         break;
@@ -59,7 +63,9 @@ export function buildRunSummary(toolCalls: ToolCallRecord[]): RunSummaryData {
         break;
       }
 
-      case "run_command": {
+      // Codex reports shell commands as `shell`, its equivalent of `run_command`.
+      case "run_command":
+      case "shell": {
         const cmd = call.input.command as string | undefined;
         if (!cmd) break;
 
@@ -92,43 +98,6 @@ export function buildRunSummary(toolCalls: ToolCallRecord[]): RunSummaryData {
           for (const p of parts) {
             changedSet.add(p);
           }
-        }
-        break;
-      }
-
-      // ── Codex CLI tool names ───────────────────────────────────────────────
-      // Codex reports file edits as `str_replace_editor` and new files as
-      // `create_file`. Shell commands are reported as `shell` (not `run_command`).
-      // These cases mirror the Claude equivalents above.
-
-      case "str_replace_editor": {
-        // Codex file-editing tool — the `path` argument identifies the changed file
-        const path = call.input.path as string | undefined;
-        if (path) changedSet.add(path);
-        break;
-      }
-
-      case "create_file": {
-        // Codex file-creation tool — the `path` argument identifies the new file
-        const path = call.input.path as string | undefined;
-        if (path) changedSet.add(path);
-        break;
-      }
-
-      case "shell": {
-        // Codex shell tool — equivalent to Claude's `run_command`
-        const cmd = call.input.command as string | undefined;
-        if (!cmd) break;
-
-        const exitStatus = inferExitStatus(call.output);
-        commands.push({ command: cmd, exitStatus, durationMs: call.durationMs });
-
-        if (isTestCommand(cmd)) {
-          tests.push({
-            command: cmd,
-            passed: exitStatus === "ok",
-            durationMs: call.durationMs,
-          });
         }
         break;
       }

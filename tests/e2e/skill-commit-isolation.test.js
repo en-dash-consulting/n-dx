@@ -6,7 +6,7 @@
  *      in the correct format (snapshot → guard → explicit-path stage → commit
  *      from a project-root message file, with a skill-scoped message).
  *   2. Read-only skills do not contain git commit instructions.
- *   3. The hench run-loop commit pathway (shared.ts) is not modified by
+ *   3. The hench run-loop commit pathway (shared.ts and pre-run-commit-gate.ts) is not modified by
  *      skill-level commit additions — no skill-specific commit messages appear
  *      in the hench agent lifecycle, and the key hench commit infrastructure
  *      (PENDING_COMMIT_FILE, performCommitPromptIfNeeded, didAutoCommit) remains intact.
@@ -381,6 +381,12 @@ describe("hench run-loop: commit pathway is unmodified", () => {
     join(ROOT, "packages/hench/src/agent/lifecycle/shared.ts"),
     "utf-8",
   );
+  // The pre-run commit gate makes commits of its own and lives beside
+  // shared.ts, so the "no skill commit message" checks read both files.
+  const commitPathwaySrc = [
+    sharedSrc,
+    readFileSync(join(ROOT, "packages/hench/src/agent/lifecycle/pre-run-commit-gate.ts"), "utf-8"),
+  ].join("\n");
 
   it("performCommitPromptIfNeeded is present (hench commit pathway intact)", () => {
     expect(sharedSrc).toContain("performCommitPromptIfNeeded");
@@ -395,18 +401,18 @@ describe("hench run-loop: commit pathway is unmodified", () => {
   });
 
   it("hench commit pathway does not reference ndx-config commit message", () => {
-    expect(sharedSrc).not.toContain("ndx-config:");
+    expect(commitPathwaySrc).not.toContain("ndx-config:");
   });
 
   it("hench commit pathway does not reference ndx-capture commit message", () => {
-    expect(sharedSrc).not.toContain("ndx-capture:");
+    expect(commitPathwaySrc).not.toContain("ndx-capture:");
   });
 
   it("hench commit pathway does not reference ndx-plan commit message", () => {
-    expect(sharedSrc).not.toContain("ndx-plan:");
+    expect(commitPathwaySrc).not.toContain("ndx-plan:");
   });
 
   it("hench commit pathway does not reference ndx-reshape commit message", () => {
-    expect(sharedSrc).not.toContain("ndx-reshape:");
+    expect(commitPathwaySrc).not.toContain("ndx-reshape:");
   });
 });

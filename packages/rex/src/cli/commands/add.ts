@@ -6,7 +6,8 @@ import {
   resolvePRDFile,
   resolveGitBranch,
   ensureLegacyPrdMigrated,
- resolveRexPaths } from "../../store/index.js";
+  resolveRexPaths,
+} from "../../store/index.js";
 import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js";
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";

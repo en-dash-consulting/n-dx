@@ -8,8 +8,8 @@
 import type { ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse } from "../response-utils.js";
-import { loadPRDSync } from "../prd-io.js";
+import { jsonResponse } from "../response-utils.js";
+import { loadPRDOr404 } from "./rex-route-helpers.js";
 import { henchDirIn } from "../paths.js";
 import { RunFilesCache, computeImpacts, importFanIn, type ImpactSourceItem } from "../item-impact.js";
 
@@ -25,11 +25,8 @@ function runFiles(projectDir: string): Map<string, string[]> {
 
 export function routeImpact(path: string, method: string, res: ServerResponse, ctx: ServerContext): boolean {
   if (path !== "impact" || method !== "GET") return false;
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
   const items = computeImpacts(doc.items as unknown as ImpactSourceItem[], runFiles(ctx.projectDir), importFanIn(ctx.svDir));
   jsonResponse(res, 200, { items });
   return true;

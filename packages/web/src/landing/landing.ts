@@ -269,19 +269,8 @@ function initSetupWizard(): void {
     }
   }
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (errorEl) errorEl.hidden = true;
-    if (successEl) successEl.hidden = true;
-
-    const assistants = Array.from(
-      form.querySelectorAll<HTMLInputElement>('input[name="assistant"]:checked'),
-    ).map((el) => el.value);
-    if (assistants.length === 0) {
-      showError("Choose at least one assistant.");
-      return;
-    }
-
+  /** The init request's body: the chosen assistants and vendor, and the answers the form asked for. */
+  function requestBody(assistants: string[]): Record<string, unknown> {
     const body: Record<string, unknown> = { assistants, provider: selectedVendor };
     // Only sent when the question was actually asked — a hidden fieldset means
     // the folder is already a repository (or the preflight never answered).
@@ -301,6 +290,22 @@ function initSetupWizard(): void {
         if (!Number.isNaN(port)) body.localPort = port;
       }
     }
+    return body;
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (errorEl) errorEl.hidden = true;
+    if (successEl) successEl.hidden = true;
+
+    const assistants = Array.from(
+      form.querySelectorAll<HTMLInputElement>('input[name="assistant"]:checked'),
+    ).map((el) => el.value);
+    if (assistants.length === 0) {
+      showError("Choose at least one assistant.");
+      return;
+    }
+    const body = requestBody(assistants);
 
     setBusy(true);
     if (progressEl) progressEl.hidden = false;
@@ -473,32 +478,15 @@ function createTerminalLine(line: TerminalLine, typed = false): HTMLElement {
   return el;
 }
 
-/** Highlight the matching pipeline step in the hero section */
+/** Highlight the matching pipeline step in the hero section; no phase clears every highlight. */
 function setPipelinePhase(phase: string | undefined): void {
-  const steps = document.querySelectorAll<HTMLElement>(".pipeline-step");
-  steps.forEach((step) => {
-    if (phase && step.dataset.product === phase) {
-      step.classList.add("active");
-    } else {
-      step.classList.remove("active");
-    }
+  document.querySelectorAll<HTMLElement>(".pipeline-step").forEach((step) => {
+    step.classList.toggle("active", !!phase && step.dataset.product === phase);
   });
-
   // Also pulse the connecting arrows when a phase is active
-  const arrows = document.querySelectorAll<HTMLElement>(".pipeline-arrow");
-  arrows.forEach((arrow) => {
-    if (phase) {
-      arrow.classList.add("flowing");
-    } else {
-      arrow.classList.remove("flowing");
-    }
+  document.querySelectorAll<HTMLElement>(".pipeline-arrow").forEach((arrow) => {
+    arrow.classList.toggle("flowing", !!phase);
   });
-}
-
-/** Clear all pipeline highlights */
-function clearPipelinePhase(): void {
-  document.querySelectorAll<HTMLElement>(".pipeline-step").forEach((s) => s.classList.remove("active"));
-  document.querySelectorAll<HTMLElement>(".pipeline-arrow").forEach((a) => a.classList.remove("flowing"));
 }
 
 /** Schedule helper: returns a promise that resolves after `ms` milliseconds */
@@ -549,7 +537,7 @@ async function runTerminalDemo(): Promise<void> {
   // Finish: hide cursor and clear pipeline
   await wait(800);
   if (cursor) cursor.classList.remove("visible");
-  clearPipelinePhase();
+  setPipelinePhase(undefined);
 }
 
 function initTerminalDemo(prefersReducedMotion: boolean): void {

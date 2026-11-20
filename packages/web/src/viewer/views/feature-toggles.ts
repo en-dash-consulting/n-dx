@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { FeatureToggle, FeaturesResponse } from "../external.js";
 import { SettingRow, Switch, type SettingRowSpec, type SettingTag } from "./setting-row.js";
 import type { ProjectSectionId } from "./project-sections.js";
+import { responseError } from "../utils/response-error.js";
 
 // ── Form state ───────────────────────────────────────────────────────
 
@@ -58,8 +59,7 @@ export function useFeatureTogglesForm(): FeatureTogglesForm {
     try {
       const res = await fetch("/api/features");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setLoadError((body as { error?: string }).error ?? "Failed to load feature toggles");
+        setLoadError(await responseError(res, "Failed to load", "Failed to load feature toggles"));
         return;
       }
       setSaved((await res.json() as FeaturesResponse).toggles);
@@ -102,8 +102,7 @@ export function useFeatureTogglesForm(): FeatureTogglesForm {
         body: JSON.stringify({ changes }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Save failed" }));
-        setSaveError((body as { error?: string }).error ?? "Failed to save");
+        setSaveError(await responseError(res, "Save failed", "Failed to save"));
         return false;
       }
     } catch (err) {

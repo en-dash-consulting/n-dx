@@ -566,10 +566,14 @@ function compareVersions(a, b) {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /**
+ * A non-null, non-array object: what JSON read from a manifest, the cache or a
+ * config schema must be before its keys are read. Shared by the extension
+ * modules.
+ *
  * @param {unknown} value
- * @returns {value is Record<string, unknown>}
+ * @returns {value is Record<string, any>}
  */
-function isObject(value) {
+export function isObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

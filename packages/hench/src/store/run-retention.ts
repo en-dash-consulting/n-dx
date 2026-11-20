@@ -186,10 +186,6 @@ async function readRunFile(filePath: string): Promise<unknown> {
 // ---------------------------------------------------------------------------
 
 /**
- * List run files in a directory (both `.json` and `.json.gz`), excluding
- * hidden files.
- */
-/**
  * Name of the progress-event sidecar for a run file.
  *
  * `<id>.json` and `<id>.json.gz` both map to `<id>.events.jsonl` — the stream is
@@ -201,6 +197,10 @@ export function eventsSidecarFor(runFile: string): string {
   return runFile.replace(/\.json(\.gz)?$/, "") + ".events.jsonl";
 }
 
+/**
+ * List run files in a directory (both `.json` and `.json.gz`), excluding
+ * hidden files.
+ */
 async function listRunFiles(runsDir: string): Promise<string[]> {
   let files: string[];
   try {

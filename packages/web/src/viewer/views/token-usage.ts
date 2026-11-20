@@ -31,6 +31,7 @@ import { BrandedHeader } from "../components/index.js";
 import { usePolling } from "../hooks/index.js";
 import { TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS } from "../usage/constants.js";
 import { itemTypeOf } from "../external.js";
+import { errorMessage, formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirroring API response shapes)
@@ -216,12 +217,6 @@ function unattributedResidual(usage: AggregateTokenUsage): {
   };
 }
 
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 function fmtNumber(n: number): string {
   return n.toLocaleString();
 }
@@ -287,6 +282,25 @@ function pkgTotal(usage: PackageTokenUsage | undefined): number {
     + (usage.cacheCreationTokens ?? 0)
     + (usage.cacheReadTokens ?? 0)
   );
+}
+
+/** The figure columns the vendor/model and command tables share, after each table's two label columns. */
+const USAGE_COLUMNS = ["Input Tokens", "Output Tokens", "Cache Write", "Cache Read", "Total", "Calls"];
+
+function usageHeaderCells() {
+  return USAGE_COLUMNS.map((label) => h("th", { class: "num" }, label));
+}
+
+/** One row's cells under `USAGE_COLUMNS`, in the same order. */
+function usageCells(usage: PackageTokenUsage) {
+  return [
+    usage.inputTokens,
+    usage.outputTokens,
+    usage.cacheCreationTokens ?? 0,
+    usage.cacheReadTokens ?? 0,
+    pkgTotal(usage),
+    usage.calls,
+  ].map((n) => h("td", { class: "num" }, fmtNumber(n)));
 }
 
 /** Same sum over the whole-project aggregate. */
@@ -616,7 +630,7 @@ export function TokenUsageView() {
         }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -824,12 +838,7 @@ export function TokenUsageView() {
                 h("tr", null,
                   h("th", null, "Vendor"),
                   h("th", null, "Model"),
-                  h("th", { class: "num" }, "Input Tokens"),
-                  h("th", { class: "num" }, "Output Tokens"),
-                  h("th", { class: "num" }, "Cache Write"),
-                  h("th", { class: "num" }, "Cache Read"),
-                  h("th", { class: "num" }, "Total"),
-                  h("th", { class: "num" }, "Calls"),
+                  ...usageHeaderCells(),
                 ),
               ),
               h("tbody", null,
@@ -837,12 +846,7 @@ export function TokenUsageView() {
                   h("tr", { key: `${row.vendor}:${row.model}` },
                     h("td", null, row.vendor),
                     h("td", null, row.model, row.diagnosticStatus && row.diagnosticStatus !== "complete" ? ` (usage ${row.diagnosticStatus})` : ""),
-                    h("td", { class: "num" }, fmtNumber(row.inputTokens)),
-                    h("td", { class: "num" }, fmtNumber(row.outputTokens)),
-                    h("td", { class: "num" }, fmtNumber(row.cacheCreationTokens ?? 0)),
-                    h("td", { class: "num" }, fmtNumber(row.cacheReadTokens ?? 0)),
-                    h("td", { class: "num" }, fmtNumber(pkgTotal(row))),
-                    h("td", { class: "num" }, fmtNumber(row.calls)),
+                    ...usageCells(row),
                   ),
                 ),
               ),
@@ -900,12 +904,7 @@ export function TokenUsageView() {
                 h("tr", null,
                   h("th", null, "Package"),
                   h("th", null, "Command"),
-                  h("th", { class: "num" }, "Input Tokens"),
-                  h("th", { class: "num" }, "Output Tokens"),
-                  h("th", { class: "num" }, "Cache Write"),
-                  h("th", { class: "num" }, "Cache Read"),
-                  h("th", { class: "num" }, "Total"),
-                  h("th", { class: "num" }, "Calls"),
+                  ...usageHeaderCells(),
                 ),
               ),
               h("tbody", null,
@@ -917,12 +916,7 @@ export function TokenUsageView() {
                       ),
                     ),
                     h("td", null, c.command, c.diagnosticStatus && c.diagnosticStatus !== "complete" ? ` (usage ${c.diagnosticStatus})` : ""),
-                    h("td", { class: "num" }, fmtNumber(c.inputTokens)),
-                    h("td", { class: "num" }, fmtNumber(c.outputTokens)),
-                    h("td", { class: "num" }, fmtNumber(c.cacheCreationTokens ?? 0)),
-                    h("td", { class: "num" }, fmtNumber(c.cacheReadTokens ?? 0)),
-                    h("td", { class: "num" }, fmtNumber(pkgTotal(c))),
-                    h("td", { class: "num" }, fmtNumber(c.calls)),
+                    ...usageCells(c),
                   ),
                 ),
               ),

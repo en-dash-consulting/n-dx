@@ -15,7 +15,6 @@
  */
 
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import {
   CLI_ERROR_CODES,
   CLIError as BaseCLIError,

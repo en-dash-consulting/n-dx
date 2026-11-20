@@ -11,7 +11,7 @@
 import { useState, useCallback, useMemo, useRef } from "preact/hooks";
 import { replaceAppHistory } from "../base-path.js";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
-import type { DetailItem } from "../types.js";
+import type { DetailItem, PRDDetail } from "../types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
 import { itemTypeOf } from "../external.js";
 
@@ -48,6 +48,24 @@ export interface ItemSelectionState {
   handleNavigateToItem: (id: string) => void;
 }
 
+/** The detail-panel header for a PRD item. */
+export function prdDetailOf(item: PRDItemData): PRDDetail {
+  return {
+    type: "prd",
+    title: item.title,
+    id: item.id,
+    itemType: itemTypeOf(item),
+    status: item.status,
+    description: item.description,
+    acceptanceCriteria: item.acceptanceCriteria,
+    priority: item.priority,
+    tags: item.tags,
+    blockedBy: item.blockedBy,
+    startedAt: item.startedAt,
+    completedAt: item.completedAt,
+  };
+}
+
 /**
  * Hook for item selection state — single select, bulk multi-select, and navigation.
  */
@@ -76,20 +94,7 @@ export function useItemSelection({ data, onSelectItem }: ItemSelectionDeps): Ite
         `/prd/${item.id}`,
       );
       if (onSelectItem) {
-        onSelectItem({
-          type: "prd",
-          title: item.title,
-          id: item.id,
-          itemType: itemTypeOf(item),
-          status: item.status,
-          description: item.description,
-          acceptanceCriteria: item.acceptanceCriteria,
-          priority: item.priority,
-          tags: item.tags,
-          blockedBy: item.blockedBy,
-          startedAt: item.startedAt,
-          completedAt: item.completedAt,
-        });
+        onSelectItem(prdDetailOf(item));
       }
     },
     [onSelectItem],

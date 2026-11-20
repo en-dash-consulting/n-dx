@@ -14,6 +14,7 @@
 
 import { createContext, h } from "preact";
 import { ActionIcon } from "./action-icon.js";
+import { useEscapeKey } from "./use-escape-key.js";
 import type { ComponentChildren } from "preact";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ViewId } from "../api.js";
@@ -122,11 +123,7 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
 
   const current = entries.find((e) => e.view === view);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useEscapeKey(true, onClose);
 
   // The highlight follows the content's scroll, at most once a frame.
   useEffect(() => {

@@ -15,9 +15,13 @@ An unspecified work model is not assumed equivalent to an explicit review pin.
 Pair review and batch-chain admission keep their existing contracts.
 
 Transient retries continue the work child's ID, never a shared orientation
-parent. A failed Codex retry continuation exhausts this retry path instead of
-recursively resuming or replaying it cold. Missing IDs or failed admission use
-the existing cold-retry notice and retry budget. Once a fork reports a child or
+parent. A failed Codex continuation terminates recovery with a
+`codex_continuation_failed` log naming the continuation, actual attempt and
+configured attempt limit. It preserves the original error and does not claim
+the retry budget was exhausted or recursively resume or replay work cold.
+Cancellation, run bounds, livelock and classified auth/configuration failures
+retain their own outcomes. Missing IDs or failed admission use the existing
+cold-retry notice and retry budget. Once a fork reports a child or
 work, it cannot take the empty-fork cold fallback. Accounting accumulates across
 attempts; review gates and spawn limits still apply. A successful resumed spawn
 must confirm the expected session ID before its work/report is accepted.
@@ -30,7 +34,7 @@ describe explicit-ID resume and per-process execution policy. Installed
 `codex-cli 0.167.0-alpha.3.2` advertises the required resume flags. The existing
 installed-CLI flag-surface tests pass.
 
-An isolated, credential-free fixture ran fresh and resumed turns with
+An early isolated, credential-free fixture ran fresh and resumed turns with
 `gpt-6-astra`, workspace-write sandbox, approvals never, ignored user
 configuration/rules and shell credential hiding. Both reported the same thread
 ID; both were terminated at their 12-second bounds without completing a model
@@ -39,7 +43,7 @@ model availability, successful transient recovery or successful self-review.
 
 The opt-in `packages/llm-client/tests/integration/codex-resume-live.test.ts`
 checks completed marker recall on one thread across work, continuation and
-self-review prompts. Its real run failed at the first 15-second turn bound.
+self-review prompts. Its initial real run failed at the first 15-second turn bound.
 It does not convert an unavailable model into a pass. To repeat in an environment
 with model access, set `NDX_CODEX_RESUME_LIVE=1` and supply an explicit fixture
 credential through `NDX_CODEX_RESUME_API_KEY`; optional `NDX_CODEX_RESUME_BINARY`
@@ -50,9 +54,30 @@ pnpm --filter @n-dx/llm-client exec vitest run tests/integration/codex-resume-li
 ```
 
 The live test uses a disposable home and never copies the operator's auth files.
-Without opt-in it is reported skipped. No other CLI versions or browser flows
-were tested. Authenticated continuity and live Codex self-review remain required
-before marking the task complete.
+Without opt-in it is reported skipped. That early timeout remains part of the
+history; it does not establish successful continuity.
+
+### Later completed authenticated evidence
+
+The later evidence recorded in [PR #1080](https://github.com/en-dash-consulting/n-dx/pull/1080)
+used the selected `codex-cli 0.167.0-alpha.3.2` with ChatGPT sign-in through
+the **built session API**. Work, continuation and self-review all completed,
+reported the same session ID and recalled the exact marker on every turn.
+Workspace-write, approvals never, network disabled and shell credential hiding
+remained in force. This establishes authenticated transcript continuity on that
+selected CLI; the earlier credential-free timeouts are not pass evidence.
+
+The same PR records actual task B run `306e2899-6957-432d-bb3f-a4deafc866e0`:
+the explicitly approved Astra self-review resumed the executor's work session,
+completed its report with zero findings and passed 370 scoped checks. Mandatory
+review and test gates remained enabled. This supplies completed Hench
+self-review evidence as well as the built-API marker probe.
+
+These are recorded observations, not new live runs performed for this
+remediation. Forced transient, unfinished-session and cancellation failures
+remain disposable-fixture coverage; no live fault injection is claimed.
+Browser flows, native Windows execution and other CLI versions remain locally
+untested.
 
 Scripted protocol tests separately cover retry and self-review argv, child
 continuity, identity invalidation, prior attempt accounting, bounded resume
@@ -82,12 +107,13 @@ model. The report-only continuation rechecks the reviewer's own identity. Missin
 or malformed reports fail the review gate for all vendors while preserving work;
 `--review-optional` remains the explicit best-effort override.
 
-Additional observations on 2026-11-16: installed `codex-cli 0.167.0-alpha.3.2`
+Earlier observations on 2026-11-16: installed `codex-cli 0.167.0-alpha.3.2`
 accepted fresh and explicit-ID resume invocations in a disposable, credential-free
 fixture. Both emitted the same thread ID, but each hit its six-second bound with
 no completed turn. A separate read-only Codex self-review of this patch hit its
-20-second bound with no completed turn or report. This verifies thread selection
-only: authenticated model availability, successful live recovery and live
-self-review remain unverified. No other versions or browser flows were tested.
+20-second bound with no completed turn or report. Those early probes verify
+thread selection only. The later completed authenticated continuity and task B
+self-review evidence above supersede their unverified model/self-review state;
+successful recovery from injected live failures remains untested.
 Scripted fixture tests cover work/reviewer continuation, repeat failure, wrong
 thread IDs, identity invalidation, cancellation, shell-text rejection and gates.

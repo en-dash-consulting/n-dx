@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { removeEpic } from "../../core/remove-epic.js";
 import { removeTask } from "../../core/remove-task.js";
@@ -15,6 +14,7 @@ import { info, warn, result } from "../output.js";
 import type { ItemStatus } from "../../schema/index.js";
 import { isRootLevel, getLevelLabel } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
+import { confirmPrompt } from "../prompt.js";
 
 /**
  * Supported levels for the remove command.
@@ -22,24 +22,6 @@ import { ensureSnapshot } from "../snapshot-guard.js";
  * Features include integrity pre-checks (external dependents, sync state).
  */
 const REMOVABLE_LEVELS = new Set(["epic", "feature", "task"]);
-
-/**
- * Ask a single yes/no question in a TTY. Returns true for "y"/"yes".
- */
-async function confirmPrompt(question: string): Promise<boolean> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const answer = await new Promise<string>((resolve) =>
-    rl.question(question, resolve),
-  );
-  rl.close();
-
-  return answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes";
-}
 
 /**
  * `rex remove <level> <id> [dir]` — remove an epic, feature, or task from the PRD.

@@ -37,7 +37,7 @@
  */
 
 import { useState, useCallback, useEffect } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 import type { RunOptions } from "../external.js";
 
 /** Mirrors QueueEntry in server-side hub/admission.ts. */

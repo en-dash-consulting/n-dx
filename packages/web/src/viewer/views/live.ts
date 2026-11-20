@@ -36,6 +36,7 @@ import { useFeatureToggle } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { READY_NEXT_FEATURE, ReadyNext } from "./live-ready-next.js";
 import { TrackerActivitySection } from "./live-tracker.js";
+import { errorOf } from "../utils/response-error.js";
 import { PeekLink, TaskStartControl, isCurrentWorktree, jobTarget, liveHref, runTarget } from "../components/index.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import {
@@ -77,11 +78,6 @@ function elapsed(startedAt: string): string {
 
 function Elapsed({ startedAt }: { startedAt: string }) {
   return h("span", { class: "live-elapsed" }, useTick(startedAt, elapsed));
-}
-
-async function errorOf(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: string } | null;
-  return body?.error ?? `${fallback} (HTTP ${res.status})`;
 }
 
 // ── Header ───────────────────────────────────────────────────────────

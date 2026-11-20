@@ -30,6 +30,8 @@ import {
   nodeHalfWidth,
   type NodeKind,
 } from "./import-graph/layout.js";
+import { useColumnSort } from "./column-sort.js";
+import { formatByteSize } from "../utils/format.js";
 
 interface GraphProps {
   data: LoadedData;
@@ -89,12 +91,6 @@ function fitToBox(
 ): { textLength?: number; lengthAdjust?: "spacingAndGlyphs" } {
   if (!text || estTextWidth(text, fontPx, mono) <= maxWidth) return {};
   return { textLength: Math.max(8, Math.round(maxWidth)), lengthAdjust: "spacingAndGlyphs" };
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function parentContext(path: string): string {
@@ -212,6 +208,23 @@ function zoomMapToFocal(
 
 function offsetFromDrag(dx: number, dy: number, view: Viewport): Point {
   return { x: dx / view.k, y: dy / view.k };
+}
+
+/** Distance between a pinch's two fingers; 0 when fewer than two are down. */
+function touchDistance(touches: TouchList): number {
+  return touches.length < 2
+    ? 0
+    : Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY,
+      );
+}
+
+function touchMidpoint(touches: TouchList): Point {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2,
+  };
 }
 
 /**
@@ -347,17 +360,8 @@ function ImportEdgeTableView({
   focusPackage: string | null;
   packageFiles: string[];
 }) {
-  const [sortCol, setSortCol] = useState<"source" | "imported" | "type">("source");
-  const [sortAsc, setSortAsc] = useState(true);
-
-  const toggleSort = (col: typeof sortCol) => {
-    if (sortCol === col) setSortAsc((v) => !v);
-    else { setSortCol(col); setSortAsc(true); }
-  };
-
-  const thKeyDown = (col: typeof sortCol) => (e: KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(col); }
-  };
+  const { sortCol, sortAsc, toggleSort, thKeyDown, ariaSort, sortArrow } =
+    useColumnSort<"source" | "imported" | "type">("source");
 
   // In package mode, synthesise rows from the importer list
   const rows = useMemo(() => {
@@ -374,12 +378,6 @@ function ImportEdgeTableView({
       return sortAsc ? cmp : -cmp;
     });
   }, [edges, mode, focusPackage, packageFiles, sortCol, sortAsc]);
-
-  const ariaSort = (col: typeof sortCol): "ascending" | "descending" | "none" =>
-    sortCol !== col ? "none" : sortAsc ? "ascending" : "descending";
-
-  const sortArrow = (col: typeof sortCol) =>
-    sortCol !== col ? "" : (sortAsc ? " ▲" : " ▼");
 
   const captionId = "ig-table-caption";
   const scopeLabel = mode === "package" && focusPackage
@@ -741,6 +739,20 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     setDragState({ kind: "pan", surface, startX: event.clientX, startY: event.clientY, origin: viewFor(surface) });
   }, [viewFor]);
 
+  /** Start dragging a node of the zone map (file, directory or neighbouring zone), keyed by `path`. */
+  const beginFileNodeDrag = (event: PointerEvent, path: string) => {
+    event.stopPropagation();
+    suppressNodeClickRef.current = false;
+    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+    setDragState({
+      kind: "file-node",
+      path,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin: fileNodeOffsets[path] ?? { x: 0, y: 0 },
+    });
+  };
+
   const handlePointerMove = useCallback((event: PointerEvent) => {
     if (!dragState) return;
     const dx = event.clientX - dragState.startX;
@@ -768,19 +780,6 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
 
   // ── Canvas zoom: wheel (trackpad pinch === ctrl/meta wheel) + touch pinch ──
   const pinchRef = useRef<{ surface: SurfaceKind; startDist: number; startK: number } | null>(null);
-
-  const touchDistance = (touches: TouchList): number =>
-    touches.length < 2
-      ? 0
-      : Math.hypot(
-          touches[0].clientX - touches[1].clientX,
-          touches[0].clientY - touches[1].clientY,
-        );
-
-  const touchMidpoint = (touches: TouchList): { x: number; y: number } => ({
-    x: (touches[0].clientX + touches[1].clientX) / 2,
-    y: (touches[0].clientY + touches[1].clientY) / 2,
-  });
 
   const handleSurfaceWheel = useCallback((surface: SurfaceKind, event: WheelEvent) => {
     event.preventDefault();
@@ -1841,18 +1840,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           key: node.path,
                           class: `ig-zone-network-node${activeZoneFocusNode === node.path ? " ig-zone-network-node-active" : ""}${hoverPreviewFile === node.path ? " ig-zone-network-node-preview" : ""}${mapHasRouteFocus && !isRouteNode ? " ig-zone-network-node-muted" : ""}`,
                           transform: `translate(${node.x}, ${node.y})`,
-                          onPointerDown: (event: PointerEvent) => {
-                            event.stopPropagation();
-                            suppressNodeClickRef.current = false;
-                            (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-                            setDragState({
-                              kind: "file-node",
-                              path: node.path,
-                              startX: event.clientX,
-                              startY: event.clientY,
-                              origin: fileNodeOffsets[node.path] ?? { x: 0, y: 0 },
-                            });
-                          },
+                          onPointerDown: (event: PointerEvent) => beginFileNodeDrag(event, node.path),
                           onPointerEnter: () => openHoverPreview(node.path, node.x > activeZoneNetworkW / 2 ? "left" : "right"),
                           onPointerLeave: () => closeHoverPreview(node.path),
                           onClick: (event: MouseEvent) => {
@@ -1889,18 +1877,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           key: node.id,
                           class: "ig-zone-dir-node",
                           transform: `translate(${node.x}, ${node.y})`,
-                          onPointerDown: (event: PointerEvent) => {
-                            event.stopPropagation();
-                            suppressNodeClickRef.current = false;
-                            (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-                            setDragState({
-                              kind: "file-node",
-                              path: node.id,
-                              startX: event.clientX,
-                              startY: event.clientY,
-                              origin: fileNodeOffsets[node.id] ?? { x: 0, y: 0 },
-                            });
-                          },
+                          onPointerDown: (event: PointerEvent) => beginFileNodeDrag(event, node.id),
                         },
                           h("rect", { x: -ZONE_DIR_NODE_W / 2, y: -ZONE_DIR_NODE_H / 2, width: ZONE_DIR_NODE_W, height: ZONE_DIR_NODE_H, rx: 12 }),
                           h("text", { class: "ig-zone-dir-label", x: -ZONE_DIR_NODE_W / 2 + 12, y: -2, ...fitToBox(truncateNodeLabel(node.dir, "file", 30), 9, ZONE_DIR_NODE_W - 24, true) }, truncateNodeLabel(node.dir, "file", 30)),
@@ -1914,18 +1891,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           key: node.id,
                           class: `ig-zone-external-node${hoverExternalZoneId === node.id ? " ig-zone-external-node-preview" : ""}`,
                           transform: `translate(${node.x}, ${node.y})`,
-                          onPointerDown: (event: PointerEvent) => {
-                            event.stopPropagation();
-                            suppressNodeClickRef.current = false;
-                            (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-                            setDragState({
-                              kind: "file-node",
-                              path: `zone:${node.id}`,
-                              startX: event.clientX,
-                              startY: event.clientY,
-                              origin: fileNodeOffsets[`zone:${node.id}`] ?? { x: 0, y: 0 },
-                            });
-                          },
+                          onPointerDown: (event: PointerEvent) => beginFileNodeDrag(event, `zone:${node.id}`),
                           onPointerEnter: () => {
                             setHoverExternalZoneId(node.id);
                             setHoverPreviewSide(node.x > activeZoneNetworkW / 2 ? "left" : "right");
@@ -2260,7 +2226,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               h("strong", { title: focusFile }, focusFile),
               h("span", null, `${inDegree.get(focusFile) ?? 0} importing · ${outDegree.get(focusFile) ?? 0} outgoing`),
               focusInv
-                ? h("span", null, `${focusInv.language} · ${formatSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
+                ? h("span", null, `${focusInv.language} · ${formatByteSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
                 : null,
             )
           : null,
@@ -2283,7 +2249,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   ? h("span", null, "File")
                   : null,
                 focusInv
-                  ? h("strong", null, `${focusInv.language} · ${formatSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
+                  ? h("strong", null, `${focusInv.language} · ${formatByteSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
                   : null,
               )
             : h("div", { class: "ig-focus-detail-grid" },

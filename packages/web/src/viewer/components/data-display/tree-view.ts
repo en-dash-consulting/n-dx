@@ -1,5 +1,6 @@
 import { h, VNode } from "preact";
 import { useState, useRef, useEffect } from "preact/hooks";
+import { toggled } from "../set-toggle.js";
 
 export interface TreeNode {
   id: string;
@@ -52,10 +53,7 @@ export function TreeView({
 
   const toggle = (id: string) => {
     if (filterMatch) return;
-    const next = new Set(expanded);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setExpanded(next);
+    setExpanded(toggled(expanded, id));
   };
 
   // Visible node IDs in render order, mirroring renderNodes' filter/expand

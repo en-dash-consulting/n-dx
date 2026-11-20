@@ -6,6 +6,7 @@ import { ALL_STATE_DIRS, stateDirPrefixes } from "../state-paths.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
 import { BrandedHeader, LanguageAnalysisStrip, GlossaryLine, InfoTip } from "../components/index.js";
+import { errorMessage, formatByteSize } from "../utils/format.js";
 
 const FILE_SEARCH_LISTBOX_ID = "file-search-listbox";
 const FILE_SEARCH_MAX_OPTIONS = 10;
@@ -69,7 +70,7 @@ export function ArchetypeCell({ path, archetype, validArchetypes }: ArchetypeCel
       setCurrent(next);
       setNote("saved — re-analyze to apply");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     }
   }, [path, current]);
 
@@ -255,7 +256,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
       title: basename(file.path),
       path: file.path,
       language: file.language,
-      size: formatSize(file.size),
+      size: formatByteSize(file.size),
       lines: file.lineCount,
       role: file.role,
       category: file.category,
@@ -488,7 +489,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
               : null,
             h("td", null, file.language),
             h("td", { class: "text-right" }, file.lineCount.toLocaleString()),
-            h("td", { class: "text-right" }, formatSize(file.size)),
+            h("td", { class: "text-right" }, formatByteSize(file.size)),
             h("td", null,
               h("span", { class: `tag ${ROLE_TAG_CLASS[file.role] || "tag-other"}` }, file.role)
             ),
@@ -517,10 +518,4 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
         )
       : null
   );
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

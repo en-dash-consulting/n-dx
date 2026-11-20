@@ -74,7 +74,7 @@ export interface PackCommandDeps {
   readonly listed?: readonly string[];
   /** Where `bundle` makes its temporary npm prefix; defaults to the OS temp directory. */
   readonly tempRoot?: string;
-  /** Whether a pack directory lock's holder still runs; defaults to `pidAlive` (`pack-lock.ts`). */
+  /** Whether a pack directory lock's holder still runs; defaults to `pidAlive` (`util/pid.ts`). */
   readonly isAlive?: (pid: number) => boolean;
   /** The most `add --from` lets a bundle inflate to; defaults to {@link MAX_BUNDLE_BYTES}. */
   readonly maxBundleBytes?: number;

@@ -9,6 +9,8 @@
 import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { toggled } from "../set-toggle.js";
+import { stringErrorOf } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -58,15 +60,10 @@ const RISK_CLASSES: Record<string, string> = {
   high: "reorg-risk-high",
 };
 
-/**
- * The message for a refused apply: the server's `error` text (the branch
- * guard's refusal names the branch), else the status code.
- */
-async function applyFailure(res: Response): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: unknown } | null;
-  return typeof body?.error === "string" && body.error
-    ? body.error
-    : `Apply failed (${res.status})`;
+/** What `POST /api/rex/reorganize/apply` reports. */
+interface ApplyResult {
+  applied: number;
+  failed: number;
 }
 
 // ── Component ────────────────────────────────────────────────────
@@ -112,48 +109,34 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
   }, [open, fetchProposals]);
 
   const toggleSelection = useCallback((id: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setSelected((prev) => toggled(prev, id));
   }, []);
 
   const toggleLlmSelection = useCallback((id: string) => {
-    setSelectedLlm((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setSelectedLlm((prev) => toggled(prev, id));
   }, []);
 
-  const applySelected = useCallback(async () => {
-    if (selected.size === 0 && selectedLlm.size === 0) return;
+  /**
+   * Apply the proposals in `body`, report what the server did with
+   * `describe`, and re-read the proposals when anything changed.
+   */
+  const apply = useCallback(async (body: Record<string, unknown>, describe: (data: ApplyResult) => string) => {
     setApplying(true);
     setError(null);
     try {
       const res = await fetch("/api/rex/reorganize/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          proposalIds: [...selected],
-          llmProposalIds: [...selectedLlm],
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        setError(await applyFailure(res));
+        // The server's `error` text (the branch guard's refusal names the
+        // branch), else the status code.
+        setError(await stringErrorOf(res, "Apply failed"));
         return;
       }
       const data = await res.json();
-      setResult(`Applied ${data.applied} proposal(s)${data.failed > 0 ? `, ${data.failed} failed` : ""}`);
+      setResult(describe(data));
       if (data.applied > 0) {
         onApplied?.();
         await fetchProposals();
@@ -163,35 +146,21 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
     } finally {
       setApplying(false);
     }
-  }, [selected, selectedLlm, onApplied, fetchProposals]);
+  }, [onApplied, fetchProposals]);
+
+  const applySelected = useCallback(async () => {
+    if (selected.size === 0 && selectedLlm.size === 0) return;
+    await apply(
+      { proposalIds: [...selected], llmProposalIds: [...selectedLlm] },
+      (data) => `Applied ${data.applied} proposal(s)${data.failed > 0 ? `, ${data.failed} failed` : ""}`,
+    );
+  }, [selected, selectedLlm, apply]);
 
   const applyAllLowRisk = useCallback(async () => {
     const lowRiskIds = proposals.filter((p) => p.risk === "low").map((p) => p.id);
     if (lowRiskIds.length === 0) return;
-    setApplying(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/rex/reorganize/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proposalIds: lowRiskIds }),
-      });
-      if (!res.ok) {
-        setError(await applyFailure(res));
-        return;
-      }
-      const data = await res.json();
-      setResult(`Applied ${data.applied} low-risk proposal(s)`);
-      if (data.applied > 0) {
-        onApplied?.();
-        await fetchProposals();
-      }
-    } catch {
-      setError("Failed to apply proposals.");
-    } finally {
-      setApplying(false);
-    }
-  }, [proposals, onApplied, fetchProposals]);
+    await apply({ proposalIds: lowRiskIds }, (data) => `Applied ${data.applied} low-risk proposal(s)`);
+  }, [proposals, apply]);
 
   if (!open) return null;
 

@@ -317,12 +317,6 @@ function renderCommitsFromItem(item: PRDItem): CommitInfo[] {
   }));
 }
 
-function extractCommits(_log: LogEntry[], _itemId: string): CommitInfo[] {
-  // TODO: Parse execution log and git trailers to find commits for this item
-  // For now, return empty list (placeholder for future implementation)
-  return [];
-}
-
 interface ChangeInfo {
   label: string;
   detail: string;

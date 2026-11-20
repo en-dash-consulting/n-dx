@@ -38,6 +38,7 @@ import type { JevQuestion, JsonValue } from "@n-dx/llm-client";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { tryParseJSON } from "./enrich-parsing.js";
 import { SV_CACHE_DIRNAME } from "../paths.js";
+import { addCallTokens } from "./token-usage.js";
 
 /** Documents searched for declared rules, relative to the project root. */
 export const RULE_DOC_PATHS = [
@@ -331,10 +332,7 @@ export async function judgeRuleViolations(
       break;
     }
     result.calls++;
-    if (response.tokenUsage) {
-      usage.input += response.tokenUsage.input;
-      usage.output += response.tokenUsage.output;
-    }
+    addCallTokens(usage, response.tokenUsage);
     for (const { edge, rule, ruleIndex, edgeIndex } of slice) {
       const a = response.answers[`v${edgeIndex}-${ruleIndex}`];
       if (a?.type !== "noul" || a.noul < RULE_VIOLATION_MIN_PROBABILITY) continue;

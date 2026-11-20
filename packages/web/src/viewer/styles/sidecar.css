@@ -325,14 +325,13 @@
   gap: var(--space-1);
   padding: var(--space-2);
   border: 1px solid var(--border);
-  border-left-width: 3px;
   border-radius: 6px;
   font-size: 12px;
 }
 .sidecar-card--pending { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 8%, transparent); }
-.sidecar-card--approved, .sidecar-card--allow-listed { border-left-color: var(--green); }
-.sidecar-card--denied { border-left-color: var(--red); }
-.sidecar-card--withdrawn { border-left-color: var(--text-muted); }
+.sidecar-card--approved, .sidecar-card--allow-listed { background: color-mix(in srgb, var(--green) 8%, transparent); }
+.sidecar-card--denied { background: color-mix(in srgb, var(--red) 8%, transparent); }
+.sidecar-card--withdrawn { background: color-mix(in srgb, var(--text) 4%, transparent); }
 .sidecar-card-head { display: flex; gap: var(--space-2); align-items: baseline; min-width: 0; }
 .sidecar-card-kind {
   flex: none;
@@ -490,7 +489,7 @@
 .sidecar-external-input[aria-invalid="true"] { border-color: var(--red); outline: 1px solid var(--red); }
 .sidecar-external-group { margin: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; gap: var(--space-2); }
 .sidecar-external-group legend { padding: 0 var(--space-1); }
-.sidecar-external-problems { border-left: 3px solid var(--red); padding: var(--space-1) var(--space-2); background: var(--bg-surface); }
+.sidecar-external-problems { padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--red) 8%, var(--bg-surface)); }
 .sidecar-external-problems-head { font-weight: 600; }
 .sidecar-external-problems ul { margin: var(--space-1) 0 0; padding-left: var(--space-3); font-size: 12px; }
 

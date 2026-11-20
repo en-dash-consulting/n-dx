@@ -14,12 +14,7 @@
 
 import { readdir, writeFile, unlink, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const LOCKS_DIR = "locks";
+import { LOCKS_DIRNAME } from "../store/paths.js";
 
 // ---------------------------------------------------------------------------
 // Error types
@@ -87,7 +82,7 @@ function isPidAlive(pid: number): boolean {
 // ---------------------------------------------------------------------------
 
 function locksDir(henchDir: string): string {
-  return join(henchDir, LOCKS_DIR);
+  return join(henchDir, LOCKS_DIRNAME);
 }
 
 function lockFilePath(henchDir: string, pid: number): string {

@@ -17,7 +17,7 @@
  * refused run still exits 0 with a complete report.
  */
 
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem, RunSettings, V2Tree } from "../../prd/rex-gateway.js";
 import { LLM_VENDOR, getGitCommonDir, supportsOpenAiTurns } from "../../prd/llm-gateway.js";
@@ -29,7 +29,7 @@ import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../sto
 import { resolveHenchPaths, resolveHenchRexDir } from "../../store/paths.js";
 import { missingPrdFolderError } from "./prd-folder.js";
 import { excludeHenchRuntimeArtifacts, formatPorcelainPath, splitPlanningPaths } from "../../store/artifacts.js";
-import { PLANNING_COMMIT_SUBJECT } from "../../agent/lifecycle/shared.js";
+import { PLANNING_COMMIT_SUBJECT } from "../../agent/lifecycle/pre-run-commit-gate.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
 import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal, readTreeAsReset } from "../../agent/planning/work-selection.js";

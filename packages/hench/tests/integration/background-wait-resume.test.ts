@@ -164,7 +164,7 @@ describe("cliLoop — background-wait resume", () => {
 
     expect(cli.invocations).toHaveLength(2);
     expect(run.status).toBe("failed");
-    expect(run.error).toMatch(/waiting on a background command again after being resumed/);
+    expect(run.error).toMatch(/unfinished again after being resumed/);
     expect(run.error).toContain("ScheduleWakeup");
     // The gate is not a rollback, and neither is this: the work is still there.
     expect(execFileSync("git", ["status", "--porcelain"], { cwd: projectDir, encoding: "utf-8" }))

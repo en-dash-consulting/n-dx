@@ -29,7 +29,6 @@ import {
 // Set conservatively below the prompt-context ceiling so the full-prompt
 // attempt still fits comfortably with file headers + project shape.
 export const ZONES_PER_BATCH = 7;
-export const MAX_CONCURRENT_BATCHES = 1;
 
 // ── Per-zone mode constants ──────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@
  * `@n-dx/llm-client` is the registry that maps classes to tiers. This test
  * walks every package's source for declared task classes and asserts:
  *
- * 1. Every class a call site declares exists in `DEFAULT_ROUTES` — a typo'd
+ * 1. Every class a call site declares is registered for routing or effort — a typo'd
  *    or unregistered class would silently resolve to the standard tier.
  * 2. The choke-point migrations hold: the classes each package is expected
  *    to declare are actually declared, so a refactor that quietly drops a
@@ -21,6 +21,7 @@ import { join } from "node:path";
 
 // Foundation tier: the routing registry (dist import, like the other
 // cross-tier contract tests — run `pnpm build` if this import fails).
+import { EFFORT_ONLY_TASK_CLASSES } from "../../packages/core/config.js";
 import { DEFAULT_ROUTES } from "../../packages/llm-client/dist/public.js";
 
 // web declares classes too (the SourceVision Ask endpoint), so it is scanned
@@ -68,12 +69,12 @@ function scanPackage(pkg) {
 describe("task-class registry contract", () => {
   const byPackage = new Map(PACKAGES.map((pkg) => [pkg, scanPackage(pkg)]));
 
-  it("every declared task class is registered in DEFAULT_ROUTES", () => {
+  it("every declared task class is registered for routing or effort", () => {
     for (const [pkg, classes] of byPackage) {
       for (const [cls, file] of classes) {
         expect(
-          DEFAULT_ROUTES[cls],
-          `${pkg}: "${cls}" (declared in ${file}) is not in DEFAULT_ROUTES`,
+          DEFAULT_ROUTES[cls] ?? (EFFORT_ONLY_TASK_CLASSES.has(cls) ? "effort-only" : undefined),
+          `${pkg}: "${cls}" (declared in ${file}) is not registered for routing or effort`,
         ).toBeDefined();
       }
     }

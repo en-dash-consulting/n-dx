@@ -17,10 +17,9 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
+import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { isProjectRestricted, refuseWhileRestricted, TRUST_HINT } from "./trust-gate.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
@@ -41,6 +40,7 @@ import {
   isPlausibleLlmHost,
   isValidPort,
   describeLocalEndpointProblem,
+  acceptsImageInput,
 } from "@n-dx/llm-client";
 import type { LLMConfig, LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import {
@@ -164,6 +164,12 @@ export interface LlmConfigResponse {
    * own, so the rules live only here, beside the validators they come from.
    */
   effectiveProblems: EffectiveProblem[];
+  /**
+   * Whether the model `ndx work` runs ({@link LlmConfigResponse.effective})
+   * takes image input. Quick Add offers to attach images to a new change only
+   * when it does, since that model is the one that will look at them.
+   */
+  imageInput: boolean;
   /**
    * The model tier table for the active vendor: the model each tier resolves
    * to, the key that supplied it, and the commands that run on it. See
@@ -444,31 +450,6 @@ const BOOLEAN_PATHS = new Set(["llm.autoFailover", "llm.escalation.enabled"]);
 // Helpers
 // ---------------------------------------------------------------------------
 
-function readJsonFile(path: string): Record<string, unknown> {
-  if (!existsSync(path)) return {};
-  try {
-    return JSON.parse(readFileSync(path, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-/** Read the shared, git-tracked project config only. Writes always target this file. */
-function readNdxConfig(projectDir: string): Record<string, unknown> {
-  return readJsonFile(resolveLayout(projectDir).configFile);
-}
-
-// `readEffectiveNdxConfig` (shared config deep-merged with the gitignored
-// `.n-dx.local.json` overlay, local wins) lives in effective-agent-config.ts
-// beside the snapshot it feeds. Use it for anything the user should *see*; use
-// `readNdxConfig` for anything about to be *written back*, so a write never
-// flattens the local overlay's values into the shared file.
-
-function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = resolveLayout(projectDir).configFile;
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-}
-
 /** Read a string leaf from a nested object. Returns null if absent or not a string. */
 function getString(obj: Record<string, unknown>, key: string): string | null {
   const v = obj[key];
@@ -731,6 +712,7 @@ function resolveLlmConfig(snapshot: ConfigSnapshot): LlmResolution {
 
 function extractLlmConfig(projectDir: string): LlmConfigResponse {
   const snapshot = readConfigSnapshot(projectDir);
+  const resolution = resolveLlmConfig(snapshot);
   const config = snapshot.ndx;
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
@@ -780,7 +762,8 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
       ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
     agentModels: readAgentModels(config),
-    ...resolveLlmConfig(snapshot),
+    ...resolution,
+    imageInput: acceptsImageInput(resolution.effective.vendor, resolution.effective.model),
     vendorTiers: buildVendorTiers(parseLLMConfig(config)),
     routeOverrides: buildRouteOverrides(parseLLMConfig(config)),
   };

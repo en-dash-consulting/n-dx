@@ -60,6 +60,7 @@ import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 import { installBasePathFetch } from "./base-path.js";
+import { defaultView } from "./route-state.js";
 import { waitForSession } from "./session.js";
 import { renderActiveView, renderViewContent, buildValidViews } from "./views/view-registry.js";
 import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
@@ -108,14 +109,6 @@ async function fetchBootConfig(): Promise<BootConfig> {
   } catch {
     return { scope: null, server: null };
   }
-}
-
-/**
- * The page shown under the settings overlay when a settings route is opened
- * directly: the landing page, or the first view when there is none.
- */
-function fallbackPage(validViews: Set<ViewId>): ViewId {
-  return validViews.has("home") ? "home" : (validViews.values().next().value as ViewId);
 }
 
 function App({ scope, server = null }: { scope: string | null; server?: ServerIdentity | null }) {
@@ -209,7 +202,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const { page, lastEntry } = usePageEntry(
     { view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId },
     settingsOpen,
-    fallbackPage(validViews),
+    defaultView(validViews),
   );
   const pageView: ViewId = page.view;
   // Sidecar: the drawer attaches the page under any settings overlay. The top-nav button, ⌘J and the drawer all read `web.sidecar` here.
