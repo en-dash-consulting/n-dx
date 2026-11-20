@@ -621,14 +621,20 @@ async function handleExport(
   return true;
 }
 
-/** POST /api/commands/install-sample — ndx install-sample */
-async function handleInstallSample(
-  req: IncomingMessage,
+/**
+ * POST /api/commands/install-sample — ndx install-sample
+ * POST /api/commands/destroy-sample — ndx destroy-sample
+ *
+ * `failure` names the step in the 500 a failed run answers ("Install failed: …").
+ */
+async function handleSampleCommand(
+  command: "install-sample" | "destroy-sample",
+  failure: "Install" | "Destroy",
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
-  const cmdArgs = [...prefixArgs, "install-sample", ctx.projectDir];
+  const cmdArgs = [...prefixArgs, command, ctx.projectDir];
 
   try {
     const result = await foundationExec(bin, cmdArgs, {
@@ -638,35 +644,7 @@ async function handleInstallSample(
     });
 
     if (result.error && !result.stdout) {
-      errorResponse(res, 500, `Install failed: ${result.stderr || result.error.message}`);
-      return true;
-    }
-
-    jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
-  } catch (err) {
-    errorResponse(res, 500, errorMessage(err));
-  }
-  return true;
-}
-
-/** POST /api/commands/destroy-sample — ndx destroy-sample */
-async function handleDestroySample(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: ServerContext,
-): Promise<boolean> {
-  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
-  const cmdArgs = [...prefixArgs, "destroy-sample", ctx.projectDir];
-
-  try {
-    const result = await foundationExec(bin, cmdArgs, {
-      cwd: ctx.projectDir,
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    if (result.error && !result.stdout) {
-      errorResponse(res, 500, `Destroy failed: ${result.stderr || result.error.message}`);
+      errorResponse(res, 500, `${failure} failed: ${result.stderr || result.error.message}`);
       return true;
     }
 
@@ -2297,7 +2275,6 @@ const TRUST_GATED_POSTS = new Set([
   "reshape",
 ]);
 
-/** Handle command trigger API requests. Returns true if the request was handled. */
 /** Options threaded into {@link handleCommandsRoute} from start.ts, beyond the plain ctx/broadcast pair. */
 export interface CommandsRouteOptions {
   /**
@@ -2309,6 +2286,7 @@ export interface CommandsRouteOptions {
   onProjectInitialized?: () => void;
 }
 
+/** Handle command trigger API requests. Returns true if the request was handled. */
 export function handleCommandsRoute(
   req: IncomingMessage,
   res: ServerResponse,
@@ -2368,10 +2346,10 @@ export function handleCommandsRoute(
     return handleExport(req, res, ctx);
   }
   if (path === "install-sample" && method === "POST") {
-    return handleInstallSample(req, res, ctx);
+    return handleSampleCommand("install-sample", "Install", res, ctx);
   }
   if (path === "destroy-sample" && method === "POST") {
-    return handleDestroySample(req, res, ctx);
+    return handleSampleCommand("destroy-sample", "Destroy", res, ctx);
   }
   if (path === "sample-status" && method === "GET") {
     return handleSampleStatus(req, res, ctx);

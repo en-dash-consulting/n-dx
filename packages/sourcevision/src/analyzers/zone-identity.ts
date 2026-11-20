@@ -19,7 +19,7 @@
  * @module sourcevision/analyzers/zone-identity
  */
 
-import type { Finding, Zone, ZoneCrossing } from "../schema/index.js";
+import type { Finding, Zone } from "../schema/index.js";
 
 /** Title-case an id's last path segment, dropping empty segments: "routes--marketing" → "Routes Marketing". */
 export function titleFromId(id: string): string {
@@ -131,19 +131,13 @@ export function idsFollowNames(zones: Zone[]): IdRename {
   return { zones: out, renamed };
 }
 
-/** Apply an id rename to finding scopes and crossing endpoints. */
+/**
+ * Apply an id rename to finding scopes. Crossings need no rename: the
+ * pipeline builds them after ids settle.
+ */
 export function renameZoneRefs<T extends Pick<Finding, "scope">>(items: T[], renamed: Map<string, string>): T[] {
   if (renamed.size === 0) return items;
   return items.map((f) => (renamed.has(f.scope) ? { ...f, scope: renamed.get(f.scope)! } : f));
-}
-
-export function renameCrossings(crossings: ZoneCrossing[], renamed: Map<string, string>): ZoneCrossing[] {
-  if (renamed.size === 0) return crossings;
-  return crossings.map((c) => ({
-    ...c,
-    fromZone: renamed.get(c.fromZone) ?? c.fromZone,
-    toZone: renamed.get(c.toZone) ?? c.toZone,
-  }));
 }
 
 /** Resolve a zone by current or previous id. */

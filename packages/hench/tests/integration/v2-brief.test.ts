@@ -132,3 +132,27 @@ describe("v2 brief", () => {
     expect(formatTaskBrief(brief)).toContain("Active tag filter: checkout");
   });
 });
+
+describe("v2 brief: attached images", () => {
+  const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]);
+
+  it("names the images in the unit's change folder, relative to the project, right after the task", async () => {
+    await writeFile(join(rexDir, "changes", "add-apple-pay", "checkout-mock.png"), PNG);
+    await writeFile(join(rexDir, "changes", "add-apple-pay", "notes.txt"), "not an image");
+
+    const { brief } = await assembleTaskBrief(await store(), WIRE_ID, { projectDir: root });
+    expect(brief.attachments).toEqual([".rex/changes/add-apple-pay/checkout-mock.png"]);
+
+    const text = formatTaskBrief(brief);
+    expect(text).toContain("## Attached Images");
+    expect(text).toContain("- .rex/changes/add-apple-pay/checkout-mock.png");
+    expect(text).not.toContain("notes.txt");
+    expect(text.indexOf("## Attached Images")).toBeGreaterThan(text.indexOf("Wire the button"));
+  });
+
+  it("has no attachments block when the change holds no images", async () => {
+    const { brief } = await assembleTaskBrief(await store(), WIRE_ID, { projectDir: root });
+    expect(brief.attachments).toBeUndefined();
+    expect(formatTaskBrief(brief)).not.toContain("Attached Images");
+  });
+});

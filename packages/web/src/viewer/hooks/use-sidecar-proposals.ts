@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "preact/hooks";
 import { getWorkspaceKey } from "../base-path.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 import { createWSPipeline } from "./use-gateway.js";
 import type { SidecarCard } from "./use-sidecar.js";
 
@@ -41,7 +41,6 @@ export function useSidecarProposals(enabled: boolean): SidecarCard[] {
     };
     void read();
 
-    let ws: WebSocket | null = null;
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
       onFlush: (batch) => {
@@ -50,22 +49,13 @@ export function useSidecarProposals(enabled: boolean): SidecarCard[] {
       throttledTypes: [],
       coalescerWindowMs: 100,
     });
-    try {
-      ws = openWebSocket();
-      ws.onmessage = (event) => {
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // A malformed frame: the next announcement reads the proposals again.
-        }
-      };
-    } catch {
-      // No socket: the ghost rows read once, on mount.
-    }
+    // No socket: the ghost rows read once, on mount. A malformed frame is
+    // dropped: the next announcement reads the proposals again.
+    const closeSocket = openFrameSocket((frame) => pipeline.push(frame));
     return () => {
       live = false;
       pipeline.dispose();
-      ws?.close();
+      closeSocket();
     };
   }, [enabled]);
 

@@ -7,10 +7,14 @@
 
 import { useMemo } from "preact/hooks";
 import type { FileConnectionMap, FileToFileMap, ZoneData, FlowEdge, BoxRect } from "../views/zone-types.js";
-
-const FILE_ROW_H = 22;
-const BOX_H_COLLAPSED = 80;
-const FILE_ROWS_MAX = 15;
+import {
+  BOX_H_COLLAPSED,
+  FILE_ROW_H,
+  FILE_ROWS_MAX,
+  boxEdgeAnchor,
+  clampToBox,
+  edgeCurve,
+} from "../views/zone-edge-geometry.js";
 
 interface FileEdgeElement {
   key: string;
@@ -33,17 +37,10 @@ function computeFileEdgePath(
   const targetCx = targetBox.x + targetBox.w / 2;
   const exitRight = targetCx > fileBox.x + fileBox.w / 2;
   const fromX = exitRight ? fileBox.x + fileBox.w : fileBox.x;
-  const fromY = Math.max(fileBox.y + 4, Math.min(fileCenterY, fileBox.y + fileBox.h - 4));
+  const fromY = clampToBox(fileBox, fileCenterY);
 
   const to = boxEdgeAnchor(targetBox, fromX, fromY);
-
-  const dx = to.x - fromX;
-  const cp1x = fromX + dx * 0.4;
-  const cp1y = fromY;
-  const cp2x = fromX + dx * 0.6;
-  const cp2y = to.y;
-
-  return `M ${fromX} ${fromY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${to.x} ${to.y}`;
+  return edgeCurve(fromX, fromY, to.x, to.y);
 }
 
 /** Compute a cubic Bézier between two file rows in different expanded zone boxes. */
@@ -56,34 +53,7 @@ function computeFileToFileEdgePath(
   const goRight = toBox.x > fromBox.x;
   const fromX = goRight ? fromBox.x + fromBox.w : fromBox.x;
   const toX = goRight ? toBox.x : toBox.x + toBox.w;
-  const fromY = Math.max(fromBox.y + 4, Math.min(fromFileY, fromBox.y + fromBox.h - 4));
-  const toY = Math.max(toBox.y + 4, Math.min(toFileY, toBox.y + toBox.h - 4));
-
-  const dx = toX - fromX;
-  const cp1x = fromX + dx * 0.4;
-  const cp1y = fromY;
-  const cp2x = fromX + dx * 0.6;
-  const cp2y = toY;
-
-  return `M ${fromX} ${fromY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toX} ${toY}`;
-}
-
-function boxEdgeAnchor(box: BoxRect, tx: number, ty: number): { x: number; y: number } {
-  const cx = box.x + box.w / 2;
-  const cy = box.y + box.h / 2;
-  const dx = tx - cx;
-  const dy = ty - cy;
-
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-
-  const hw = box.w / 2;
-  const hh = box.h / 2;
-
-  const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
-  const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
-  const s = Math.min(sx, sy);
-
-  return { x: cx + dx * s, y: cy + dy * s };
+  return edgeCurve(fromX, clampToBox(fromBox, fromFileY), toX, clampToBox(toBox, toFileY));
 }
 
 export interface FileEdgesResult {

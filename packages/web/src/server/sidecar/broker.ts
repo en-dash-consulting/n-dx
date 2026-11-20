@@ -38,6 +38,7 @@ import { IDEMPOTENCY_KEY_PROPERTIES } from "./external-call.js";
 import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { resolveDraftPath } from "./draft-file.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
+import { isRecord } from "../../shared/index.js";
 
 export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
 
@@ -172,10 +173,6 @@ export interface SidecarLedgerTarget {
 interface PendingCard {
   card: SidecarCard;
   settle: (outcome: BrokerOutcome) => void;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 const ALLOW_LIST_SCHEMA = "ndx/sidecar-allow-list/v1";
@@ -389,8 +386,8 @@ export class SidecarBroker {
     if (decision.arguments !== undefined) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries arguments");
       if (card.kind !== "external-call") throw new BrokerDecisionError(409, `A ${card.kind} card takes no arguments`);
-      if (!isPlainObject(decision.arguments)) throw new BrokerDecisionError(400, `"arguments" must be an object`);
-      const agent = isPlainObject(card.input.arguments) ? card.input.arguments : {};
+      if (!isRecord(decision.arguments)) throw new BrokerDecisionError(400, `"arguments" must be an object`);
+      const agent = isRecord(card.input.arguments) ? card.input.arguments : {};
       const next = { ...decision.arguments };
       // An idempotency key is the agent's: the form shows it read-only and approval cannot change it.
       for (const name of IDEMPOTENCY_KEY_PROPERTIES) {
@@ -583,7 +580,7 @@ export class SidecarBroker {
 function ruleInput(key: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(key);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : { argv: parsed };
+    return isRecord(parsed) ? parsed : { argv: parsed };
   } catch {
     return { argv: undefined };
   }

@@ -109,7 +109,6 @@ export class FileStore implements PRDStore {
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
-  private primaryFile: string | null = null;
   private currentBranchFile: string = PRD_FILENAME;
 
   constructor(rexDir: string, options?: { currentBranchFile?: string }) {
@@ -123,16 +122,8 @@ export class FileStore implements PRDStore {
     return join(this.rexDir, file);
   }
 
-  private get prdPath(): string {
-    return this.path(PRD_FILENAME);
-  }
-
   private get markdownPath(): string {
     return this.path(PRD_MARKDOWN_FILENAME);
-  }
-
-  private get markdownLockPath(): string {
-    return this.path(`${PRD_MARKDOWN_FILENAME}.lock`);
   }
 
   private get treeRoot(): string {
@@ -168,10 +159,6 @@ export class FileStore implements PRDStore {
   /** Filenames known to the store after ownership has been loaded. */
   getKnownFiles(): ReadonlyArray<string> {
     return [...this.fileMetadata.keys()];
-  }
-
-  private lockPathForFile(filename: string): string {
-    return this.path(`${filename}.lock`);
   }
 
   private toAttributedSourceFile(filename: string): string {
@@ -236,7 +223,6 @@ export class FileStore implements PRDStore {
       throw new Error(`ID collision across PRD files:\n${collisions.join("\n")}`);
     }
 
-    this.primaryFile = sources[0].filename;
     this.ownershipLoaded = true;
 
     return {
@@ -303,9 +289,6 @@ export class FileStore implements PRDStore {
       });
     }
 
-    this.primaryFile = this.fileMetadata.has(PRD_FILENAME)
-      ? PRD_FILENAME
-      : [...this.fileMetadata.keys()][0] ?? PRD_FILENAME;
     this.ownershipLoaded = true;
   }
 
@@ -414,7 +397,6 @@ export class FileStore implements PRDStore {
       for (const entry of walkTree(doc.items)) {
         this.itemToFile.set(entry.item.id, PRD_FILENAME);
       }
-      this.primaryFile = PRD_FILENAME;
       this.ownershipLoaded = true;
       return doc;
     }
@@ -448,7 +430,6 @@ export class FileStore implements PRDStore {
       for (const entry of walkTree(doc.items)) {
         this.itemToFile.set(entry.item.id, filename);
       }
-      this.primaryFile = filename;
       this.ownershipLoaded = true;
       return doc;
     }

@@ -28,6 +28,7 @@ import { join } from "node:path";
 import { resolveNdxHome } from "@n-dx/llm-client";
 import { parseFieldHints, type FieldHints } from "../connections/connection-config.js";
 import caos from "./profiles/caos.json" with { type: "json" };
+import { isRecord } from "../../shared/index.js";
 
 /** The ndx events tracker sync rules fire on, in workflow order. */
 export const TRACKER_EVENTS = [
@@ -208,7 +209,6 @@ const USER_PREFIX = "user:";
 
 type Json = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is Json => !!value && typeof value === "object" && !Array.isArray(value);
 const isString = (value: unknown): value is string => typeof value === "string" && value !== "";
 
 /** The built-in profile names. */

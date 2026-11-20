@@ -10,7 +10,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { replaceInstalled } from "../../../src/cli/commands/pack.js";
-import { acquirePackLock, packLockPath, pidAlive } from "../../../src/cli/commands/pack-lock.js";
+import { acquirePackLock, packLockPath } from "../../../src/cli/commands/pack-lock.js";
+import { pidAlive } from "../../../src/util/pid.js";
 
 let root: string;
 let packDir: string;

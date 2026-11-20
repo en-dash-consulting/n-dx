@@ -17,6 +17,7 @@ import { useState, useMemo, useCallback, useEffect } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData } from "./types.js";
 import { computeBranchStats, completionRatio } from "./compute.js";
 import { itemTypeLabel, itemTypeOf } from "../../external.js";
+import { toggled } from "../set-toggle.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -335,12 +336,7 @@ export function PruneDiffTree({ prunableIds, epicImpact, onLoad }: PruneDiffTree
   const allIds = useMemo(() => doc ? collectAllIds(doc.items) : new Set<string>(), [doc]);
 
   const toggle = useCallback((id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setExpanded((prev) => toggled(prev, id));
   }, []);
 
   const expandAll = useCallback(() => setExpanded(new Set(allIds)), [allIds]);

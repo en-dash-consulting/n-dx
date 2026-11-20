@@ -124,7 +124,7 @@ never its value. Credentials appearing in an HTTP response, a run record, a
 log, an exported bundle, or an analysis artifact are in scope.
 
 **Server-side file access is confined.** Routes that read or serve files
-(`/data/*`, git diffs, run records, static assets, the preview server) must
+(`/data/*`, git diffs, run records, static assets) must
 resolve inside the directory they serve. Path traversal, symlink escapes and
 prefix-confusion on these routes are in scope.
 

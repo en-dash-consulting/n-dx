@@ -63,8 +63,7 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 // Only `--write` shells out, and only to establish whether the tree is clean.
 // See treeState() for why reading .git/ was not enough. This script is listed
-// under "Development scripts" in the ALLOWED set of
-// tests/e2e/architecture-policy.test.js.
+// in packages/core/child-process-allowlist.json.
 import { execFileSync } from "node:child_process";
 
 // PROMPT_CENSUS_ROOT is a test seam: tests/e2e/prompt-census.test.js runs a
@@ -494,62 +493,39 @@ function extractStaticPromptText(
   /** Local helpers already inlined — guards against recursion and re-counting. */
   const followedHelpers = new Set([builderName]);
 
-  const visit = (node) => {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      parts.push(node.text);
-    } else if (ts.isTemplateExpression(node)) {
-      // Static spans only — interpolations are per-run context.
-      let joined = node.head.text;
-      for (const span of node.templateSpans) joined += span.literal.text;
-      parts.push(joined);
-      // Descend into each interpolation — `${PRD_SCHEMA}` is a bare identifier
-      // that must be visited itself, not just its children, and a ternary can
-      // pick between two fixed sentences. Calling visit() rather than
-      // forEachChild() is what makes `${CONST}` resolve.
-      for (const span of node.templateSpans) visit(span.expression);
-      return;
-    } else if (
-      ts.isIdentifier(node) &&
-      moduleConstants.has(node.text) &&
-      !pulledConstants.has(node.text) &&
-      // Skip `obj.NAME` — only a bare value reference pulls the constant in.
-      !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
+  const followHelperCall = (node, visit) => {
+    if (
+      !ts.isIdentifier(node.expression) ||
+      followedHelpers.has(node.expression.text) ||
+      registeredSurfaces.has(node.expression.text) ||
+      pulledConstants.has(node.expression.text)
     ) {
-      pulledConstants.set(node.text, moduleConstants.get(node.text));
-      return;
-    } else if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      !followedHelpers.has(node.expression.text) &&
-      !registeredSurfaces.has(node.expression.text) &&
-      !pulledConstants.has(node.expression.text)
-    ) {
-      // Inline a module-local helper's prompt text, so factoring a duplicated
-      // block out of three builders does not delete it from the measurement.
-      const name = node.expression.text;
-      const helper = findFunctionBody(ts, sf, name);
-      if (helper) {
-        followedHelpers.add(name);
-        const helperParts = [];
-        const helperConstants = new Map();
-        collectInto(ts, sf, helper, helperParts, helperConstants, moduleConstants);
-        // Recorded as shared, keyed by the helper's name: charged to every
-        // caller per call, edited once. Its own constant references are folded
-        // in so `placementContent` carries AUTO_PLACEMENT_INSTRUCTION with it.
-        const helperText = [
-          helperParts.join("\n"),
-          [...helperConstants.values()].join("\n"),
-        ].filter(Boolean).join("\n");
-        if (helperText.length > 0) pulledConstants.set(name, helperText);
-      }
-      // Arguments may carry literals of their own (`section("role", "…")`).
-      for (const arg of node.arguments) visit(arg);
-      return;
+      return false;
     }
-    ts.forEachChild(node, visit);
+    // Inline a module-local helper's prompt text, so factoring a duplicated
+    // block out of three builders does not delete it from the measurement.
+    const name = node.expression.text;
+    const helper = findFunctionBody(ts, sf, name);
+    if (helper) {
+      followedHelpers.add(name);
+      const helperParts = [];
+      const helperConstants = new Map();
+      collectInto(ts, helper, helperParts, helperConstants, moduleConstants);
+      // Recorded as shared, keyed by the helper's name: charged to every
+      // caller per call, edited once. Its own constant references are folded
+      // in so `placementContent` carries AUTO_PLACEMENT_INSTRUCTION with it.
+      const helperText = [
+        helperParts.join("\n"),
+        [...helperConstants.values()].join("\n"),
+      ].filter(Boolean).join("\n");
+      if (helperText.length > 0) pulledConstants.set(name, helperText);
+    }
+    // Arguments may carry literals of their own (`section("role", "…")`).
+    for (const arg of node.arguments) visit(arg);
+    return true;
   };
 
-  ts.forEachChild(target, visit);
+  ts.forEachChild(target, literalVisitor(ts, parts, pulledConstants, moduleConstants, followHelperCall));
 
   return {
     /** Literals written inside this builder — text only it can shorten. */
@@ -568,28 +544,47 @@ function extractStaticPromptText(
  * it interpolates, but does not recurse further. That bound is what keeps
  * "one level deep" true for calls as well as imports.
  */
-function collectInto(ts, sf, body, parts, constants, moduleConstants) {
+function collectInto(ts, body, parts, constants, moduleConstants) {
+  ts.forEachChild(body, literalVisitor(ts, parts, constants, moduleConstants));
+}
+
+/**
+ * The node visitor both walks share: string and template literals go to
+ * `parts`, bare references to module string constants to `constants`.
+ * `visitCall`, when given, sees each call expression first and returns true
+ * when it has handled the call itself (a builder's helper following);
+ * otherwise the walk descends into the call as into any other node.
+ */
+function literalVisitor(ts, parts, constants, moduleConstants, visitCall) {
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       parts.push(node.text);
     } else if (ts.isTemplateExpression(node)) {
+      // Static spans only — interpolations are per-run context.
       let joined = node.head.text;
       for (const span of node.templateSpans) joined += span.literal.text;
       parts.push(joined);
+      // Descend into each interpolation — `${PRD_SCHEMA}` is a bare identifier
+      // that must be visited itself, not just its children, and a ternary can
+      // pick between two fixed sentences. Calling visit() rather than
+      // forEachChild() is what makes `${CONST}` resolve.
       for (const span of node.templateSpans) visit(span.expression);
       return;
     } else if (
       ts.isIdentifier(node) &&
       moduleConstants.has(node.text) &&
       !constants.has(node.text) &&
+      // Skip `obj.NAME` — only a bare value reference pulls the constant in.
       !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
     ) {
       constants.set(node.text, moduleConstants.get(node.text));
       return;
+    } else if (visitCall && ts.isCallExpression(node) && visitCall(node, visit)) {
+      return;
     }
     ts.forEachChild(node, visit);
   };
-  ts.forEachChild(body, visit);
+  return visit;
 }
 
 /**
@@ -699,13 +694,6 @@ function findFunctionBody(ts, sf, name) {
 // ── Representative inputs (the `--dump` fixtures) ────────────────────────────
 
 /**
- * One assembled prompt per package, from a fixed input.
- *
- * These exist so the assembled number is reproducible: the same fixture in,
- * the same token count out, on any machine, with no model call. They import
- * from `dist/`, which the package guidelines permit for repo tooling.
- */
-/**
  * Render an envelope as a dump entry: the assembled text plus its per-section
  * split.
  *
@@ -726,6 +714,13 @@ function envelopeDump(mod, { envelope, assemble }) {
   };
 }
 
+/**
+ * One assembled prompt per package, from a fixed input.
+ *
+ * These exist so the assembled number is reproducible: the same fixture in,
+ * the same token count out, on any machine, with no model call. They import
+ * from `dist/`, which the package guidelines permit for repo tooling.
+ */
 const REPRESENTATIVE = {
   rex: {
     // Names the registered *envelope* builder, not the `*Prompt` wrapper that
@@ -886,7 +881,6 @@ const FIXTURE_BRIEF = {
   recentLog: [],
 };
 
-/** Import a built module by workspace-relative path. */
 /**
  * Measure every workflow skill body.
  *
@@ -921,6 +915,7 @@ async function measureSkills(model) {
     .sort((a, b) => b.tokens - a.tokens);
 }
 
+/** Import a built module by workspace-relative path. */
 async function loadDist(relative) {
   const abs = join(ROOT, "packages", relative);
   if (!existsSync(abs)) {
@@ -1645,9 +1640,8 @@ function renderMarkdown(report) {
  * index, inflating loose objects, and walking packfiles — reimplementing git.
  * The mtime shortcut (compare each measured file against `.git/index`) is
  * guesswork that reports clean after a `touch`. Since a false *clean* is the
- * exact failure being fixed, neither is acceptable, so this script joins the
- * "Development scripts" entries already in the ALLOWED set of
- * tests/e2e/architecture-policy.test.js.
+ * exact failure being fixed, neither is acceptable, so this script has its
+ * own entry, with that reason, in packages/core/child-process-allowlist.json.
  *
  * ## Scope, and why it is deliberately broad
  *

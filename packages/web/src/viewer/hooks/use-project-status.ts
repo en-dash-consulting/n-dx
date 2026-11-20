@@ -17,13 +17,13 @@
 
 import { getWorkspaceKey } from "../base-path.js";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 import {
   createWSPipeline,
   isFeatureDisabled,
   onDegradationChange,
 } from "./use-gateway.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirror server-side ProjectStatus shape)
@@ -198,8 +198,6 @@ export function useProjectStatus(): ProjectStatus | null {
     // Connect to WebSocket for instant status updates when runs/PRD change.
     // Composed throttle → coalescer pipeline debounces high-frequency
     // message types independently before batching into a single refresh.
-    let ws: WebSocket | null = null;
-
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
       onFlush: (batch) => {
@@ -212,36 +210,22 @@ export function useProjectStatus(): ProjectStatus | null {
           refresh();
         }
       },
-      defaultDelayMs: 250,
       delays: {
         "rex:prd-changed": 300,
         "hench:task-execution-progress": 200,
       },
       throttledTypes: ["rex:prd-changed", "hench:task-execution-progress"],
-      maxPendingPerType: 20,
     });
 
-    try {
-      ws = openWebSocket();
-      ws.onmessage = (event) => {
-        if (!mountedRef.current) return;
-        try {
-          const msg = JSON.parse(event.data);
-          pipeline.push(msg);
-        } catch {
-          // ignore malformed messages
-        }
-      };
-    } catch {
-      // WebSocket not available — polling still works as fallback
-    }
+    // WebSocket not available — polling still works as fallback
+    const closeSocket = openFrameSocket((frame) => {
+      if (mountedRef.current) pipeline.push(frame);
+    });
 
     return () => {
       mountedRef.current = false;
       pipeline.dispose();
-      if (ws) {
-        try { ws.close(); } catch { /* ignore */ }
-      }
+      closeSocket();
     };
   }, [refresh]);
 

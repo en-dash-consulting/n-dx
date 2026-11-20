@@ -8,12 +8,17 @@
 
 import { useMemo } from "preact/hooks";
 import type { ZoneData, FlowEdge, BoxRect, FileConnectionMap, ExpandedSubZones } from "../views/zone-types.js";
+import {
+  BOX_H_COLLAPSED,
+  FILE_ROW_H,
+  FILE_ROWS_MAX,
+  boxEdgeAnchor,
+  clampToBox,
+  edgeCurve,
+} from "../views/zone-edge-geometry.js";
 
-const BOX_H_COLLAPSED = 80;
 const SUBZONE_ROW_H = 28;
 const SUBZONE_ROWS_MAX = 10;
-const FILE_ROW_H = 22;
-const FILE_ROWS_MAX = 15;
 
 interface SubZoneEdgeElement {
   key: string;
@@ -48,20 +53,6 @@ function subZoneRowY(
     }
   }
   return y + SUBZONE_ROW_H / 2;
-}
-
-function boxEdgeAnchor(box: BoxRect, tx: number, ty: number): { x: number; y: number } {
-  const cx = box.x + box.w / 2;
-  const cy = box.y + box.h / 2;
-  const dx = tx - cx;
-  const dy = ty - cy;
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-  const hw = box.w / 2;
-  const hh = box.h / 2;
-  const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
-  const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
-  const s = Math.min(sx, sy);
-  return { x: cx + dx * s, y: cy + dy * s };
 }
 
 export function useSubZoneEdges(
@@ -144,18 +135,13 @@ export function useSubZoneEdges(
         for (const [szIdx, weight] of szWeights) {
           const szY = subZoneRowY(box, visibleSz, szIdx, szIds);
           const fromX = otherBox.x > box.x ? box.x + box.w : box.x;
-          const clampedY = Math.max(box.y + 4, Math.min(szY, box.y + box.h - 4));
-
+          const clampedY = clampToBox(box, szY);
           const to = boxEdgeAnchor(otherBox, fromX, clampedY);
-          const dx = to.x - fromX;
-          const cp1x = fromX + dx * 0.4;
-          const cp2x = fromX + dx * 0.6;
-          const d = `M ${fromX} ${clampedY} C ${cp1x} ${clampedY} ${cp2x} ${to.y} ${to.x} ${to.y}`;
 
           const sz = visibleSz[szIdx];
           elements.push({
             key: `sze-${zoneId}-${sz.id}-${otherZoneId}`,
-            d,
+            d: edgeCurve(fromX, clampedY, to.x, to.y),
             color: sz.color,
             weight,
           });

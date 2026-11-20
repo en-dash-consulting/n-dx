@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
+import { serializeDocument } from "@n-dx/rex";
 import { cleanupProjectDir, decodeClaudeDelivery } from "../helpers/index.js";
 import {
   createScriptedClaudeCli,
@@ -16,6 +17,7 @@ import {
   type ScriptedTurn,
 } from "../helpers/scripted-claude-cli.js";
 import { loadConfig, saveConfig } from "../../src/store/config.js";
+import { ensureRunLogsIgnored } from "../../src/store/run-log.js";
 import {
   ORIENTATION_LIFT_NOTICE,
   buildOrientationPrompt,
@@ -56,6 +58,7 @@ describe("cliLoop — orientation lift on forked spawns", () => {
 
   afterEach(async () => {
     vi.doUnmock("node:child_process");
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     await cleanupProjectDir(projectDir);
   });
@@ -106,7 +109,7 @@ describe("cliLoop — orientation lift on forked spawns", () => {
 
   const taskPromptOf = (call: CliInvocation): string => decodeClaudeDelivery(call.args, call.stdin).taskPrompt;
 
-  async function runLoop() {
+  async function runLoop(taskId = "task-1") {
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
     const config = await loadConfig(henchDir);
@@ -115,7 +118,7 @@ describe("cliLoop — orientation lift on forked spawns", () => {
       store: createStore("file", rexDir),
       projectDir,
       henchDir,
-      taskId: "task-1",
+      taskId,
       autonomous: true,
       yes: true,
       reviewOptional: true,
@@ -149,6 +152,36 @@ describe("cliLoop — orientation lift on forked spawns", () => {
       expect(run.error).toBeUndefined();
       expect(run.status).toBe("completed");
     });
+  });
+
+  it("reuses the Claude parent across unrelated sanitized child environment changes", async () => {
+    await ensureRunLogsIgnored(projectDir);
+    execFileSync("git", ["add", ".gitignore"], { cwd: projectDir, stdio: "ignore" });
+    writeFileSync(join(rexDir, "prd.md"), serializeDocument({
+      schema: "rex/v1", title: "Reuse fixture", items: [
+        { id: "task-1", title: "First task", status: "pending", level: "task", priority: "high" },
+        { id: "task-2", title: "Second task", status: "pending", level: "task", priority: "high" },
+      ],
+    } as never));
+    await configure("fork");
+    vi.stubEnv("NDX_FORK_FIXTURE", "before");
+    cli.script(orients, works, () => {
+      writeFileSync(join(projectDir, "second.ts"), "export const second = 2;\n");
+      execFileSync("git", ["add", "second.ts"], { cwd: projectDir, stdio: "ignore" });
+      execFileSync("git", ["commit", "-m", "fixture second task"], { cwd: projectDir, stdio: "ignore" });
+      return { lines: [initLine("sess-work-0002"), resultLine("sess-work-0002", "Committed.")] };
+    });
+
+    const first = await runLoop();
+    vi.stubEnv("NDX_FORK_FIXTURE", "after");
+    const second = await runLoop("task-2");
+
+    expect(second.run.session).toMatchObject({ strategy: "fork", outcome: "hit", reason: "cached" });
+    expect(first.run.error).toBeUndefined();
+    expect(second.run.error).toBeUndefined();
+    expect(second.run.parentSessionId).toBe(PARENT);
+    expect(cli.invocations).toHaveLength(3);
+    for (const call of cli.invocations.slice(1)) expect(resumes(call, PARENT) && forks(call)).toBe(true);
   });
 
   it("does not add the lift to a cold spawn", async () => {

@@ -33,6 +33,7 @@ import { emptyAnalyzeTokenUsage } from "../../analyzers/token-usage.js";
 import { info } from "../output.js";
 import { dim, bold, warn } from "@n-dx/llm-client";
 import { resolveSourcevisionPaths } from "../../paths.js";
+import { pidAlive } from "../../util/pid.js";
 
 /** Basename of the detached narrator's stdio log inside the analysis cache. */
 export const NARRATION_LOG_FILENAME = "narration.log";
@@ -134,16 +135,6 @@ export interface NarrationTakeover {
   names: string[];
   /** Pid of a live narrator this call stopped. */
   stopped?: number;
-}
-
-function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    // EPERM: the process exists but belongs to someone else.
-    return (err as NodeJS.ErrnoException).code === "EPERM";
-  }
 }
 
 /**

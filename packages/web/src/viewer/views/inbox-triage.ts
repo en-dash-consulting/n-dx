@@ -23,6 +23,7 @@ import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
 import { AppliedHistory, bestGuess, useInbox, type InboxRow } from "./inbox.js";
 import { Pending, StaleNotice } from "./product-pages.js";
+import { shortChangeId } from "./product-model.js";
 
 // ── Shortcuts ────────────────────────────────────────────────────────
 
@@ -272,7 +273,7 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
         current
           ? [
               h("div", { key: "head", class: "inbox-detail-head" },
-                h("span", { class: "ch-display-id" }, current.displayId ?? current.id.slice(0, 8)),
+                h("span", { class: "ch-display-id" }, shortChangeId(current)),
                 h("div", { class: "inbox-detail-title" }, current.title),
                 navigateTo
                   ? h("button", {

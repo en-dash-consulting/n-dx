@@ -34,6 +34,7 @@ import { cmdPack } from "./commands/pack.js";
 import { CLIError, handleCLIError, requireSvDir } from "./errors.js";
 import { setQuiet, setVerbose, setDebug } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "@n-dx/llm-client";
+import { DEFAULT_SERVE_PORT } from "../constants.js";
 
 suppressKnownDeprecations();
 
@@ -42,7 +43,7 @@ const command = args[0];
 
 // ── arg parsing & dispatch ──────────────────────────────────────────────────
 
-let port = 3117;
+let port = DEFAULT_SERVE_PORT;
 let quiet = false;
 let verboseMode = false;
 let debugMode = false;
@@ -167,7 +168,6 @@ try {
         work: "ndx work",
         "self-heal": "ndx self-heal",
         start: "ndx start",
-        init: "ndx init",
         ci: "ndx ci",
         dev: "ndx dev",
         refresh: "ndx refresh",

@@ -1,4 +1,3 @@
-import { TOAST_DURATION_MS } from "../utils/notifications.js";
 /**
  * App data management hook for the viewer.
  *
@@ -30,6 +29,7 @@ import {
 } from "../loader/index.js";
 import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { TOAST_DURATION_MS } from "../utils/notifications.js";
 
 /**
  * Where the page is running. `unavailable` is a server that answered but
@@ -134,7 +134,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
       initialLoad.current = false;
       // In deployed mode, data is static — polling would be wasteful.
       if (!isDeployedMode()) {
-        startPolling(5000);
+        startPolling();
       }
 
       // Load remaining modules in the background (non-blocking).
@@ -205,7 +205,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
       stopPolling();
     } else if (!initialLoad.current) {
       // Only resume if we've already completed the initial load.
-      startPolling(5000);
+      startPolling();
     }
   }, [shouldPause, mode]);
 

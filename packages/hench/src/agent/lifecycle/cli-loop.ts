@@ -24,10 +24,12 @@
 
 import { createHash } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
-import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import type { PermissionMode, RetryConfig, RunRecord, TokenUsage, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
+import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
-import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
+import { checkTokenBudget, formatBudgetExceeded } from "./token-budget.js";
+import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
@@ -164,8 +166,8 @@ import {
   type PriorAttemptWork,
 } from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
-import type { PromptSectionDiagnostic, PersistedRuntimeEvent, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
-import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS } from "../../schema/index.js";
+import type { PromptSectionDiagnostic, PersistedRuntimeEvent, RunReviewMode } from "../../schema/index.js";
+import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS, MAX_SUMMARY_LENGTH, MAX_TOOL_OUTPUT_STORED } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
 import {
@@ -316,9 +318,7 @@ export interface SpawnTokenMetadata {
   model: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────
-
-const MAX_SUMMARY_LENGTH = 500;
+// ── Formatting ────────────────────────────────────────────────────────────
 
 /** `90000` → `"90s"`, for limit messages. */
 function formatSeconds(ms: number): string {
@@ -488,9 +488,9 @@ function applyRuntimeEvent(
       const resultId = event.toolResult?.id;
       const answered = resultId ? toolCallsById?.get(resultId) : undefined;
       if (answered) {
-        answered.output = output.slice(0, 2000);
+        answered.output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
       } else if (!resultId && result.toolCalls.length > 0) {
-        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
       }
       const preview = output.slice(0, 200);
       stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
@@ -605,17 +605,7 @@ export function rawJsonToTokenUsageEvent(
   metadata: SpawnTokenMetadata,
   seen?: UsageMessageFilter,
 ): RuntimeEvent | null {
-  let usage: Record<string, unknown> | undefined;
-
-  if (rawJson.usage && typeof rawJson.usage === "object") {
-    usage = rawJson.usage as Record<string, unknown>;
-  } else if (rawJson.message && typeof rawJson.message === "object") {
-    const msg = rawJson.message as Record<string, unknown>;
-    if (msg.usage && typeof msg.usage === "object") {
-      usage = msg.usage as Record<string, unknown>;
-    }
-  }
-
+  const usage = findUsagePayload(rawJson);
   if (!usage) return null;
 
   // A repeat of a message already counted. Dropping it here rather than at the
@@ -642,11 +632,60 @@ export function rawJsonToTokenUsageEvent(
 // ── Token usage extraction from raw JSON ──────────────────────────────────
 
 /**
+ * The usage payload of a raw vendor event, from the two places Claude and
+ * Codex put it: the event's own `usage` (both vendors), else the nested
+ * `message.usage` (Claude "assistant" events).
+ */
+function findUsagePayload(rawJson: Record<string, unknown>): Record<string, unknown> | undefined {
+  // Direct usage field (both vendors)
+  if (rawJson.usage && typeof rawJson.usage === "object") {
+    return rawJson.usage as Record<string, unknown>;
+  }
+  // Nested message.usage (Claude "assistant" events)
+  if (rawJson.message && typeof rawJson.message === "object") {
+    const msg = rawJson.message as Record<string, unknown>;
+    if (msg.usage && typeof msg.usage === "object") {
+      return msg.usage as Record<string, unknown>;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Push the token usage a Codex spawn reported in its whole stdout, for when no
+ * structured event carried any: the JSON mapping when stdout is one JSON
+ * document, else the text-format summary line (non-JSON stdout, e.g. codex
+ * --json JSONL). Pushes nothing when neither yields a reading.
+ */
+function pushCodexStdoutUsage(
+  accumulator: EventAccumulator,
+  stdout: string,
+  vendor: LLMVendor,
+): void {
+  let tokenUsage: TokenUsage | undefined;
+  try {
+    const codexMapping = mapCodexUsageToTokenUsage(JSON.parse(stdout));
+    if (codexMapping.diagnosticStatus !== "unavailable") tokenUsage = codexMapping.usage;
+  } catch {
+    const textTokens = parseCodexCliTokenUsage(stdout);
+    if (textTokens) tokenUsage = { input: textTokens.input, output: textTokens.output };
+  }
+  if (!tokenUsage) return;
+  accumulator.push({
+    type: "token_usage",
+    vendor,
+    turn: 1,
+    timestamp: new Date().toISOString(),
+    tokenUsage,
+  });
+}
+
+/**
  * Extract token usage from a raw JSON event object.
  *
  * Both Claude and Codex embed token usage in event payloads at predictable
- * locations (`event.usage`, `event.message.usage`). This function checks
- * those locations and accumulates usage into the SpawnResult.
+ * locations (see {@link findUsagePayload}). This function accumulates that
+ * usage into the SpawnResult.
  */
 function extractTokenUsage(
   rawJson: Record<string, unknown>,
@@ -655,20 +694,7 @@ function extractTokenUsage(
   tokenMetadata: SpawnTokenMetadata,
   seen: UsageMessageFilter,
 ): void {
-  let usage: Record<string, unknown> | undefined;
-
-  // Direct usage field (both vendors)
-  if (rawJson.usage && typeof rawJson.usage === "object") {
-    usage = rawJson.usage as Record<string, unknown>;
-  }
-  // Nested message.usage (Claude "assistant" events)
-  else if (rawJson.message && typeof rawJson.message === "object") {
-    const msg = rawJson.message as Record<string, unknown>;
-    if (msg.usage && typeof msg.usage === "object") {
-      usage = msg.usage as Record<string, unknown>;
-    }
-  }
-
+  const usage = findUsagePayload(rawJson);
   if (!usage) return;
 
   // See {@link rawJsonToTokenUsageEvent}: the same message arrives once per
@@ -1116,64 +1142,14 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
 
           // Codex-specific: extract token usage from raw stdout
           if (adapter.vendor === LLM_VENDOR.CODEX) {
-            try {
-              const raw = JSON.parse(fullStdout);
-              const codexMapping = mapCodexUsageToTokenUsage(raw);
-              if (codexMapping.diagnosticStatus !== "unavailable") {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: codexMapping.usage,
-                });
-              }
-            } catch {
-              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
-              // usage from the text-format summary line.
-              const textTokens = parseCodexCliTokenUsage(fullStdout);
-              if (textTokens) {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: { input: textTokens.input, output: textTokens.output },
-                });
-              }
-            }
+            pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
         // Codex token usage fallback: structured events parsed but no usage
         if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
           if (adapter.vendor === LLM_VENDOR.CODEX) {
-            try {
-              const raw = JSON.parse(fullStdout);
-              const codexMapping = mapCodexUsageToTokenUsage(raw);
-              if (codexMapping.diagnosticStatus !== "unavailable") {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: codexMapping.usage,
-                });
-              }
-            } catch {
-              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
-              // usage from the text-format summary line.
-              const textTokens = parseCodexCliTokenUsage(fullStdout);
-              if (textTokens) {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: { input: textTokens.input, output: textTokens.output },
-                });
-              }
-            }
+            pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
@@ -3088,10 +3064,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         ? "not-consulted"
         : config.sessionStrategy === "cold"
           ? "configured-cold"
-          // `resolveSessionStrategy` degrades to cold for any vendor or
-          // provider that cannot resume a session by id. Saying so is the
-          // difference between "forking is off" and "forking was asked for and
-          // this vendor cannot do it".
+          // Forking needs a supported CLI surface and a reusable identity;
+          // resume support alone does not make a warm parent safe to fork.
           : forkCapability?.supported && !forkCapability.reusable
             ? "identity-unavailable"
             : "fork-unsupported",
@@ -3132,13 +3106,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   }
 
   if (sessionStrategy === "fork") {
-    // Hash values without logging/storing credentials. A changed child environment
-    // invalidates orientation even if model and source analysis are unchanged.
-    const identityHash = createHash("sha256").update(JSON.stringify([
+    // Codex binds orientation to the full execution identity without persisting
+    // credentials. Preserve Claude's historical parent admission checks.
+    const identityHash = vendor === "codex" ? createHash("sha256").update(JSON.stringify([
       run.worktreeRoot ?? projectDir, chainRefIdentity(run), policyFingerprint(policy),
       cliBinary, forkCapability?.version, forkCapability?.identity, config.permissionMode,
       Object.entries(cliEnv ?? process.env).sort(([a], [b]) => a.localeCompare(b)),
-    ])).digest("hex");
+    ])).digest("hex") : undefined;
     const decision = await ensureWarmParent({
       identityHash,
       codexOrientationFlags: forkCapability?.orientationFlags,

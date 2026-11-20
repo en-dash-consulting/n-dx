@@ -12,13 +12,12 @@
  * @module analyze/modify-reason
  */
 
-import type {PRDItem} from "../schema/index.js";import type { Proposal } from "./propose.js";
+import type { PRDItem } from "../schema/index.js";
+import type { Proposal } from "./propose.js";
 import type { ReasonResult } from "./reason.js";
 import {
-  spawnClaude,
   parseProposalResponse,
   emptyAnalyzeTokenUsage,
-  accumulateTokenUsage,
   readProjectContext,
   validateProposalQuality,
   PRD_SCHEMA,
@@ -211,7 +210,6 @@ export async function modifyProposals(
   }
 
   const maxRetries = options.maxRetries ?? MAX_RETRIES;
-  const tokenUsage = emptyAnalyzeTokenUsage();
 
   // Build context
   const existingSummary = options.existingItems

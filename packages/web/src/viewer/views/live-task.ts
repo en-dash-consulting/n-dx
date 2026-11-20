@@ -22,7 +22,6 @@
  */
 
 import { h } from "preact";
-import type { ComponentChildren } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
 import {
@@ -38,6 +37,8 @@ import { TrackerLinkList, WorkspaceWriteStrip, useTrackerLabel } from "../compon
 import { CRITERIA_LABEL } from "../external.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
+import { errorOf } from "../utils/response-error.js";
+import { SideSection, copyPageLink, useFollowScroll } from "./live-shared.js";
 import { LogTab } from "./live-log.js";
 import { ReviewSection, ReviewTab, StageStrip } from "./live-review.js";
 import { reviewStages, reviewTabMarker } from "./live-review-model.js";
@@ -76,11 +77,6 @@ type TabId = "summary" | "work" | "log" | "review";
 const RERUN_POLL_MS = 1_000;
 const RERUN_POLL_TRIES = 20;
 
-async function errorOf(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => null) as { error?: string } | null;
-  return body?.error ?? `${fallback} (HTTP ${res.status})`;
-}
-
 function elapsed(startedAt: string): string {
   return fmtDuration(startedAt, new Date().toISOString());
 }
@@ -111,12 +107,7 @@ function Header({ taskId, snapshot, run, onPick, navigateTo, refresh }: HeaderPr
   const position = run ? runPosition(snapshot.runs, run.runId) : null;
 
   const copyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(location.href);
-      setNotice("Link copied");
-    } catch {
-      setNotice("Could not copy the link");
-    }
+    setNotice(await copyPageLink());
   }, []);
 
   const act = useCallback(async (kind: "stop" | "stuck") => {
@@ -214,24 +205,8 @@ function Chips({ run, snapshot }: { run: LiveTaskRun; snapshot: LiveTaskSnapshot
 
 function StepList({ rows }: { rows: StepRow[] }) {
   const listRef = useRef<HTMLOListElement>(null);
-  const [following, setFollowing] = useState(true);
-  const programmatic = useRef(false);
-
   // Following keeps the newest (current) step in view as steps arrive.
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el || !following) return;
-    programmatic.current = true;
-    el.scrollTop = el.scrollHeight;
-  }, [rows.length, following]);
-
-  const onScroll = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    if (programmatic.current) { programmatic.current = false; return; }
-    // Scrolling up to read stops following; reaching the bottom resumes it.
-    setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 8);
-  }, []);
+  const { following, follow, onScroll } = useFollowScroll(listRef, [rows.length]);
 
   return h("div", { class: "live-steps-wrap" },
     h("ol", { class: "live-steps", ref: listRef, onScroll, "aria-label": "Steps", "aria-live": "polite" },
@@ -249,7 +224,7 @@ function StepList({ rows }: { rows: StepRow[] }) {
       )),
     ),
     following ? null : h("button", {
-      type: "button", class: "cmd-btn cmd-btn-secondary live-follow", onClick: () => setFollowing(true),
+      type: "button", class: "cmd-btn cmd-btn-secondary live-follow", onClick: follow,
     }, "Follow"),
   );
 }
@@ -293,19 +268,12 @@ function WorkTab({ run, events, eventsAvailable, onOpenLog }: {
 
 // ── Side column ──────────────────────────────────────────────────────
 
-function Section({ id, title, children }: { id: string; title: string; children?: ComponentChildren }) {
-  return h("section", { class: "live-side-section", "aria-labelledby": id },
-    h("h3", { id, class: "live-side-title" }, title),
-    children,
-  );
-}
-
 function TaskSection({ snapshot }: { snapshot: LiveTaskSnapshot }) {
   const task = snapshot.task;
   const trackerLabel = useTrackerLabel();
-  if (!task) return h(Section, { id: "lt-task-h", title: "Task" }, h("p", { class: "live-muted" }, "This worktree's PRD does not have this task."));
+  if (!task) return h(SideSection, { id: "lt-task-h", title: "Task" }, h("p", { class: "live-muted" }, "This worktree's PRD does not have this task."));
   const criteria = criteriaRows(task);
-  return h(Section, { id: "lt-task-h", title: "Task" },
+  return h(SideSection, { id: "lt-task-h", title: "Task" },
     task.description ? h("p", { class: "live-task-desc" }, task.description) : null,
     task.links.length > 0
       ? h("p", { class: "live-task-tracker" }, h("span", { class: "live-muted" }, "Tracker "), h(TrackerLinkList, { refs: task.links, label: trackerLabel }))
@@ -322,7 +290,7 @@ function TaskSection({ snapshot }: { snapshot: LiveTaskSnapshot }) {
 }
 
 function RunsSection({ snapshot, run, onPick }: { snapshot: LiveTaskSnapshot; run: LiveTaskRun | null; onPick: (id: string) => void }) {
-  return h(Section, { id: "lt-runs-h", title: "Runs of this task" },
+  return h(SideSection, { id: "lt-runs-h", title: "Runs of this task" },
     h("ul", { class: "live-recent" }, snapshot.runs.map((r, i) => {
       const current = r.runId === run?.runId;
       return h("li", { key: r.runId, class: `live-task-run${current ? " live-task-run-current" : ""}`, "aria-current": current ? "true" : undefined },
@@ -342,7 +310,7 @@ function RunsSection({ snapshot, run, onPick }: { snapshot: LiveTaskSnapshot; ru
 function WhereSection({ run, events }: { run: LiveTaskRun; events: RunEventLine[] }) {
   const files = editedFiles(events);
   const running = run.status === "running";
-  return h(Section, { id: "lt-where-h", title: "Where it runs" },
+  return h(SideSection, { id: "lt-where-h", title: "Where it runs" },
     h("dl", { class: "live-facts" },
       h("dt", null, "Worktree"), h("dd", { class: "live-mono" }, run.worktreeRoot ?? "—"),
       h("dt", null, "Branch"), h("dd", { class: "live-mono" }, run.branch ?? "detached"),
@@ -358,7 +326,7 @@ function WhereSection({ run, events }: { run: LiveTaskRun; events: RunEventLine[
 }
 
 function SpendSection({ run }: { run: LiveTaskRun }) {
-  return h(Section, { id: "lt-spend-h", title: run.status === "running" ? "Spend so far" : "Spend" },
+  return h(SideSection, { id: "lt-spend-h", title: run.status === "running" ? "Spend so far" : "Spend" },
     h("dl", { class: "live-facts" },
       h("dt", null, "Input"), h("dd", null, formatTokenCount(run.tokens.input)),
       h("dt", null, "Output"), h("dd", null, formatTokenCount(run.tokens.output)),
@@ -369,7 +337,7 @@ function SpendSection({ run }: { run: LiveTaskRun }) {
 }
 
 function AfterSection({ run, events }: { run: LiveTaskRun; events: RunEventLine[] }) {
-  return h(Section, { id: "lt-after-h", title: "After the run" },
+  return h(SideSection, { id: "lt-after-h", title: "After the run" },
     h("ul", { class: "live-recent" }, afterRunItems(run, events).map((item) =>
       h("li", { key: item.key, class: "live-after-item" },
         h("span", { class: `live-step-dot live-step-dot-${item.state === "running" ? "active" : item.state === "pending" ? "info" : item.state}`, "aria-hidden": "true" }),

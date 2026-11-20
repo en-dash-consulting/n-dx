@@ -1218,3 +1218,155 @@ describe("SmartAddInput placement choice on a v2 PRD", () => {
     expect(posted[1]).not.toHaveProperty("touches");
   });
 });
+
+describe("SmartAddInput image attachments on a v2 PRD", () => {
+  // Real timers and act(): the "+" waits on a config read in an effect, and
+  // FileReader answers on a real task (see the scope-dropdown test above).
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let mounted: HTMLElement[] = [];
+  const PNG_BYTES = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]);
+  const CHANGE = { id: "01J9CHANGE0000000000000000", type: "change", title: "Redo the checkout header", needsPlacement: true };
+  const preview = { preview: true, proposals: [], confidence: 0, qualityIssues: [], changes: [CHANGE] };
+  const png = () => new File([PNG_BYTES], "mock.png", { type: "image/png" });
+
+  function route(imageInput: boolean, attachOk = true) {
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url === "/api/llm/config") return { ok: true, json: () => Promise.resolve({ vendor: "claude", imageInput }) };
+      if (url === "/api/rex/smart-add-accept") return { ok: true, json: () => Promise.resolve({ ok: true, changes: [CHANGE] }) };
+      if (String(url).endsWith("/attachments")) {
+        return attachOk
+          ? { ok: true, json: () => Promise.resolve({ ok: true, files: ["mock.png"] }) }
+          : { ok: false, status: 400, json: () => Promise.resolve({ error: "mock.png is not a image/png file." }), text: () => Promise.resolve('{"error":"mock.png is not a image/png file."}'), headers: new Headers({ "content-type": "application/json" }) };
+      }
+      return { ok: true, json: () => Promise.resolve(preview) };
+    });
+  }
+
+  async function tick() {
+    await act(async () => { await new Promise<void>((r) => setTimeout(r, 0)); });
+  }
+
+  async function until(check: () => boolean) {
+    for (let i = 0; i < 100; i++) {
+      if (check()) return;
+      await tick();
+    }
+    throw new Error("timed out waiting for the component");
+  }
+
+  /** Let reads an effect started at the end of the last act() land inside act() too. */
+  async function settle() {
+    for (let i = 0; i < 5; i++) await tick();
+  }
+
+  async function mount(layout: "v1" | "v2") {
+    const root = document.createElement("div");
+    mounted.push(root);
+    await act(async () => { render(h(SmartAddInput, { onPrdChanged: vi.fn(), layout }), root); });
+    await settle();
+    return root;
+  }
+
+  /** Pick `files` through the hidden file input, as the "+" button's picker would. */
+  async function pick(root: HTMLElement, files: File[]) {
+    const input = root.querySelector<HTMLInputElement>(".smart-add-attach-input")!;
+    Object.defineProperty(input, "files", { value: files, configurable: true });
+    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+    await until(() => root.querySelector(".smart-add-attachment, .smart-add-error") !== null);
+  }
+
+  /**
+   * Click `selector` and wait a task inside the same act(), so the handler's
+   * fetch chain commits inside it, then settle: Add's refreshScopes() starts a
+   * scope read in an effect that only runs as that act() ends. A commit outside
+   * act() arms preact's real setTimeout(35) after-paint fallback, which the
+   * frame-leak guard fails the file on when it is still pending at afterAll.
+   */
+  async function click(root: HTMLElement, selector: string) {
+    await act(async () => {
+      root.querySelector<HTMLButtonElement>(selector)!.click();
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+    await settle();
+  }
+
+  async function addChange(root: HTMLElement) {
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+    await act(async () => { typeInTextarea(textarea, "Redo the checkout header"); });
+    await click(root, ".smart-add-btn-generate");
+    await until(() => root.querySelector(".smart-add-btn-accept") !== null);
+    await click(root, ".smart-add-btn-accept");
+  }
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+  });
+
+  afterEach(async () => {
+    // Let late reads land inside act(), then unmount inside it too.
+    await settle();
+    for (const root of mounted) await act(async () => { render(null, root); });
+    mounted = [];
+    vi.restoreAllMocks();
+  });
+
+  it("offers no + when the agent's model does not take images", async () => {
+    route(false);
+    const root = await mount("v2");
+    expect(fetchSpy.mock.calls.some((c) => c[0] === "/api/llm/config")).toBe(true);
+    expect(root.querySelector(".smart-add-btn-attach")).toBeNull();
+  });
+
+  it("never asks on a v1 PRD", async () => {
+    route(true);
+    const root = await mount("v1");
+    expect(root.querySelector(".smart-add-btn-attach")).toBeNull();
+    expect(fetchSpy.mock.calls.some((c) => c[0] === "/api/llm/config")).toBe(false);
+  });
+
+  it("shows a picked image below the input, removes it on ×, and refuses a type rex refuses", async () => {
+    route(true);
+    const root = await mount("v2");
+    expect(root.querySelector(".smart-add-btn-attach")?.getAttribute("aria-label")).toBe("Attach images");
+
+    await pick(root, [png()]);
+    const thumb = root.querySelector<HTMLImageElement>(".smart-add-attachment-thumb")!;
+    expect(thumb.getAttribute("alt")).toBe("mock.png");
+    expect(thumb.getAttribute("src")).toMatch(/^data:image\/png;base64,/);
+    // Below the entry box, not inside it.
+    expect(root.querySelector(".smart-add-input-area + .smart-add-attachments")).not.toBeNull();
+
+    await act(async () => { root.querySelector<HTMLButtonElement>(".smart-add-attachment-remove")!.click(); });
+    expect(root.querySelector(".smart-add-attachment")).toBeNull();
+
+    await pick(root, [new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" })]);
+    expect(root.querySelector(".smart-add-error")?.textContent).toContain("only PNG, JPEG, GIF and WebP");
+    expect(root.querySelector(".smart-add-attachment")).toBeNull();
+  });
+
+  it("attaches the images to the change Add created, then clears them", async () => {
+    route(true);
+    const root = await mount("v2");
+    await pick(root, [png()]);
+    await addChange(root);
+    await until(() => root.querySelector(".smart-add-attachment") === null);
+
+    const call = fetchSpy.mock.calls.find((c) => String(c[0]).endsWith("/attachments"))!;
+    expect(call[0]).toBe(`/api/rex/items/${CHANGE.id}/attachments`);
+    expect(JSON.parse(call[1].body).images).toEqual([
+      { name: "mock.png", mediaType: "image/png", data: Buffer.from(PNG_BYTES).toString("base64") },
+    ]);
+    expect(root.querySelector(".smart-add-error")).toBeNull();
+  });
+
+  it("says so when the change was added but its images were not", async () => {
+    route(true, false);
+    const root = await mount("v2");
+    await pick(root, [png()]);
+    await addChange(root);
+    await until(() => root.querySelector(".smart-add-error") !== null);
+    expect(root.querySelector(".smart-add-error")!.textContent).toContain("The change was added, but its images were not attached");
+  });
+});

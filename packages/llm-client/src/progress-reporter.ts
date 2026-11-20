@@ -19,6 +19,8 @@
  * without the caller needing to know what that line currently says.
  */
 
+import { formatRetryCountdown } from "./rate-limit.js";
+
 /** Returns true when `stream` is an interactive TTY (supports `\r`/ANSI redraw). */
 function isTTY(stream: NodeJS.WritableStream): boolean {
   return !!(stream as Partial<NodeJS.WriteStream>).isTTY;
@@ -120,4 +122,14 @@ export function printRetryLine(attempt: number, maxAttempts: number, reason: str
   } else {
     process.stderr.write(`${formatRetryLine(attempt, maxAttempts, reason)}\n`);
   }
+}
+
+/**
+ * The default `onRetry` of the Anthropic API, Claude CLI and Codex CLI
+ * providers: a {@link printRetryLine} saying the call was rate limited and
+ * how long the wait before the next attempt is.
+ */
+export function printRateLimitRetryLine(attempt: number, maxAttempts: number, delayMs: number): void {
+  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
+  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
 }

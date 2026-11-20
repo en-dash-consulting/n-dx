@@ -16,7 +16,7 @@
  */
 
 import type { FactKind, FileFacts, SourceSpan, SymbolFact, SymbolKind } from "@n-dx/lang-kit";
-import { groupCalls, innermost } from "./pack-calls.js";
+import { contains, groupCalls, innermost } from "./pack-calls.js";
 import type { Capture, LanguagePack, PackSourceFile, PreparedResolver } from "./pack.js";
 
 /** How one declaration capture becomes a symbol. */
@@ -64,9 +64,6 @@ const TYPE_KINDS: ReadonlySet<SymbolKind> = new Set(["class", "interface", "enum
 const span = (capture: Capture): SourceSpan => ({ start: capture.start, end: capture.end });
 
 const before = (a: SourceSpan["start"], b: SourceSpan["start"]): number => a.line - b.line || a.column - b.column;
-
-const within = (outer: SourceSpan, inner: SourceSpan): boolean =>
-  before(outer.start, inner.start) <= 0 && before(inner.end, outer.end) <= 0;
 
 /** The fields of `FileFacts` other than `path`. */
 export type FileFactFields = Omit<FileFacts, "path">;
@@ -181,11 +178,11 @@ export function readSymbols(pack: LanguagePack, file: PackSourceFile, symbolRule
     if (symbol.container !== undefined) return symbol;
     let enclosing: SymbolFact | undefined;
     for (const other of symbols) {
-      if (other === symbol || !TYPE_KINDS.has(other.kind) || !within(other.span, symbol.span)) continue;
-      if (enclosing === undefined || within(enclosing.span, other.span)) enclosing = other;
+      if (other === symbol || !TYPE_KINDS.has(other.kind) || !contains(other.span, symbol.span)) continue;
+      if (enclosing === undefined || contains(enclosing.span, other.span)) enclosing = other;
     }
     // An anonymous body between the symbol and its named type makes it no member of that type.
-    const cut = bodies.some((b) => within(span(b), symbol.span) && (enclosing === undefined || within(enclosing.span, span(b))));
+    const cut = bodies.some((b) => contains(b, symbol.span) && (enclosing === undefined || contains(enclosing.span, b)));
     return enclosing && !cut ? { ...symbol, container: enclosing.name } : symbol;
   });
   return symbolRules.refine ? symbolRules.refine(contained, file).sort((a, b) => before(a.span.start, b.span.start)) : contained;

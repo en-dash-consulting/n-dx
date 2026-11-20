@@ -20,6 +20,7 @@ import type {
 } from "../schema/index.js";
 import { buildClassificationMap } from "./classify.js";
 import { detectGoServerRoutes } from "./go-route-detection.js";
+import { parseJsTsSource } from "./ts-source.js";
 import { isVerbose, verbose } from "@n-dx/llm-client";
 import { debugTimed, debugTimedAsync, checkpoint } from "../util/debug-timing.js";
 
@@ -86,17 +87,7 @@ export function extractRoutesFromFrameworkCalls(
   sourceText: string,
   filePath: string,
 ): ServerRoute[] {
-  const sf = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    extname(filePath) === ".tsx" || extname(filePath) === ".jsx"
-      ? ts.ScriptKind.TSX
-      : extname(filePath) === ".ts"
-        ? ts.ScriptKind.TS
-        : ts.ScriptKind.JS,
-  );
+  const sf = parseJsTsSource(filePath, sourceText);
 
   const routes: ServerRoute[] = [];
   const seen = new Set<string>();

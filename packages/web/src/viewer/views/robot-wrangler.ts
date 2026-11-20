@@ -18,6 +18,8 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { ROBOT_WRANGLER_SECTIONS, robotWranglerSectionId } from "./robot-wrangler-sections.js";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
+import { responseError } from "../utils/response-error.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -212,6 +214,8 @@ const VENDORS = [
   { id: VIEWER_LLM_VENDOR.GOOGLE, label: "Gemini", subtitle: "Google" },
   { id: VIEWER_LLM_VENDOR.LOCAL, label: "Local", subtitle: "LM Studio / Ollama" },
 ] satisfies ReadonlyArray<{ id: ViewerLLMVendor; label: string; subtitle: string }>;
+
+const vendorLabel = (id: string): string => VENDORS.find((v) => v.id === id)?.label ?? id;
 
 /** `<option>` value for the free-entry choice; never a model id. */
 const OTHER_MODEL = "__other__";
@@ -519,7 +523,7 @@ function ConnectionCards({
   dirty: boolean;
 }) {
   const cliName = useCliName();
-  const label = VENDORS.find((v) => v.id === vendor)?.label ?? vendor;
+  const label = vendorLabel(vendor);
   const single = choices.length === 1;
   return h("section", { class: `llm-rw-section${dirty ? " llm-field-dirty" : ""}` },
     h(SectionHeader, { number: 2, title: "Connection", subtitle: `How ${cliName} reaches ${label}` }),
@@ -756,7 +760,6 @@ function FailoverSection({
   onChange: (key: string, v: boolean) => void;
   dirty: boolean;
 }) {
-  const cliName = useCliName();
   const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
   // Without the server's block there is no chain and no reason: the toggle stands alone.
   const chain = failover?.chain ?? [];
@@ -918,8 +921,7 @@ function ReviewSection({
   onChange: (key: string, v: string) => void;
 }) {
   const cliName = useCliName();
-  const label = (v: string) => VENDORS.find((x) => x.id === v)?.label ?? v;
-  const executorLabel = label(executor);
+  const executorLabel = vendorLabel(executor);
   const mode = editValues[REVIEW_MODE_KEY] ?? review.mode.value;
   const on = review.available && (mode === "self" || mode === "pair");
   const pair = mode === "pair";
@@ -952,7 +954,7 @@ function ReviewSection({
   ];
 
   const body = !ready
-    ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to set up review for ${label(vendor)}.`)
+    ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to set up review for ${vendorLabel(vendor)}.`)
     : [
         review.available ? null : h("p", { class: "llm-review-unavailable", role: "alert" }, review.unavailableReason),
         h(RadioCards, {
@@ -975,16 +977,16 @@ function ReviewSection({
           })),
         }),
         on ? h(ReviewOptions, {
-          review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label,
-          executor, editValues, dirtyKeys, onChange,
+          review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog,
+          executor, dirtyKeys, onChange,
         }) : null,
         on ? h(FlowStrip, {
           steps: pair
             ? [
                 { who: executorLabel, model: executorModel, action: "does the task" },
-                { who: reviewerId ? label(reviewerId) : "Reviewer", model: resolvedModel, action: "reviews" },
+                { who: reviewerId ? vendorLabel(reviewerId) : "Reviewer", model: resolvedModel, action: "reviews" },
                 { who: executorLabel, model: executorModel, action: "fixes findings" },
-                { who: reviewerId ? label(reviewerId) : "Reviewer", model: resolvedModel, action: `checks the fixes · up to ${rounds} rounds` },
+                { who: reviewerId ? vendorLabel(reviewerId) : "Reviewer", model: resolvedModel, action: `checks the fixes · up to ${rounds} rounds` },
               ]
             : [
                 { who: executorLabel, model: executorModel, action: "does the task" },
@@ -993,7 +995,7 @@ function ReviewSection({
         }) : null,
         on && readiness && readiness.state !== "ready"
           ? h("p", { class: "llm-review-warning", role: "alert" },
-              `⚠ ${label(reviewerId ?? executor)} is not ready (${readiness.summary}). Review is skipped until it is.`)
+              `⚠ ${vendorLabel(reviewerId ?? executor)} is not ready (${readiness.summary}). Review is skipped until it is.`)
           : null,
         review.available
           ? h("p", { class: "llm-tier-note" },
@@ -1009,7 +1011,7 @@ function ReviewSection({
 
 /** The options panel: reviewer vendor and fix rounds (pair only) and the reviewer model. */
 function ReviewOptions({
-  review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label, executor, editValues, dirtyKeys, onChange,
+  review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, executor, dirtyKeys, onChange,
 }: {
   review: ReviewInfo;
   pair: boolean;
@@ -1019,9 +1021,7 @@ function ReviewOptions({
   modelValue: string;
   resolvedModel: string;
   catalog: LlmCatalog | null;
-  label: (v: string) => string;
   executor: ViewerLLMVendor;
-  editValues: Record<string, string>;
   dirtyKeys: Set<string>;
   onChange: (key: string, v: string) => void;
 }) {
@@ -1104,8 +1104,6 @@ const MODEL_SOURCE_LABEL: Record<EffectiveConfig["modelSource"], string> = {
 
 const CODEX_INSTALL_URL = "https://github.com/openai/codex#readme";
 
-const vendorLabel = (id: string): string => VENDORS.find((v) => v.id === id)?.label ?? id;
-
 /** "Reviewed by Codex · gpt-5.6-sol" or "Self review · <model>"; null when no review pass will run. */
 function reviewChipText(review: ReviewInfo | undefined, executor: string, executorModel: string): string | null {
   if (!review?.available) return null;
@@ -1164,7 +1162,7 @@ function useAuthCheck(): { state: AuthState; detail: string | null; check: (forc
       }
     } catch (err) {
       setState("bad");
-      setDetail(err instanceof Error ? err.message : String(err));
+      setDetail(errorMessage(err));
     }
   }, []);
 
@@ -1919,8 +1917,7 @@ export function RobotWranglerView() {
     try {
       const res = await fetch("/api/llm/config");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load");
+        setError(await responseError(res, "Failed to load"));
         return;
       }
       setData(await res.json() as LlmConfigResponse);
@@ -2131,10 +2128,9 @@ export function RobotWranglerView() {
           body: JSON.stringify({ changes }),
         });
         if (!res.ok) {
-          const body = await res.json().catch(() => ({ error: "Save failed" }));
           // Edits stay in place and `dirty` stays true, so the frame keeps Save
           // enabled and the leave prompt armed.
-          setError((body as { error?: string }).error ?? "Failed to save");
+          setError(await responseError(res, "Save failed", "Failed to save"));
           return;
         }
         const json = await res.json() as { config: LlmConfigResponse };
@@ -2157,8 +2153,7 @@ export function RobotWranglerView() {
           body: JSON.stringify({ changes: { provider: provider.value } }),
         });
         if (!res.ok) {
-          const body = await res.json().catch(() => ({ error: "Save failed" }));
-          setError((body as { error?: string }).error ?? "Failed to save the provider");
+          setError(await responseError(res, "Save failed", "Failed to save the provider"));
           return;
         }
         setHenchProvider(provider.value);
