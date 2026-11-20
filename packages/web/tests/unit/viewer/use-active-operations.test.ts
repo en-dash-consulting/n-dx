@@ -424,6 +424,49 @@ describe("useActiveOperations", () => {
     expect(op.detail).toBe("Stopped");
   });
 
+  // With web.sidecar off, the route answers 403 (route-feature-gates.ts), and
+  // each refused poll logged a failed request in the browser console.
+  it("does not ask for the Sidecar command's status while web.sidecar is off", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      urls.push(String(url));
+      if (String(url) === "/api/hench/execute/status") return { ok: true, json: async () => ({ executions: [] }) } as Response;
+      if (String(url) === "/api/features") return { ok: true, json: async () => ({ toggles: [{ key: "web.sidecar", enabled: false }] }) } as Response;
+      if (String(url) === "/api/commands/sidecar-command/status") return { ok: false, status: 403, json: async () => ({}) } as Response;
+      return { ok: true, json: async () => idleWire() } as Response;
+    }) as typeof fetch;
+
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    await act(async () => { await capturedPoll!(); });
+    await act(async () => { await capturedPoll!(); });
+
+    expect(urls).toContain("/api/commands/sv-analyze/status");
+    expect(urls).not.toContain("/api/commands/sidecar-command/status");
+  });
+
+  it("polls the Sidecar command's status once web.sidecar is on", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      urls.push(String(url));
+      if (String(url) === "/api/hench/execute/status") return { ok: true, json: async () => ({ executions: [] }) } as Response;
+      if (String(url) === "/api/features") return { ok: true, json: async () => ({ toggles: [{ key: "web.sidecar", enabled: true }] }) } as Response;
+      if (String(url) === "/api/commands/sidecar-command/status") {
+        return { ok: true, json: async () => ({ running: true, startedAt: "2026-11-19T10:00:00.000Z", finishedAt: null, command: "ndx status" }) } as Response;
+      }
+      return { ok: true, json: async () => idleWire() } as Response;
+    }) as typeof fetch;
+
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+    await act(async () => { await capturedPoll!(); });
+    act(() => { render(h(TestHarness, null), root); });
+    await settleInAct();
+
+    expect(urls).toContain("/api/commands/sidecar-command/status");
+    expect(hookResult.find((o) => o.kind === "sidecar-command")).toMatchObject({ status: "running", detail: "ndx status" });
+  });
+
   it("handles fetch failure for a singleton source gracefully", async () => {
     globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
       if (String(url) === "/api/hench/execute/status") {

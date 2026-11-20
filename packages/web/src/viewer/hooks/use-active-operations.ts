@@ -34,6 +34,7 @@
 import { getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef, useState, useCallback, useMemo } from "preact/hooks";
 import { usePolling } from "./use-polling.js";
+import { useFeatureToggle } from "./use-feature-toggle.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useCliName, resolveCliLabel } from "./use-project-metadata.js";
 import type { ViewId } from "../types.js";
@@ -108,6 +109,12 @@ interface SingletonSource {
   label: string;
   /** Where this job's output lands — the tray's result-card link target. */
   result: { view: ViewId; label: string };
+  /**
+   * The feature toggle the status route is gated by (route-feature-gates.ts).
+   * While it is off the route answers 403, so the tray does not ask: every
+   * refused poll would log a failed request in the browser console.
+   */
+  feature?: "web.sidecar";
   detail: (wire: SingletonWire) => string | undefined;
 }
 
@@ -166,6 +173,8 @@ const SINGLETON_SOURCES: SingletonSource[] = [
     stopUrl: "/api/commands/sidecar-command/stop",
     label: "Sidecar command",
     result: { view: "live", label: "View Live" },
+    // Only an approved Sidecar call starts this job; with web.sidecar off the route refuses.
+    feature: "web.sidecar",
     detail: (w) => lastLine(w.output as string | undefined) ?? (typeof w.command === "string" ? w.command : undefined),
   },
   {
@@ -284,10 +293,14 @@ export function useActiveOperations(): JobTray {
   const cliName = useCliName();
   const cliNameRef = useRef(cliName);
   cliNameRef.current = cliName;
+  // Toggles that gate a source, read the same way (off until /api/features says otherwise).
+  const enabledRef = useRef<Record<string, boolean>>({});
+  enabledRef.current = { "web.sidecar": useFeatureToggle("web.sidecar", false) };
 
   const pollSingletons = useCallback(async () => {
     const results = await Promise.all(
       SINGLETON_SOURCES.map(async (source) => {
+        if (source.feature && !enabledRef.current[source.feature]) return null;
         try {
           const res = await fetch(source.url);
           if (!res.ok) return null;
