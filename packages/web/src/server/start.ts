@@ -27,7 +27,7 @@ import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
 import { handleLiveWorkRoute } from "./routes-live-work.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
-import { guardWatcher } from "./watcher-guard.js";
+import { debounce, guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
@@ -72,7 +72,7 @@ import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { ALL_DATA_FILES, CredentialStore, stripWorkspaceSlot, urlWithNonce } from "../shared/index.js";
-import { findAvailablePort } from "./port.js";
+import { DEFAULT_PORT, findAvailablePort } from "./port.js";
 import { resolveWebPaths } from "./paths.js";
 import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "./request-security.js";
 
@@ -297,18 +297,6 @@ type RouteResult = boolean | Promise<boolean>;
 // from concurrent fetch storms.
 
 const WATCHER_DEBOUNCE_MS = 500;
-
-/**
- * Create a debounced version of a callback. Multiple calls within `delayMs`
- * are collapsed into a single trailing invocation.
- */
-function debounce<T extends (...args: unknown[]) => void>(fn: T, delayMs: number): T {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  return ((...args: unknown[]) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => { timer = null; fn(...args); }, delayMs);
-  }) as T;
-}
 
 function isInScope(scope: ViewerScope | undefined, pkg: ViewerScope): boolean {
   return !scope || scope === pkg;
@@ -632,26 +620,6 @@ function registerWatchers(
 }
 
 /**
- * Re-register the file watchers that {@link registerWatchers} skipped at
- * server startup because their target directory (`.sourcevision`, `.rex`,
- * `.hench/runs`) didn't exist yet — the project was uninitialized, so the
- * server was showing the landing page rather than the dashboard.
- *
- * Called once, right after a successful `ndx init` triggered from the
- * dashboard's setup wizard (see `handleInit` in routes-commands.ts). Without
- * this, the dashboard the client reloads into after init would work for its
- * initial data load (every route reads straight from disk), but live
- * updates — WebSocket broadcasts on PRD/SourceVision changes — would stay
- * silently dead until the server was restarted by hand, since `fs.watch`
- * only gets set up once per directory.
- *
- * Safe to call exactly once per directory: each of the three registration
- * functions already no-ops (returns null/[]) when its target still doesn't
- * exist, so calling this on a directory that already has a watcher would be
- * the only way to double up — which the setup wizard's own pre-init-only
- * gating (see `isProjectInitialized`) rules out in practice.
- */
-/**
  * Re-resolve the project's layout after a successful `ndx init`.
  *
  * `ctx.svDir` / `ctx.rexDir` and the hench runs directory are resolved once in
@@ -677,6 +645,26 @@ export function refreshProjectLayout(ctx: ServerContext, handles: WatcherHandles
   handles.henchRunsDir = join(layout.henchDir, "runs");
 }
 
+/**
+ * Re-register the file watchers that {@link registerWatchers} skipped at
+ * server startup because their target directory (`.sourcevision`, `.rex`,
+ * `.hench/runs`) didn't exist yet — the project was uninitialized, so the
+ * server was showing the landing page rather than the dashboard.
+ *
+ * Called once, right after a successful `ndx init` triggered from the
+ * dashboard's setup wizard (see `handleInit` in routes-commands.ts). Without
+ * this, the dashboard the client reloads into after init would work for its
+ * initial data load (every route reads straight from disk), but live
+ * updates — WebSocket broadcasts on PRD/SourceVision changes — would stay
+ * silently dead until the server was restarted by hand, since `fs.watch`
+ * only gets set up once per directory.
+ *
+ * Safe to call exactly once per directory: each of the three registration
+ * functions already no-ops (returns null/[]) when its target still doesn't
+ * exist, so calling this on a directory that already has a watcher would be
+ * the only way to double up — which the setup wizard's own pre-init-only
+ * gating (see `isProjectInitialized`) rules out in practice.
+ */
 function reregisterProjectWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
@@ -864,7 +852,6 @@ async function handleApiRoutes(
   res: ServerResponse,
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
   watcherHandles: WatcherHandles,
@@ -1063,7 +1050,7 @@ function createHttpServer(
       const broadcast = tagBroadcaster(ws.broadcast, frameTagOf(workspace));
       if (handleConfigEndpoint(req, res, ctx)) return;
       if (handleReloadSignalEndpoint(req, res, ws, broadcast)) return;
-      if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
+      if (await handleApiRoutes(req, res, ctx, watcher, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
       res.writeHead(404);
       res.end("Not found");
     } catch (err) {
@@ -1208,7 +1195,7 @@ export function silenceChildLegacyNotice(env: NodeJS.ProcessEnv = process.env): 
 
 export async function startServer(
   targetDir: string,
-  port: number = 3117,
+  port: number = DEFAULT_PORT,
   opts: ServerOptions = {},
 ): Promise<StartResult> {
   silenceChildLegacyNotice();

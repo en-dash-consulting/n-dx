@@ -9,9 +9,10 @@ import {
   getCurrentLevel,
   getLatestSnapshot,
   onSnapshot,
+  type MemoryLevel,
 } from "./memory-monitor.js";
 
-export type MemoryLevel = "normal" | "elevated" | "warning" | "critical";
+export type { MemoryLevel };
 
 export function getInitialRefreshThrottleMemoryLevel(): MemoryLevel {
   return getLatestSnapshot()?.level ?? getCurrentLevel();

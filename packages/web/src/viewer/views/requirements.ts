@@ -14,6 +14,7 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { errorMessage } from "../utils/format.js";
 
 // ── Wire types (from routes-rex/requirements.ts) ─────────────────────
 
@@ -92,7 +93,7 @@ export function RequirementsView() {
           setError(null);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) setError(errorMessage(err));
       }
     })();
     return () => { cancelled = true; };

@@ -417,8 +417,7 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
  * write overwrites the first’s scratch file, and the first rename then
  * publishes contents it never wrote, or fails with ENOENT because the other
  * rename already consumed it. The lock makes that unreachable today, and the
- * name should not be the reason — `preview.ts` reached the same conclusion
- * from the other direction, having no lock at all.
+ * name should not be the reason.
  */
 async function writeCacheFileAtomic(henchDir: string, file: SessionCacheFile): Promise<void> {
   const target = cachePath(henchDir);

@@ -24,6 +24,7 @@ import { PeekLink } from "./live-tab.js";
 import { livenessBadge, useLive, type LiveRunSummary } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { openWebSocket } from "../session.js";
+import { formatElapsedSince } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -65,19 +66,6 @@ const STALE_THRESHOLD_MS = 5 * 60 * 1000;
 function isStale(run: ActiveRun): boolean {
   if (!run.lastActivityAt) return true; // Legacy run
   return Date.now() - new Date(run.lastActivityAt).getTime() > STALE_THRESHOLD_MS;
-}
-
-function formatElapsed(startedAt: string): string {
-  const ms = Date.now() - new Date(startedAt).getTime();
-  if (ms < 0) return "0s";
-  const totalSecs = Math.floor(ms / 1000);
-  if (totalSecs < 60) return `${totalSecs}s`;
-  const mins = Math.floor(totalSecs / 60);
-  const secs = totalSecs % 60;
-  if (mins < 60) return `${mins}m ${secs}s`;
-  const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hours}h ${remainMins}m`;
 }
 
 function formatStartTime(iso: string): string {
@@ -144,7 +132,7 @@ function ActiveTaskCard({ run, navigateTo, verdict }: {
       h("div", { class: "active-task-meta" },
         h("span", { class: "active-task-elapsed", title: "Elapsed time" },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "⏱"),
-          h(ElapsedTime, { startedAt: run.startedAt, formatter: formatElapsed }),
+          h(ElapsedTime, { startedAt: run.startedAt, formatter: formatElapsedSince }),
         ),
         h("span", { class: "active-task-started", title: `Started at ${formatStartTime(run.startedAt)}` },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "▶"),
@@ -189,7 +177,7 @@ function ExecutionCard({ exec }: { exec: ExecutionState }) {
       h("div", { class: "active-task-meta" },
         h("span", { class: "active-task-elapsed", title: "Elapsed time" },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "⏱"),
-          h(ElapsedTime, { startedAt: exec.startedAt, formatter: formatElapsed }),
+          h(ElapsedTime, { startedAt: exec.startedAt, formatter: formatElapsedSince }),
         ),
         h("span", { class: "active-task-started", title: `Started at ${formatStartTime(exec.startedAt)}` },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "▶"),

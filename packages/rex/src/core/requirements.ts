@@ -307,12 +307,7 @@ export async function validateAutomatedRequirements(
   itemId: string,
   executor?: CommandExecutor,
 ): Promise<RequirementsValidationSummary> {
-  const traced = collectRequirements(items, itemId).filter(
-    (tr) => tr.requirement.validationType !== "manual",
-  );
-
-  // Rebuild item list with only the target item's non-manual requirements
-  // We use the full validation flow but only on automated/metric requirements
+  // Run the full validation flow, then keep only the automated/metric results
   const fullSummary = await validateRequirements(items, itemId, executor);
   const automatedResults = fullSummary.results.filter(
     (r) => r.validationType !== "manual",

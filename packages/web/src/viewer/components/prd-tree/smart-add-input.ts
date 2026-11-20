@@ -21,13 +21,25 @@
 import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
-import { ProposalEditor } from "./proposal-editor.js";
+import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { TargetRow, TargetSearch, requestPlacement, type PlacementTarget } from "./change-placement.js";
 import { PlanWithSidecarButton } from "../plan-with-sidecar.js";
 import { useProductRead } from "../../hooks/index.js";
 import type { AreaDetail, PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
+import { errorMessage } from "../../utils/format.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
+import {
+  AttachImageButton,
+  AttachmentPreview,
+  checkImageFiles,
+  imageFilesOf,
+  readPendingImage,
+  uploadAttachments,
+  useImageInputSupport,
+  type PendingImage,
+} from "./image-attachments.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -240,8 +252,7 @@ async function postJson<T>(url: string, body: unknown, fallback: string): Promis
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({ error: fallback }));
-    throw new Error(errBody.error || `HTTP ${res.status}`);
+    throw new Error(await errorOrHttpStatus(res, fallback));
   }
   return await res.json() as T;
 }
@@ -285,6 +296,27 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [accepting, setAccepting] = useState(false);
+
+  // v2 only: images attached to the change on Add, offered when the agent's model takes images.
+  const imagesSupported = useImageInputSupport(layout === "v2");
+  const [images, setImages] = useState<PendingImage[]>([]);
+  const imageCountRef = useRef(0);
+  imageCountRef.current = images.length;
+
+  const addImageFiles = useCallback(async (files: File[]) => {
+    const { accepted, problems } = checkImageFiles(files, imageCountRef.current);
+    setError(problems.length ? problems.join(" ") : null);
+    try {
+      const read = await Promise.all(accepted.map(readPendingImage));
+      if (read.length) setImages((prev) => [...prev, ...read]);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }, []);
+
+  const removeImage = useCallback((key: string) => {
+    setImages((prev) => prev.filter((image) => image.key !== key));
+  }, []);
 
   // Context selection state
   const [scopeOptions, setScopeOptions] = useState<ScopeOption[]>([]);
@@ -379,8 +411,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       if (reqId !== requestIdRef.current) return;
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Preview failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Preview failed"));
       }
 
       const data = await res.json();
@@ -477,8 +508,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       // Reset state
@@ -520,7 +550,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
             }, "Add failed")];
           } catch (err) {
             if (!created.length) throw err;
-            const message = err instanceof Error ? err.message : String(err);
+            const message = errorMessage(err);
             throw new Error(`${message} (${created.length} of ${changes.length} changes were added before it failed)`);
           }
         }
@@ -535,11 +565,24 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
         created = accepted.changes ?? [];
       }
 
+      // The change exists now; images go into its folder. A refusal here leaves
+      // the change added without them, which the message says.
+      let attachError: string | null = null;
+      if (images.length && created.length) {
+        try {
+          await uploadAttachments(created.map((c) => c.id), images);
+        } catch (err) {
+          attachError = `The change was added, but its images were not attached: ${errorMessage(err)}`;
+        }
+      }
+
       setInput("");
+      setImages([]);
       setChanges([]);
       setChoices([]);
       setState("idle");
       previewedRef.current = null;
+      if (attachError) setError(attachError);
       refreshScopes();
       onPrdChanged();
 
@@ -555,7 +598,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } finally {
       setAccepting(false);
     }
-  }, [changes, choices, onPrdChanged, onOpenChange, refreshScopes]);
+  }, [changes, choices, images, onPrdChanged, onOpenChange, refreshScopes]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
@@ -568,6 +611,14 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     refreshScopes();
     onPrdChanged();
   }, [onPrdChanged, refreshScopes]);
+
+  // Scope label for display. Read before the editor's early return, so the
+  // hooks run in the same order on every render.
+  const scopeLabel = useMemo(() => {
+    if (!selectedScope) return null;
+    const opt = scopeOptions.find((o) => o.id === selectedScope);
+    return opt ? `${opt.itemType}: ${opt.title}` : null;
+  }, [selectedScope, scopeOptions]);
 
   // ── Render: Proposal editor mode ─────────────────────────────────
 
@@ -585,18 +636,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
 
   // ── Render: Input + preview ──────────────────────────────────────
 
-  const taskCount = proposals.reduce(
-    (sum, p) => sum + p.features.reduce((fs, f) => fs + f.tasks.length, 0),
-    0,
-  );
-  const featureCount = proposals.reduce((sum, p) => sum + p.features.length, 0);
-
-  // Scope label for display
-  const scopeLabel = useMemo(() => {
-    if (!selectedScope) return null;
-    const opt = scopeOptions.find((o) => o.id === selectedScope);
-    return opt ? `${opt.itemType}: ${opt.title}` : null;
-  }, [selectedScope, scopeOptions]);
+  const { features: featureCount, tasks: taskCount } = proposalCounts(proposals);
 
   const panelClass = bar ? "smart-add-panel smart-add-panel-bar" : "smart-add-panel";
 
@@ -664,6 +704,14 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
         value: input,
         placeholder: bar ? copy.barPlaceholder : copy.placeholder,
         onInput: (e: Event) => handleInput((e.target as HTMLTextAreaElement).value),
+        onPaste: imagesSupported
+          ? (e: ClipboardEvent) => {
+              const files = imageFilesOf(e.clipboardData?.items);
+              if (!files.length) return;
+              e.preventDefault();
+              void addImageFiles(files);
+            }
+          : undefined,
         rows: bar ? 1 : 4,
         "aria-label": copy.inputLabel,
       }),
@@ -700,7 +748,18 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       // v2 only: the Plan lens proposes a change set, which a v1 tree has no place for.
       layout === "v2" ? h(PlanWithSidecarButton, { text: input, areaId: area?.id, disabled: state === "loading" }) : null,
       bar ? barAction : null,
+      // "+": attach images, when the agent's model takes them (v2 only). Last
+      // in the row's DOM so the bar layout's positional rules keep their
+      // targets; the stylesheet places it beside the input.
+      imagesSupported
+        ? h(AttachImageButton, { onFiles: (files: File[]) => void addImageFiles(files), disabled: accepting, count: images.length })
+        : null,
     ),
+
+    // Images waiting to be attached, below the entry box.
+    imagesSupported
+      ? h(AttachmentPreview, { images, onRemove: removeImage, disabled: accepting })
+      : null,
 
     // Loading state with progress
     state === "loading"
@@ -781,22 +840,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
             : null,
 
           // Summary stats
-          h("div", { class: "smart-add-stats" },
-            h("span", { class: "smart-add-stat" },
-              h("span", { class: "smart-add-stat-count" }, String(proposals.length)),
-              ` epic${proposals.length !== 1 ? "s" : ""}`,
-            ),
-            h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-            h("span", { class: "smart-add-stat" },
-              h("span", { class: "smart-add-stat-count" }, String(featureCount)),
-              ` feature${featureCount !== 1 ? "s" : ""}`,
-            ),
-            h("span", { class: "smart-add-stat-sep" }, "\u2022"),
-            h("span", { class: "smart-add-stat" },
-              h("span", { class: "smart-add-stat-count" }, String(taskCount)),
-              ` task${taskCount !== 1 ? "s" : ""}`,
-            ),
-          ),
+          h(ProposalStats, { epics: proposals.length, features: featureCount, tasks: taskCount }),
 
           // Proposal hierarchy preview
           h("div", { class: "smart-add-preview" },

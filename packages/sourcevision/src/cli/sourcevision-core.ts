@@ -64,7 +64,7 @@ export { generateLlmsTxt } from "../analyzers/llms-txt.js";
 export { generateContext } from "../analyzers/context.js";
 export { emitZoneOutputs } from "../analyzers/zone-output.js";
 export { assessAllZoneRisks } from "../analyzers/risk-scoring.js";
-export type { ZoneType } from "../analyzers/risk-scoring.js";
+export type { RiskAssessmentOptions, ZoneType } from "../analyzers/risk-scoring.js";
 export { emptyAnalyzeTokenUsage, formatTokenUsage } from "../analyzers/token-usage.js";
 export {
   setLLMConfig,

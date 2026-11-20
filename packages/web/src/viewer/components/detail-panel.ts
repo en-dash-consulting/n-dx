@@ -2,7 +2,8 @@ import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import { useEffect, useRef } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
-import { meterClass, getZoneColorByIndex } from "../visualization/index.js";
+import { getZoneColorByIndex } from "../visualization/index.js";
+import { ZoneMeter } from "./zone-meter.js";
 import { basename } from "../utils.js";
 import type { VNode } from "preact";
 
@@ -237,20 +238,7 @@ function renderZoneDetail(
         h("span", { class: "label" }, "Cohesion"),
         h("span", null, cohesion.toFixed(2))
       ),
-      h("div", {
-        class: "meter",
-        role: "meter",
-        "aria-label": "Cohesion",
-        "aria-valuemin": 0,
-        "aria-valuemax": 1,
-        "aria-valuenow": cohesion,
-        "aria-valuetext": cohesion.toFixed(2),
-      },
-        h("div", {
-          class: `meter-fill ${meterClass(cohesion)}`,
-          style: `width: ${cohesion * 100}%`,
-        })
-      )
+      h(ZoneMeter, { label: "Cohesion", value: cohesion })
     ),
 
     // Coupling meter
@@ -259,20 +247,7 @@ function renderZoneDetail(
         h("span", { class: "label" }, "Coupling"),
         h("span", null, coupling.toFixed(2))
       ),
-      h("div", {
-        class: "meter",
-        role: "meter",
-        "aria-label": "Coupling",
-        "aria-valuemin": 0,
-        "aria-valuemax": 1,
-        "aria-valuenow": coupling,
-        "aria-valuetext": coupling.toFixed(2),
-      },
-        h("div", {
-          class: `meter-fill ${meterClass(coupling, true)}`,
-          style: `width: ${coupling * 100}%`,
-        })
-      )
+      h(ZoneMeter, { label: "Coupling", value: coupling, invert: true })
     ),
 
     // Scoped findings

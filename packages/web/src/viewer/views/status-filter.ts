@@ -9,6 +9,7 @@
 import { h } from "preact";
 import { useCallback, useMemo } from "preact/hooks";
 import type { ItemStatus } from "../components/prd-tree/types.js";
+import { STATUS_DISPLAY } from "../components/prd-tree/status-display.js";
 
 /** All available statuses in display order. */
 export const ALL_STATUSES: ItemStatus[] = [
@@ -21,18 +22,6 @@ export const ALL_STATUSES: ItemStatus[] = [
   "cancelled",
   "deleted",
 ];
-
-/** Human-readable labels and icons for each status. */
-const STATUS_DISPLAY: Record<ItemStatus, { icon: string; label: string; cssClass: string }> = {
-  pending:     { icon: "\u25CB", label: "Pending",     cssClass: "prd-status-pending" },
-  in_progress: { icon: "\u25D0", label: "In Progress", cssClass: "prd-status-in-progress" },
-  completed:   { icon: "\u25CF", label: "Completed",   cssClass: "prd-status-completed" },
-  failing:     { icon: "\u26A0", label: "Failing",     cssClass: "prd-status-failing" },
-  blocked:     { icon: "\u2298", label: "Blocked",     cssClass: "prd-status-blocked" },
-  deferred:    { icon: "\u25CC", label: "Deferred",    cssClass: "prd-status-deferred" },
-  cancelled:   { icon: "\u2297", label: "Cancelled",   cssClass: "prd-status-cancelled" },
-  deleted:     { icon: "\u2715", label: "Deleted",     cssClass: "prd-status-deleted" },
-};
 
 // ── Filter presets ───────────────────────────────────────────────────
 

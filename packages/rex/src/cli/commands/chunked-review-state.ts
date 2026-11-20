@@ -1,6 +1,7 @@
 import type { Proposal } from "./chunked-review-types.js";
 import { classifyModificationRequest } from "./modification-intent.js";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
+import { parseGranularityInput, parseNumericIndices } from "./proposal-selection.js";
 import type { GranularityAdjustmentRecord, BatchAcceptanceRecord } from "../../analyze/batch-types.js";
 import { green, red, cyan, dim, yellow } from "@n-dx/llm-client";
 
@@ -8,6 +9,9 @@ import { green, red, cyan, dim, yellow } from "@n-dx/llm-client";
 export type { GranularityAdjustmentRecord, BatchAcceptanceRecord };
 
 const DEFAULT_CHUNK_SIZE = 5;
+
+/** How many proposals per page `more` adds and `fewer` removes. */
+const CHUNK_SIZE_STEP = 5;
 
 /** Assessment of a single proposal's task granularity. */
 export interface ProposalAssessment {
@@ -250,19 +254,9 @@ export function buildPrompt(state: ChunkReviewState): string {
   return "> ";
 }
 
-/**
- * Parse a string of comma/space-separated 1-based numbers into
- * deduplicated, sorted 0-based indices within the valid range.
- */
-function parseNumericIndices(input: string, total: number): number[] {
-  return [...new Set(
-    input
-      .trim()
-      .split(/[\s,]+/)
-      .map((s) => parseInt(s, 10))
-      .filter((n) => !isNaN(n) && n >= 1 && n <= total)
-      .map((n) => n - 1),
-  )].sort((a, b) => a - b);
+/** 0-based proposal indices as the 1-based numbers the operator sees, e.g. "1, 3". */
+function proposalNumbers(indices: number[]): string {
+  return indices.map((i) => i + 1).join(", ");
 }
 
 /**
@@ -315,50 +309,25 @@ export function parseChunkInput(
   // Consolidate current chunk: "ca" or "consolidate all"
   if (["ca", "consolidate all", "consolidate chunk"].includes(trimmed)) return { kind: "consolidate_chunk" };
 
-  // Break down: "b1,3" or "break down 1,3" or "b 1 3"
-  const breakMatch = raw.match(/^[bB](?:reak\s*down)?\s*(.+)$/i);
-  if (breakMatch) {
-    const indices = parseNumericIndices(breakMatch[1], state.proposals.length);
-    if (indices.length > 0) {
-      return { kind: "break_down", indices };
-    }
-  }
-
-  // Consolidate: "c1,3" or "consolidate 1,3" or "c 1 3"
-  const consolidateMatch = raw.match(/^[cC](?:onsolidate)?\s*(.+)$/i);
-  if (consolidateMatch) {
-    const indices = parseNumericIndices(consolidateMatch[1], state.proposals.length);
-    if (indices.length > 0) {
-      return { kind: "consolidate", indices };
-    }
+  // Break down or consolidate: "b1,3", "break down 1,3", "c 1 3", "consolidate 1,3"
+  const granularity = parseGranularityInput(raw, state.proposals.length);
+  if (granularity) {
+    return { kind: granularity.direction, indices: granularity.indices };
   }
 
   // Numeric selection (1-based, comma or space separated)
-  const nums = trimmed
-    .split(/[\s,]+/)
-    .map((s) => parseInt(s, 10))
-    .filter((n) => !isNaN(n));
-
-  if (nums.length > 0) {
-    // Convert to 0-based indices, filter valid range
-    const indices = [...new Set(
-      nums
-        .filter((n) => n >= 1 && n <= state.proposals.length)
-        .map((n) => n - 1),
-    )].sort((a, b) => a - b);
-
-    if (indices.length > 0) {
-      return { kind: "select", indices };
-    }
+  const indices = parseNumericIndices(trimmed, state.proposals.length);
+  if (indices.length > 0) {
+    return { kind: "select", indices };
   }
 
   // Natural language modification detection:
   // If the input contains a recognized action verb (add, remove, change, split, etc.)
   // treat it as a modification request rather than unknown.
-  if (raw.trim()) {
-    const classification = classifyModificationRequest(raw.trim());
+  if (raw) {
+    const classification = classifyModificationRequest(raw);
     if (classification.intent !== "unknown") {
-      return { kind: "modify", request: raw.trim() };
+      return { kind: "modify", request: raw };
     }
   }
 
@@ -403,7 +372,7 @@ export function applyAction(
           offset: newOffset,
         },
         done: false,
-        message: `Accepted proposals ${indices.map((i) => i + 1).join(", ")}.`,
+        message: `Accepted proposals ${proposalNumbers(indices)}.`,
       };
     }
 
@@ -446,7 +415,7 @@ export function applyAction(
     }
 
     case "more": {
-      const newSize = Math.min(state.chunkSize + 5, total);
+      const newSize = Math.min(state.chunkSize + CHUNK_SIZE_STEP, total);
       if (newSize === state.chunkSize) {
         return { state, done: false, message: "Already showing all proposals." };
       }
@@ -460,7 +429,7 @@ export function applyAction(
     }
 
     case "fewer": {
-      const newSize = Math.max(1, state.chunkSize - 5);
+      const newSize = Math.max(1, state.chunkSize - CHUNK_SIZE_STEP);
       if (newSize === state.chunkSize) {
         return { state, done: false, message: "Already at minimum chunk size." };
       }
@@ -490,7 +459,7 @@ export function applyAction(
       return {
         state: { ...state, accepted: newAccepted, rejected: newRejected },
         done: false,
-        message: `Toggled proposals ${action.indices.map((i) => i + 1).join(", ")}.`,
+        message: `Toggled proposals ${proposalNumbers(action.indices)}.`,
       };
     }
 
@@ -500,7 +469,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Breaking down proposal(s) ${action.indices.map((i) => i + 1).join(", ")}...`,
+        message: `Breaking down proposal(s) ${proposalNumbers(action.indices)}...`,
         granularityRequest: { kind: "break_down", indices: action.indices },
       };
     }
@@ -511,7 +480,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Consolidating proposal(s) ${action.indices.map((i) => i + 1).join(", ")}...`,
+        message: `Consolidating proposal(s) ${proposalNumbers(action.indices)}...`,
         granularityRequest: { kind: "consolidate", indices: action.indices },
       };
     }
@@ -560,14 +529,14 @@ export function applyAction(
         return {
           state,
           done: false,
-          message: `Applying assessment: breaking down proposal(s) ${breakDownIndices.map((i) => i + 1).join(", ")}...`,
+          message: `Applying assessment: breaking down proposal(s) ${proposalNumbers(breakDownIndices)}...`,
           granularityRequest: { kind: "break_down", indices: breakDownIndices },
         };
       }
       return {
         state,
         done: false,
-        message: `Applying assessment: consolidating proposal(s) ${consolidateIndices.map((i) => i + 1).join(", ")}...`,
+        message: `Applying assessment: consolidating proposal(s) ${proposalNumbers(consolidateIndices)}...`,
         granularityRequest: { kind: "consolidate", indices: consolidateIndices },
       };
     }
@@ -578,7 +547,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Breaking down all proposals in current chunk (${indices.map((i) => i + 1).join(", ")})...`,
+        message: `Breaking down all proposals in current chunk (${proposalNumbers(indices)})...`,
         granularityRequest: { kind: "break_down", indices },
       };
     }
@@ -589,7 +558,7 @@ export function applyAction(
       return {
         state,
         done: false,
-        message: `Consolidating all proposals in current chunk (${indices.map((i) => i + 1).join(", ")})...`,
+        message: `Consolidating all proposals in current chunk (${proposalNumbers(indices)})...`,
         granularityRequest: { kind: "consolidate", indices },
       };
     }

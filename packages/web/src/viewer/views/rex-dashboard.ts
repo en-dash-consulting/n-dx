@@ -271,6 +271,21 @@ interface EpicProgressProps {
   navigateTo?: NavigateTo;
 }
 
+/** A flag kept in localStorage under `key` (false when storage is unavailable), and its toggle. */
+function useRememberedToggle(key: string): [boolean, () => void] {
+  const [value, setValue] = useState<boolean>(() => {
+    try { return localStorage.getItem(key) === "true"; } catch { return false; }
+  });
+  const toggle = useCallback(() => {
+    setValue((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(key, String(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, [key]);
+  return [value, toggle];
+}
+
 /**
  * Epic (v1) or change (v2) progress — a dropdown of blocks, closed by default,
  * with filters by name, status, tag and owner. Completed rows are hidden
@@ -279,27 +294,9 @@ interface EpicProgressProps {
  */
 function EpicProgress({ epics, rootLabel, rootPlural, navigateTo }: EpicProgressProps) {
   // Bounded and scrollable by default; Expand shows every row. Remembered.
-  const [expanded, setExpanded] = useState<boolean>(() => {
-    try { return localStorage.getItem(EPICS_EXPANDED_KEY) === "true"; } catch { return false; }
-  });
-  const toggleExpanded = useCallback(() => {
-    setExpanded((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(EPICS_EXPANDED_KEY, String(next)); } catch { /* storage unavailable */ }
-      return next;
-    });
-  }, []);
+  const [expanded, toggleExpanded] = useRememberedToggle(EPICS_EXPANDED_KEY);
   // A dropdown like the stage sections below it: closed until opened. Remembered.
-  const [open, setOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem(EPICS_OPEN_KEY) === "true"; } catch { return false; }
-  });
-  const toggleOpen = useCallback(() => {
-    setOpen((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(EPICS_OPEN_KEY, String(next)); } catch { /* storage unavailable */ }
-      return next;
-    });
-  }, []);
+  const [open, toggleOpen] = useRememberedToggle(EPICS_OPEN_KEY);
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState(STATUS_OPEN);

@@ -22,6 +22,7 @@ import { SpecMap, liveCapabilities } from "./area-spec-map.js";
 import { AreaCards } from "./area-cards.js";
 import { AreaCapability } from "./area-capability.js";
 import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
+import { plural } from "../utils/format.js";
 
 /** The area's address. */
 export function areaPath(slug: string): string {
@@ -32,8 +33,6 @@ export function areaPath(slug: string): string {
 export function areaCapabilityPath(slug: string, capabilityId: string): string {
   return `${areaPath(slug)}/capability/${encodeURIComponent(capabilityId)}`;
 }
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** The header's counts, in the order the header reads them. */
 export function areaCountLabels(counts: AreaDetail["counts"]): string[] {

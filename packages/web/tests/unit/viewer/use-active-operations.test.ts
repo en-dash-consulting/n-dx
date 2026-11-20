@@ -15,7 +15,7 @@ import { act } from "preact/test-utils";
 
 let capturedPoll: (() => Promise<void>) | null = null;
 
-vi.mock("../../../src/viewer/views/use-polling.js", () => ({
+vi.mock("../../../src/viewer/hooks/use-polling.js", () => ({
   usePolling: vi.fn((_key: string, cb: () => Promise<void>) => {
     capturedPoll = cb;
   }),
@@ -35,7 +35,7 @@ import {
   type ActiveOperation,
   type JobTray,
 } from "../../../src/viewer/hooks/use-active-operations.js";
-import { usePolling } from "../../../src/viewer/views/use-polling.js";
+import { usePolling } from "../../../src/viewer/hooks/use-polling.js";
 
 // ─── Harness ─────────────────────────────────────────────────────────────────
 

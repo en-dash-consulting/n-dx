@@ -32,7 +32,7 @@ export {
 } from "./colors.js";
 
 // ── Foundation: metric helpers ──────────────────────────────────────
-export { meterClass } from "./metrics.js";
+export { meterClass, zoneNeedsAttention } from "./metrics.js";
 
 // ── Foundation: flow-diagram data builders ──────────────────────────
 export {
@@ -41,6 +41,7 @@ export {
   buildCallFlowEdges,
   buildExternalImportEdges,
   buildFlowNodes,
+  mapPackagesToZones,
 } from "./flow.js";
 
 // ── Primitive components: charts & gauges ───────────────────────────

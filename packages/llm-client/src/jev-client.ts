@@ -32,6 +32,7 @@ import { credentialFingerprint, resolveCredential, TYPESAFE_API_KEY_ENV, TYPESAF
 import { ClaudeClientError } from "./types.js";
 import type { TokenUsage } from "./types.js";
 import { isJudgmentCacheConfigured, lookupJudgments, storeJudgments } from "./judgment-cache.js";
+import { asRecord } from "./json.js";
 
 export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 export const JEV_MODEL = "jev-latest";
@@ -383,12 +384,6 @@ function parseAnswer(a: Record<string, unknown> | undefined, expected: JevQuesti
       return { type: "score", score: a.score, probabilities, confidence };
     }
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 }
 
 /** Retry-After is seconds per RFC 9110; tolerate a millisecond-looking value. */

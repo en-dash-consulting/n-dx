@@ -9,6 +9,7 @@
 
 import { h, Fragment } from "preact";
 import { useState, useCallback, useMemo } from "preact/hooks";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -190,6 +191,35 @@ function countSelected(proposals: EditableProposal[]): { epics: number; features
   return { epics, features, tasks };
 }
 
+/** How many features and tasks a set of proposals holds; each proposal is one epic. */
+export function proposalCounts(proposals: readonly RawProposal[]): { features: number; tasks: number } {
+  return {
+    features: proposals.reduce((sum, p) => sum + p.features.length, 0),
+    tasks: proposals.reduce(
+      (sum, p) => sum + p.features.reduce((fs, f) => fs + f.tasks.length, 0),
+      0,
+    ),
+  };
+}
+
+function proposalStat(count: number, noun: string) {
+  return h("span", { class: "smart-add-stat" },
+    h("span", { class: "smart-add-stat-count" }, String(count)),
+    ` ${noun}${count !== 1 ? "s" : ""}`,
+  );
+}
+
+/** The "N epics • N features • N tasks" line over the proposals Smart Add and Batch Import offer. */
+export function ProposalStats({ epics, features, tasks }: { epics: number; features: number; tasks: number }) {
+  return h("div", { class: "smart-add-stats" },
+    proposalStat(epics, "epic"),
+    h("span", { class: "smart-add-stat-sep" }, "\u2022"),
+    proposalStat(features, "feature"),
+    h("span", { class: "smart-add-stat-sep" }, "\u2022"),
+    proposalStat(tasks, "task"),
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }: ProposalEditorProps) {
@@ -364,8 +394,7 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
       });
 
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
       onAccepted();

@@ -10,16 +10,12 @@ export function canonicalJson(value: unknown): string {
 
 /** The value with its object keys sorted at every depth and its `undefined` members dropped. */
 export function canonical(value: unknown): unknown {
-  return sortKeys(value);
-}
-
-function sortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeys);
+  if (Array.isArray(value)) return value.map(canonical);
   if (value !== null && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(value as Record<string, unknown>).sort()) {
       const v = (value as Record<string, unknown>)[key];
-      if (v !== undefined) out[key] = sortKeys(v);
+      if (v !== undefined) out[key] = canonical(v);
     }
     return out;
   }

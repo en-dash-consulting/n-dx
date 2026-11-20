@@ -6,10 +6,9 @@
  */
 
 import { OPENAI_MODEL_COSTS, OPENAI_CONTEXT_WINDOWS } from "./openai-model-metadata.js";
-import { readFile, access } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
 import { warn } from "./output.js";
-import { deepMerge } from "./project-config.js";
+import { deepMerge, loadJSONFile } from "./project-config.js";
 import { isRepoRestricted, isLocalConfigTracked, type RepoTrustStoreOptions } from "./repo-trust.js";
 import { stripTrackedExecutionConfig } from "./tracked-config-clamp.js";
 import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
@@ -825,23 +824,6 @@ export function resolveReviewModel(
 }
 
 /**
- * Load and parse a JSON file, returning null on failure.
- */
-async function loadJSONFile(filePath: string): Promise<Record<string, unknown> | null> {
-  try {
-    await access(filePath);
-    const raw = await readFile(filePath, "utf-8");
-    const data = JSON.parse(raw);
-    if (data && typeof data === "object" && !Array.isArray(data)) {
-      return data as Record<string, unknown>;
-    }
-  } catch {
-    // File doesn't exist or is invalid
-  }
-  return null;
-}
-
-/**
  * Extract a ClaudeConfig from a raw config object's "claude" section.
  */
 function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null {
@@ -905,6 +887,25 @@ export function clampTrackedLocalConfig(dir: string, data: Record<string, unknow
 }
 
 /**
+ * The project config and its machine-local overlay as the loaders read them:
+ * each gated and clamped for trust, then deep-merged (local wins). Null when
+ * neither file holds a JSON object. Shared by {@link loadClaudeConfig} and
+ * `loadLLMConfig` (`llm-config.ts`).
+ */
+export async function loadMergedProjectConfig(
+  dir: string,
+  options: LoadProjectConfigOptions = {},
+): Promise<Record<string, unknown> | null> {
+  const { root, configFile, localConfigFile } = resolveLayout(dir);
+  const projectData = clampTrackedProjectConfig(root, trustedProjectConfig(root, await loadJSONFile(configFile), options.trust), options);
+  const localData = clampTrackedLocalConfig(root, await loadJSONFile(localConfigFile), options);
+
+  // Merge project and local configs (local wins)
+  if (projectData && localData) return deepMerge(projectData, localData);
+  return localData ?? projectData;
+}
+
+/**
  * The base URL a vendor's API provider sends requests to: the configured
  * `api_endpoint`, else the vendor's default. One helper for every provider,
  * so the rule about *which* configured endpoint counts lives in one place:
@@ -930,18 +931,7 @@ export function resolveApiEndpoint<D extends string | undefined>(
  * @param dir  The directory containing .n-dx.json (project root)
  */
 export async function loadClaudeConfig(dir: string, options: LoadProjectConfigOptions = {}): Promise<ClaudeConfig> {
-  const { root, configFile, localConfigFile } = resolveLayout(dir);
-  const projectData = clampTrackedProjectConfig(root, trustedProjectConfig(root, await loadJSONFile(configFile), options.trust), options);
-  const localData = clampTrackedLocalConfig(root, await loadJSONFile(localConfigFile), options);
-
-  // Merge project and local configs (local wins)
-  let merged: Record<string, unknown> | null = projectData;
-  if (projectData && localData) {
-    merged = deepMerge(projectData, localData);
-  } else if (localData) {
-    merged = localData;
-  }
-
+  const merged = await loadMergedProjectConfig(dir, options);
   if (merged) {
     // llm.claude.<field> over legacy claude.<field>, per field — the rule
     // resolveClaudeConfig (llm-config.ts) defines. The spread is that rule

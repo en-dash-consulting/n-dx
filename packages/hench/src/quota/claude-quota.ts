@@ -30,7 +30,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { LLM_VENDOR, resolveLayout } from "../prd/llm-gateway.js";
-import { resolveHenchPaths } from "../store/paths.js";
+import { RUNS_DIRNAME, resolveHenchPaths } from "../store/paths.js";
 import type { QuotaRemaining } from "./types.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ function isoWeekKey(date: Date): string {
  */
 function computeWeeklySpend(henchDir: string, now: Date): number {
   const currentWeek = isoWeekKey(now);
-  const runsDir = join(henchDir, "runs");
+  const runsDir = join(henchDir, RUNS_DIRNAME);
 
   let files: string[];
   try {

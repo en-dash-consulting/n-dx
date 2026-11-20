@@ -64,7 +64,8 @@
  *   findActionableWork, resolveWorkById — what `get_next_task` runs on a v2
  *   tree, so `ndx work` picks the same unit)
  * - v2 agent brief (buildChangeBrief — the selected unit's brief, built from
- *   its change and the product nodes it touches or amends)
+ *   its change and the product nodes it touches or amends; listAttachments —
+ *   the images attached to that change, which the brief names)
  * - v2 completion (completeV2Work — what `update_task_status` runs on a v2
  *   tree: completes the change with its last task and applies it)
  * - Cross-worktree task claims (openClaimsStore, resolveClaimHolder — the
@@ -168,6 +169,10 @@ export {
 // projection. What that brief holds, and what its budget drops first, is rex's
 // to decide; a hench-side assembly would be a second definition of it.
 export { buildChangeBrief } from "@n-dx/rex";
+// Images attached to the unit's change (or task) sit in its folder; the brief
+// names them so the agent opens them. Where a node's folder is, and which files
+// in it are attachments, is rex's storage rule.
+export { listAttachments } from "@n-dx/rex";
 
 // ---- v2 completion --------------------------------------------------------------
 // On a v2 tree completing a task can complete its change, and a completed

@@ -12,11 +12,13 @@
  * @module viewer/components/search-overlay
  */
 
-import {h} from "preact";import type { ComponentChild } from "preact";
+import { h } from "preact";
+import type { ComponentChild } from "preact";
 import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import type { NavigateTo } from "../api.js";
 import { itemTypeEmoji, itemTypeLabel } from "../external.js";
 import { usePrdLayout } from "../hooks/index.js";
+import { PRIORITY_OPTIONS, statusOptions } from "./prd-tree/status-display.js";
 
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -61,19 +63,7 @@ function levelOptions(layout: "v1" | "v2"): Array<{ value: string; label: string
   return (layout === "v2" ? V2_LEVELS : V1_LEVELS).map((value) => ({ value, label: itemTypeLabel(value) }));
 }
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed", label: "Completed" },
-  { value: "blocked", label: "Blocked" },
-] as const;
-
-const PRIORITY_OPTIONS = [
-  { value: "critical", label: "Critical" },
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-] as const;
+const STATUS_OPTIONS = statusOptions(["pending", "in_progress", "completed", "blocked"]);
 
 const CONTEXT_CHARS = 50;
 const DEBOUNCE_MS = 200;
@@ -559,10 +549,6 @@ function renderResult(
     "data-result-index": index,
     tabIndex: -1,
     onClick: () => onSelect(result),
-    onMouseEnter: () => {
-      // Allow mouse to update active index for visual feedback
-      // (handled via CSS :hover, but aria-selected needs state)
-    },
   },
     // Top row: level icon + highlighted title + status badge
     h("div", { class: "search-result-header" },

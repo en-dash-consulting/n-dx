@@ -19,7 +19,9 @@ import { loadConfig, saveConfig } from "../../store/config.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { validateConfig, formatValidationErrors } from "../../schema/index.js";
 import { DEFAULT_HENCH_CONFIG } from "../../schema/v1.js";
-import type {HenchConfig, Provider} from "../../schema/v1.js";import { CLIError } from "../errors.js";import { info, result } from "../output.js";
+import type { HenchConfig } from "../../schema/v1.js";
+import { CLIError } from "../errors.js";
+import { info, result } from "../output.js";
 
 // ── Config field metadata ─────────────────────────────────────────────
 

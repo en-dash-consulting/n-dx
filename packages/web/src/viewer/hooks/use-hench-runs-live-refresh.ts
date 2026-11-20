@@ -29,7 +29,7 @@
 import { getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef } from "preact/hooks";
 import { createWSPipeline } from "./use-gateway.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 /** Mirrors the server's TaskExecutionStatus (routes-hench.ts). */
 export interface HenchExecutionProgress {
@@ -62,7 +62,6 @@ export function useHenchRunsLiveRefresh(
 
   useEffect(() => {
     mountedRef.current = true;
-    let ws: WebSocket | null = null;
 
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
@@ -79,35 +78,21 @@ export function useHenchRunsLiveRefresh(
           batch.types.has("hench:task-execution-progress");
         if (needsRefresh) refresh();
       },
-      defaultDelayMs: 250,
       delays: {
         "hench:task-execution-progress": 200,
       },
       throttledTypes: ["hench:task-execution-progress"],
-      maxPendingPerType: 20,
     });
 
-    try {
-      ws = openWebSocket();
-      ws.onmessage = (event) => {
-        if (!mountedRef.current) return;
-        try {
-          const msg = JSON.parse(event.data);
-          pipeline.push(msg);
-        } catch {
-          // ignore malformed messages
-        }
-      };
-    } catch {
-      // WebSocket not available — polling still works as fallback
-    }
+    // WebSocket not available — polling still works as fallback
+    const closeSocket = openFrameSocket((frame) => {
+      if (mountedRef.current) pipeline.push(frame);
+    });
 
     return () => {
       mountedRef.current = false;
       pipeline.dispose();
-      if (ws) {
-        try { ws.close(); } catch { /* ignore */ }
-      }
+      closeSocket();
     };
   }, [refresh, onExecutionProgress]);
 }

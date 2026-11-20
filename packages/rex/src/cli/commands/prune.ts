@@ -6,7 +6,9 @@ import { findPrunableItems, findKeptItems, pruneItems, countSubtree } from "../.
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
-import {ARCHIVE_FILE, loadArchive} from "../../core/archive.js";import {  hashPRD,
+import { ARCHIVE_FILE, loadArchive } from "../../core/archive.js";
+import {
+  hashPRD,
   savePendingSmartPrune,
   loadPendingSmartPrune,
   clearPendingSmartPrune,
@@ -15,59 +17,52 @@ import {ARCHIVE_FILE, loadArchive} from "../../core/archive.js";import {  hashPR
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
-import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
+import { enforceBudgetPreflight } from "./budget-preflight.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
+import { headerModelSource } from "../model-resolution.js";
 import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
+import type { LLMVendor } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
+import { confirmPrompt, reviewEach } from "../prompt.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 
-// ── Parsed flag helpers ──────────────────────────────────────────────
+// ── LLM setup ────────────────────────────────────────────────────────
 
-interface PruneFlags {
-  dryRun: boolean;
-  skipConsolidate: boolean;
-  accept: boolean;
-  autoConfirm: boolean;
-  isJson: boolean;
-  model?: string;
-  format?: string;
-  raw: Record<string, string>;
-}
+/**
+ * Configure the LLM client from the project's config, print the vendor and
+ * model header, and run the budget gate — everything a prune pass does
+ * before its first LLM call. `tier` "light" runs the pass on the light tier.
+ */
+async function prepareLlmPass(
+  rexDir: string,
+  dir: string,
+  flags: Record<string, string>,
+  tier?: "light",
+): Promise<{ resolvedModel: string; vendor: LLMVendor }> {
+  const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
+  const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
+  const llmConfig = await loadLLMConfig(rexDir);
+  setLLMConfig(llmConfig);
+  const claudeConfig = await loadClaudeConfig(rexDir);
+  setClaudeConfig(claudeConfig);
+  setProjectDir(dir);
 
-function parseFlags(flags: Record<string, string>): PruneFlags {
-  return {
-    dryRun: flags["dry-run"] === "true",
-    skipConsolidate: flags["no-consolidate"] === "true",
-    accept: flags.accept === "true",
-    autoConfirm: flags.yes === "true" || flags.y === "true",
-    isJson: flags.format === "json",
-    model: flags.model,
+  const resolvedModel = resolveConfiguredModel(flags.model, tier);
+  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
+  printVendorModelHeader(vendor, llmConfig, {
     format: flags.format,
-    raw: flags,
-  };
+    resolvedModel,
+    modelSource: headerModelSource(flags.model, llmConfig, tier),
+    ...(tier ? { tier } : {}),
+  });
+
+  await enforceBudgetPreflight(rexDir, dir);
+  return { resolvedModel, vendor };
 }
 
 // ── TTY interaction ──────────────────────────────────────────────────
-
-/**
- * Ask a single yes/no question in a TTY. Returns true for "y"/"yes".
- */
-async function confirmPrompt(question: string): Promise<boolean> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const answer = await new Promise<string>((resolve) =>
-    rl.question(question, resolve),
-  );
-  rl.close();
-
-  return answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes";
-}
 
 /**
  * Format a pruning impact summary for interactive preview.
@@ -182,47 +177,10 @@ export async function cmdPrune(
     let consolidateSpinner: ReturnType<typeof startSpinner> | null = null;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
-        const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
-        const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-        const llmConfig = await loadLLMConfig(rexDir);
-        setLLMConfig(llmConfig);
-        const claudeConfig = await loadClaudeConfig(rexDir);
-        setClaudeConfig(claudeConfig);
-        setProjectDir(dir);
-
         // Resolve model: explicit flag > light-tier resolution (consolidation
         // is a mechanical single-shot pass, so it runs on the light tier;
         // only lightModel config or --model overrides it).
-        const resolvedModel = resolveConfiguredModel(flags.model, "light");
-        const dryRunVendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-        const dryRunModelSource = flags.model
-          ? "cli-override" as const
-          : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
-            ? "configured" as const
-            : "default" as const;
-        printVendorModelHeader(dryRunVendor, llmConfig, {
-          format: flags.format,
-          resolvedModel,
-          modelSource: dryRunModelSource,
-          tier: "light",
-        });
-
-        // Pre-flight budget check
-        const budgetResult = await preflightBudgetCheck(rexDir, dir);
-        if (budgetResult) {
-          const budgetLines = formatBudgetWarnings(budgetResult);
-          if (budgetLines.length > 0) {
-            for (const line of budgetLines) warn(line);
-            warn("");
-          }
-          if (budgetResult.severity === "exceeded") {
-            const store2 = await resolveStore(rexDir);
-            const config = await store2.loadConfig();
-            if (config.budget?.abort) {
-              throw new BudgetExceededError(budgetResult.warnings);
-            }
-          }
-        }
+        const { resolvedModel } = await prepareLlmPass(rexDir, dir, flags, "light");
 
         const { reasonForReshape, formatReshapeProposal: fmtProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -417,48 +375,10 @@ async function consolidateAfterPrune(
   const accept = flags.accept === "true";
 
   try {
-    // Load Claude config
-    const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
-    const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-    const llmConfig = await loadLLMConfig(rexDir);
-    setLLMConfig(llmConfig);
-    const claudeConfig = await loadClaudeConfig(rexDir);
-    setClaudeConfig(claudeConfig);
-    setProjectDir(dir);
-
     // Resolve model: explicit flag > light-tier resolution (post-prune
     // consolidation is a mechanical single-shot pass, so it runs on the
     // light tier; only lightModel config or --model overrides it).
-    const resolvedModel = resolveConfiguredModel(flags.model, "light");
-    const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-    const modelSource = flags.model
-      ? "cli-override" as const
-      : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
-        ? "configured" as const
-        : "default" as const;
-    printVendorModelHeader(vendor, llmConfig, {
-      format: flags.format,
-      resolvedModel,
-      modelSource,
-      tier: "light",
-    });
-
-    // Pre-flight budget check
-    const budgetResult = await preflightBudgetCheck(rexDir, dir);
-    if (budgetResult) {
-      const budgetLines = formatBudgetWarnings(budgetResult);
-      if (budgetLines.length > 0) {
-        for (const line of budgetLines) warn(line);
-        warn("");
-      }
-      if (budgetResult.severity === "exceeded") {
-        const store2 = await resolveStore(rexDir);
-        const config = await store2.loadConfig();
-        if (config.budget?.abort) {
-          throw new BudgetExceededError(budgetResult.warnings);
-        }
-      }
-    }
+    const { resolvedModel } = await prepareLlmPass(rexDir, dir, flags, "light");
 
     const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -488,7 +408,7 @@ async function consolidateAfterPrune(
     if (accept) {
       accepted = proposals;
     } else if (process.stdin.isTTY) {
-      accepted = await interactiveAcceptProposals(proposals, doc.items, "Consolidate");
+      accepted = await reviewEach(proposals, (p) => formatReshapeProposal(p, doc.items), "Consolidate");
     } else {
       info("Run with --accept to apply consolidation, or use interactively in a TTY.");
       return undefined;
@@ -586,44 +506,8 @@ async function smartPrune(
     );
   }
 
-  // Load Claude config
-  const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
-  const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-  const llmConfig = await loadLLMConfig(rexDir);
-  setLLMConfig(llmConfig);
-  const claudeConfig = await loadClaudeConfig(rexDir);
-  setClaudeConfig(claudeConfig);
-  setProjectDir(dir);
-
   // Resolve model: explicit flag > vendor config > default
-  const resolvedModel = resolveConfiguredModel(flags.model);
-  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
-  const modelSource = flags.model
-    ? "cli-override" as const
-    : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
-      ? "configured" as const
-      : "default" as const;
-  printVendorModelHeader(vendor, llmConfig, {
-    format: flags.format,
-    resolvedModel,
-    modelSource,
-  });
-
-  // Pre-flight budget check
-  const budgetResult = await preflightBudgetCheck(rexDir, dir);
-  if (budgetResult) {
-    const budgetLines = formatBudgetWarnings(budgetResult);
-    if (budgetLines.length > 0) {
-      for (const line of budgetLines) warn(line);
-      warn("");
-    }
-    if (budgetResult.severity === "exceeded") {
-      const config = await store.loadConfig();
-      if (config.budget?.abort) {
-        throw new BudgetExceededError(budgetResult.warnings);
-      }
-    }
-  }
+  const { resolvedModel, vendor } = await prepareLlmPass(rexDir, dir, flags);
 
   const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -699,7 +583,7 @@ async function smartPrune(
   if (accept) {
     accepted = proposals;
   } else if (process.stdin.isTTY) {
-    accepted = await interactiveAcceptProposals(proposals, doc.items, "Prune");
+    accepted = await reviewEach(proposals, (p) => formatReshapeProposal(p, doc.items), "Prune");
   } else {
     info("Run with --accept to apply, or use interactively in a TTY.");
     return;
@@ -768,44 +652,4 @@ async function smartPrune(
 
 function summarize(item: PRDItem): { id: string; title: string; level: string } {
   return { id: item.id, title: item.title, level: item.level };
-}
-
-async function interactiveAcceptProposals(
-  proposals: ReshapeProposal[],
-  items: PRDItem[],
-  promptLabel = "Accept",
-): Promise<ReshapeProposal[]> {
-  const { formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const ask = (q: string): Promise<string> =>
-    new Promise((resolve) => rl.question(q, resolve));
-
-  const accepted: ReshapeProposal[] = [];
-
-  try {
-    for (let i = 0; i < proposals.length; i++) {
-      const p = proposals[i];
-      info(`\n[${i + 1}/${proposals.length}] ${formatReshapeProposal(p, items)}`);
-      const answer = await ask(`  ${promptLabel}? (y/n/a=all/q=quit) `);
-      const choice = answer.trim().toLowerCase();
-
-      if (choice === "q") break;
-      if (choice === "a") {
-        accepted.push(...proposals.slice(i));
-        break;
-      }
-      if (choice === "y" || choice === "yes") {
-        accepted.push(p);
-      }
-    }
-  } finally {
-    rl.close();
-  }
-
-  return accepted;
 }

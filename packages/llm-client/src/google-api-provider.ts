@@ -39,8 +39,8 @@ import { requireVendorApiKey, resolveVendorKey } from "./vendor-auth.js";
 import { resolveApiEndpoint } from "./config.js";
 import type { GeminiFunctionDeclaration } from "./tool-schema.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
+import { postJsonWithRetries, throwHttpStatusError } from "./http-retry.js";
 
-const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
@@ -207,22 +207,20 @@ export function isGoogleAuthFailure(status: number, body: string): boolean {
   return status === 400 && body.includes(GOOGLE_API_KEY_INVALID_REASON);
 }
 
-/** Classify an HTTP status code (and the body it came with) into an ErrorReason and throw. */
+/**
+ * Classify an HTTP status code (and the body it came with) into an
+ * ErrorReason and throw: Google's auth failures and 404 here, every other
+ * status as {@link throwHttpStatusError} classifies it.
+ */
 function classifyAndThrow(status: number, body: string, message: string): never {
   if (isGoogleAuthFailure(status, body)) {
     throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
       new ClaudeClientError(message, "auth", false);
   }
-  if (status === 408) {
-    throw new ClaudeClientError(message, "timeout", true);
-  }
-  if (RETRY_STATUS_CODES.has(status)) {
-    throw new ClaudeClientError(message, "rate-limit", true);
-  }
   if (status === 404) {
     throw new ClaudeClientError(message, "not-found", false);
   }
-  throw new ClaudeClientError(message, "unknown", false);
+  throwHttpStatusError(status, message);
 }
 
 /** Build the base URL for Gemini API requests. */
@@ -365,6 +363,28 @@ export function createGoogleApiProvider(
     return JSON.stringify(body);
   }
 
+  /**
+   * POST a `generateContent` request, retrying transient failures, and read
+   * the response with `read`. Shared by `complete()` and
+   * `generateContentWithTools()`; `stream()` is not retried.
+   */
+  function generateContent<T>(
+    model: string,
+    body: () => string,
+    read: (data: Record<string, unknown>) => T,
+  ): Promise<T> {
+    return postJsonWithRetries({
+      url: () => buildUrl(model, "generateContent"),
+      body,
+      headers: authHeaders(),
+      maxRetries,
+      baseDelayMs,
+      throwForStatus: (status, responseBody) =>
+        classifyAndThrow(status, responseBody, `Gemini API error ${status}: ${responseBody}`),
+      read,
+    });
+  }
+
   return {
     info,
 
@@ -374,94 +394,39 @@ export function createGoogleApiProvider(
       const model = args.model || defaultModel;
       validateGeminiModelId(model);
 
-      let lastError: Error | undefined;
+      return generateContent(model, () => buildToolBody(args), (data) => {
+        const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
+        const firstCandidate = candidates?.[0];
+        const content = firstCandidate?.content as Record<string, unknown> | undefined;
+        const rawParts = (content?.parts as Array<Record<string, unknown>> | undefined) ?? [];
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          const response = await fetch(buildUrl(model, "generateContent"), {
-            method: "POST",
-            headers: authHeaders(),
-            body: buildToolBody(args),
-          });
+        const parts: GeminiPart[] = [];
+        const functionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+        let text = "";
 
-          if (!response.ok) {
-            const body = await response.text();
-            const message = `Gemini API error ${response.status}: ${body}`;
-
-            if (isGoogleAuthFailure(response.status, body)) {
-              throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
-                new ClaudeClientError(message, "auth", false);
-            }
-            if (response.status === 404) {
-              throw new ClaudeClientError(message, "not-found", false);
-            }
-            if (response.status === 408) {
-              throw new ClaudeClientError(message, "timeout", true);
-            }
-            if (RETRY_STATUS_CODES.has(response.status) && attempt < maxRetries) {
-              const delay = baseDelayMs * 2 ** attempt;
-              await new Promise((r) => setTimeout(r, delay));
-              continue;
-            }
-            if (RETRY_STATUS_CODES.has(response.status)) {
-              throw new ClaudeClientError(message, "rate-limit", true);
-            }
-            throw new ClaudeClientError(message, "unknown", false);
+        for (const part of rawParts) {
+          if (typeof part.text === "string") {
+            text += part.text;
+            parts.push({ text: part.text });
+          } else if (part.functionCall && typeof part.functionCall === "object") {
+            const fc = part.functionCall as Record<string, unknown>;
+            const name = typeof fc.name === "string" ? fc.name : "";
+            const fcArgs = (fc.args as Record<string, unknown> | undefined) ?? {};
+            functionCalls.push({ name, args: fcArgs });
+            parts.push({ functionCall: { name, args: fcArgs } });
           }
-
-          const data = await response.json() as Record<string, unknown>;
-          const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
-          const firstCandidate = candidates?.[0];
-          const content = firstCandidate?.content as Record<string, unknown> | undefined;
-          const rawParts = (content?.parts as Array<Record<string, unknown>> | undefined) ?? [];
-
-          const parts: GeminiPart[] = [];
-          const functionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
-          let text = "";
-
-          for (const part of rawParts) {
-            if (typeof part.text === "string") {
-              text += part.text;
-              parts.push({ text: part.text });
-            } else if (part.functionCall && typeof part.functionCall === "object") {
-              const fc = part.functionCall as Record<string, unknown>;
-              const name = typeof fc.name === "string" ? fc.name : "";
-              const fcArgs = (fc.args as Record<string, unknown> | undefined) ?? {};
-              functionCalls.push({ name, args: fcArgs });
-              parts.push({ functionCall: { name, args: fcArgs } });
-            }
-          }
-
-          const finishReason = typeof firstCandidate?.finishReason === "string"
-            ? firstCandidate.finishReason as string
-            : undefined;
-
-          const usage = data.usageMetadata
-            ? parseGeminiTokenUsage(data.usageMetadata as Record<string, unknown>)
-            : undefined;
-
-          return { parts, functionCalls, text, finishReason, usage };
-        } catch (err) {
-          if (err instanceof ClaudeClientError) {
-            throw err;
-          }
-          lastError = err as Error;
-
-          if (attempt < maxRetries) {
-            const delay = baseDelayMs * 2 ** attempt;
-            await new Promise((r) => setTimeout(r, delay));
-            continue;
-          }
-
-          throw new ClaudeClientError(
-            (err as Error).message ?? "Unknown error",
-            "unknown",
-            false,
-          );
         }
-      }
 
-      throw lastError ?? new ClaudeClientError("Exhausted retries", "unknown", false);
+        const finishReason = typeof firstCandidate?.finishReason === "string"
+          ? firstCandidate.finishReason as string
+          : undefined;
+
+        const usage = data.usageMetadata
+          ? parseGeminiTokenUsage(data.usageMetadata as Record<string, unknown>)
+          : undefined;
+
+        return { parts, functionCalls, text, finishReason, usage };
+      });
     },
 
     async validateAuth(): Promise<boolean> {
@@ -499,71 +464,16 @@ export function createGoogleApiProvider(
       // Validate at call time as well — callers can pass any model string.
       validateGeminiModelId(model);
 
-      let lastError: Error | undefined;
+      return generateContent(model, () => buildBody(request.prompt), (data) => {
+        const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
+        const text = extractTextFromCandidates(candidates);
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          const response = await fetch(buildUrl(model, "generateContent"), {
-            method: "POST",
-            headers: authHeaders(),
-            body: buildBody(request.prompt),
-          });
+        const tokenUsage = data.usageMetadata
+          ? parseGeminiTokenUsage(data.usageMetadata as Record<string, unknown>)
+          : undefined;
 
-          if (!response.ok) {
-            const body = await response.text();
-            const message = `Gemini API error ${response.status}: ${body}`;
-
-            if (isGoogleAuthFailure(response.status, body)) {
-              throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
-                new ClaudeClientError(message, "auth", false);
-            }
-            if (response.status === 404) {
-              throw new ClaudeClientError(message, "not-found", false);
-            }
-            if (response.status === 408) {
-              throw new ClaudeClientError(message, "timeout", true);
-            }
-            if (RETRY_STATUS_CODES.has(response.status) && attempt < maxRetries) {
-              const delay = baseDelayMs * 2 ** attempt;
-              await new Promise((r) => setTimeout(r, delay));
-              continue;
-            }
-            if (RETRY_STATUS_CODES.has(response.status)) {
-              throw new ClaudeClientError(message, "rate-limit", true);
-            }
-            throw new ClaudeClientError(message, "unknown", false);
-          }
-
-          const data = await response.json() as Record<string, unknown>;
-          const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
-          const text = extractTextFromCandidates(candidates);
-
-          const tokenUsage = data.usageMetadata
-            ? parseGeminiTokenUsage(data.usageMetadata as Record<string, unknown>)
-            : undefined;
-
-          return { text, tokenUsage };
-        } catch (err) {
-          if (err instanceof ClaudeClientError) {
-            throw err;
-          }
-          lastError = err as Error;
-
-          if (attempt < maxRetries) {
-            const delay = baseDelayMs * 2 ** attempt;
-            await new Promise((r) => setTimeout(r, delay));
-            continue;
-          }
-
-          throw new ClaudeClientError(
-            (err as Error).message ?? "Unknown error",
-            "unknown",
-            false,
-          );
-        }
-      }
-
-      throw lastError ?? new ClaudeClientError("Exhausted retries", "unknown", false);
+        return { text, tokenUsage };
+      });
     },
 
     async *stream(request: CompletionRequest): AsyncIterable<StreamChunk> {
@@ -600,6 +510,26 @@ export function createGoogleApiProvider(
       let buffer = "";
       let totalUsage: TokenUsage | undefined;
 
+      // One `data:` payload: its text becomes a chunk, its usage is kept for
+      // the final chunk. A payload that is not JSON is skipped.
+      function* readData(raw: string): Generator<StreamChunk> {
+        try {
+          const data = JSON.parse(raw) as Record<string, unknown>;
+          const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
+          const chunkText = extractTextFromCandidates(candidates);
+          if (chunkText) {
+            yield { text: chunkText };
+          }
+          if (data.usageMetadata) {
+            totalUsage = parseGeminiTokenUsage(
+              data.usageMetadata as Record<string, unknown>,
+            );
+          }
+        } catch {
+          // Skip malformed JSON lines
+        }
+      }
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -620,21 +550,7 @@ export function createGoogleApiProvider(
                 yield { done: true, usage: totalUsage };
                 return;
               }
-              try {
-                const data = JSON.parse(raw) as Record<string, unknown>;
-                const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
-                const chunkText = extractTextFromCandidates(candidates);
-                if (chunkText) {
-                  yield { text: chunkText };
-                }
-                if (data.usageMetadata) {
-                  totalUsage = parseGeminiTokenUsage(
-                    data.usageMetadata as Record<string, unknown>,
-                  );
-                }
-              } catch {
-                // Skip malformed JSON lines
-              }
+              yield* readData(raw);
             }
           }
         }
@@ -645,21 +561,7 @@ export function createGoogleApiProvider(
           if (trimmed.startsWith("data: ")) {
             const raw = trimmed.slice(6).trim();
             if (raw && raw !== "[DONE]") {
-              try {
-                const data = JSON.parse(raw) as Record<string, unknown>;
-                const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
-                const chunkText = extractTextFromCandidates(candidates);
-                if (chunkText) {
-                  yield { text: chunkText };
-                }
-                if (data.usageMetadata) {
-                  totalUsage = parseGeminiTokenUsage(
-                    data.usageMetadata as Record<string, unknown>,
-                  );
-                }
-              } catch {
-                // Skip malformed JSON
-              }
+              yield* readData(raw);
             }
           }
         }
