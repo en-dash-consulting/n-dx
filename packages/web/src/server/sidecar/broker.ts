@@ -30,7 +30,7 @@ import {
   type BrokerCardTool,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarChoice, SidecarExternalCall, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
+import type { QueuePlan, SidecarCallProblem, SidecarChangeSet, SidecarChoice, SidecarExternalCall, SidecarHeldBy, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
 import { applyItemEditEdits } from "./item-edit-card.js";
 import { readChoiceAnswer } from "./choice-card.js";
@@ -74,6 +74,14 @@ export interface SidecarCard {
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator chose to start on a run-plan card. */
   lane?: number;
+  /**
+   * Active work (a run or a claim in some worktree) holds an item the card
+   * writes to: read when the card was raised, or when an approval found it
+   * held since. Approval still writes, but only one that acknowledges it.
+   */
+  heldBy?: SidecarHeldBy;
+  /** Approved while held: the operator confirmed writing under the active work. */
+  heldAcknowledged?: true;
   status: SidecarCardStatus;
   raisedAt: string;
   decidedAt?: string;
@@ -104,6 +112,7 @@ export interface CardAnnex {
   statusChange?: SidecarStatusChange;
   choice?: SidecarChoice;
   externalCall?: SidecarExternalCall;
+  heldBy?: SidecarHeldBy;
 }
 
 /** How a broker call was settled. */
@@ -140,6 +149,8 @@ export interface CardDecision {
   arguments?: unknown;
   /** A choice card's answer: the labels picked and any Other text. Required on a choice approval, refused elsewhere. */
   answer?: unknown;
+  /** The operator confirmed approving a card whose item active work holds (`heldBy`). */
+  acknowledgeHeld?: boolean;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
@@ -247,6 +258,7 @@ export class SidecarBroker {
       ...(annex.statusChange !== undefined && { statusChange: annex.statusChange }),
       ...(annex.choice !== undefined && { choice: annex.choice }),
       ...(annex.externalCall !== undefined && { externalCall: annex.externalCall }),
+      ...(annex.heldBy !== undefined && { heldBy: annex.heldBy }),
       status: "pending",
       raisedAt: this.iso(),
     };
@@ -327,6 +339,18 @@ export class SidecarBroker {
     ensureSidecarDir(this.dir);
     appendFileSync(join(this.dir, `${card.sessionId}.cards.jsonl`), JSON.stringify(card) + "\n", "utf-8");
     this.onCard?.({ ...card });
+  }
+
+  /**
+   * Mark a waiting card as touching an item active work holds now, and
+   * announce it, so the drawer shows the warning an approval must acknowledge.
+   * A settled or unknown card is left alone.
+   */
+  markHeld(sessionId: string, cardId: string, heldBy: SidecarHeldBy): void {
+    const entry = this.pending.get(cardId);
+    if (!entry || entry.card.sessionId !== sessionId || isDeepStrictEqual(entry.card.heldBy, heldBy)) return;
+    entry.card.heldBy = heldBy;
+    this.onCard?.({ ...entry.card });
   }
 
   /** Decide the session's first undecided card. */
@@ -434,6 +458,7 @@ export class SidecarBroker {
     }
     if (answered) card.choice = answered;
     if (decision.lane !== undefined) card.lane = decision.lane;
+    if (decision.approve && decision.acknowledgeHeld && card.heldBy) card.heldAcknowledged = true;
     this.settle(cardId, decision.approve ? "approved" : "denied", decision.reason);
     return { ...card };
   }

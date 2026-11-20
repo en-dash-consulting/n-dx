@@ -50,6 +50,7 @@ import {
 } from "./carry-out.js";
 import { readChoiceCall } from "./choice-card.js";
 import { PROPOSABLE_STATUSES } from "./status-card.js";
+import { cardItemIds } from "./active-work.js";
 import { buildExternalCall, callProblems } from "./external-call.js";
 import { BRANCH_HEALTH_OFF_READ, CLASS_FAILING_ON_MAIN, classFailingOnBase } from "./github.js";
 import { LEDGER_ENTRY_MAX_CHARS, type LedgerEntryType } from "./ledger.js";
@@ -466,6 +467,12 @@ export function createBrokerMcpServer(
           const result = await carryOutDecision(name, input, allowed, actions, extra.signal);
           return text(result.text, !result.ok);
         }
+      }
+      // A PRD card whose item a run or claim holds says so, and its approval must acknowledge it.
+      const itemIds = cardItemIds(annex);
+      if (itemIds.length > 0 && actions?.heldItem) {
+        const heldBy = await actions.heldItem(itemIds).catch(() => null);
+        if (heldBy) annex.heldBy = heldBy;
       }
       const outcome = await broker.request(sessionId, name, input, extra.signal, annex);
       // A stopped turn ends the wait on an effect (a command), never the effect itself.

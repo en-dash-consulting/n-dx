@@ -643,6 +643,7 @@ export function useSidecar(
         ...(decision.approve && decision.path !== undefined && { path: decision.path }),
         ...(decision.approve && decision.arguments !== undefined && { arguments: decision.arguments }),
         ...(decision.approve && decision.answer !== undefined && { answer: decision.answer }),
+        ...(decision.approve && decision.acknowledgeHeld && { acknowledgeHeld: true }),
       },
     );
     if (!mountedRef.current) return res.ok;
