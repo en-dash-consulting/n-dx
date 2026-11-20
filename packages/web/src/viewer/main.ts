@@ -142,7 +142,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // One tracker for every async job. Passed down to the views that start
   // jobs (Commands, Overview, Suggestions) rather than each calling the hook
   // again — a second caller would mean a second poller and a second socket.
-  const jobs = useActiveOperations();
+  // The Sidecar command's status route answers 403 while web.sidecar is off.
+  const jobs = useActiveOperations({ "web.sidecar": useFeatureToggle("web.sidecar", false) });
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
   const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();

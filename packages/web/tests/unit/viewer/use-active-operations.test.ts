@@ -36,6 +36,7 @@ import {
   type JobTray,
 } from "../../../src/viewer/hooks/use-active-operations.js";
 import { usePolling } from "../../../src/viewer/hooks/use-polling.js";
+import { useFeatureToggle } from "../../../src/viewer/hooks/use-feature-toggle.js";
 
 // ─── Harness ─────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ let hookResult: ActiveOperation[] = [];
 let tray: JobTray | null = null;
 
 function TestHarness() {
-  tray = useActiveOperations();
+  tray = useActiveOperations({ "web.sidecar": useFeatureToggle("web.sidecar", false) });
   hookResult = tray.operations;
   return h("div", null, JSON.stringify(hookResult));
 }

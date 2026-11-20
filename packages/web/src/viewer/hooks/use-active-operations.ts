@@ -34,7 +34,6 @@
 import { getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef, useState, useCallback, useMemo } from "preact/hooks";
 import { usePolling } from "./use-polling.js";
-import { useFeatureToggle } from "./use-feature-toggle.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useCliName, resolveCliLabel } from "./use-project-metadata.js";
 import type { ViewId } from "../types.js";
@@ -278,7 +277,13 @@ function parseHenchExecution(wire: HenchExecutionWire): ActiveOperation {
 
 // ── Hook ────────────────────────────────────────────────────────────────
 
-export function useActiveOperations(): JobTray {
+/**
+ * `enabled` names the feature toggles that gate a source (`web.sidecar` gates
+ * the Sidecar command's status). The caller reads them — main.ts, through
+ * `useFeatureToggle` — because that hook stays contained to its zone
+ * (boundary-check.test.ts). A toggle not named is off.
+ */
+export function useActiveOperations(enabled: Readonly<Record<string, boolean>> = {}): JobTray {
   const [bySingleton, setBySingleton] = useState<Map<string, ActiveOperation>>(new Map());
   const [byHench, setByHench] = useState<Map<string, ActiveOperation>>(new Map());
   // Remembers (kind → startedAt) pairs already shown to completion, so a
@@ -293,9 +298,9 @@ export function useActiveOperations(): JobTray {
   const cliName = useCliName();
   const cliNameRef = useRef(cliName);
   cliNameRef.current = cliName;
-  // Toggles that gate a source, read the same way (off until /api/features says otherwise).
-  const enabledRef = useRef<Record<string, boolean>>({});
-  enabledRef.current = { "web.sidecar": useFeatureToggle("web.sidecar", false) };
+  // Toggles that gate a source, read the same way (off until the caller says otherwise).
+  const enabledRef = useRef<Readonly<Record<string, boolean>>>(enabled);
+  enabledRef.current = enabled;
 
   const pollSingletons = useCallback(async () => {
     const results = await Promise.all(
