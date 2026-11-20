@@ -116,15 +116,6 @@ const VIEW_ALIASES: Readonly<Record<string, ViewId>> = {
   "pr-markdown": "analyze",
 };
 
-/**
- * Resolve an old view path segment to the stage it now redirects to, or
- * `null` when no alias applies.
- *
- * The alias only fires when its target is itself a valid view for this
- * viewer — the one exception this covers today is a rex-scoped viewer,
- * which has no `work` stage, so `rex-dashboard` keeps being its own page
- * there rather than redirecting nowhere.
- */
 /** Aliases that land on a tab of their target rather than on its first one. */
 const VIEW_ALIAS_SUBPATH: Readonly<Record<string, string>> = {
   "command-reference": "reference",
@@ -142,6 +133,15 @@ export function resolveViewAliasRoute(
   return view ? { view, sub: VIEW_ALIAS_SUBPATH[segment] ?? null } : null;
 }
 
+/**
+ * Resolve an old view path segment to the stage it now redirects to, or
+ * `null` when no alias applies.
+ *
+ * The alias only fires when its target is itself a valid view for this
+ * viewer — the one exception this covers today is a rex-scoped viewer,
+ * which has no `work` stage, so `rex-dashboard` keeps being its own page
+ * there rather than redirecting nowhere.
+ */
 export function resolveViewAlias(segment: string, validViews: ReadonlySet<ViewId>): ViewId | null {
   const target = VIEW_ALIASES[segment];
   return target && validViews.has(target) ? target : null;

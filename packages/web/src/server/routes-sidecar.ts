@@ -766,16 +766,16 @@ export function hubSidecarBrokerEndpoint(ctx: ServerContext, sessionId: string):
   };
 }
 
-/**
- * The hub session's ledger: `<ndx home>/hub/ledger.jsonl`, the machine's
- * rather than one session's, written only by the agent's `ledger_append`,
- * which may also record a `decision-needed`.
- */
 /** `<ndx home>/hub/drafts/`: where a relative `save_draft` path lands. */
 export function hubDraftsDir(hubHome: string): string {
   return join(dirname(hubSidecarDir(hubHome)), "drafts");
 }
 
+/**
+ * The hub session's ledger: `<ndx home>/hub/ledger.jsonl`, the machine's
+ * rather than one session's, written only by the agent's `ledger_append`,
+ * which may also record a `decision-needed`.
+ */
 export function hubLedgerTarget(homeDir?: string): SidecarLedgerTarget {
   const path = hubLedgerPath(resolveHubHome(homeDir));
   return { path: () => path, types: HUB_LEDGER_TYPES };

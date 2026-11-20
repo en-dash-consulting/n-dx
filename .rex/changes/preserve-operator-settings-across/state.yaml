@@ -1,0 +1,21 @@
+schema: "rex/v2"
+items:
+  "b50ad9a5-7f80-4051-a239-f3b647d0f64e":
+    status: "completed"
+    startedAt: "2026-11-19T18:08:32.955Z"
+    completedAt: "2026-11-19T18:08:32.955Z"
+    endedAt: "2026-11-19T18:08:32.955Z"
+    activeIntervals: [{"end":"2026-11-19T18:08:32.955Z","start":"2026-11-19T18:08:32.955Z"}]
+    appliedAt: "2026-11-19T18:08:32.955Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-19T16:53:31.715Z"
+    lastModified: "2026-11-19T18:08:32.955Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fea962f8-9e8d-4448-ab08-3d06dac93401":
+    status: "completed"
+    startedAt: "2026-11-19T16:55:57.772Z"
+    completedAt: "2026-11-19T18:08:32.955Z"
+    endedAt: "2026-11-19T18:08:32.955Z"
+    activeIntervals: [{"end":"2026-11-19T18:08:32.955Z","start":"2026-11-19T16:55:57.772Z"}]
+    lastModified: "2026-11-19T18:08:32.955Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

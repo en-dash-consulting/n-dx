@@ -522,9 +522,10 @@ export function classifyLLMError(
  * Scan an error message text and extract the first valid JSON error object,
  * returning `error.message` when present. Used to recover a human-readable
  * reason from payloads that embed raw JSON (e.g. Claude CLI stdout envelope
- * or vendor HTTP response bodies).
+ * or vendor HTTP response bodies). Also the CLI provider's fallback when a
+ * result is not one JSON object as a whole.
  */
-function extractJsonErrorMessage(text: string): string {
+export function extractJsonErrorMessage(text: string): string {
   let depth = 0;
   let start = -1;
   for (let i = 0; i < text.length; i++) {

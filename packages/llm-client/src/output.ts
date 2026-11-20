@@ -66,6 +66,15 @@ export function isDebug(): boolean {
 }
 
 /**
+ * Whether the vendor CLI providers trace each spawn: `NDX_DEBUG_LLM`, else
+ * `NDX_DEBUG` (which {@link setDebug} sets), is `1`, `true` or `yes`.
+ */
+export function isLlmDebugEnabled(): boolean {
+  const v = process.env.NDX_DEBUG_LLM ?? process.env.NDX_DEBUG;
+  return v === "1" || v === "true" || v === "yes";
+}
+
+/**
  * Print informational output. Suppressed in quiet mode.
  * Use for progress messages, hints, decorative output.
  */

@@ -22,6 +22,9 @@
 import { priceTokens, resolveModelPricing } from "@n-dx/llm-client";
 import type { AnalysisRun, LLMClassUsage, RerunSummary, TokenUsage } from "../schema/index.js";
 
+/** The run history in the analysis cache directory: one snapshot per line. */
+export const ANALYSIS_HISTORY_FILE = "analyses.jsonl";
+
 /** One LLM call, as the client that made it saw it. */
 export interface LLMCallRecord {
   /** Task class the call site declared; `unclassed` when it declared none. */

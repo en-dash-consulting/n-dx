@@ -13,6 +13,7 @@
 
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
+import { errorMessage } from "../utils/format.js";
 
 /** The ref as a link target when it is a URL; a bare tracker key has none. */
 export function linkHref(ref: string): string | null {
@@ -120,7 +121,7 @@ export function TrackerLinksEditor({ itemId, refreshKey, onChanged }: TrackerLin
       onChanged?.();
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
       return false;
     } finally {
       setBusy(false);

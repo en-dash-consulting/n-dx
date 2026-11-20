@@ -12,8 +12,8 @@ import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, appendLog, parentIdOf, dashboardBranchRefusal } from "./rex-route-helpers.js";
-import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { findItemById, appendLog, parentIdOf, dashboardBranchRefusal, loadPRDOr404, broadcastPrdChanged } from "./rex-route-helpers.js";
+import { refreshPRDCache } from "../prd-io.js";
 import { resolveStore } from "../rex-gateway.js";
 
 import {
@@ -326,11 +326,8 @@ function handlePrunePreview(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   // Parse criteria from query params
   const url = req.url || "";
@@ -403,10 +400,7 @@ async function handlePruneExecute(
     errorResponse(res, 409, dashboardBranchRefusal("prune", guard.branch, "rex prune --allow-on-branch"));
     return true;
   }
-  if (!loadPRDSync(ctx.rexDir)) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  if (!loadPRDOr404(ctx, res)) return true;
 
   try {
     const body = await readBody(req, res);
@@ -501,12 +495,7 @@ async function handlePruneExecute(
       detail: `Pruned ${prunedCount} items: ${titles} (via web, criteria: statuses=${criteria.statuses.join(",")}, minAge=${criteria.minAgeDays}d)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, {
       ok: true,

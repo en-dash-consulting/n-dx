@@ -20,10 +20,12 @@ import { TrackerLinksEditor } from "../tracker-links.js";
 import { ChangeTrackerChip } from "../tracker-chip.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
+import { PRIORITY_OPTIONS, statusOptions } from "./status-display.js";
 import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { useFeatureToggle, useIndexMd } from "../../hooks/index.js";
 import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-verdict-banner.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
+import { TaskSection } from "./task-section.js";
 import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 import { ChangeApplySection } from "./change-apply.js";
@@ -58,23 +60,9 @@ export interface TaskDetailProps {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: Array<{ value: ItemStatus; label: string; icon: string }> = [
-  { value: "pending", label: "Pending", icon: "○" },
-  { value: "in_progress", label: "In Progress", icon: "◐" },
-  { value: "completed", label: "Completed", icon: "●" },
-  { value: "failing", label: "Failing", icon: "⚠" },
-  { value: "blocked", label: "Blocked", icon: "⊘" },
-  { value: "deferred", label: "Deferred", icon: "◌" },
-  { value: "cancelled", label: "Cancelled", icon: "⊗" },
-  { value: "deleted", label: "Deleted", icon: "✕" },
-];
-
-const PRIORITY_OPTIONS: Array<{ value: Priority; label: string }> = [
-  { value: "critical", label: "Critical" },
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-];
+const STATUS_OPTIONS = statusOptions([
+  "pending", "in_progress", "completed", "failing", "blocked", "deferred", "cancelled", "deleted",
+]);
 
 /** The items that link to a tracker work item: work, never the product layer. */
 const LINKABLE_TYPES: ReadonlySet<string> = new Set(["change", "epic", "feature", "task", "subtask"]);
@@ -486,21 +474,32 @@ function addedChildCarriesPriority(item: PRDItemData, itemType: ItemType, allIte
   return childCarriesPriority(itemType, parentTypeIn(allItems, item.id));
 }
 
-/** Inline form for adding a child item within the detail panel. */
-function AddChildForm({
-  parentId,
-  parentType,
-  offerPriority,
-  onSubmit,
-  onCancel,
-}: {
+interface AddChildFormProps {
   parentId: string;
   parentType: ItemType;
   /** False when the child carries no priority (a v2 subtask), so none is offered. */
   offerPriority: boolean;
   onSubmit: (data: AddChildData) => Promise<void>;
   onCancel: () => void;
-}) {
+}
+
+/**
+ * Inline form for adding a child item within the detail panel; nothing for a
+ * type that takes no children. The fields are their own component so their
+ * hooks run in the same order on every render.
+ */
+function AddChildForm(props: AddChildFormProps) {
+  const childType = childTypeOf(props.parentType);
+  return childType ? h(AddChildFields, { ...props, childType }) : null;
+}
+
+function AddChildFields({
+  parentId,
+  childType,
+  offerPriority,
+  onSubmit,
+  onCancel,
+}: AddChildFormProps & { childType: ItemType }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [criteria, setCriteria] = useState("");
@@ -508,9 +507,6 @@ function AddChildForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExtra, setShowExtra] = useState(false);
-
-  const childType = childTypeOf(parentType);
-  if (!childType) return null;
 
   const childLabel = itemTypeLabel(childType);
   const extraLabel = offerPriority ? "Show description, criteria & priority" : "Show description & criteria";
@@ -1051,9 +1047,8 @@ function HenchRunsList({
   if (runs.length === 0) return null;
 
   return h(
-    "div",
-    { class: "task-section task-runs-section" },
-    h("div", { class: "task-section-label" }, `Hench Runs (${runs.length})`),
+    TaskSection,
+    { label: `Hench Runs (${runs.length})`, class: "task-runs-section" },
     h(
       "div",
       { class: "task-runs-list" },
@@ -1111,10 +1106,7 @@ function IndexMdSectionsRenderer({ itemId }: { itemId: string }) {
 
   // Show error if parsing failed
   if (error) {
-    return h(
-      "div",
-      { class: "task-section task-index-md-error" },
-      h("div", { class: "task-section-label" }, "Schema Error"),
+    return h(TaskSection, { label: "Schema Error", class: "task-index-md-error" },
       h("p", { class: "error-message" }, error),
     );
   }
@@ -1274,10 +1266,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // In plain terms: what the item does and why it matters, for readers who do not read code.
     item.summary || onUpdate
-      ? h(
-          "div",
-          { class: "task-section task-summary-section" },
-          h("div", { class: "task-section-label" }, "In plain terms"),
+      ? h(TaskSection, { label: "In plain terms", class: "task-summary-section" },
           h(EditableDescription, {
             description: item.summary,
             noun: "plain-language summary",
@@ -1294,9 +1283,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Status selector
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, saving ? "Status (saving...)" : "Status"),
+      TaskSection,
+      { label: saving ? "Status (saving...)" : "Status" },
       h(StatusSelector, {
         current: item.status,
         onChange: handleStatusChange,
@@ -1356,9 +1344,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Description (editable)
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, "Description"),
+      TaskSection,
+      { label: "Description" },
       h(EditableDescription, {
         description: item.description,
         onUpdate: onUpdate
@@ -1384,9 +1371,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
     // Aggregated token usage across runs
     tracksRuns
       ? h(
-          "div",
-          { class: "task-section task-usage-section" },
-          h("div", { class: "task-section-label" }, "Usage"),
+          TaskSection,
+          { label: "Usage", class: "task-usage-section" },
           h("div", { class: "task-usage-row" },
             h("span", { class: "label" }, "Total Tokens"),
             h("span", { class: "task-usage-value" }, `${formatTokenCount(usageSummary.totalTokens)} tokens`),
@@ -1436,17 +1422,15 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Priority selector
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, "Priority"),
+      TaskSection,
+      { label: "Priority" },
       h(PrioritySelector, { current: item.priority, onChange: handlePriorityChange }),
     ),
 
     // Tags editor
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" }, "Tags"),
+      TaskSection,
+      { label: "Tags" },
       h(TagEditor, { tags: item.tags ?? [], onUpdate: handleTagsUpdate }),
     ),
 
@@ -1463,11 +1447,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Requirements
     h(
-      "div",
-      { class: "task-section" },
-      h("div", { class: "task-section-label" },
-        `Requirements (${(item.requirements ?? []).length})`,
-      ),
+      TaskSection,
+      { label: `Requirements (${(item.requirements ?? []).length})` },
       h(RequirementsList, {
         requirements: item.requirements ?? [],
         onAdd: onUpdate
@@ -1548,9 +1529,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
     // Timestamps
     (item.startedAt || item.completedAt)
       ? h(
-          "div",
-          { class: "task-section task-timestamps" },
-          h("div", { class: "task-section-label" }, "Timeline"),
+          TaskSection,
+          { label: "Timeline", class: "task-timestamps" },
           item.startedAt
             ? h("div", { class: "detail-row" },
                 h("span", { class: "label" }, "Started"),

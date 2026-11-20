@@ -17,6 +17,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { isTrustedBrowserOrigin, isTrustedHost, authorizeUpgrade } from "./request-security.js";
 import type { CredentialStore } from "../shared/index.js";
+import { isRecord } from "../shared/index.js";
 
 // ── Health tracking types ──────────────────────────────────────────────────
 
@@ -328,8 +329,8 @@ export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: strin
       broadcast(data);
       return;
     }
-    if (data && typeof data === "object" && !Array.isArray(data) && !("workspace" in data)) {
-      broadcast({ ...(data as Record<string, unknown>), workspace });
+    if (isRecord(data) && !("workspace" in data)) {
+      broadcast({ ...data, workspace });
       return;
     }
     broadcast(data);
@@ -473,21 +474,6 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
     // Release the OS socket if still open.
     if (!client.socket.destroyed) {
       client.socket.destroy();
-    }
-  }
-
-  /**
-   * Remove clients whose underlying socket is no longer writable.
-   * Called before each broadcast to catch connections that died between
-   * event-loop ticks without emitting a socket event.
-   *
-   * Uses removeClient() for full cleanup (listener removal + socket destroy).
-   */
-  function pruneDeadClients(): void {
-    for (const client of clients) {
-      if (client.socket.destroyed || !client.socket.writable) {
-        removeClient(client, "prune");
-      }
     }
   }
 
@@ -678,8 +664,8 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
 
     tracker?.recordBroadcast();
 
-    // Single-pass broadcast: inline health checks replace the separate
-    // pruneDeadClients() call, and JSON serialization is deferred until
+    // Single-pass broadcast: inline health checks replace a separate
+    // pruning pass, and JSON serialization is deferred until
     // the first confirmed-active connection is found. This means:
     //   1. JSON.stringify is never called unless an active client exists
     //   2. Dead connections are skipped without attempting socket writes

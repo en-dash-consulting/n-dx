@@ -323,6 +323,18 @@ describe("the resolution report", () => {
     expect(r.options.find((o) => o.key === "provider")?.values).toEqual(["cli", "api"]);
   });
 
+  it("reports the Codex pair reviewer in CLI and dashboard resolution", async () => {
+    await projectConfig({ llm: { vendor: "claude" } });
+    const r = await resolve({ task: "t-pending", "review-mode": "pair", reviewer: "codex" });
+    expect(r.warnings).toContainEqual(expect.objectContaining({
+      code: "policy-unsupported", message: expect.stringContaining("pair reviewer"),
+    }));
+    for (const flags of [{ "no-review": "true" }, { "review-mode": "self" }, { provider: "api" }]) {
+      const off = await resolve({ task: "t-pending", ...flags });
+      expect(off.warnings.some(w => w.code === "policy-unsupported")).toBe(false);
+    }
+  });
+
   describe("repository trust", () => {
     let trustHome: string;
 

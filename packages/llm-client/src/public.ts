@@ -209,6 +209,9 @@ export {
 } from "./claude-effort.js";
 export type { ClaudeEffort } from "./claude-effort.js";
 
+// Whether a vendor and model take image input (the dashboard's attach-image control)
+export { acceptsImageInput } from "./image-input.js";
+
 // Model-aware token pricing (the single price table for every cost surface)
 export {
   resolveModelPricing,
@@ -268,11 +271,13 @@ export {
   DEFAULT_CODEX_MODEL,
   createCodexCliClient,
   compileCodexPolicyFlags,
+  createCodexScratch,
   codexShellEnvFlags,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
 } from "./codex-cli-provider.js";
 export type { CodexCliProviderOptions } from "./codex-cli-provider.js";
+export { assertCodexScratchEnvironment } from "./codex-scratch-env.js";
 
 export {
   CodexProjectConfigError,

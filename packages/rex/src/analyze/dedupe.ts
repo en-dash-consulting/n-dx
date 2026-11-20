@@ -1,65 +1,16 @@
 import type { ScanResult } from "./scanners.js";
 import { PRIORITY_ORDER } from "../schema/index.js";
-import {
-  normalize,
-  splitActionContent,
-  rawSimilarity,
-} from "../recommend/text-similarity-shared.js";
+import { similarity } from "../recommend/similarity.js";
 
 /** Default similarity threshold for merging near-duplicates */
 const DEFAULT_THRESHOLD = 0.7;
 
 // ── Similarity scoring ──
 
-/**
- * Compute similarity between two strings using a combination of:
- * 1. Action-verb normalization (synonyms mapped, then compared on content)
- * 2. Bigram Dice coefficient (character-level)
- * 3. Word overlap with fuzzy matching (Jaccard index)
- * 4. Substring containment bonus
- *
- * When both strings start with an action verb (e.g. "Fix", "Implement"),
- * the verb is factored out and similarity is computed on the remaining
- * content words. Synonymous verbs ("Add" / "Implement") are treated as
- * matching, so only the content difference matters.
- *
- * Returns the maximum of these scores (0.0–1.0).
- */
-export function similarity(a: string, b: string): number {
-  const na = normalize(a);
-  const nb = normalize(b);
-
-  if (na.length === 0 || nb.length === 0) return 0;
-  if (na === nb) return 1.0;
-
-  // Compute raw similarity on the full strings
-  const fullScore = rawSimilarity(na, nb);
-
-  // Action-verb-aware comparison: if both strings have a leading action verb,
-  // compute similarity on content words only and weight verb match separately.
-  // This prevents shared action verbs from inflating scores for unrelated items.
-  const sa = splitActionContent(na);
-  const sb = splitActionContent(nb);
-
-  if (sa.verb && sb.verb && sa.content.length > 0 && sb.content.length > 0) {
-    const contentScore = rawSimilarity(sa.content, sb.content);
-
-    if (sa.verb === sb.verb) {
-      // Same or synonymous verb: the verb is shared context that confirms
-      // relatedness when content overlaps. Score is primarily content-driven
-      // but verb agreement provides a boost when content is similar.
-      // This avoids inflating scores when content is unrelated (e.g. both
-      // say "Fix" but describe different bugs).
-      const verbAwareScore = contentScore * 0.85 + 0.15;
-      return Math.min(verbAwareScore, 1.0);
-    } else {
-      // Different verb classes: content similarity alone decides.
-      return contentScore * 0.85;
-    }
-  }
-
-  return fullScore;
-}
+// One scorer for scan dedupe, duplicate matching and recommendation conflicts:
+// it lives beside the text helpers it is built from, and the analyze-side
+// callers keep importing it from here.
+export { similarity };
 
 // ── Merge strategy: pick the "best" representative from a cluster ──
 
@@ -182,48 +133,62 @@ export function deduplicateScanResults(
   const output: ScanResult[] = [];
 
   for (const [, kindResults] of byKind) {
-    // Build clusters using union-find approach
-    const n = kindResults.length;
-    const parent = Array.from({ length: n }, (_, i) => i);
-
-    function find(i: number): number {
-      while (parent[i] !== i) {
-        parent[i] = parent[parent[i]]; // path compression
-        i = parent[i];
-      }
-      return i;
-    }
-
-    function union(i: number, j: number): void {
-      const ri = find(i);
-      const rj = find(j);
-      if (ri !== rj) parent[ri] = rj;
-    }
-
-    // Compare all pairs within this kind using combined similarity
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const score = resultSimilarity(kindResults[i], kindResults[j]);
-        if (score >= threshold) {
-          union(i, j);
-        }
-      }
-    }
-
-    // Collect clusters
-    const clusters = new Map<number, ScanResult[]>();
-    for (let i = 0; i < n; i++) {
-      const root = find(i);
-      const cluster = clusters.get(root) ?? [];
-      cluster.push(kindResults[i]);
-      clusters.set(root, cluster);
-    }
-
-    // Merge each cluster into a single representative
-    for (const [, cluster] of clusters) {
+    // Compare all pairs within this kind using combined similarity, then
+    // merge each cluster into a single representative
+    const clusters = clusterTransitively(
+      kindResults,
+      (a, b) => resultSimilarity(a, b) >= threshold,
+    );
+    for (const cluster of clusters) {
       output.push(mergeCluster(cluster));
     }
   }
 
   return output;
+}
+
+/**
+ * Group `items` into clusters of transitively similar members (union-find):
+ * `a` and `c` share a cluster when `a`~`b` and `b`~`c`, even if `a`≁`c`.
+ *
+ * Every pair is compared once, in index order. Clusters come back in order of
+ * their first member, and members keep their input order.
+ */
+export function clusterTransitively<T>(
+  items: T[],
+  similar: (a: T, b: T) => boolean,
+): T[][] {
+  const n = items.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+
+  function find(i: number): number {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]]; // path compression
+      i = parent[i];
+    }
+    return i;
+  }
+
+  function union(i: number, j: number): void {
+    const ri = find(i);
+    const rj = find(j);
+    if (ri !== rj) parent[ri] = rj;
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (similar(items[i], items[j])) {
+        union(i, j);
+      }
+    }
+  }
+
+  const clusters = new Map<number, T[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    const cluster = clusters.get(root) ?? [];
+    cluster.push(items[i]);
+    clusters.set(root, cluster);
+  }
+  return [...clusters.values()];
 }

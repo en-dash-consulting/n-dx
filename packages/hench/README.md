@@ -169,12 +169,26 @@ Direct runs share the API tool guard, task claims, budgets, completion/test
 gates and recovery. `--approve-diff` is supported; CLI self/pair review remains
 unavailable on API runs, as on Claude API. Explicit incompatible review flags
 are refused; saved/configured self-review follows the existing warning policy.
+Opt-in `llm.autoFailover=true` tries Codex light, Claude standard, then Claude
+light after eligible API errors, consuming at most three fallback selections per
+run. It stays on a successful fallback for later turns. Claude uses its own API
+credentials; unsupported OpenAI models are skipped. Refusals, malformed output,
+budget limits and caller aborts never switch vendors. Exhaustion restores the
+original selection/error, and cancellation returns the task to pending with a
+`task_cancelled` event for both OpenAI and Claude API runs.
 
-Direct API runs support bounded model/vendor failover when
-`llm.autoFailover=true`. Each fallback still requires a supported agent model
-and that vendor's API credentials. Codex CLI execution does not use this chain.
-See the [configuration guide](../../docs/guide/configuration.md#llm-vendor)
-for the failover policy.
+Each attempt in that chain, including Claude, gets two minutes plus
+`ceil(hench.maxTokens / 10)` seconds, clamped to 10–30 minutes (15 minutes 40 seconds
+for 8,192 tokens). This bounds the entire response, including body reads and primary
+retries/backoff; secondary calls do not retry. Timeouts remain distinct from user
+aborts, which take precedence. See [configuration](../../docs/guide/configuration.md)
+for the chain and error rules.
+
+Stateless turns request encrypted reasoning. Output-token exhaustion prompts the
+agent to continue with measured usage retained, even when no visible text was
+produced. Calls and opaque reasoning from a truncated turn are discarded so no
+unanswered call is executed or replayed. Other incomplete responses fail, and
+truncated compaction summaries remain unusable.
 
 The Responses codec is tested against synthetic transport fixtures. Model
 listing and codec support do not prove live account access. The dashboard lists

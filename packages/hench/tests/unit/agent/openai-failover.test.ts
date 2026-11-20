@@ -18,7 +18,7 @@ function setup(settings = llm) {
   const provider = createOpenAiApiProvider({ codexConfig: settings.codex, maxRetries: 0 });
   return { provider, executor: new OpenAiFailover(provider, request.model, settings, config) };
 }
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("OpenAI bounded API failover", () => {
   it("uses the configured light model and retains it for subsequent turns", async () => {
@@ -138,8 +138,107 @@ describe("OpenAI bounded API failover", () => {
       const { executor, provider } = setup({ ...llm, autoFailover: enabled });
       const call = vi.spyOn(provider, "completeTurn").mockRejectedValue(new Error("stop"));
       await expect(executor.call(request, hooks())).rejects.toThrow("stop");
-      expect(call.mock.calls[0][0].timeoutMs).toBe(enabled ? 60_000 : undefined);
+      expect(call.mock.calls[0][0].timeoutMs).toBe(enabled ? 600_000 : undefined);
     }
+  });
+
+  it.each([[8192, 940_000], [32768, 1_800_000]])("scales the deadline for a %s-token budget with a finite ceiling", async (maxTokens, timeoutMs) => {
+    const { provider } = setup();
+    const call = vi.spyOn(provider, "completeTurn").mockRejectedValue(new Error("stop"));
+    const executor = new OpenAiFailover(provider, request.model, llm, { ...config, maxTokens });
+    await expect(executor.call(request, hooks())).rejects.toThrow("stop");
+    expect(call.mock.calls[0][0].timeoutMs).toBe(timeoutMs);
+  });
+
+  it("does not consume failover for a refusal or malformed successful payload", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(Response.json({ status: "completed", output: [
+      { type: "message", role: "assistant", content: [{ type: "refusal", refusal: "Cannot comply" }] },
+    ] })).mockResolvedValueOnce(Response.json({ status: "completed", output: null }));
+    vi.stubGlobal("fetch", fetch);
+    const { executor } = setup();
+    const events = hooks();
+    expect(await executor.call(request, events)).toMatchObject({ stop_reason: "refusal" });
+    await expect(executor.call(request, events)).rejects.toMatchObject({ retryable: false });
+    expect(events.switched).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  function fakeDeadlines() {
+    vi.useFakeTimers();
+    // Node's native AbortSignal.timeout bypasses Vitest's fake clock.
+    return vi.spyOn(AbortSignal, "timeout").mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException("Deadline", "TimeoutError")), ms);
+      return controller.signal;
+    });
+  }
+
+  it.each(["gpt-6-astra", "gpt-6.1-sol", "claude-sonnet-4-6", "claude-haiku-4-5"])(
+    "allows a healthy 90-second response body on %s", async target => {
+      fakeDeadlines();
+      const models: string[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+        const model = JSON.parse(init.body).model;
+        models.push(model);
+        if (model !== target) return rejected();
+        return new Response(new ReadableStream({ start(controller) {
+          init.signal.addEventListener("abort", () => controller.error(init.signal.reason), { once: true });
+          setTimeout(() => {
+            if (init.signal.aborted) return;
+            const data = model.startsWith("claude")
+              ? { id: "msg", type: "message", role: "assistant", model, stop_reason: "end_turn", content: [], usage: { input_tokens: 5, output_tokens: 3 } }
+              : { status: "completed", model, output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "Done" }] }], usage: { input_tokens: 5, output_tokens: 3 } };
+            controller.enqueue(new TextEncoder().encode(JSON.stringify(data)));
+            controller.close();
+          }, 90_000);
+        } }), { headers: { "Content-Type": "application/json" } });
+      }));
+      const { executor } = setup();
+      const events = hooks();
+      const result = expect(executor.call(request, events)).resolves.toMatchObject({ stop_reason: "end_turn" });
+      await Promise.all([result, vi.advanceTimersByTimeAsync(90_000)]);
+      expect(executor.selection.model).toBe(target);
+      expect(models.at(-1)).toBe(target);
+      expect(events.failed.mock.calls.every(([error]) => error.reason === "rate-limit")).toBe(true);
+    },
+  );
+
+  it("bounds hanging primary and secondary bodies, classifying timeouts separately from caller abort", async () => {
+    const deadlines = fakeDeadlines();
+    const fetch = vi.fn(async (_url, init) => new Response(new ReadableStream({ start(controller) {
+      init.signal.addEventListener("abort", () => controller.error(init.signal.reason), { once: true });
+    } }), { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetch);
+    const { executor } = setup();
+    const events = hooks();
+    const result = expect(executor.call(request, events)).rejects.toMatchObject({ reason: "timeout", retryable: true });
+    await Promise.all([result, vi.advanceTimersByTimeAsync(4 * 600_000)]);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(events.failed.mock.calls.map(([error]) => error.reason)).toEqual(["timeout", "timeout", "timeout", "timeout"]);
+    expect(events.switched).toHaveBeenCalledTimes(3);
+    expect(deadlines.mock.calls.every(([ms]) => ms === 600_000)).toBe(true);
+  });
+
+  it.each([false, true])("gives caller abort precedence over a deadline (Claude fallback=%s)", async fallback => {
+    fakeDeadlines();
+    const controller = new AbortController();
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+      calls++;
+      if (fallback && calls < 3) return rejected();
+      return new Response(new ReadableStream({ start(body) {
+        init.signal.addEventListener("abort", () => {
+          controller.abort();
+          body.error(new Error("private transport failure"));
+        }, { once: true });
+      } }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const { executor } = setup();
+    const events = hooks();
+    const result = expect(executor.call({ ...request, signal: controller.signal }, events)).rejects.toMatchObject({ name: "AbortError" });
+    await Promise.all([result, vi.advanceTimersByTimeAsync(600_000)]);
+    expect(calls).toBe(fallback ? 3 : 1);
+    expect(events.switched).toHaveBeenCalledTimes(fallback ? 2 : 0);
   });
 
   it("sends Anthropic messages/tools and only Claude credentials after OpenAI auth and model failures", async () => {

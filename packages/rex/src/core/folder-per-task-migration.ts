@@ -281,6 +281,27 @@ async function renameTitleMdToIndexMd(
 }
 
 /**
+ * Run one file migration, counting it on success. A failure is recorded on
+ * `result` against the file rather than aborting the walk.
+ */
+async function migrateRecorded(
+  dir: string,
+  mdFile: string,
+  result: FolderPerTaskMigrationResult,
+  migrate: (dir: string, mdFile: string, result: FolderPerTaskMigrationResult) => Promise<void>,
+): Promise<void> {
+  try {
+    await migrate(dir, mdFile, result);
+    result.migratedCount++;
+  } catch (err) {
+    result.errors.push({
+      path: join(dir, mdFile),
+      error: `Failed to migrate: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
+/**
  * Recursively scan and migrate a directory and its children.
  * currentLevel is the level of items we expect to find AT this directory.
  * depth is the actual nesting depth: 0 (root), 1 (epic), 2 (feature), 3 (task), 4+ (subtask).
@@ -356,15 +377,7 @@ async function migrateDirRecursive(
       // At task level, check for subtask .md files with children
       const hasChildren = await hasChildrenSiblings(dir, mdFile);
       if (hasChildren) {
-        try {
-          await migrateSubtaskWithChildrenToFolder(dir, mdFile, result);
-          result.migratedCount++;
-        } catch (err) {
-          result.errors.push({
-            path: join(dir, mdFile),
-            error: `Failed to migrate: ${err instanceof Error ? err.message : String(err)}`,
-          });
-        }
+        await migrateRecorded(dir, mdFile, result, migrateSubtaskWithChildrenToFolder);
         // Skip further processing for this file since we handled the children
         continue;
       }
@@ -377,15 +390,7 @@ async function migrateDirRecursive(
       // This might be a bare task file with children
       const hasChildren = await hasChildrenSiblings(dir, mdFile);
       if (hasChildren) {
-        try {
-          await migrateBareFileToFolder(dir, mdFile, result);
-          result.migratedCount++;
-        } catch (err) {
-          result.errors.push({
-            path: join(dir, mdFile),
-            error: `Failed to migrate: ${err instanceof Error ? err.message : String(err)}`,
-          });
-        }
+        await migrateRecorded(dir, mdFile, result, migrateBareFileToFolder);
         continue;
       }
       // If no children, fall through to the next check
@@ -399,15 +404,7 @@ async function migrateDirRecursive(
     if (!dirIsItemFolder && itemLevel === currentLevel && (itemLevel === "task" || itemLevel === "subtask")) {
       const hasChildren = await hasChildrenSiblings(dir, mdFile);
       if (hasChildren) {
-        try {
-          await migrateBareFileToFolder(dir, mdFile, result);
-          result.migratedCount++;
-        } catch (err) {
-          result.errors.push({
-            path: join(dir, mdFile),
-            error: `Failed to migrate: ${err instanceof Error ? err.message : String(err)}`,
-          });
-        }
+        await migrateRecorded(dir, mdFile, result, migrateBareFileToFolder);
         continue;
       }
     }
@@ -417,15 +414,7 @@ async function migrateDirRecursive(
     if (itemLevel === childLevel && currentLevel !== childLevel) {
       const hasChildren = await hasChildrenSiblings(dir, mdFile);
       if (hasChildren) {
-        try {
-          await migrateBareFileToFolder(dir, mdFile, result);
-          result.migratedCount++;
-        } catch (err) {
-          result.errors.push({
-            path: join(dir, mdFile),
-            error: `Failed to migrate: ${err instanceof Error ? err.message : String(err)}`,
-          });
-        }
+        await migrateRecorded(dir, mdFile, result, migrateBareFileToFolder);
       }
     }
   }

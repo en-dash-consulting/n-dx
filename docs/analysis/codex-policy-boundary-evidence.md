@@ -4,6 +4,99 @@ Task: `9285e760-055c-4638-adf0-63358f35a339`. Supported policy controls and
 capability reporting are verified below. This is not admission evidence for
 Codex hub sessions: native repository-read confinement remains unsupported.
 
+## PR8 review remediation — 2026-11-19
+
+Task: `83b0a2a3-1f01-4f64-8e93-920b6a685b7e`. Hench's workspace-write
+execution and review spawns now own a private temporary directory. The completion
+provider uses the same owner. Each spawn adds only that directory to writable
+roots and sets `TMPDIR`, `TMP` and `TEMP` in both the CLI environment and its
+shell overrides. Resume and fork create new scratch directories; they do not
+reuse a path from a prior thread. Cleanup follows child exit, failure or
+cancellation, with a process-exit fallback. Host temp roots remain excluded.
+
+The resolved Codex pair reviewer now triggers the unsupported-guard warning
+even with a Claude executor. Resolution (also consumed by dashboard preparation),
+live output and persisted diagnostics carry the same warning. Core's separate
+`n-dx pair-programming` reviewer receives the compiled read-only, approval-never,
+strict-config policy and shell credential masks through its existing config
+helper boundary. Its test command still runs separately on the host.
+
+New deterministic coverage uses actual Node child processes for ordinary temp
+APIs, fresh/resume/fork scratch ownership, error and abort cleanup, symlink-safe
+disposal and idempotency. Scripted reviewer tests cover live/persisted warnings
+and both core reviewer spawn paths with hostile native config fixtures. These
+tests establish lifecycle and argv contracts, **not new installed-Codex
+enforcement evidence**. The November 18 host records below predate this change.
+The coordinator still owns the fresh mandatory review and any new host probe,
+then the original PR8 parent's supported Rex status correction. No task or
+parent completion is asserted by this executor.
+
+### Scratch retry — 2026-11-19
+
+The coordinator's `host-scratch.json` records successful installed-CLI
+fresh/resume/fork temp APIs and cleanup on 0.167.0-alpha.3.2, bounded writes,
+credential masking and denied network access. Its separate core kernel check
+denied workspace/temp writes using production reviewer flags. These establish
+neither a core model review nor browser/native-Windows confinement.
+`host-filter.json` records the counterexample: a native PATH-only `include_only`
+removes the temp overrides, leaving Node's temp API at `/tmp` with EPERM.
+
+The retry reproduces populated 0555 cleanup failures with real children under
+non-root UID 501, then verifies success, failure and abort results survive
+cleanup. Directory-only permission repair skips symlinks and never chmods files;
+external directory contents and permissions remain unchanged. Replaced roots
+are refused. Irrecoverable cleanup warns once without replacing the child result.
+
+Execution and completion now read `app-server config/read` with the same cwd,
+environment and config-loading flags before model work. All three exact private
+temp overrides must appear in that effective configuration. A nonempty
+`include_only` must explicitly admit TMPDIR/TMP/TEMP (or already contain `*`);
+ambiguous filter dialects or unavailable strict configuration support fail
+closed. No filter is cleared or widened. The protocol follows the native
+[config/read contract](https://github.com/openai/codex/blob/main/codex-rs/app-server/src/config_manager_service.rs)
+and sends no thread or inference request.
+
+The review exercised the configuration protocol on the installed macOS
+0.167.0-alpha.3.2 CLI with an isolated home. Default and temp-compatible
+allowlists passed. A PATH-only allowlist produced the expected refusal.
+That binary accepts `--ignore-user-config` on `exec` and rejects it on
+`app-server`. Workspace-write calls using that selector stop before execution
+and identify the incompatible option. This includes the invocation in the
+coordinator's earlier host record. Hench's read-only orientation skips the
+scratch preflight. Fresh, resumed and forked model execution with the final
+build still requires host verification before the original Rex status correction.
+
+### Final host verification and status correction — 2026-11-19
+
+After commit `5a62b2765`, the coordinator reran the built Hench adapter and
+spawn path against the installed CLI. Ordinary workspace-write fresh, same-thread
+resume and distinct-thread fork each used a different mode-0700 scratch directory.
+Node's normal temp API succeeded; scratch was removed after each child. The
+latest turn contexts retained approval `never` and disabled network. Credential
+environment canaries were masked, and outside-workspace writes, host-temp sibling
+writes and network sockets were denied. Production core reviewer flags also
+denied workspace and temp writes in a separate native sandbox check. This was
+not a core model review, browser test or Windows verification.
+
+The final probe omitted orientation-only `--ignore-user-config` flags from the
+workspace turns; production read-only orientation remains separate. Explicitly
+combining that selector with workspace-write remains unsupported on this binary
+and fails before model work, without removing the selector or weakening filters.
+A separate final PATH-only filter probe returned the actionable TMPDIR/TMP/TEMP
+incompatibility with no model session started. Raw records are
+`final-live-scratch-probe.json` and `final-live-scratch-filter-probe.json` in the
+external PR8 review-remediation evidence directory.
+
+The final mandatory distinct-model review passed 819 scoped tests (164
+llm-client, 262 Hench, 41 dashboard and 352 root), including both required startup
+checks; changed packages built and passed typecheck. The intensive outer gate
+was explicitly skipped. After these checks, supported Rex completion corrected
+both the original PR8 change and the remediation change to completed without
+reapplying product amendments. Historical failure reasons remain audit history;
+the completed status and current resolution detail supersede them. Native
+command/Git/read confinement remains unsupported and Codex hub admission remains
+refused.
+
 ## Same-task correction — 2026-11-18
 
 The earlier run explicitly reported incomplete criteria, but the outer runner

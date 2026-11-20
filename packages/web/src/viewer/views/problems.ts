@@ -7,6 +7,7 @@ import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { effectiveEnrichmentPass } from "../enrichment-pass.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
 import { findingAskSeed } from "./finding-seed.js";
+import { StatCard } from "./stat-card.js";
 
 interface ProblemsProps {
   data: LoadedData;
@@ -85,18 +86,9 @@ export function ProblemsView({ data, navigateTo, askEnabled = false }: ProblemsP
     // Severity stat cards
     findings.length > 0
       ? h("div", { class: "stat-grid" },
-          h("div", { class: "stat-card" },
-            h("div", { class: "value text-red" }, String(critical)),
-            h("div", { class: "label" }, "Critical")
-          ),
-          h("div", { class: "stat-card" },
-            h("div", { class: "value text-orange" }, String(warning)),
-            h("div", { class: "label" }, "Warnings")
-          ),
-          h("div", { class: "stat-card" },
-            h("div", { class: "value" }, String(info)),
-            h("div", { class: "label" }, "Info")
-          ),
+          h(StatCard, { value: String(critical), label: "Critical", valueClass: "text-red" }),
+          h(StatCard, { value: String(warning), label: "Warnings", valueClass: "text-orange" }),
+          h(StatCard, { value: String(info), label: "Info" }),
         )
       : null,
 

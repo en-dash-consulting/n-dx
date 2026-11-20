@@ -7,6 +7,7 @@
  * requests for it.
  */
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
+import { errorMessage } from "../utils/format.js";
 
 export interface DetectedCommand {
   id: string;
@@ -108,7 +109,7 @@ export function useRunCommands(enabled = true): RunCommandsState {
       if (!res.ok) throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
       await refreshStatus();
     } catch (err) {
-      if (mounted.current) setError(err instanceof Error ? err.message : String(err));
+      if (mounted.current) setError(errorMessage(err));
     }
   }, [refreshStatus]);
 
@@ -120,7 +121,7 @@ export function useRunCommands(enabled = true): RunCommandsState {
       if (!res.ok) throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
       await refreshStatus();
     } catch (err) {
-      if (mounted.current) setError(err instanceof Error ? err.message : String(err));
+      if (mounted.current) setError(errorMessage(err));
     }
   }, [refreshStatus]);
 

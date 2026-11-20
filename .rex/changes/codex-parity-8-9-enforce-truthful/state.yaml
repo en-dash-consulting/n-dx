@@ -3,14 +3,16 @@ items:
   "8d9b361a-d4d1-4e20-a500-b37555d961c5":
     status: "completed"
     startedAt: "2026-11-18T04:49:28.789Z"
-    completedAt: "2026-11-18T15:44:26.924Z"
-    endedAt: "2026-11-18T15:44:26.924Z"
-    activeIntervals: [{"end":"2026-11-18T04:49:28.789Z","start":"2026-11-18T04:49:28.789Z"},{"end":"2026-11-18T15:44:26.924Z","start":"2026-11-18T15:44:26.924Z"}]
+    completedAt: "2026-11-19T18:00:42.765Z"
+    endedAt: "2026-11-19T18:00:42.765Z"
+    activeIntervals: [{"end":"2026-11-18T04:49:28.789Z","start":"2026-11-18T04:49:28.789Z"},{"end":"2026-11-19T18:00:42.765Z","start":"2026-11-19T18:00:42.765Z"}]
     failureReason: "PR8 completion was premature: executor/reviewer recorded incomplete boundary criteria. Host runtime evidence now available; all-mode/config/version validation and accurate evidence documentation still require same-task completion."
+    resolutionType: "code-change"
+    resolutionDetail: "Review findings repaired in actual sequential ndx work runs with mandatory distinct fresh review. 819 scoped tests, required startup checks, builds/typechecks passed. Final native macOS fresh/resume/fork verified private temp API, cleanup, never approval, network/outside-write denial and credential masking; core reviewer kernel read-only passed. PATH-only filters refused before model work. Optional workspace-write --ignore-user-config is explicitly unsupported on this CLI because app-server rejects its selector; no weaker retry. Native command/read confinement remains unsupported and hub admission stays refused. No Windows/browser claim."
     appliedAt: "2026-11-18T04:49:28.789Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-11T21:06:38.810Z"
-    lastModified: "2026-11-18T15:44:26.924Z"
+    lastModified: "2026-11-19T18:00:42.765Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9285e760-055c-4638-adf0-63358f35a339":
     status: "completed"

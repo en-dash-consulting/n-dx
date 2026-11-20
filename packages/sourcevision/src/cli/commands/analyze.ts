@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { constants as osConstants } from "node:os";
-import {resolve, join} from "node:path";import {
+import { resolve, join } from "node:path";
+import {
   DATA_FILES,
   SUPPLEMENTARY_FILES,
   readManifest,
@@ -25,8 +26,8 @@ import {resolve, join} from "node:path";import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter } from "@n-dx/llm-client";
-import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
+import type { RiskAssessmentOptions, RiskJustificationEntry, ZoneType, Zones } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
   runImportsPhase,
@@ -54,9 +55,8 @@ import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
-import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
+import { ANALYSIS_HISTORY_FILE, startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
 import { readAnalysisOutcome } from "../../analyzers/analysis-outcome.js";
-import { configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
 import { configureRerunLog } from "../../analyzers/rerun-judge.js";
 import { configureRuleCache } from "../../analyzers/declared-rules.js";
 import {
@@ -72,7 +72,7 @@ import {
 import { carryNarration, cmdNarrate, narrationLogPath, takeOverNarration } from "./narrate.js";
 import type { NarrateDeps } from "./narrate.js";
 import type { Manifest } from "../sourcevision-core.js";
-import { resolveSourcevisionPaths } from "../../paths.js";
+import { resolveSourcevisionPaths, SV_CACHE_DIRNAME } from "../../paths.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -144,6 +144,16 @@ function shouldRunPhase(filter: PhaseFilter, phase: number, moduleName: string):
 }
 
 /**
+ * Exit after a phase failed, when the failure decides the run: a critical
+ * phase stops a full run, and a non-critical one fails a run that asked for
+ * it alone. Otherwise the run continues.
+ */
+function exitIfPhaseFailureIsFatal(filter: PhaseFilter, critical: boolean): void {
+  if (critical && filter.type === "all") process.exit(1);
+  if (!critical && filter.type !== "all") process.exit(1);
+}
+
+/**
  * Ensure the .sourcevision directory exists and load LLM configuration.
  *
  * Returns the loaded LLM config and the resolved svDir path.
@@ -162,9 +172,10 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   setProjectDir(absDir);
-  configureJudgmentCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
-  configureRerunLog({ svDir: resolveSourcevisionPaths(absDir).svDir });
-  configureRuleCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
+  const cacheOwner = { svDir: resolveSourcevisionPaths(absDir).svDir };
+  configureJudgmentCache(cacheOwner);
+  configureRerunLog(cacheOwner);
+  configureRuleCache(cacheOwner);
   // The Jev client is foundation-tier and cannot import the run ledger, so the
   // accounting is handed to it here — once, beside the cache it also owns.
   setJevObserver({ onCall: recordLLMCall, onCacheStats: recordJudgmentCache });
@@ -242,8 +253,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
         } else {
           console.error(`  Phase ${err.phase} failed: ${err.reason}`);
         }
-        if (critical && filter.type === "all") process.exit(1);
-        if (!critical && filter.type !== "all") process.exit(1);
+        exitIfPhaseFailureIsFatal(filter, critical);
       } else {
         // Unrecognized error — try LLM classification before rethrowing
         const errObj = err instanceof Error ? err : new Error(String(err));
@@ -253,8 +263,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
         if (classified.category !== "unknown") {
           console.error(`  Phase ${phase} failed: ${classified.message}`);
           warn(`  Hint: ${classified.suggestion}`);
-          if (critical && filter.type === "all") process.exit(1);
-          if (!critical && filter.type !== "all") process.exit(1);
+          exitIfPhaseFailureIsFatal(filter, critical);
         } else {
           throw err;
         }
@@ -285,7 +294,7 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
   const logPath = join(absDir, narrationLog);
   const startedAt = new Date().toISOString();
   try {
-    mkdirSync(join(svDir, ".cache"), { recursive: true });
+    mkdirSync(join(svDir, SV_CACHE_DIRNAME), { recursive: true });
     const cli = fileURLToPath(new URL("../index.js", import.meta.url));
     const child = await spawnTool(process.execPath, [cli, "narrate", absDir], {
       detached: true,
@@ -308,6 +317,11 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
     writeManifest(absDir, manifest);
     warn(`  could not start background narration (${err instanceof Error ? err.message : String(err)}); run 'sv narrate .' or 'sv analyze --wait .'`);
   }
+}
+
+/** Whether any zone still waits to be narrated or named. */
+function hasPendingNarration(ctx: AnalyzeContext): boolean {
+  return (ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0;
 }
 
 function currentZoneIds(svDir: string): Set<string> {
@@ -346,6 +360,12 @@ export function finalizeTokenUsage(
       cacheCreationInputTokens: (sum.cacheCreationInputTokens ?? 0) + (bucket.cacheCreationInputTokens ?? 0),
       cacheReadInputTokens: (sum.cacheReadInputTokens ?? 0) + (bucket.cacheReadInputTokens ?? 0),
     }), emptyAnalyzeTokenUsage());
+    const unmeasured = buckets.some(bucket => (bucket.unmeasuredCalls ?? 0) > 0);
+    const hasMeasurement = buckets.some(bucket => (bucket.measuredCalls ?? 0) > 0)
+      || ctx.tokenUsage.inputTokens + ctx.tokenUsage.outputTokens
+        + (ctx.tokenUsage.cacheCreationInputTokens ?? 0) + (ctx.tokenUsage.cacheReadInputTokens ?? 0) > 0;
+    ctx.tokenUsage.diagnosticStatus = unmeasured
+      ? (hasMeasurement ? "partial" : "unavailable") : "complete";
   }
   const usageLine = formatTokenUsage(ctx.tokenUsage);
   if (usageLine) {
@@ -378,9 +398,9 @@ export function finalizeTokenUsage(
 /** Append one run to the history file, trimming it to {@link ANALYSIS_HISTORY_MAX} lines. */
 export function appendAnalysisHistory(svDir: string, line: string): void {
   try {
-    const dir = join(svDir, ".cache");
+    const dir = join(svDir, SV_CACHE_DIRNAME);
     mkdirSync(dir, { recursive: true });
-    const path = join(dir, "analyses.jsonl");
+    const path = join(dir, ANALYSIS_HISTORY_FILE);
     appendFileSync(path, line + "\n");
     const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
     if (lines.length > ANALYSIS_HISTORY_MAX) {
@@ -505,8 +525,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
     // --wait: narrate the escalated zones (and generate pending names) now,
     // before the outputs are written.
-    const anythingPending = (ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0;
-    if (anythingPending && ctx.wait) {
+    if (hasPendingNarration(ctx) && ctx.wait) {
       await cmdNarrate(absDir, { inline: true, zoneIds: ctx.pendingNarration ?? [], nameZoneIds: ctx.pendingNames ?? [], deps: narrateDeps() });
       ctx.pendingNarration = undefined;
       ctx.pendingNames = undefined;
@@ -522,13 +541,13 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
     // Otherwise the results are on disk already; narration continues in a
     // detached child so this command can return.
-    if ((ctx.pendingNarration?.length ?? 0) + (ctx.pendingNames?.length ?? 0) > 0) {
+    if (hasPendingNarration(ctx)) {
       await scheduleDetachedNarration(ctx.absDir, ctx.svDir, ctx.pendingNarration ?? [], ctx.pendingNames ?? []);
     }
 
     // Hint about zone pins when move-file or structural findings exist
     try {
-      const zonesPath = join(ctx.svDir, "zones.json");
+      const zonesPath = join(ctx.svDir, DATA_FILES.zones);
       const zonesRaw = readFileSync(zonesPath, "utf-8");
       const zonesData = JSON.parse(zonesRaw);
       const findings = zonesData.findings ?? [];
@@ -690,6 +709,36 @@ async function writePrimerIfPossible(
   }
 }
 
+/**
+ * Attach each zone's architectural risk metrics to it and replace the
+ * previous run's risk findings (pass 0: a zone's risk score, or the
+ * fragile-zones summary) with this run's. Mutates `zonesData`; when this run
+ * found no risk, the existing findings are left as they are.
+ */
+function applyZoneRisks(zonesData: Zones, options: RiskAssessmentOptions): void {
+  const riskResult = assessAllZoneRisks(zonesData, options);
+
+  for (const zone of zonesData.zones) {
+    const metrics = riskResult.metrics[zone.id];
+    if (metrics) {
+      zone.riskMetrics = metrics;
+    }
+  }
+
+  if (riskResult.findings.length > 0) {
+    const existingFindings = (zonesData.findings ?? []).filter(
+      (f: { pass: number; text: string }) =>
+        !(f.pass === 0 && (
+          f.text.includes("(risk score:") ||
+          f.text.includes("zones are fragile")
+        )),
+    );
+    zonesData.findings = enforceSeverityRules(
+      deduplicateFindings([...existingFindings, ...riskResult.findings]),
+    );
+  }
+}
+
 export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
   try {
     const manifestPath = join(ctx.svDir, DATA_FILES.manifest);
@@ -722,34 +771,8 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
 
     // Compute architectural risk scoring and attach metrics to zones
     if (zonesData.zones.length > 0) {
-      const riskResult = assessAllZoneRisks(zonesData, {
-        justifications: riskJustifications,
-        zoneTypes,
-      });
-
-      // Attach risk metrics to each zone object
-      for (const zone of zonesData.zones) {
-        const metrics = riskResult.metrics[zone.id];
-        if (metrics) {
-          zone.riskMetrics = metrics;
-        }
-      }
-
-      // Merge risk findings with existing findings (replace previous risk findings)
-      if (riskResult.findings.length > 0) {
-        const existingFindings = (zonesData.findings ?? []).filter(
-          (f: { pass: number; text: string }) =>
-            !(f.pass === 0 && (
-              f.text.includes("(risk score:") ||
-              f.text.includes("zones are fragile")
-            )),
-        );
-        zonesData.findings = enforceSeverityRules(
-          deduplicateFindings([...existingFindings, ...riskResult.findings]),
-        );
-      }
-
-      writeFileSync(join(ctx.svDir, DATA_FILES.zones), toCanonicalJSON(zonesData));
+      applyZoneRisks(zonesData, { justifications: riskJustifications, zoneTypes });
+      writeFileSync(zonesPath, toCanonicalJSON(zonesData));
     }
 
     // Project profile — primary language, frameworks, release/build/CI surfaces

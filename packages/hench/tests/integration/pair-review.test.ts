@@ -206,6 +206,10 @@ describe("cliLoop — pair review", () => {
     const { run } = await runLoop();
 
     expect(run.reviewPlan).toMatchObject({ mode: "pair", vendor: "codex", model: REVIEWER_MODEL });
+    expect(printed.join("\n")).toContain("Codex pair reviewer");
+    expect(run.diagnostics?.notes.join("\n")).toContain("Codex pair reviewer");
+    const saved = JSON.parse(readFileSync(join(henchDir, "runs", `${run.id}.json`), "utf-8"));
+    expect(saved.diagnostics.notes.join("\n")).toContain("Codex pair reviewer");
     expect(run.review).toMatchObject({
       mode: "pair",
       vendor: "codex",

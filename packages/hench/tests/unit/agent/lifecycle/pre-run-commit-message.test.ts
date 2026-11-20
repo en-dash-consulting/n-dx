@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { proposePreRunCommitMessage } from "../../../../src/agent/lifecycle/shared.js";
+import { proposePreRunCommitMessage } from "../../../../src/agent/lifecycle/pre-run-commit-gate.js";
 import { defaultRegistry, TIER_MODELS, NEWEST_MODELS } from "../../../../src/prd/llm-gateway.js";
 import type { ReviewDiff } from "../../../../src/agent/analysis/review.js";
 import { RM_RETRY } from "../../../helpers/index.js";

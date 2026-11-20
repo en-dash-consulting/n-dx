@@ -53,6 +53,8 @@ import type { PermissionMode } from "../../schema/index.js";
  *   is portable and doesn't depend on Node.js typings.
  */
 export interface SpawnConfig {
+  /** Bind a private scratch directory at spawn time. The caller owns cleanup. */
+  readonly withScratchDir?: (dir: string) => SpawnConfig;
   /** Codex cumulative usage boundary, including inherited fork history. */
   readonly usageResumeSessionId?: string;
   /** Path to the vendor CLI binary (e.g. "claude", "codex", or absolute path). */
@@ -162,6 +164,18 @@ export interface VendorSpawnOptions {
 // ── VendorAdapter ────────────────────────────────────────────────────────
 
 /**
+ * A tool call that handed work to the background — something whose result
+ * arrives as a later notification, which a non-interactive session never
+ * receives. See `agent/lifecycle/background-wait.ts`.
+ */
+export interface BackgroundWaitSignal {
+  /** Tool name as the vendor reported it. */
+  tool: string;
+  /** What the call was waiting on, for the operator, in one line. */
+  detail: string;
+}
+
+/**
  * Adapter interface for vendor-specific CLI execution.
  *
  * Each LLM vendor (Claude, Codex, future providers) implements this
@@ -174,18 +188,6 @@ export interface VendorSpawnOptions {
  * `cli-loop.ts`'s `dispatchVendorSpawn` function, making the vendor
  * surface pluggable and independently testable.
  */
-/**
- * A tool call that handed work to the background — something whose result
- * arrives as a later notification, which a non-interactive session never
- * receives. See `agent/lifecycle/background-wait.ts`.
- */
-export interface BackgroundWaitSignal {
-  /** Tool name as the vendor reported it. */
-  tool: string;
-  /** What the call was waiting on, for the operator, in one line. */
-  detail: string;
-}
-
 export interface VendorAdapter {
   /** Which LLM vendor this adapter handles. */
   readonly vendor: LLMVendor;

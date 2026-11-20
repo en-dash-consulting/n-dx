@@ -313,6 +313,11 @@ function InitApp({
       // code + stderr so a genuine failure fails init and any preflight warning is
       // surfaced in the recap — never silently swallowed.
       if (!llmSkipped && provider) {
+        const readModel = async () => {
+          const script = `import{readFileSync}from"node:fs";const c=JSON.parse(readFileSync(${JSON.stringify(layout.configFile)},"utf8"));process.stdout.write(JSON.stringify(c?.llm?.[${JSON.stringify(provider)}]?.model??null));`;
+          return JSON.parse(await spawnAsync("node", ["--input-type=module", "-e", script], true) || "null");
+        };
+        const existingModel = await readModel();
         // Skip the vendor write (and its auth preflight) when the provider
         // comes from existing config — it's already persisted and re-running
         // the preflight on every `ndx init` produces noisy auth warnings for
@@ -328,7 +333,8 @@ function InitApp({
           }
           if (vendorWrite.stderr) llmWarning = vendorWrite.stderr;
         }
-        if (model) {
+        // Confirming an existing pin must not undo the vendor writer's cleanup.
+        if (model && model !== existingModel) {
           await spawnAsync("node", [cliPath, "config", `llm.${provider}.model`, model, dir]);
         }
         if (claudeModelFromFlag && provider !== "claude") {
@@ -340,6 +346,7 @@ function InitApp({
         if (googleModelFromFlag && provider !== "google") {
           await spawnAsync("node", [cliPath, "config", "llm.google.model", googleModelFromFlag, dir]);
         }
+        model = await readModel();
       }
 
       // Target-repo README generation — runs before assistant integrations

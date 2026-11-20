@@ -78,6 +78,19 @@ describe("CodexCliAdapter: VendorAdapter interface", () => {
 // ── 2. buildSpawnConfig ──────────────────────────────────────────────────
 
 describe("CodexCliAdapter: buildSpawnConfig", () => {
+  it("binds private scratch on fresh, resumed and forked sessions without changing the base policy", () => {
+    for (const opts of [{}, { resumeSessionId: "parent" }, { resumeSessionId: "parent", forkSession: true, codexForkSupported: true }]) {
+      const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, opts);
+      const prepared = config.withScratchDir!("/private/scratch");
+      expect(prepared.args).toContain('sandbox_workspace_write={network_access=false,writable_roots=["/private/scratch"],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}');
+      expect(prepared.args).toContain('shell_environment_policy.set.TMPDIR="/private/scratch"');
+      expect(prepared.env).toMatchObject({ TMPDIR: "/private/scratch", TMP: "/private/scratch", TEMP: "/private/scratch" });
+      expect(config.args.join(" ")).not.toContain("/private/scratch");
+    }
+    const readOnly = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), READONLY_POLICY, {});
+    expect(readOnly.withScratchDir).toBeUndefined();
+  });
+
   it("returns a valid SpawnConfig", () => {
     const envelope = createStandardEnvelope();
     const config: SpawnConfig = codexCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { chmod, link, mkdtemp, rm, readFile, mkdir, writeFile, symlink } from "node:fs/promises";
+import { existsSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { writeFakeCli } from "../helpers/fake-cli.js";
 import {
@@ -10,6 +11,7 @@ import {
   codexShellEnvFlags,
   CODEX_AGENT_HIDDEN_ENV,
   createCodexCliClient,
+  createCodexScratch,
 } from "../../src/codex-cli-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
 import { DEFAULT_EXECUTION_POLICY } from "../../src/runtime-contract.js";
@@ -23,6 +25,130 @@ const SHELL_ENV = [
 ];
 
 const WORKSPACE = ["--strict-config", "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}'];
+
+describe("Codex provider scratch lifecycle", () => {
+  it("preserves the missing executable diagnosis when preflight is the first spawn", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-missing-"));
+    try {
+      const cli_path = join(dir, "absent-codex");
+      const client = createCodexCliClient({ codexConfig: { cli_path }, maxRetries: 0 });
+      await expect(client.complete({ prompt: "test" })).rejects.toMatchObject({
+        reason: "not-found", retryable: false, message: expect.stringContaining(cli_path),
+      });
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+
+  it.each([false, true])("checks effective native PATH-only filtering before model work (usable temp: %s)", async usable => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-filter-test-"));
+    const include = usable ? ["PATH", "TMPDIR", "TMP", "TEMP", "UNRELATED_PRIVATE_VALUE"] : ["PATH"];
+    const policy = { include_only: include, exclude: ["UNRELATED_PRIVATE_VALUE"] };
+    try {
+      const capture = join(dir, "effective.json");
+      const binary = writeFakeCli(dir, { name: "filter-cli",
+        codexConfigRead: { shell_environment_policy: policy },
+        script: `
+          import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+          import { spawnSync } from 'node:child_process';
+          const args = process.argv.slice(2);
+          // Replay the native ordering measured in host-filter.json: set, then include_only.
+          const effective = { ...process.env, UNRELATED_PRIVATE_VALUE: 'canary' };
+          const policy = ${JSON.stringify(policy)};
+          for (const name of policy.exclude) delete effective[name];
+          for (const arg of args) {
+            if (/^shell_environment_policy[.=]/.test(arg) && !arg.startsWith('shell_environment_policy.set.')) {
+              throw new Error('Execution replaced a native shell filter');
+            }
+            const match = /^shell_environment_policy\\.set\\.(TMPDIR|TMP|TEMP)=(.*)$/.exec(arg);
+            if (match) effective[match[1]] = JSON.parse(match[2]);
+          }
+          for (const name of Object.keys(effective)) if (!policy.include_only.includes(name)) delete effective[name];
+          const child = spawnSync(process.execPath, ['-e',
+            'const fs=require("fs"),os=require("os"),path=require("path"); fs.mkdtempSync(path.join(os.tmpdir(),"api-")); console.log(JSON.stringify({tmp:os.tmpdir(),secret:process.env.UNRELATED_PRIVATE_VALUE}));'],
+            { env: effective, encoding: 'utf8' });
+          fs.writeFileSync(${JSON.stringify(capture)}, child.stdout);
+          if (child.status !== 0) process.exit(1);
+          fs.writeFileSync(args[args.indexOf('-o') + 1], 'done');
+        ` });
+      const completion = createCodexCliClient({ codexConfig: { cli_path: binary }, maxRetries: 0 }).complete({ prompt: "test" });
+      if (usable) {
+        expect((await completion).text).toBe("done");
+        const observed = JSON.parse(await readFile(capture, "utf8"));
+        expect(observed.secret).toBeUndefined();
+        expect(observed.tmp).not.toBe(tmpdir());
+        expect(existsSync(observed.tmp)).toBe(false);
+      } else {
+        await expect(completion).rejects.toThrow(/include_only.*TMPDIR/);
+        expect(existsSync(capture)).toBe(false);
+      }
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+
+  it("disposes only its own directory and does not reclaim a reused path", async () => {
+    const scratch = createCodexScratch();
+    const other = createCodexScratch();
+    try {
+      await writeFile(join(other.dir, "keep"), "owned by another spawn");
+      await symlink(other.dir, join(scratch.dir, "link"), process.platform === "win32" ? "junction" : "dir");
+      if (process.platform !== "win32") {
+        await symlink(join(other.dir, "keep"), join(scratch.dir, "file-link"));
+        await link(join(other.dir, "keep"), join(scratch.dir, "hard-link"));
+        await chmod(join(other.dir, "keep"), 0o400);
+        await chmod(other.dir, 0o555);
+      }
+      scratch.dispose();
+      expect(await readFile(join(other.dir, "keep"), "utf-8")).toBe("owned by another spawn");
+      if (process.platform !== "win32") {
+        expect(statSync(other.dir).mode & 0o777).toBe(0o555);
+        expect(statSync(join(other.dir, "keep")).mode & 0o777).toBe(0o400);
+      }
+      await mkdir(scratch.dir);
+      await writeFile(join(scratch.dir, "keep"), "reused path");
+      scratch.dispose();
+      expect(await readFile(join(scratch.dir, "keep"), "utf-8")).toBe("reused path");
+    } finally {
+      scratch.dispose();
+      other.dispose();
+      await rm(scratch.dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each([0, 1])("supplies normal temp APIs a private bounded directory and cleans exit %s", async exitCode => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-scratch-test-"));
+    try {
+      const capture = join(dir, "capture.json");
+      const binary = writeFakeCli(dir, { name: "scratch-cli", codexConfigRead: {}, script: `
+        import fs from 'node:fs';
+        import os from 'node:os';
+        import path from 'node:path';
+        const args = process.argv.slice(2);
+        if (!args.includes('-o')) process.exit(0);
+        const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'normal-api-'));
+        fs.writeFileSync(path.join(temporary, 'file'), 'ok');
+        fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({ args, tmp: os.tmpdir(),
+          temp: process.env.TEMP, tmpEnv: process.env.TMP, mode: fs.statSync(os.tmpdir()).mode & 0o777 }));
+        fs.writeFileSync(args[args.indexOf('-o') + 1], 'done');
+        if (process.platform !== 'win32') fs.chmodSync(temporary, 0o555);
+        process.exit(${exitCode});
+      ` });
+      const client = createCodexCliClient({ codexConfig: { cli_path: binary }, maxRetries: 0 });
+      const result = client.complete({ prompt: "test" });
+      if (exitCode) await expect(result).rejects.toThrow();
+      else await result;
+      const observed = JSON.parse(await readFile(capture, "utf-8"));
+      expect(observed.tmp).not.toBe(tmpdir());
+      expect(observed.temp).toBe(observed.tmp);
+      expect(observed.tmpEnv).toBe(observed.tmp);
+      if (process.platform !== "win32") expect(observed.mode).toBe(0o700);
+      expect(observed.args).toContain(`sandbox_workspace_write={network_access=false,writable_roots=[${JSON.stringify(observed.tmp)}],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}`);
+      expect(observed.args).toContain(`shell_environment_policy.set.TMPDIR=${JSON.stringify(observed.tmp)}`);
+      const output = observed.args[observed.args.indexOf("-o") + 1];
+      const relativeOutput = relative(observed.tmp, output);
+      expect(isAbsolute(relativeOutput) || relativeOutput.startsWith(`..${sep}`)).toBe(true);
+      expect(existsSync(output)).toBe(false);
+      expect(existsSync(observed.tmp)).toBe(false);
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+});
 
 describe("Codex policy flag compilation", () => {
   describe("mapSandboxToCodexFlag", () => {
@@ -293,7 +419,7 @@ async function makeMockBinary(
   tmpDir: string,
   { stderr, exitCode }: { stderr: string; exitCode: number },
 ): Promise<string> {
-  return writeFakeCli(tmpDir, { name: "mock-codex", stderr, exitCode });
+  return writeFakeCli(tmpDir, { name: "mock-codex", stderr, exitCode, codexConfigRead: {} });
 }
 
 describe("createCodexCliClient — rate limit retry", () => {
@@ -301,14 +427,17 @@ describe("createCodexCliClient — rate limit retry", () => {
     "does not retry without strict config when an older CLI rejects it in %s mode", async (sandbox) => {
       const dir = await mkdtemp(join(tmpdir(), "ndx-policy-version-"));
       try {
+        const attempts = join(dir, "attempts");
         const binary = writeFakeCli(dir, {
           name: "unsupported-codex",
           script: `
-            for await (const chunk of process.stdin) { void chunk; }
+            import fs from 'node:fs';
+            fs.appendFileSync(${JSON.stringify(attempts)}, 'attempt\\n');
             if (process.argv.includes('--strict-config')) {
               process.stderr.write('error: unexpected argument --strict-config');
               process.exit(2);
             }
+            for await (const chunk of process.stdin) { void chunk; }
             process.stdout.write('UNSAFE FALLBACK');
           `,
         });
@@ -324,6 +453,7 @@ describe("createCodexCliClient — rate limit retry", () => {
         await expect(client.complete({ prompt: "test", model: "test-model" }))
           .rejects.toThrow(/strict-config/);
         expect(retries).toEqual([]);
+        expect(await readFile(attempts, "utf8")).toBe("attempt\n");
       } finally {
         await rm(dir, { recursive: true, force: true });
       }

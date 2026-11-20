@@ -58,7 +58,8 @@ import {
   detectBasePath,
   stripBasePath,
   stripWorkspaceSlot,
-  AUTH_HINT,
+  authRequiredBody,
+  BEARER_CHALLENGE,
 } from "../shared/index.js";
 import type { CredentialStore, RequestAccess } from "../shared/index.js";
 
@@ -85,28 +86,25 @@ export function classifyOrigin(req: Pick<IncomingMessage, "headers">, hubPort: n
   return isLoopbackOriginOnPort(origin, hubPort) ? "trusted" : "untrusted";
 }
 
-function reject(res: ServerResponse): true {
-  res.writeHead(403, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-  res.end(JSON.stringify({ error: "Cross-origin request rejected" }));
+/** Answer the gate's own JSON, never cached; true, so a guard can return it as "answered". */
+function answer(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): true {
+  res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers });
+  res.end(JSON.stringify(body));
   return true;
+}
+
+function reject(res: ServerResponse): true {
+  return answer(res, 403, { error: "Cross-origin request rejected" });
 }
 
 function rejectHost(res: ServerResponse): true {
   // 421 Misdirected Request: the request was not meant for the server it
   // reached. No CORS headers are set.
-  res.writeHead(421, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-  res.end(JSON.stringify({ error: "Request Host does not name this server" }));
-  return true;
+  return answer(res, 421, { error: "Request Host does not name this server" });
 }
 
 function rejectUnauthenticated(res: ServerResponse): true {
-  res.writeHead(401, {
-    "Content-Type": "application/json",
-    "Cache-Control": "no-store",
-    "WWW-Authenticate": 'Bearer realm="n-dx"',
-  });
-  res.end(JSON.stringify({ error: "Authentication required", hint: AUTH_HINT }));
-  return true;
+  return answer(res, 401, authRequiredBody(), { "WWW-Authenticate": BEARER_CHALLENGE });
 }
 
 /** Requests the gate let through without a credential. */
@@ -199,12 +197,8 @@ export function guardHubRequest(
   }
 
   if (route !== null) {
-    const answer = answerAuthRoute(route, method, req.headers, token, credentials, access);
-    const headers: Record<string, string> = { "Content-Type": "application/json", "Cache-Control": "no-store" };
-    if (answer.status === 401) headers["WWW-Authenticate"] = 'Bearer realm="n-dx"';
-    res.writeHead(answer.status, headers);
-    res.end(JSON.stringify(answer.body));
-    return true;
+    const routed = answerAuthRoute(route, method, req.headers, token, credentials, access);
+    return answer(res, routed.status, routed.body, routed.status === 401 ? { "WWW-Authenticate": BEARER_CHALLENGE } : {});
   }
 
   return false;

@@ -21,7 +21,8 @@ import {
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
-import {tryParseJSON, extractFindings, formatFileLabel} from "./enrich-parsing.js";import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
+import { tryParseJSON, extractFindings, formatFileLabel } from "./enrich-parsing.js";
+import { emptyAnalyzeTokenUsage, accumulateTokenUsage, addCallUsage, mergeTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 import { extractFileHeader } from "./file-headers.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
@@ -115,9 +116,7 @@ export async function runMetaEvaluation(
     const rerated = await judgeFindings(existingFindings);
     updatedFindings = rerated.findings;
     if (rerated.calls > 0) {
-      metaTokenUsage.calls += rerated.calls;
-      metaTokenUsage.inputTokens += rerated.tokenUsage?.input ?? 0;
-      metaTokenUsage.outputTokens += rerated.tokenUsage?.output ?? 0;
+      addCallUsage(metaTokenUsage, rerated.calls, rerated.tokenUsage);
     }
   } else if (Array.isArray(parsed.severityUpdates)) {
     const validSeverities = ["info", "warning", "critical"];
@@ -315,18 +314,7 @@ export function aggregateBatchResults(results: BatchResult[]): AggregatedBatchDa
   const successfulBatchIds = new Set<string>();
 
   for (const br of results) {
-    // Token usage
-    totalTokenUsage.calls += br.tokenUsage.calls;
-    totalTokenUsage.inputTokens += br.tokenUsage.inputTokens;
-    totalTokenUsage.outputTokens += br.tokenUsage.outputTokens;
-    if (br.tokenUsage.cacheCreationInputTokens) {
-      totalTokenUsage.cacheCreationInputTokens =
-        (totalTokenUsage.cacheCreationInputTokens ?? 0) + br.tokenUsage.cacheCreationInputTokens;
-    }
-    if (br.tokenUsage.cacheReadInputTokens) {
-      totalTokenUsage.cacheReadInputTokens =
-        (totalTokenUsage.cacheReadInputTokens ?? 0) + br.tokenUsage.cacheReadInputTokens;
-    }
+    mergeTokenUsage(totalTokenUsage, br.tokenUsage);
 
     // Parsed data
     if (Array.isArray(br.parsed.zones)) {

@@ -94,7 +94,7 @@
 }
 
 .hench-config-field.modified {
-  border-left: 3px solid var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 6%, var(--bg-surface));
 }
 
 .hench-config-field.dirty {

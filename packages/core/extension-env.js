@@ -29,6 +29,7 @@ import * as nodeFs from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SUPPORTED_EXTENSION_API_VERSIONS } from "./extension-manifest.js";
+import { isPidAlive } from "./child-lifecycle.js";
 
 /** The contract version n-dx speaks: the newest it supports. */
 export const EXTENSION_API_VERSION = Math.max(...SUPPORTED_EXTENSION_API_VERSIONS);
@@ -215,17 +216,6 @@ function runningHub(home, fs, isAlive) {
   if (!isAlive(pid)) return null;
   const tokenFile = join(home, AUTH_TOKEN_FILE);
   return { url: `http://127.0.0.1:${port}`, tokenFile: fs.existsSync(tokenFile) ? tokenFile : undefined };
-}
-
-/** @param {number} pid */
-function isPidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    // EPERM: the process exists but belongs to someone else.
-    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
-  }
 }
 
 /**

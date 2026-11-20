@@ -14,6 +14,7 @@ import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { usePolling } from "../hooks/index.js";
 import { USAGE_POLL_INTERVAL_MS } from "../usage/constants.js";
+import { formatTokenCount as fmtTokens } from "../utils/format.js";
 
 /** The slice of the utilization reply this summary reads. */
 export interface SpendReply {
@@ -51,12 +52,6 @@ const TOP_COMMANDS = 3;
 
 const tokensOf = (c: NonNullable<SpendReply["commands"]>[number]) =>
   (c.inputTokens ?? 0) + (c.outputTokens ?? 0) + (c.cacheCreationTokens ?? 0) + (c.cacheReadTokens ?? 0);
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 /** What the summary says, computed apart from rendering so it can be tested on its own. */
 export function spendLines(reply: SpendReply): {

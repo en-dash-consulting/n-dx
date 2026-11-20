@@ -162,11 +162,25 @@ function faceBin(face: string | undefined, platform: NodeJS.Platform): string | 
   return undefined;
 }
 
+/**
+ * What `NDX_GRAVIEW_NPX` says about downloading graview: true (1, true, yes,
+ * on), false (0, false, no, off), or undefined when unset, empty or anything
+ * else, which leaves it to the config.
+ */
+function npxChoiceFromEnv(value: string | undefined): boolean | undefined {
+  const choice = value?.trim().toLowerCase();
+  if (!choice) return undefined;
+  if (["1", "true", "yes", "on"].includes(choice)) return true;
+  if (["0", "false", "no", "off"].includes(choice)) return false;
+  return undefined;
+}
+
 export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOptions = {}): GraviewCommand {
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
+  const config = readGraviewConfig(layout);
 
-  const configured = readGraviewConfig(layout).bin;
+  const configured = config.bin;
   if (configured) return commandFor(configured, layout.root, "config");
 
   const fromEnv = env[GRAVIEW_BIN_ENV]?.trim();
@@ -179,9 +193,7 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
   if (fromFace) return { cmd: fromFace, prefix: [], source: "face", detail: fromFace };
 
   // The environment wins either way: NDX_GRAVIEW_NPX=0 (false, no, off) refuses a download the local config allows.
-  const npxEnv = env[GRAVIEW_NPX_ENV]?.trim().toLowerCase();
-  const envAllows = npxEnv === undefined || npxEnv === "" ? undefined : ["1", "true", "yes", "on"].includes(npxEnv) ? true : ["0", "false", "no", "off"].includes(npxEnv) ? false : undefined;
-  if (envAllows ?? readGraviewConfig(layout).allowNpx === true) {
+  if (npxChoiceFromEnv(env[GRAVIEW_NPX_ENV]) ?? config.allowNpx === true) {
     const npx = platform === "win32" ? "npx.cmd" : "npx";
     return {
       cmd: npx,

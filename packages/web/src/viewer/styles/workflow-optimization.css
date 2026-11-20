@@ -106,14 +106,12 @@
 .wf-suggestion-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
 }
 
-.wf-suggestion-card.wf-priority-high { border-left-color: var(--red); }
-.wf-suggestion-card.wf-priority-medium { border-left-color: var(--orange); }
-.wf-suggestion-card.wf-priority-low { border-left-color: var(--border-strong); }
+.wf-suggestion-card.wf-priority-high { background: color-mix(in srgb, var(--red) 7%, var(--bg-surface)); }
+.wf-suggestion-card.wf-priority-medium { background: color-mix(in srgb, var(--orange) 7%, var(--bg-surface)); }
 
 .wf-suggestion-header {
   cursor: pointer;
@@ -252,7 +250,7 @@
 }
 
 .wf-error {
-  border-left: 3px solid var(--red);
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
 }
 
 .wf-error-hint,

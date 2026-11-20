@@ -1,6 +1,6 @@
 /**
- * Detect a CLI session that ended waiting on a background command, and decide
- * whether to resume it.
+ * Resume a CLI session that ended unfinished, including a background wait or
+ * a truncated event stream.
  *
  * WHY THIS EXISTS. The system prompt's Foreground Invariant
  * (`agent/planning/prompt.ts`) tells the agent never to background a command
@@ -64,15 +64,15 @@ export function buildReviewResumeMessage(reportPath: string): string {
 }
 
 /**
- * The run error when a work session ends waiting a second time, after it has
+ * The run error when a work session ends unfinished a second time, after it has
  * already been resumed once.
  */
 export function formatBackgroundWaitFailure(signal: BackgroundWaitSignal): string {
   const what = signal.detail ? `${signal.tool} (${signal.detail})` : signal.tool;
   return (
-    `The agent ended its session waiting on a background command again after being resumed ` +
-    `to finish in the foreground (last: ${what}). Nothing notifies a non-interactive run, ` +
-    `so its work was left uncommitted. The task is reset to pending.`
+    `The agent left its session unfinished again after being resumed ` +
+    `to finish in the foreground (last: ${what}). Its work was left uncommitted. ` +
+    `The task is reset to pending.`
   );
 }
 

@@ -26,10 +26,12 @@ import { codexGuardLimitations } from "./codex-policy.js";
 import { CodexManagedUsage } from "./codex-managed-usage.js";
 import { createHash } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
-import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import type { PermissionMode, RetryConfig, RunRecord, TokenUsage, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
+import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
-import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
+import { checkTokenBudget, formatBudgetExceeded } from "./token-budget.js";
+import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
@@ -126,6 +128,8 @@ import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
 import {
+  createCodexScratch,
+  assertCodexScratchEnvironment,
   codexSessionDriver,
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -166,8 +170,8 @@ import {
   type PriorAttemptWork,
 } from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
-import type { PromptSectionDiagnostic, PersistedRuntimeEvent, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
-import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS } from "../../schema/index.js";
+import type { PromptSectionDiagnostic, PersistedRuntimeEvent, RunReviewMode } from "../../schema/index.js";
+import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS, MAX_SUMMARY_LENGTH, MAX_TOOL_OUTPUT_STORED } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
 import {
@@ -319,9 +323,7 @@ export interface SpawnTokenMetadata {
   model: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────
-
-const MAX_SUMMARY_LENGTH = 500;
+// ── Formatting ────────────────────────────────────────────────────────────
 
 /** `90000` → `"90s"`, for limit messages. */
 function formatSeconds(ms: number): string {
@@ -491,9 +493,9 @@ function applyRuntimeEvent(
       const resultId = event.toolResult?.id;
       const answered = resultId ? toolCallsById?.get(resultId) : undefined;
       if (answered) {
-        answered.output = output.slice(0, 2000);
+        answered.output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
       } else if (!resultId && result.toolCalls.length > 0) {
-        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, MAX_TOOL_OUTPUT_STORED);
       }
       const preview = output.slice(0, 200);
       stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
@@ -608,17 +610,7 @@ export function rawJsonToTokenUsageEvent(
   metadata: SpawnTokenMetadata,
   seen?: UsageMessageFilter,
 ): RuntimeEvent | null {
-  let usage: Record<string, unknown> | undefined;
-
-  if (rawJson.usage && typeof rawJson.usage === "object") {
-    usage = rawJson.usage as Record<string, unknown>;
-  } else if (rawJson.message && typeof rawJson.message === "object") {
-    const msg = rawJson.message as Record<string, unknown>;
-    if (msg.usage && typeof msg.usage === "object") {
-      usage = msg.usage as Record<string, unknown>;
-    }
-  }
-
+  const usage = findUsagePayload(rawJson);
   if (!usage) return null;
 
   // A repeat of a message already counted. Dropping it here rather than at the
@@ -645,11 +637,60 @@ export function rawJsonToTokenUsageEvent(
 // ── Token usage extraction from raw JSON ──────────────────────────────────
 
 /**
+ * The usage payload of a raw vendor event, from the two places Claude and
+ * Codex put it: the event's own `usage` (both vendors), else the nested
+ * `message.usage` (Claude "assistant" events).
+ */
+function findUsagePayload(rawJson: Record<string, unknown>): Record<string, unknown> | undefined {
+  // Direct usage field (both vendors)
+  if (rawJson.usage && typeof rawJson.usage === "object") {
+    return rawJson.usage as Record<string, unknown>;
+  }
+  // Nested message.usage (Claude "assistant" events)
+  if (rawJson.message && typeof rawJson.message === "object") {
+    const msg = rawJson.message as Record<string, unknown>;
+    if (msg.usage && typeof msg.usage === "object") {
+      return msg.usage as Record<string, unknown>;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Push the token usage a Codex spawn reported in its whole stdout, for when no
+ * structured event carried any: the JSON mapping when stdout is one JSON
+ * document, else the text-format summary line (non-JSON stdout, e.g. codex
+ * --json JSONL). Pushes nothing when neither yields a reading.
+ */
+function pushCodexStdoutUsage(
+  accumulator: EventAccumulator,
+  stdout: string,
+  vendor: LLMVendor,
+): void {
+  let tokenUsage: TokenUsage | undefined;
+  try {
+    const codexMapping = mapCodexUsageToTokenUsage(JSON.parse(stdout));
+    if (codexMapping.diagnosticStatus !== "unavailable") tokenUsage = codexMapping.usage;
+  } catch {
+    const textTokens = parseCodexCliTokenUsage(stdout);
+    if (textTokens) tokenUsage = { input: textTokens.input, output: textTokens.output };
+  }
+  if (!tokenUsage) return;
+  accumulator.push({
+    type: "token_usage",
+    vendor,
+    turn: 1,
+    timestamp: new Date().toISOString(),
+    tokenUsage,
+  });
+}
+
+/**
  * Extract token usage from a raw JSON event object.
  *
  * Both Claude and Codex embed token usage in event payloads at predictable
- * locations (`event.usage`, `event.message.usage`). This function checks
- * those locations and accumulates usage into the SpawnResult.
+ * locations (see {@link findUsagePayload}). This function accumulates that
+ * usage into the SpawnResult.
  */
 function extractTokenUsage(
   rawJson: Record<string, unknown>,
@@ -658,20 +699,7 @@ function extractTokenUsage(
   tokenMetadata: SpawnTokenMetadata,
   seen: UsageMessageFilter,
 ): void {
-  let usage: Record<string, unknown> | undefined;
-
-  // Direct usage field (both vendors)
-  if (rawJson.usage && typeof rawJson.usage === "object") {
-    usage = rawJson.usage as Record<string, unknown>;
-  }
-  // Nested message.usage (Claude "assistant" events)
-  else if (rawJson.message && typeof rawJson.message === "object") {
-    const msg = rawJson.message as Record<string, unknown>;
-    if (msg.usage && typeof msg.usage === "object") {
-      usage = msg.usage as Record<string, unknown>;
-    }
-  }
-
+  const usage = findUsagePayload(rawJson);
   if (!usage) return;
 
   // See {@link rawJsonToTokenUsageEvent}: the same message arrives once per
@@ -912,13 +940,26 @@ export async function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<S
     const reason = describeAbortReason(opts.abortSignal.reason);
     return { ...emptySpawnResult(), error: reason, aborted: { reason } };
   }
-  const spawned = spawnVendorProcess(opts);
   const backstop = opts.configBackstop;
-  if (!backstop) return spawned;
-  return spawned.finally(() => {
-    const writes = backstop.restore();
-    if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
-  });
+  const scratch = opts.spawnConfig.withScratchDir ? createCodexScratch() : undefined;
+  try {
+    if (scratch) {
+      const spawnConfig = opts.spawnConfig.withScratchDir!(scratch.dir);
+      opts = { ...opts, spawnConfig, cliEnv: { ...opts.cliEnv, ...spawnConfig.env } };
+      await assertCodexScratchEnvironment({ binary: opts.cliBinary, args: spawnConfig.args,
+        cwd: opts.cwd, env: opts.cliEnv, scratchDir: scratch.dir, signal: opts.abortSignal });
+    }
+    return await spawnVendorProcess(opts);
+  } finally {
+    try {
+      scratch?.dispose();
+    } finally {
+      if (backstop) {
+        const writes = backstop.restore();
+        if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
+      }
+    }
+  }
 }
 
 function emptySpawnResult(): SpawnResult {
@@ -1135,64 +1176,14 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
 
           // Codex-specific: extract token usage from raw stdout
           if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
-            try {
-              const raw = JSON.parse(fullStdout);
-              const codexMapping = mapCodexUsageToTokenUsage(raw);
-              if (codexMapping.diagnosticStatus !== "unavailable") {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: codexMapping.usage,
-                });
-              }
-            } catch {
-              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
-              // usage from the text-format summary line.
-              const textTokens = parseCodexCliTokenUsage(fullStdout);
-              if (textTokens) {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: { input: textTokens.input, output: textTokens.output },
-                });
-              }
-            }
+            pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
         // Codex token usage fallback: structured events parsed but no usage
         if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
           if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
-            try {
-              const raw = JSON.parse(fullStdout);
-              const codexMapping = mapCodexUsageToTokenUsage(raw);
-              if (codexMapping.diagnosticStatus !== "unavailable") {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: codexMapping.usage,
-                });
-              }
-            } catch {
-              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
-              // usage from the text-format summary line.
-              const textTokens = parseCodexCliTokenUsage(fullStdout);
-              if (textTokens) {
-                accumulator.push({
-                  type: "token_usage",
-                  vendor: tokenMetadata.vendor,
-                  turn: 1,
-                  timestamp: new Date().toISOString(),
-                  tokenUsage: { input: textTokens.input, output: textTokens.output },
-                });
-              }
-            }
+            pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
@@ -2552,6 +2543,8 @@ interface ErrorContext {
   taskId: string;
   retryConfig: RetryConfig;
   vendor: string;
+  /** A failed Codex continuation cannot resume again or replay the task cold. */
+  codexContinuation?: "retry" | "unfinished-work";
 }
 
 /**
@@ -2622,6 +2615,20 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
     run.summary = result.summary;
     run.error = `${diagnosis.message} ${diagnosis.suggestion}`;
     await handleRunFailure(store, taskId, "deferred", "auth_error", run.error);
+    return "break";
+  }
+
+  if (ctx.codexContinuation) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    const transient = isTransientError(result.error!);
+    run.status = transient ? "error_transient" : "failed";
+    run.summary = result.summary;
+    run.error =
+      `Codex ${ctx.codexContinuation} continuation failed during attempt ${attempt + 1}/${retryConfig.maxRetries + 1}. ` +
+      "Stopping recovery without another resume or cold replay. " +
+      `Last error: ${result.error}`;
+    info(`\n${run.error}`);
+    await handleRunFailure(store, taskId, transient ? "pending" : "deferred", "codex_continuation_failed", run.error);
     return "break";
   }
 
@@ -2709,7 +2716,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     return { run };
   }
 
-  const policyLimitations = codexGuardLimitations(vendor, "cli");
+  const policyLimitations = codexGuardLimitations(vendor, "cli",
+    opts.reviewPass ? opts.reviewMode : "off", opts.reviewVendor);
   if (policyLimitations) stream("Guard", policyLimitations);
 
   // Shared: transition task to in_progress
@@ -3146,10 +3154,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         ? "not-consulted"
         : config.sessionStrategy === "cold"
           ? "configured-cold"
-          // `resolveSessionStrategy` degrades to cold for any vendor or
-          // provider that cannot resume a session by id. Saying so is the
-          // difference between "forking is off" and "forking was asked for and
-          // this vendor cannot do it".
+          // Forking needs a supported CLI surface and a reusable identity;
+          // resume support alone does not make a warm parent safe to fork.
           : forkCapability?.supported && !forkCapability.reusable
             ? "identity-unavailable"
             : "fork-unsupported",
@@ -3190,13 +3196,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   }
 
   if (sessionStrategy === "fork") {
-    // Hash values without logging/storing credentials. A changed child environment
-    // invalidates orientation even if model and source analysis are unchanged.
-    const identityHash = createHash("sha256").update(JSON.stringify([
+    // Codex binds orientation to the full execution identity without persisting
+    // credentials. Preserve Claude's historical parent admission checks.
+    const identityHash = vendor === "codex" ? createHash("sha256").update(JSON.stringify([
       run.worktreeRoot ?? projectDir, chainRefIdentity(run), policyFingerprint(policy),
       cliBinary, forkCapability?.version, forkCapability?.identity, config.permissionMode,
       Object.entries(cliEnv ?? process.env).sort(([a], [b]) => a.localeCompare(b)),
-    ])).digest("hex");
+    ])).digest("hex") : undefined;
     const decision = await ensureWarmParent({
       identityHash,
       codexOrientationFlags: forkCapability?.orientationFlags,
@@ -3301,8 +3307,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
    */
   let lastSessionId: string | undefined;
   /**
-   * Session to resume because it ended waiting on a background command with
-   * its work uncommitted. Set for exactly one spawn, then cleared.
+   * Session to resume because it ended unfinished with its work uncommitted.
+   * Set for exactly one spawn, then cleared.
    *
    * Once per task: a session that ends the same way after being told nothing
    * will notify it is not going to be talked out of it by a second message,
@@ -3321,7 +3327,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries - planRespawnsChargedToRetries; attempt++) {
       let result!: SpawnResult;
-      let codexRetryAttempt = false;
+      let codexContinuation: ErrorContext["codexContinuation"];
       let attemptAccumulator: EventAccumulator | undefined;
 
       // Inner re-spawn loop: handles plan-mode interceptions without
@@ -3443,7 +3449,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
 
         if (backgroundResumeSessionId) {
-          subsection("Resuming the session: it ended waiting on a background command");
+          subsection("Resuming the unfinished session");
         } else if (readOnlyRetryPending) {
           subsection("Re-spawn cold after a read-only refusal");
         } else if (attempt > 0 && planRespawns === 0) {
@@ -3477,7 +3483,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
         recordSpawn(spawnLedger, nextSpawnReason);
 
-        codexRetryAttempt = vendor === "codex" && (retryResumeSessionId !== undefined || backgroundResumeSessionId !== undefined);
+        codexContinuation = vendor === "codex"
+          ? backgroundResumeSessionId ? "unfinished-work" : retryResumeSessionId ? "retry" : undefined
+          : undefined;
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
         resetLiveSpawnProgress(liveProgress);
         result = await withHeartbeat(
@@ -3545,7 +3553,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
         if (vendor === "codex") {
           codexWorkSession = result.sessionId ? { id: result.sessionId, identity: codexSpawnIdentity } : undefined;
-          if (codexRetryAttempt && !result.error && result.sessionId !== expectedContinuationSession) {
+          if (codexContinuation && !result.error && result.sessionId !== expectedContinuationSession) {
             result.error = "Codex did not confirm the resumed work session id; refusing to replay this task";
           }
         }
@@ -3554,10 +3562,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         noteUsageDiagnostics(run, result);
         accumulateResult(accumulated, result);
 
-        // Background wait: the session handed work to the background and then
-        // ended, and nothing will ever notify it. Only a session that left its
-        // work uncommitted needs anything — one that backgrounded a command
-        // but still committed has finished.
+        // An unfinished session may have backgrounded work or emitted a
+        // truncated stream. Only uncommitted work needs a continuation.
         if (
           result.backgroundWait && !result.error && !result.planModeIntercept &&
           (await hasUnfinishedWork({ projectDir, autoCommit: config.autoCommit === true }))
@@ -3573,13 +3579,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             nextSpawnReason = "background-resume";
             run.backgroundResume = { ...signal };
             info(
-              `\n⚠ The session ended waiting on a background command (${signal.tool}` +
+              `\n⚠ The session ended unfinished (${signal.tool}` +
                 `${signal.detail ? `: ${signal.detail}` : ""}) with its work uncommitted. ` +
                 "Resuming it once to finish in the foreground.",
             );
             await toolRexAppendLog(store, taskId, {
               event: "background_wait_resumed",
-              detail: `Session ${resumeId.slice(0, 8)} ended waiting on ${signal.tool}; resumed once.`,
+              detail: `Session ${resumeId.slice(0, 8)} ended unfinished (last: ${signal.tool}` +
+                `${signal.detail ? `: ${signal.detail}` : ""}); resumed once.`,
             });
             continue;
           }
@@ -3680,9 +3687,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         const action = await processErrorResult({
           run, result, accumulated, attempt,
           store, taskId, vendor,
-          // A failed Codex continuation is terminal, not another resume or a
-          // cold replay of work which may already have completed.
-          retryConfig: codexRetryAttempt ? { ...retryConfig, maxRetries: attempt } : retryConfig,
+          retryConfig, codexContinuation,
         });
         if (action === "break") break;
         // action === "retry" → continue loop.

@@ -21,9 +21,11 @@
  */
 
 import { codexEffortFlags, resolveCodexCliEffort } from "./codex-effort.js";
+import { assertCodexScratchEnvironment } from "./codex-scratch-env.js";
 
 import { CodexCliUsage } from "./codex-cli-usage.js";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdtempSync, openSync, readdirSync, realpathSync, rmdirSync, rmSync, type BigIntStats } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type {
@@ -38,25 +40,14 @@ import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-con
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
-import { printRetryLine } from "./progress-reporter.js";
-import { formatRetryCountdown } from "./rate-limit.js";
+import { printRateLimitRetryLine } from "./progress-reporter.js";
+import { CLI_RATE_LIMIT_PATTERN, CLI_TRANSIENT_PATTERNS } from "./rate-limit.js";
 import { resolveVendorCliEnv } from "./child-env.js";
+import { isLlmDebugEnabled } from "./output.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
-const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
-const TRANSIENT_PATTERNS = [
-  /\b500\b/,
-  /\b502\b/,
-  /\b503\b/,
-  /\b529\b/,
-  /\b429\b/,
-  /overloaded/i,
-  /ETIMEDOUT/,
-  /ECONNRESET/,
-  /ECONNREFUSED/,
-  /socket hang up/i,
-  /stream disconnected/i,
-];
+/** The shared CLI transient failures, plus a Codex stream the CLI lost mid-response. */
+const TRANSIENT_PATTERNS = [...CLI_TRANSIENT_PATTERNS, /stream disconnected/i];
 
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BASE_DELAY_MS = 1000;
@@ -90,11 +81,6 @@ export interface CodexCliProviderOptions {
 // ── Policy flag compilation ──────────────────────────────────────────────
 
 /**
- * Map an n-dx {@link SandboxMode} to the Codex CLI `--sandbox` flag value.
- *
- * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
- */
-/**
  * The `--sandbox` values `codex exec` accepts.
  *
  * From `codex exec --help`: `[possible values: read-only, workspace-write,
@@ -124,6 +110,11 @@ export type CodexApprovalPolicy =
   | "granular"
   | "never";
 
+/**
+ * Map an n-dx {@link SandboxMode} to the Codex CLI `--sandbox` flag value.
+ *
+ * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
+ */
 export function mapSandboxToCodexFlag(mode: SandboxMode): CodexSandboxMode {
   switch (mode) {
     case "read-only":
@@ -206,7 +197,7 @@ export function mapApprovalToCodexFlag(policy: ApprovalPolicy): CodexApprovalPol
  */
 export function compileCodexPolicyFlags(
   policy: ExecutionPolicy,
-  options: { resume?: boolean } = {},
+  options: { resume?: boolean; scratchDir?: string } = {},
 ): string[] {
   // A disabled sandbox cannot enforce a network or writable-root restriction.
   // Refuse contradictory policies instead of silently discarding their limits.
@@ -233,6 +224,14 @@ export function compileCodexPolicyFlags(
   if (policy.sandbox === "workspace-write" && additionalRoots.length === policy.writableRoots.length) {
     throw new Error("Codex workspace-write always permits the project root; writableRoots must include '.' or use read-only");
   }
+  const scratchDir = policy.sandbox === "workspace-write" ? options.scratchDir : undefined;
+  if (scratchDir) additionalRoots.push(scratchDir);
+  const shellFlags = [
+    ...(scratchDir ? ["TMPDIR", "TMP", "TEMP"].flatMap(name => [
+      "-c", `shell_environment_policy.set.${name}=${JSON.stringify(scratchDir)}`,
+    ]) : []),
+    ...codexShellEnvFlags(),
+  ];
   // Strict parsing is required in every mode, including continuation turns.
   // Older CLIs must reject the flag rather than ignore unfamiliar controls.
   const workspaceFlags = ["--strict-config", ...(policy.sandbox === "workspace-write" ? [
@@ -245,7 +244,7 @@ export function compileCodexPolicyFlags(
       `sandbox_mode="${mapSandboxToCodexFlag(policy.sandbox)}"`,
       "-c",
       `approval_policy="${mapApprovalToCodexFlag(policy.approvals)}"`,
-      ...workspaceFlags, ...codexShellEnvFlags(),
+      ...workspaceFlags, ...shellFlags,
     ];
   }
   if (policy.approvals === "never" && policy.sandbox === "danger-full-access") {
@@ -257,8 +256,84 @@ export function compileCodexPolicyFlags(
     mapSandboxToCodexFlag(policy.sandbox),
     "-c",
     `approval_policy=${mapApprovalToCodexFlag(policy.approvals)}`,
-    ...workspaceFlags, ...codexShellEnvFlags(),
+    ...workspaceFlags, ...shellFlags,
   ];
+}
+
+const activeScratch = new Set<ReturnType<typeof createCodexScratch>>();
+function scratchEnv(dir: string): Record<string, string> {
+  return { TMPDIR: dir, TMP: dir, TEMP: dir };
+}
+
+function disposeActiveScratch(): void {
+  for (const scratch of activeScratch) scratch.dispose();
+}
+
+/** Pin each parent while addressing its immediate entries. A surviving writer
+ * can rename a nested directory after open; its old pathname is no longer a
+ * safe base for either permission changes or recursive removal.
+ */
+function removeScratchEntry(path: string, stat: BigIntStats): void {
+  if (!stat.isDirectory()) {
+    rmSync(path, { force: true });
+    return;
+  }
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_DIRECTORY);
+  try {
+    const opened = fstatSync(fd, { bigint: true });
+    if (opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("Scratch directory changed during cleanup");
+    // Darwin's file-ID path names the open vnode. On Linux, procfs names the
+    // open descriptor directly. Keep it open through removal to pin its ID.
+    const anchor = process.platform === "darwin" ? `/.vol/${opened.dev}/${opened.ino}`
+      : process.platform === "linux" ? `/proc/self/fd/${fd}` : `/dev/fd/${fd}`;
+    if ((opened.mode & 0o700n) !== 0o700n) fchmodSync(fd, Number(opened.mode & 0o7777n) | 0o700);
+    for (const name of readdirSync(anchor)) {
+      const entry = join(anchor, name);
+      removeScratchEntry(entry, lstatSync(entry, { bigint: true }));
+    }
+    rmdirSync(path);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Owned by one spawn, never by a resumable thread. Only this private child
+ * directory is granted, never the host temp root. mkdtemp creates mode 0700.
+ * Normal completion awaits child exit before disposal; exit is the fallback.
+ */
+export function createCodexScratch(): { dir: string; env: Record<string, string>; dispose(): void } {
+  const dir = mkdtempSync(join(realpathSync(tmpdir()), "ndx-codex-scratch-"));
+  const owner = lstatSync(dir, { bigint: true });
+  let disposed = false;
+  const scratch = {
+    dir,
+    env: scratchEnv(dir),
+    dispose(): void {
+      if (disposed) return;
+      disposed = true;
+      activeScratch.delete(scratch);
+      if (activeScratch.size === 0) process.removeListener("exit", disposeActiveScratch);
+      try {
+        const current = lstatSync(dir, { bigint: true, throwIfNoEntry: false });
+        if (!current) return;
+        if (!current.isDirectory() || current.dev !== owner.dev || current.ino !== owner.ino) {
+          throw new Error("Scratch root was replaced");
+        }
+        // Windows rm handles read-only attributes itself; POSIX needs directory
+        // write permission even when force:true is specified.
+        if (process.platform === "win32") rmSync(dir, { recursive: true, force: true });
+        else removeScratchEntry(dir, owner);
+      } catch {
+        // Cleanup must not replace a successful result, a child failure or abort.
+        // Report once, without publishing untrusted filenames or error payloads.
+        process.emitWarning(`Could not remove private Codex scratch ${dir}; remove this directory after checking its ownership.`,
+          { code: "NDX_CODEX_SCRATCH_CLEANUP" });
+      }
+    },
+  };
+  if (activeScratch.size === 0) process.once("exit", disposeActiveScratch);
+  activeScratch.add(scratch);
+  return scratch;
 }
 
 /**
@@ -307,13 +382,8 @@ export function codexShellEnvFlags(extraHidden: readonly string[] = []): string[
 /** A portable environment variable name, which is also a bare TOML key. */
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-function isDebugEnabled(): boolean {
-  const v = process.env.NDX_DEBUG_LLM ?? process.env.NDX_DEBUG;
-  return v === "1" || v === "true" || v === "yes";
-}
-
 function debugLog(message: string): void {
-  if (isDebugEnabled()) {
+  if (isLlmDebugEnabled()) {
     // eslint-disable-next-line no-console
     console.error(`[ndx:llm:codex] ${message}`);
   }
@@ -342,7 +412,7 @@ function classifyStderr(stderr: string): { reason: "auth" | "rate-limit" | "unkn
   if (AUTH_PATTERNS.test(classificationText)) {
     return { reason: "auth", retryable: false };
   }
-  if (RATE_LIMIT_PATTERNS.test(classificationText)) {
+  if (CLI_RATE_LIMIT_PATTERN.test(classificationText)) {
     return { reason: "rate-limit", retryable: true };
   }
   return { reason: "unknown", retryable: isTransientError(classificationText) };
@@ -355,13 +425,20 @@ async function spawnOnce(
   codexConfig?: CodexConfig,
   policy?: ExecutionPolicy,
 ): Promise<CompletionResult> {
-  const dir = await mkdtemp(join(tmpdir(), "ndx-codex-"));
+  const scratch = createCodexScratch();
+  const dir = scratch.dir;
   const outputPath = join(dir, "last-message.txt");
   const usage = new CodexCliUsage();
 
   try {
     const effectivePolicy = policy ?? DEFAULT_EXECUTION_POLICY;
-    const policyFlags = compileCodexPolicyFlags(effectivePolicy);
+    // Keep the CLI's result file outside the temp root granted to its commands.
+    const scratchDir = effectivePolicy.sandbox === "workspace-write" ? join(dir, "tmp") : undefined;
+    if (scratchDir) {
+      await mkdir(scratchDir, { mode: 0o700 });
+      env = { ...env, ...scratchEnv(scratchDir) };
+    }
+    const policyFlags = compileCodexPolicyFlags(effectivePolicy, { scratchDir });
     const effort = await resolveCodexCliEffort(request.model || resolveCodexModel(codexConfig), request.effort,
       { binary: cliBinary, env, cwd: process.cwd() }, request.taskClass);
     const args = [
@@ -377,6 +454,9 @@ async function spawnOnce(
       ...codexEffortFlags(effort),
       "-",
     ];
+    if (scratchDir) {
+      await assertCodexScratchEnvironment({ binary: cliBinary, args, cwd: process.cwd(), env, scratchDir });
+    }
     debugLog(`spawn start cli="${cliBinary}" model="${request.model || resolveCodexModel(codexConfig)}" promptChars=${request.prompt.length}`);
     debugLog(`spawn args: ${JSON.stringify(args)}`);
 
@@ -494,13 +574,8 @@ async function spawnOnce(
     if (error instanceof Error) Object.assign(error, usage.finish());
     throw error;
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    scratch.dispose();
   }
-}
-
-function defaultRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
-  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
-  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
 }
 
 export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeClient {
@@ -509,7 +584,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
-  const onRetry = options.onRetry ?? defaultRateLimitOnRetry;
+  const onRetry = options.onRetry ?? printRateLimitRetryLine;
 
   return {
     mode: "cli",

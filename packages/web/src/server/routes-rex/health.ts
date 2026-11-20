@@ -7,9 +7,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { refreshPRDCache } from "../prd-io.js";
 import { resolveStore, isChangeLayerStore, prdLayout } from "../rex-gateway.js";
-import { dashboardBranchRefusal } from "./rex-route-helpers.js";
+import { dashboardBranchRefusal, loadPRDOr404 } from "./rex-route-helpers.js";
 
 import {
   computeHealthScore,
@@ -27,11 +27,8 @@ export function routeHealthReorganize(
 ): boolean | Promise<boolean> {
   // GET /api/rex/health — structure health score
   if (path === "health" && method === "GET") {
-    const doc = loadPRDSync(ctx.rexDir);
-    if (!doc) {
-      errorResponse(res, 404, "No PRD data found");
-      return true;
-    }
+    const doc = loadPRDOr404(ctx, res);
+    if (!doc) return true;
     const health = computeHealthScore(doc.items);
     jsonResponse(res, 200, health);
     return true;
@@ -41,11 +38,8 @@ export function routeHealthReorganize(
   // Query params: mode=fast|full (default: fast)
   if (path === "reorganize" && method === "GET") {
     return (async () => {
-      const doc = loadPRDSync(ctx.rexDir);
-      if (!doc) {
-        errorResponse(res, 404, "No PRD data found");
-        return true;
-      }
+      const doc = loadPRDOr404(ctx, res);
+      if (!doc) return true;
       if (doc.items.length === 0) {
         jsonResponse(res, 200, { structural: { proposals: [], stats: {} }, llm: [] });
         return true;

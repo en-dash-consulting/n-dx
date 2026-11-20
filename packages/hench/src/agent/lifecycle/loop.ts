@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { setTimeout as delay } from "node:timers/promises";
 import { OpenAiFailover } from "./openai-failover.js";
 import { OpenAiAgentTurn } from "./openai-agent-turn.js";
 import type { PRDStore } from "../../prd/rex-gateway.js";
@@ -7,7 +8,7 @@ import { GuardRails, createToolSandbox, resolveSandboxPosture, assertSandboxRead
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
-import { RUN_GUARD_AUDIT_MAX_DENIALS } from "../../schema/index.js";
+import { MAX_SUMMARY_LENGTH, MAX_TOOL_OUTPUT_STORED, RUN_GUARD_AUDIT_MAX_DENIALS } from "../../schema/index.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
@@ -47,6 +48,7 @@ import type { PruneOutcome, PruneShape } from "./context-prune.js";
 import { parseTokenUsageWithDiagnostic } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
+import { DEFAULT_LOCAL_HOST, DEFAULT_LOCAL_PORT, DEFAULT_VERIFIER_PORT } from "./local-endpoint-defaults.js";
 import { formatTaskBrief } from "../planning/brief.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
@@ -70,7 +72,8 @@ import {
   handleBudgetExceeded,
   formatModelLabel,
 } from "./shared.js";
-import type { SharedLoopOptions } from "./shared.js";
+import type { MemoryContext, SharedLoopOptions } from "./shared.js";
+import type { Heartbeat } from "./heartbeat.js";
 import {
   detectPlanOnlyIteration,
   runHasCodeModifications,
@@ -90,8 +93,6 @@ export interface AgentLoopResult {
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
-const MAX_SUMMARY_LENGTH = 500;
-const MAX_TOOL_OUTPUT_STORED = 2000;
 /**
  * How many times an API tool loop re-prompts a model that claims completion
  * while the run has changed nothing. The counterpart of the Claude API loop's
@@ -99,6 +100,11 @@ const MAX_TOOL_OUTPUT_STORED = 2000;
  * task and stop after a bookkeeping tool call.
  */
 const MAX_NO_WORK_RETRIES = 2;
+/** What a no-work re-prompt tells the model (see MAX_NO_WORK_RETRIES). */
+const NO_WORK_REMINDER =
+  "You have not changed any files, so the task cannot be complete. " +
+  "Use the available tools to implement the task now — read the relevant files, " +
+  "make the required edits, and verify them. Do not describe a plan; execute it.";
 
 // ---------------------------------------------------------------------------
 // Extracted helpers — each handles one focused concern within the turn loop
@@ -157,20 +163,25 @@ async function rejectUnvalidatedCompletion(args: {
 async function callWithRetry(
   client: Anthropic,
   params: Anthropic.MessageCreateParamsNonStreaming,
+  signal: AbortSignal,
 ): Promise<Anthropic.Message> {
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    signal.throwIfAborted();
     try {
-      return await client.messages.create(params);
+      const response = await client.messages.create(params, { signal });
+      signal.throwIfAborted();
+      return response;
     } catch (err) {
+      signal.throwIfAborted();
       lastError = err as Error;
       const status = (err as { status?: number }).status;
 
       if (status && RETRY_STATUS_CODES.has(status) && attempt < MAX_RETRIES) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
+        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delayMs}ms`);
+        await delay(delayMs, undefined, { signal });
         continue;
       }
 
@@ -206,14 +217,16 @@ async function callWithFailover(
   taskId: string,
   testCommand: string | undefined,
   startingHead: string | undefined,
+  signal: AbortSignal,
 ): Promise<Anthropic.Message> {
   let client = currentClient;
   let currentVendor = originalVendor;
   let currentModel = originalModel;
 
   try {
-    return await callWithRetry(client, params);
+    return await callWithRetry(client, params, signal);
   } catch (originalError) {
+    signal.throwIfAborted();
     // If failover is disabled, rethrow immediately (no-op path)
     if (!llmConfig.autoFailover) {
     throw originalError;
@@ -234,6 +247,7 @@ async function callWithFailover(
     let attemptNumber = 1;
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      signal.throwIfAborted();
       const failoverResult = getNextFailoverAttempt(attemptNumber, originalVendor as any, llmConfig);
 
       if (failoverResult.isExhausted) {
@@ -261,7 +275,7 @@ async function callWithFailover(
         // Only the client is taken; the loop's own tool context keeps its backstop.
         const apiResources = await initApiResources(
           provider, config, henchDir, projectDir, store, taskId,
-          testCommand, startingHead, undefined, undefined,
+          testCommand, startingHead, undefined, signal,
         );
         client = apiResources.client;
         currentVendor = apiResources.vendor;
@@ -275,8 +289,9 @@ async function callWithFailover(
         if (nextEffort) updatedParams.output_config = { effort: nextEffort };
 
         // Try the call with the new client/model
-        return await callWithRetry(client, updatedParams);
+        return await callWithRetry(client, updatedParams, signal);
       } catch (failoverError) {
+        signal.throwIfAborted();
         // This failover attempt failed; continue to next in chain
         attemptNumber++;
       }
@@ -336,13 +351,37 @@ async function initApiResources(
   }
   const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
 
+  const toolCtx = buildToolContext(
+    config, projectDir, store, taskId, testCommand, startingHead, configBackstop, abortSignal,
+  );
+
+  return { client, provider, vendor, toolCtx };
+}
+
+/**
+ * Build the guarded tool context (GuardRails + memory monitor) every API loop
+ * dispatches tools through.
+ *
+ * {@link initApiResources} pairs it with an Anthropic client; the Gemini and
+ * local loops drive their provider directly, so they need only this.
+ */
+function buildToolContext(
+  config: HenchConfig,
+  projectDir: string,
+  store: PRDStore,
+  taskId: string,
+  testCommand: string | undefined,
+  startingHead: string | undefined,
+  configBackstop: ConfigBackstop | undefined,
+  abortSignal: AbortSignal | undefined,
+): ToolContext {
   const guard = new GuardRails(projectDir, config.guard, {
     sandbox: createToolSandbox(projectDir),
     testMaxWorkers: config.testGate?.maxWorkers,
   });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
-  const toolCtx: ToolContext = {
+  return {
     guard,
     projectDir,
     store,
@@ -356,8 +395,6 @@ async function initApiResources(
     configBackstop,
     abortSignal,
   };
-
-  return { client, provider, vendor, toolCtx };
 }
 
 /**
@@ -372,28 +409,43 @@ function recordTurnTokenUsage(
   model: string,
 ): void {
   const { usage: parsed, cacheProvenance } = parseTokenUsageWithDiagnostic(rawUsage);
+  addTurnUsage(run, parsed, cacheProvenance, turn, vendor, model);
+}
 
+/**
+ * Add one turn's usage to the run totals and append its per-turn breakdown
+ * row. The single accumulator behind both {@link recordTurnTokenUsage} and
+ * {@link recordTurnTokenUsageNormalized}, so the row shape cannot drift.
+ */
+function addTurnUsage(
+  run: RunRecord,
+  usage: TokenUsage,
+  cacheProvenance: TurnTokenUsage["cacheProvenance"],
+  turn: number,
+  vendor: string,
+  model: string,
+): void {
   // Accumulate into run totals
-  run.tokenUsage.input += parsed.input;
-  run.tokenUsage.output += parsed.output;
-  if (parsed.cacheCreationInput) {
-    run.tokenUsage.cacheCreationInput = (run.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
+  run.tokenUsage.input += usage.input;
+  run.tokenUsage.output += usage.output;
+  if (usage.cacheCreationInput) {
+    run.tokenUsage.cacheCreationInput = (run.tokenUsage.cacheCreationInput ?? 0) + usage.cacheCreationInput;
   }
-  if (parsed.cacheReadInput) {
-    run.tokenUsage.cacheReadInput = (run.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
+  if (usage.cacheReadInput) {
+    run.tokenUsage.cacheReadInput = (run.tokenUsage.cacheReadInput ?? 0) + usage.cacheReadInput;
   }
 
   // Per-turn breakdown
   const turnUsage: TurnTokenUsage = {
     turn,
-    input: parsed.input,
-    output: parsed.output,
+    input: usage.input,
+    output: usage.output,
     cacheProvenance,
     vendor,
     model,
   };
-  if (parsed.cacheCreationInput) turnUsage.cacheCreationInput = parsed.cacheCreationInput;
-  if (parsed.cacheReadInput) turnUsage.cacheReadInput = parsed.cacheReadInput;
+  if (usage.cacheCreationInput) turnUsage.cacheCreationInput = usage.cacheCreationInput;
+  if (usage.cacheReadInput) turnUsage.cacheReadInput = usage.cacheReadInput;
   run.turnTokenUsage!.push(turnUsage);
 }
 
@@ -414,6 +466,22 @@ function recordToolCall(
   // The API path's counterpart to the CLI loop's processLine hook, so both
   // produce the same structured progress events from the same vocabulary.
   recordFileWork(record.tool, record.input, record.turn);
+}
+
+/**
+ * The tail every API loop's tool executor shares: record the call with its
+ * output capped at MAX_TOOL_OUTPUT_STORED, then print the result preview and
+ * how long the tool took.
+ */
+function recordToolResult(
+  run: RunRecord,
+  detector: LivelockDetector,
+  result: RunRecord["toolCalls"][number],
+): void {
+  const { output, durationMs } = result;
+  recordToolCall(run, detector, { ...result, output: output.slice(0, MAX_TOOL_OUTPUT_STORED) });
+  stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
+  detail(`${durationMs}ms`);
 }
 
 /**
@@ -479,6 +547,169 @@ async function stopOnSpendCap(
 }
 
 /**
+ * Create the record an API run writes to. The API loops differ only in the
+ * vendor they record and how they parse the model's output; the policy,
+ * session decision and per-invocation fields all come from the loop options.
+ */
+function initApiRunRecord(
+  opts: AgentLoopOptions,
+  fields: { taskId: string; taskTitle: string; model: string; vendor: string; parseMode: string },
+): ReturnType<typeof initRunRecord> {
+  return initRunRecord({
+    ...fields,
+    henchDir: opts.henchDir,
+    projectDir: opts.projectDir,
+    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
+    approvals: DEFAULT_EXECUTION_POLICY.approvals,
+    invocationContext: "api",
+    session: API_SESSION_DECISION,
+    // The tier of the model actually sent; see RunRecord.weight.
+    ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
+    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
+    ...(opts.loop ? { loop: opts.loop } : {}),
+    ...(opts.escalation ? { escalation: opts.escalation } : {}),
+  });
+}
+
+/**
+ * Whether a completion claim earns a re-prompt instead of standing: retries
+ * remain and the run has changed nothing. Prints the warning when it does; the
+ * caller sends {@link NO_WORK_REMINDER} in its own message format.
+ */
+async function shouldRepromptNoWork(
+  retriesSoFar: number,
+  baseline: { projectDir: string; startingHead: string | undefined; baselineUntracked: string[] },
+): Promise<boolean> {
+  if (retriesSoFar >= MAX_NO_WORK_RETRIES) return false;
+  const changed = await discoverChangedFiles(baseline);
+  if ((changed ?? []).length > 0) return false;
+  stream(
+    "Warning",
+    `Completion claimed with no changes. Re-prompting to execute (attempt ${retriesSoFar + 1}/${MAX_NO_WORK_RETRIES})...`,
+  );
+  return true;
+}
+
+/** Stamp the run's activity time and save it — the end of every API-loop turn. */
+async function saveProgress(henchDir: string, run: RunRecord): Promise<void> {
+  run.lastActivityAt = new Date().toISOString();
+  await saveRun(henchDir, run);
+}
+
+/** The tok/s metric line the web server parses for its live dashboard display. */
+function formatTokPerSec(outTokens: number, latencyMs: number): string {
+  const tokPerSec = Math.round((outTokens / latencyMs) * 1000 * 10) / 10;
+  return `⚡ ${tokPerSec} tok/s (${latencyMs}ms, ${outTokens} out)`;
+}
+
+/** Print the banner that opens an API run's turn loop. */
+function announceApiRun(model: string, opts: AgentLoopOptions): void {
+  section(
+    opts.loop !== undefined
+      ? `Agent Run #${opts.loop.iteration} (${model}) start`
+      : `Agent Run (${model})`,
+  );
+}
+
+/**
+ * Graceful Ctrl+C for an API loop: the first SIGINT asks the loop to stop at
+ * its next turn boundary, a second one exits. `release()` restores the default
+ * handling once the loop is over.
+ */
+function trapCancellation(onCancel?: () => void): { readonly requested: boolean; release(): void } {
+  let requested = false;
+  const handleSignal = () => {
+    // Second Ctrl+C: force exit
+    if (requested) process.exit(1);
+    requested = true;
+    onCancel?.();
+  };
+  process.on("SIGINT", handleSignal);
+  return {
+    get requested() { return requested; },
+    release: () => { process.removeListener("SIGINT", handleSignal); },
+  };
+}
+
+/**
+ * Close out an API run after its turn loop: stop the heartbeat, hold a
+ * completion claim to the CLI loop's standard, run the review gate, put the
+ * guard's decisions on the record, and finalize. The same sequence for the
+ * Claude, Gemini and local loops.
+ */
+async function finishApiRun(args: {
+  run: RunRecord;
+  memoryCtx: MemoryContext;
+  heartbeat: Heartbeat;
+  /** The guard the tool loop ran under; absent when no tools were dispatched. */
+  guard: ToolContext["guard"] | undefined;
+  config: HenchConfig;
+  store: PRDStore;
+  taskId: string;
+  testCommand: string | undefined;
+  startingHead: string | undefined;
+  baselineUntracked: string[];
+  baselineDirectories: DirectoryBaseline | undefined;
+  baselineDirty: string[];
+  opts: AgentLoopOptions;
+}): Promise<void> {
+  const {
+    run, memoryCtx, heartbeat, guard, config, store, taskId, testCommand,
+    startingHead, baselineUntracked, baselineDirectories, baselineDirty, opts,
+  } = args;
+  const { henchDir, projectDir } = opts;
+  const autonomous = opts.autonomous === true || config.autonomous === true;
+
+  heartbeat.stop();
+
+  // Same completion standard as the CLI loop: a claim with no changes fails.
+  await rejectUnvalidatedCompletion({
+    run, store, taskId, projectDir, startingHead, baselineUntracked,
+    testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
+    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
+  });
+
+  if (opts.approveDiff && run.status === "completed") {
+    await runReviewGate(projectDir, store, taskId, run, {
+      rollbackOnFailure: opts.rollbackOnFailure,
+      yes: opts.yes,
+      autonomous,
+      baselineUntracked,
+      baselineDirectories,
+    });
+  }
+
+  // The guard's decisions outlive the process only if they are on the record.
+  const auditedPolicy = guard?.policy;
+  if (auditedPolicy) run.guardAudit = auditedPolicy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
+
+  // Build summary, memory stats, post-task tests, save.
+  await finalizeRun({
+    claims: opts.claims,
+    configBackstop: opts.configBackstop,
+    abortSignal: opts.abortSignal,
+    run,
+    henchDir,
+    projectDir,
+    config,
+    testCommand,
+    heartbeat,
+    memoryCtx,
+    selfHeal: config.selfHeal,
+    rollbackOnFailure: opts.rollbackOnFailure,
+    yes: opts.yes,
+    autonomous,
+    store,
+    autoCommit: config.autoCommit === true,
+    skipFullTestGate: config.skipFullTestGate,
+    baselineUntracked,
+    baselineDirectories,
+    baselineDirty,
+    startingHead,
+  });
+}
+
+/**
  * Dispatch all tool_use blocks in the assistant response, record results
  * in the run, and return the tool result messages for the next turn.
  */
@@ -509,16 +740,6 @@ async function executeToolCalls(
       ),
     );
 
-    const durationMs = Date.now() - startMs;
-
-    recordToolCall(run, detector, {
-      turn,
-      tool: block.name,
-      input: block.input as Record<string, unknown>,
-      output: output.slice(0, MAX_TOOL_OUTPUT_STORED),
-      durationMs,
-    });
-
     toolResults.push({
       type: "tool_result",
       tool_use_id: block.id,
@@ -526,8 +747,13 @@ async function executeToolCalls(
       is_error: /^(\[GUARD\]|\[ERROR\]|Unknown tool:)/.test(output),
     });
 
-    stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
-    detail(`${durationMs}ms`);
+    recordToolResult(run, detector, {
+      turn,
+      tool: block.name,
+      input: block.input as Record<string, unknown>,
+      output,
+      durationMs: Date.now() - startMs,
+    });
   }
 
   return toolResults;
@@ -562,45 +788,6 @@ function streamAssistantText(assistantContent: Anthropic.ContentBlock[], label: 
 // ---------------------------------------------------------------------------
 
 /**
- * Build the tool context for a Gemini run (GuardRails + memory monitor).
- *
- * Sibling of {@link initApiResources} that omits the Anthropic client — the
- * Gemini loop drives the provider's `generateContentWithTools` directly, so it
- * needs only the shared {@link ToolContext} for guarded tool dispatch.
- */
-function initGoogleApiResources(
-  config: HenchConfig,
-  projectDir: string,
-  store: PRDStore,
-  taskId: string,
-  testCommand: string | undefined,
-  startingHead: string | undefined,
-  configBackstop: ConfigBackstop | undefined,
-  abortSignal: AbortSignal | undefined,
-): ToolContext {
-  const guard = new GuardRails(projectDir, config.guard, {
-    sandbox: createToolSandbox(projectDir),
-    testMaxWorkers: config.testGate?.maxWorkers,
-  });
-  const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
-
-  return {
-    guard,
-    projectDir,
-    store,
-    taskId,
-    testCommand,
-    startingHead,
-    memoryMonitor,
-    selfHeal: config.selfHeal,
-    testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
-    configBackstop,
-    abortSignal,
-  };
-}
-
-/**
  * Accumulate a pre-parsed {@link TokenUsage} into run totals and the per-turn
  * breakdown.
  *
@@ -618,33 +805,15 @@ function recordTurnTokenUsageNormalized(
 ): void {
   if (!usage) return;
 
-  run.tokenUsage.input += usage.input;
-  run.tokenUsage.output += usage.output;
-  if (usage.cacheCreationInput) {
-    run.tokenUsage.cacheCreationInput = (run.tokenUsage.cacheCreationInput ?? 0) + usage.cacheCreationInput;
-  }
-  if (usage.cacheReadInput) {
-    run.tokenUsage.cacheReadInput = (run.tokenUsage.cacheReadInput ?? 0) + usage.cacheReadInput;
-  }
-
-  const turnUsage: TurnTokenUsage = {
-    turn,
-    input: usage.input,
-    output: usage.output,
-    // The provider already normalized this, so the raw payload is gone and
-    // presence of a cache field is the only signal left. That under-reports a
-    // provider that measured zero — which is the safe direction: claiming
-    // "measured" for a number nobody measured is the error worth avoiding.
-    cacheProvenance:
-      usage.cacheCreationInput !== undefined || usage.cacheReadInput !== undefined
-        ? "measured"
-        : "unavailable",
-    vendor,
-    model,
-  };
-  if (usage.cacheCreationInput) turnUsage.cacheCreationInput = usage.cacheCreationInput;
-  if (usage.cacheReadInput) turnUsage.cacheReadInput = usage.cacheReadInput;
-  run.turnTokenUsage!.push(turnUsage);
+  // The provider already normalized this, so the raw payload is gone and
+  // presence of a cache field is the only signal left. That under-reports a
+  // provider that measured zero — which is the safe direction: claiming
+  // "measured" for a number nobody measured is the error worth avoiding.
+  const cacheProvenance =
+    usage.cacheCreationInput !== undefined || usage.cacheReadInput !== undefined
+      ? "measured"
+      : "unavailable";
+  addTurnUsage(run, usage, cacheProvenance, turn, vendor, model);
 }
 
 /**
@@ -707,20 +876,15 @@ async function executeGeminiFunctionCalls(
       dispatchTool(toolCtx, fc.name, fc.args, rexToolHandlers),
     );
 
-    const durationMs = Date.now() - startMs;
+    responses.push({ functionResponse: { name: fc.name, response: { result: output } } });
 
-    recordToolCall(run, detector, {
+    recordToolResult(run, detector, {
       turn,
       tool: fc.name,
       input: fc.args,
-      output: output.slice(0, MAX_TOOL_OUTPUT_STORED),
-      durationMs,
+      output,
+      durationMs: Date.now() - startMs,
     });
-
-    responses.push({ functionResponse: { name: fc.name, response: { result: output } } });
-
-    stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
-    detail(`${durationMs}ms`);
   }
 
   return responses;
@@ -772,9 +936,12 @@ export function geminiPruneShape(): PruneShape<GeminiContent> {
   };
 }
 
-/** Parameters for the Gemini agentic tool-use loop. */
-interface GeminiToolLoopParams {
-  provider: GeminiToolProvider;
+/**
+ * Parameters for the Gemini and local agentic tool-use loops. {@link agentLoop}
+ * resolves them once and hands the same set to whichever loop the vendor picks.
+ */
+interface ApiToolLoopParams<P extends LLMProvider = LLMProvider> {
+  provider: P;
   config: HenchConfig;
   model: string;
   systemPrompt: string | undefined;
@@ -817,7 +984,7 @@ interface GeminiToolLoopParams {
  * own retry/backoff (RETRY_STATUS_CODES) covers transient rate-limit/server
  * errors. TODO: wire google→claude failover via getNextFailoverAttempt.
  */
-async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoopResult> {
+async function runGeminiToolLoop(params: ApiToolLoopParams<GeminiToolProvider>): Promise<AgentLoopResult> {
   const {
     provider, config, model, systemPrompt, brief, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
@@ -828,31 +995,16 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     provider.info.capabilities.includes("function-calling") &&
     typeof provider.generateContentWithTools === "function";
 
-  const { run, memoryCtx } = await initRunRecord({
+  const { run, memoryCtx } = await initApiRunRecord(opts, {
     taskId,
     taskTitle,
     model,
-    henchDir,
-    projectDir,
     vendor: LLM_VENDOR.GOOGLE,
-    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
-    approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: hasToolCalling ? "gemini-tools" : "provider-api",
-    invocationContext: "api",
-    session: API_SESSION_DECISION,
-    // The tier of the model actually sent; see RunRecord.weight.
-    ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
-    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
-    ...(opts.loop ? { loop: opts.loop } : {}),
-    ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
-  section(
-    opts.loop !== undefined
-      ? `Agent Run #${opts.loop.iteration} (${model}) start`
-      : `Agent Run (${model})`,
-  );
+  announceApiRun(model, opts);
 
   // Livelock detection: stop a run that keeps making the same call rather than
   // letting it spend until a human notices (GH #362). Unlike the CLI loop this
@@ -862,13 +1014,8 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   recordClaimLoss(opts.claims, run, henchDir);
   const heartbeat = startHeartbeat(henchDir, run);
 
-  // Register SIGINT handler for graceful cancellation (mirrors Claude loop).
-  let cancelled = false;
-  const handleSignal = () => {
-    if (cancelled) process.exit(1);
-    cancelled = true;
-  };
-  process.on("SIGINT", handleSignal);
+  // Graceful cancellation on SIGINT (mirrors Claude loop).
+  const cancellation = trapCancellation();
 
   // The guard the tool loop ran under, for the record's audit summary.
   let auditedGuard: ToolContext["guard"] | undefined;
@@ -886,7 +1033,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       recordTurnTokenUsageNormalized(run, completionResult.tokenUsage, 1, "google", model);
       stream(formatModelLabel(model), completionResult.text ?? "");
     } else {
-      const toolCtx = initGoogleApiResources(
+      const toolCtx = buildToolContext(
         config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop, opts.abortSignal,
       );
       auditedGuard = toolCtx.guard;
@@ -908,7 +1055,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
       const spendGate = apiSpendGate(config, henchDir, run, model);
       for (let turn = 0; turn < maxTurns; turn++) {
-        if (cancelled) {
+        if (cancellation.requested) {
           run.status = "cancelled";
           stream("Cancelled", "Run interrupted by user");
           break;
@@ -950,27 +1097,11 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         if (result.functionCalls.length === 0) {
           // Same second chance the local loop gives: a completion claim with
           // no changes gets an execution reminder before it stands.
-          if (geminiNoWorkRetryCount < MAX_NO_WORK_RETRIES) {
-            const changed = await discoverChangedFiles({ projectDir, startingHead, baselineUntracked });
-            if ((changed ?? []).length === 0) {
-              geminiNoWorkRetryCount++;
-              stream(
-                "Warning",
-                `Completion claimed with no changes. Re-prompting to execute (attempt ${geminiNoWorkRetryCount}/${MAX_NO_WORK_RETRIES})...`,
-              );
-              contents.push({
-                role: "user",
-                parts: [{
-                  text:
-                    "You have not changed any files, so the task cannot be complete. " +
-                    "Use the available tools to implement the task now — read the relevant files, " +
-                    "make the required edits, and verify them. Do not describe a plan; execute it.",
-                }],
-              });
-              run.lastActivityAt = new Date().toISOString();
-              await saveRun(henchDir, run);
-              continue;
-            }
+          if (await shouldRepromptNoWork(geminiNoWorkRetryCount, { projectDir, startingHead, baselineUntracked })) {
+            geminiNoWorkRetryCount++;
+            contents.push({ role: "user", parts: [{ text: NO_WORK_REMINDER }] });
+            await saveProgress(henchDir, run);
+            continue;
           }
           run.status = "completed";
           run.summary = result.text ? result.text.slice(0, MAX_SUMMARY_LENGTH) : undefined;
@@ -984,8 +1115,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         if (await failOnLivelock(livelock, run, store, taskId)) break;
         contents.push({ role: "user", parts: responses });
 
-        run.lastActivityAt = new Date().toISOString();
-        await saveRun(henchDir, run);
+        await saveProgress(henchDir, run);
       }
 
       if (run.status === "running") {
@@ -1004,54 +1134,12 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     // Use "pending" so the task reappears as actionable after the user fixes the issue.
     await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
   } finally {
-    process.removeListener("SIGINT", handleSignal);
+    cancellation.release();
   }
 
-  heartbeat.stop();
-
-  // Same completion standard as the CLI loop: a claim with no changes fails.
-  await rejectUnvalidatedCompletion({
-    run, store, taskId, projectDir, startingHead, baselineUntracked,
-    testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
-  });
-
-  if (opts.approveDiff && run.status === "completed") {
-    await runReviewGate(projectDir, store, taskId, run, {
-      rollbackOnFailure: opts.rollbackOnFailure,
-      yes: opts.yes,
-      autonomous: opts.autonomous === true || config.autonomous === true,
-      baselineUntracked,
-      baselineDirectories,
-    });
-  }
-
-  // The guard's decisions outlive the process only if they are on the record.
-  const auditedPolicy = auditedGuard?.policy;
-  if (auditedPolicy) run.guardAudit = auditedPolicy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
-
-  await finalizeRun({
-    claims: opts.claims,
-    configBackstop: opts.configBackstop,
-    abortSignal: opts.abortSignal,
-    run,
-    henchDir,
-    projectDir,
-    config,
-    testCommand,
-    heartbeat,
-    memoryCtx,
-    selfHeal: config.selfHeal,
-    rollbackOnFailure: opts.rollbackOnFailure,
-    yes: opts.yes,
-    autonomous: opts.autonomous === true || config.autonomous === true,
-    store,
-    autoCommit: config.autoCommit === true,
-    skipFullTestGate: config.skipFullTestGate,
-    baselineUntracked,
-    baselineDirectories,
-    baselineDirty,
-    startingHead,
+  await finishApiRun({
+    run, memoryCtx, heartbeat, guard: auditedGuard, config, store, taskId, testCommand,
+    startingHead, baselineUntracked, baselineDirectories, baselineDirty, opts,
   });
 
   return { run };
@@ -1060,6 +1148,19 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 // ---------------------------------------------------------------------------
 // Local (OpenAI-compatible) tool-use loop
 // ---------------------------------------------------------------------------
+
+/**
+ * A local server's address from its `host`/`port` settings: a non-empty host
+ * string, else {@link DEFAULT_LOCAL_HOST}; a positive port, else `defaultPort`.
+ */
+function localServerAddress(
+  cfg: { host?: unknown; port?: unknown } | undefined,
+  defaultPort: number,
+): { host: string; port: number } {
+  const host = typeof cfg?.host === "string" && cfg.host ? cfg.host : DEFAULT_LOCAL_HOST;
+  const port = typeof cfg?.port === "number" && cfg.port > 0 ? cfg.port : defaultPort;
+  return { host, port };
+}
 
 /** OpenAI-format message in the conversation history. */
 export interface OpenAiMessage {
@@ -1119,11 +1220,7 @@ export function openAiPruneShape(hasSystemPrompt: boolean): PruneShape<OpenAiMes
 }
 
 /** Single tool call extracted from an OpenAI chat response. */
-interface OpenAiToolCall {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
-}
+type OpenAiToolCall = NonNullable<OpenAiMessage["tool_calls"]>[number];
 
 /** Parse token usage from an OpenAI-format usage object. */
 function parseLocalUsage(usage: unknown): { input: number; output: number } {
@@ -1160,15 +1257,6 @@ async function executeLocalToolCalls(
     stream("Tool", `${tc.function.name}(${tc.function.arguments.slice(0, 100)})`);
 
     const output = await dispatchTool(toolCtx, tc.function.name, input, rexToolHandlers);
-    const durationMs = Date.now() - startMs;
-
-    recordToolCall(run, detector, {
-      turn,
-      tool: tc.function.name,
-      input,
-      output: output.slice(0, MAX_TOOL_OUTPUT_STORED),
-      durationMs,
-    });
 
     results.push({
       role: "tool",
@@ -1176,8 +1264,13 @@ async function executeLocalToolCalls(
       content: output,
     });
 
-    stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
-    detail(`${durationMs}ms`);
+    recordToolResult(run, detector, {
+      turn,
+      tool: tc.function.name,
+      input,
+      output,
+      durationMs: Date.now() - startMs,
+    });
   }
 
   return results;
@@ -1319,8 +1412,7 @@ async function callVerifier(
    */
   timeoutMs: number = 60_000,
 ): Promise<{ verdict: "PASS" | "FAIL"; reasoning: string }> {
-  const host = typeof cfg.host === "string" && cfg.host ? cfg.host : "localhost";
-  const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
+  const { host, port } = localServerAddress(cfg, DEFAULT_VERIFIER_PORT);
   const model = typeof cfg.model === "string" ? cfg.model : "";
   const baseUrl = `http://${host}:${port}/v1`;
 
@@ -1454,28 +1546,7 @@ async function fetchLocalTurn(
  * The local server URL comes from llm.local.host / llm.local.port in
  * `.n-dx.json` (default: localhost:1234).
  */
-async function runLocalToolLoop(params: {
-  provider: LLMProvider;
-  config: HenchConfig;
-  model: string;
-  systemPrompt: string | undefined;
-  /** Rendered once the run exists, with its commit trailers (see briefForRun). */
-  brief: TaskBrief;
-  taskTitle: string;
-  testCommand: string | undefined;
-  taskId: string;
-  henchDir: string;
-  projectDir: string;
-  store: PRDStore;
-  maxTurns: number;
-  tokenBudget: number | undefined;
-  startingHead: string | undefined;
-  baselineUntracked: string[];
-  baselineDirectories?: DirectoryBaseline;
-  baselineDirty: string[];
-  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
-  opts: AgentLoopOptions;
-}): Promise<AgentLoopResult> {
+async function runLocalToolLoop(params: ApiToolLoopParams): Promise<AgentLoopResult> {
   const {
     provider, config, model, systemPrompt, brief, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
@@ -1484,10 +1555,7 @@ async function runLocalToolLoop(params: {
 
   // Resolve the base URL from config
   const localCfg = (llmConfig as Record<string, unknown>)["local"] as Record<string, unknown> | undefined;
-  const host = typeof localCfg?.["host"] === "string" && localCfg["host"]
-    ? localCfg["host"] : "localhost";
-  const port = typeof localCfg?.["port"] === "number" && localCfg["port"] > 0
-    ? localCfg["port"] : 1234;
+  const { host, port } = localServerAddress(localCfg, DEFAULT_LOCAL_PORT);
   const baseUrl = `http://${host}:${port}/v1`;
   // Read the optional maxContextTokens limit from config (set via ndx config llm.local.maxContextTokens=N).
   const maxContextTokens = typeof localCfg?.["maxContextTokens"] === "number"
@@ -1517,31 +1585,16 @@ async function runLocalToolLoop(params: {
   // Compile OpenAI-format tool definitions once
   const openAiTools = toOpenAiToolDefs([...TOOL_DEFINITIONS_NEUTRAL]);
 
-  const { run, memoryCtx } = await initRunRecord({
+  const { run, memoryCtx } = await initApiRunRecord(opts, {
     taskId,
     taskTitle,
     model,
-    henchDir,
-    projectDir,
     vendor: LLM_VENDOR.LOCAL,
-    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
-    approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: "openai-tools",
-    invocationContext: "api",
-    session: API_SESSION_DECISION,
-    // The tier of the model actually sent; see RunRecord.weight.
-    ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
-    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
-    ...(opts.loop ? { loop: opts.loop } : {}),
-    ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
-  section(
-    opts.loop !== undefined
-      ? `Agent Run #${opts.loop.iteration} (${model}) start`
-      : `Agent Run (${model})`,
-  );
+  announceApiRun(model, opts);
 
   // Livelock detection: stop a run that keeps making the same call rather than
   // letting it spend until a human notices (GH #362). Unlike the CLI loop this
@@ -1551,14 +1604,9 @@ async function runLocalToolLoop(params: {
   recordClaimLoss(opts.claims, run, henchDir);
   const heartbeat = startHeartbeat(henchDir, run);
 
-  let cancelled = false;
-  const handleSignal = () => {
-    if (cancelled) process.exit(1);
-    cancelled = true;
-  };
-  process.on("SIGINT", handleSignal);
+  const cancellation = trapCancellation();
 
-  const toolCtx = initGoogleApiResources(
+  const toolCtx = buildToolContext(
     config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop, opts.abortSignal,
   );
 
@@ -1608,7 +1656,7 @@ async function runLocalToolLoop(params: {
   const spendGate = apiSpendGate(config, henchDir, run, model);
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
-      if (cancelled) {
+      if (cancellation.requested) {
         run.status = "cancelled";
         stream("Cancelled", "Run interrupted by user");
         break;
@@ -1658,7 +1706,6 @@ async function runLocalToolLoop(params: {
       const choices = (data["choices"] as Array<Record<string, unknown>> | undefined) ?? [];
       const choice = choices[0] ?? {};
       const message = (choice["message"] as Record<string, unknown> | undefined) ?? {};
-      const finishReason = choice["finish_reason"] as string | undefined;
       const assistantContent = typeof message["content"] === "string" ? message["content"] : null;
       const rawToolCalls = (message["tool_calls"] as OpenAiToolCall[] | undefined) ?? [];
       // Reasoning models (qwen thinking, deepseek-r1, …) return their chain of
@@ -1685,11 +1732,10 @@ async function runLocalToolLoop(params: {
 
       // Emit tok/s metric for the dashboard (+ context fill when known)
       if (usage.output > 0 && latencyMs > 0) {
-        const tokPerSec = Math.round((usage.output / latencyMs) * 1000 * 10) / 10;
         const ctx = maxContextTokens && usage.input > 0
           ? ` · ctx ${Math.round(contextRatio * 100)}% (${usage.input.toLocaleString()}/${maxContextTokens.toLocaleString()})`
           : "";
-        detail(`⚡ ${tokPerSec} tok/s (${latencyMs}ms, ${usage.output} out)${ctx}`);
+        detail(`${formatTokPerSec(usage.output, latencyMs)}${ctx}`);
       }
 
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
@@ -1726,34 +1772,17 @@ async function runLocalToolLoop(params: {
         // Completion is a claim, and validateCompletion will reject it if
         // nothing changed — but first give the model the same second chance
         // the Claude loop gives plan-only turns: tell it to execute.
-        if (noWorkRetryCount < MAX_NO_WORK_RETRIES) {
-          const changed = await discoverChangedFiles({ projectDir, startingHead, baselineUntracked });
-          if ((changed ?? []).length === 0) {
-            noWorkRetryCount++;
-            stream(
-              "Warning",
-              `Completion claimed with no changes. Re-prompting to execute (attempt ${noWorkRetryCount}/${MAX_NO_WORK_RETRIES})...`,
-            );
-            messages.push({
-              role: "user",
-              content:
-                "You have not changed any files, so the task cannot be complete. " +
-                "Use the available tools to implement the task now — read the relevant files, " +
-                "make the required edits, and verify them. Do not describe a plan; execute it.",
-            });
-            run.lastActivityAt = new Date().toISOString();
-            await saveRun(henchDir, run);
-            continue;
-          }
+        if (await shouldRepromptNoWork(noWorkRetryCount, { projectDir, startingHead, baselineUntracked })) {
+          noWorkRetryCount++;
+          messages.push({ role: "user", content: NO_WORK_REMINDER });
+          await saveProgress(henchDir, run);
+          continue;
         }
 
         if (verifierCfg && verifierCycleCount < maxVerifierCycles) {
-          const vHost = typeof verifierCfg["host"] === "string" && verifierCfg["host"]
-            ? verifierCfg["host"] : "localhost";
-          const vPort = typeof verifierCfg["port"] === "number" && (verifierCfg["port"] as number) > 0
-            ? verifierCfg["port"] as number : 1235;
+          const verifier = localServerAddress(verifierCfg, DEFAULT_VERIFIER_PORT);
           section(`Verifier Review (cycle ${verifierCycleCount + 1}/${maxVerifierCycles})`);
-          detail(`[Verifier] Querying ${vHost}:${vPort} …`);
+          detail(`[Verifier] Querying ${verifier.host}:${verifier.port} …`);
           const { verdict, reasoning } = await callVerifier(
             verifierCfg as { host?: string; port?: number; model?: string },
             briefText,
@@ -1772,8 +1801,7 @@ async function runLocalToolLoop(params: {
                 `An independent reviewer checked your solution and flagged issues:\n\n${reasoning}\n\n` +
                 "Please address the issues above and re-submit your completed solution.",
             });
-            run.lastActivityAt = new Date().toISOString();
-            await saveRun(henchDir, run);
+            await saveProgress(henchDir, run);
             continue; // next turn — primary model gets the feedback
           }
           stream("Verifier", "✓ PASS — solution accepted");
@@ -1832,8 +1860,7 @@ async function runLocalToolLoop(params: {
         }
       }
 
-      run.lastActivityAt = new Date().toISOString();
-      await saveRun(henchDir, run);
+      await saveProgress(henchDir, run);
     }
 
     if (run.status === "running") {
@@ -1851,53 +1878,12 @@ async function runLocalToolLoop(params: {
     // Reset to "pending" so the task reappears as actionable after the user fixes the issue.
     await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
   } finally {
-    process.removeListener("SIGINT", handleSignal);
+    cancellation.release();
   }
 
-  heartbeat.stop();
-
-  // Same completion standard as the CLI loop: a claim with no changes fails.
-  await rejectUnvalidatedCompletion({
-    run, store, taskId, projectDir, startingHead, baselineUntracked,
-    testCommand, selfHeal: config.selfHeal, testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
-  });
-
-  if (opts.approveDiff && run.status === "completed") {
-    await runReviewGate(projectDir, store, taskId, run, {
-      rollbackOnFailure: opts.rollbackOnFailure,
-      yes: opts.yes,
-      autonomous: opts.autonomous === true || config.autonomous === true,
-      baselineUntracked,
-      baselineDirectories,
-    });
-  }
-
-  // The guard's decisions outlive the process only if they are on the record.
-  if (toolCtx.guard.policy) run.guardAudit = toolCtx.guard.policy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
-
-  await finalizeRun({
-    claims: opts.claims,
-    configBackstop: opts.configBackstop,
-    abortSignal: opts.abortSignal,
-    run,
-    henchDir,
-    projectDir,
-    config,
-    testCommand,
-    heartbeat,
-    memoryCtx,
-    selfHeal: config.selfHeal,
-    rollbackOnFailure: opts.rollbackOnFailure,
-    yes: opts.yes,
-    autonomous: opts.autonomous === true || config.autonomous === true,
-    store,
-    autoCommit: config.autoCommit === true,
-    skipFullTestGate: config.skipFullTestGate,
-    baselineUntracked,
-    baselineDirectories,
-    baselineDirty,
-    startingHead,
+  await finishApiRun({
+    run, memoryCtx, heartbeat, guard: toolCtx.guard, config, store, taskId, testCommand,
+    startingHead, baselineUntracked, baselineDirectories, baselineDirty, opts,
   });
 
   return { run };
@@ -1966,23 +1952,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const gateOnly = await planGateOnlyRetry({ projectDir, taskId, runHistory: opts.runHistory, claims: opts.claims });
   if (gateOnly) {
     await transitionToInProgress(store, taskId, brief.task.status);
-    const { run, memoryCtx } = await initRunRecord({
+    const { run, memoryCtx } = await initApiRunRecord(opts, {
       taskId,
       taskTitle: brief.task.title,
       model,
-      henchDir,
-      projectDir,
       vendor: effectiveVendor,
-      sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
-      approvals: DEFAULT_EXECUTION_POLICY.approvals,
       parseMode: "api-sdk",
-      invocationContext: "api",
-      session: API_SESSION_DECISION,
-      // The tier of the model actually sent; see RunRecord.weight.
-      ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
-      ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
-      ...(opts.loop ? { loop: opts.loop } : {}),
-      ...(opts.escalation ? { escalation: opts.escalation } : {}),
     });
     await executeGateOnlyRetry({
       plan: gateOnly,
@@ -2037,34 +2012,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     provider = defaultRegistry.create("claude", llmConfig);
   }
 
-  // Google (Gemini) drives a dedicated agentic tool-use loop.
-  if (effectiveVendor === "google") {
-    return await runGeminiToolLoop({
-      provider: provider as GeminiToolProvider,
-      config,
-      model,
-      systemPrompt,
-      brief,
-      taskTitle: brief.task.title,
-      testCommand: brief.project.testCommand,
-      taskId,
-      henchDir,
-      projectDir,
-      store,
-      maxTurns,
-      tokenBudget,
-      startingHead,
-      baselineUntracked,
-      baselineDirectories,
-      baselineDirty,
-      llmConfig,
-      opts,
-    });
-  }
-
-  // Local vendor drives an OpenAI-compatible tool-use loop via LM Studio.
-  if (effectiveVendor === "local") {
-    return await runLocalToolLoop({
+  // Google (Gemini) and local vendors drive their own agentic tool-use loops.
+  if (effectiveVendor === "google" || effectiveVendor === "local") {
+    const loopParams: ApiToolLoopParams = {
       provider,
       config,
       model,
@@ -2084,7 +2034,11 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       baselineDirty,
       llmConfig,
       opts,
-    });
+    };
+    // Local drives an OpenAI-compatible tool-use loop via LM Studio.
+    return effectiveVendor === "google"
+      ? await runGeminiToolLoop({ ...loopParams, provider: provider as GeminiToolProvider })
+      : await runLocalToolLoop(loopParams);
   }
 
   const openAi = effectiveVendor === "codex" ? new OpenAiFailover(provider, model, llmConfig, config) : undefined;
@@ -2096,29 +2050,18 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     brief.project.testCommand, startingHead, opts.configBackstop, signal,
   );
   const vendor = effectiveVendor;
-  const toolCtx = resources?.toolCtx ?? initGoogleApiResources(
+  const toolCtx = resources?.toolCtx ?? buildToolContext(
     config, projectDir, store, taskId, brief.project.testCommand,
     startingHead, opts.configBackstop, signal,
   );
 
   // Shared: initialize run record + capture start memory snapshot
-  const { run, memoryCtx } = await initRunRecord({
+  const { run, memoryCtx } = await initApiRunRecord(opts, {
     taskId,
     taskTitle: brief.task.title,
     model,
-    henchDir,
-    projectDir,
     vendor,
-    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
-    approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: openAi ? "openai-responses" : "api-sdk",
-    invocationContext: "api",
-    session: API_SESSION_DECISION,
-    // The tier of the model actually sent; see RunRecord.weight.
-    ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
-    ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
-    ...(opts.loop ? { loop: opts.loop } : {}),
-    ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
@@ -2155,11 +2098,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     config.prune,
   );
 
-  section(
-    opts.loop !== undefined
-      ? `Agent Run #${opts.loop.iteration} (${model}) start`
-      : `Agent Run (${model})`,
-  );
+  announceApiRun(model, opts);
 
   // Livelock detection: stop a run that keeps making the same call rather than
   // letting it spend until a human notices (GH #362). Unlike the CLI loop this
@@ -2178,26 +2117,41 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   let planOnlyRetryCount = 0;
   const planOnlyMaxRetries = config.planOnlyMaxRetries ?? 2;
 
-  // Register SIGINT handler for graceful cancellation
-  let cancelled = false;
-  const handleSignal = () => {
-    if (cancelled) {
-      // Second Ctrl+C: force exit
-      process.exit(1);
+  /**
+   * Hold a stop that only described a plan to the re-prompt budget: remind
+   * the model to execute while retries remain, then fail the run. Undefined
+   * when the stop is not plan-only (or re-prompting is off) and it stands.
+   */
+  const gatePlanOnlyStop = async (
+    isPlanOnly: boolean,
+    assistantContent: Anthropic.ContentBlock[],
+  ): Promise<"reprompted" | "failed" | undefined> => {
+    if (!(isPlanOnly && planOnlyMaxRetries > 0)) return undefined;
+    if (planOnlyRetryCount < planOnlyMaxRetries) {
+      planOnlyRetryCount++;
+      const summary = extractEndTurnSummary(assistantContent);
+      const reminder = createExecutionReminder(summary, planOnlyRetryCount);
+      stream("Warning", `Plan without execution detected. Re-prompting to execute (attempt ${planOnlyRetryCount}/${planOnlyMaxRetries})...`);
+      messages.push({
+        role: "user",
+        content: reminder,
+      });
+      return "reprompted";
     }
-    cancelled = true;
-    controller.abort();
+    run.status = "failed";
+    run.error = `Plan-only completion: Agent produced a plan but did not execute it after ${planOnlyMaxRetries} re-prompts.`;
+    stream("Warning", run.error);
+    await handleRunFailure(store, taskId, "deferred", "plan_only_completion", run.error);
+    return "failed";
   };
-  process.on("SIGINT", handleSignal);
+
+  // Graceful cancellation on SIGINT
+  const cancellation = trapCancellation(() => controller.abort());
 
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       // Check if cancellation was requested
-      if (cancelled || signal.aborted) {
-        run.status = "cancelled";
-        stream("Cancelled", "Run interrupted by user");
-        break;
-      }
+      signal.throwIfAborted();
       if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
       run.turns = turn + 1;
@@ -2215,7 +2169,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
       }
 
-      const _t0 = Date.now();
+      const t0 = Date.now();
       const response = await withHeartbeat<Anthropic.Message | Awaited<ReturnType<OpenAiAgentTurn["call"]>>>(
         `waiting on ${openAi?.selection.vendor ?? vendor}/${openAi?.selection.model ?? model} response`,
         openAi ? openAi.call({
@@ -2267,9 +2221,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
           taskId,
           brief.project.testCommand,
           startingHead,
+          signal,
         ),
       );
-      const _latencyMs = Date.now() - _t0;
+      const latencyMs = Date.now() - t0;
 
       // Attribute each attempt to the provider/model actually used, including after a switch.
       const turnVendor = openAi?.selection.vendor ?? vendor;
@@ -2290,16 +2245,16 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, turnVendor, turnModel);
       }
       signal.throwIfAborted();
-      if (response.stop_reason === "refusal") throw new Error("OpenAI refused the agent request");
+      if (response.stop_reason === "refusal") throw new Error(`${turnVendor === "codex" ? "OpenAI" : "Claude"} refused the agent request`);
 
       // Emit tok/s metric — parsed by the web server for live dashboard display
       {
         const outTokens = "accounting" in response ? response.accounting.tokenUsage?.output
           : (response.usage as unknown as Record<string, unknown>)?.["output_tokens"];
         const _outTok = typeof outTokens === "number" ? outTokens : 0;
-        if (_outTok > 0 && _latencyMs > 0) {
-          const _tokPerSec = Math.round((_outTok / _latencyMs) * 1000 * 10) / 10;
-          detail(`⚡ ${_tokPerSec} tok/s (${_latencyMs}ms, ${_outTok} out)`);
+        if (_outTok > 0 && latencyMs > 0) {
+          const _tokPerSec = Math.round((_outTok / latencyMs) * 1000 * 10) / 10;
+          detail(`⚡ ${_tokPerSec} tok/s (${latencyMs}ms, ${_outTok} out)`);
         }
       }
 
@@ -2312,7 +2267,11 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       // Process response content
       const assistantContent = response.content;
-      messages.push({ role: "assistant", content: assistantContent });
+      // A reasoning-only token limit leaves no assistant content for either
+      // provider to replay. Claude rejects an empty message in its history.
+      if (assistantContent.length || response.stop_reason !== "max_tokens") {
+        messages.push({ role: "assistant", content: assistantContent });
+      }
 
       streamAssistantText(assistantContent, formatModelLabel(turnModel));
 
@@ -2323,25 +2282,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       // Handle stop reasons
       if (response.stop_reason === "end_turn") {
         // Check for plan-only completion at end_turn
-        if (planDetection.isPlanOnly && planOnlyMaxRetries > 0) {
-          if (planOnlyRetryCount < planOnlyMaxRetries) {
-            planOnlyRetryCount++;
-            const summary = extractEndTurnSummary(assistantContent);
-            const reminder = createExecutionReminder(summary, planOnlyRetryCount);
-            stream("Warning", `Plan without execution detected. Re-prompting to execute (attempt ${planOnlyRetryCount}/${planOnlyMaxRetries})...`);
-            messages.push({
-              role: "user",
-              content: reminder,
-            });
-            continue;
-          } else {
-            run.status = "failed";
-            run.error = `Plan-only completion: Agent produced a plan but did not execute it after ${planOnlyMaxRetries} re-prompts.`;
-            stream("Warning", run.error);
-            await handleRunFailure(store, taskId, "deferred", "plan_only_completion", run.error);
-            break;
-          }
-        }
+        const planOnly = await gatePlanOnlyStop(planDetection.isPlanOnly, assistantContent);
+        if (planOnly === "reprompted") continue;
+        if (planOnly === "failed") break;
 
         run.status = "completed";
         run.summary = extractEndTurnSummary(assistantContent);
@@ -2371,25 +2314,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       if (response.stop_reason !== "tool_use") {
         // Check for plan-only completion at non-tool_use stop reasons
-        if (planDetection.isPlanOnly && planOnlyMaxRetries > 0) {
-          if (planOnlyRetryCount < planOnlyMaxRetries) {
-            planOnlyRetryCount++;
-            const summary = extractEndTurnSummary(assistantContent);
-            const reminder = createExecutionReminder(summary, planOnlyRetryCount);
-            stream("Warning", `Plan without execution detected. Re-prompting to execute (attempt ${planOnlyRetryCount}/${planOnlyMaxRetries})...`);
-            messages.push({
-              role: "user",
-              content: reminder,
-            });
-            continue;
-          } else {
-            run.status = "failed";
-            run.error = `Plan-only completion: Agent produced a plan but did not execute it after ${planOnlyMaxRetries} re-prompts.`;
-            stream("Warning", run.error);
-            await handleRunFailure(store, taskId, "deferred", "plan_only_completion", run.error);
-            break;
-          }
-        }
+        const planOnly = await gatePlanOnlyStop(planDetection.isPlanOnly, assistantContent);
+        if (planOnly === "reprompted") continue;
+        if (planOnly === "failed") break;
 
         run.status = "completed";
         break;
@@ -2397,15 +2324,16 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       // Process tool calls
       const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run, livelock, signal);
+      signal.throwIfAborted();
       if (await failOnLivelock(livelock, run, store, taskId)) break;
       messages.push({ role: "user", content: toolResults });
 
       // Save progress periodically
-      run.lastActivityAt = new Date().toISOString();
-      await saveRun(henchDir, run);
+      await saveProgress(henchDir, run);
     }
 
     if (run.status === "running") {
+      signal.throwIfAborted();
       run.status = "timeout";
       run.error = `Exceeded max turns (${maxTurns})`;
 
@@ -2416,66 +2344,23 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       run.vendor = openAi.selection.vendor;
       run.model = openAi.selection.model;
     }
-    if (run.status !== "budget_exceeded") {
+    if (signal.aborted || run.status !== "budget_exceeded") {
       run.status = signal.aborted ? "cancelled" : "failed";
       run.error = signal.aborted ? "Run interrupted by user" : (err as Error).message;
       console.error(`[Error] ${run.error}`);
 
-      await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
+      await handleRunFailure(store, taskId, signal.aborted || openAi ? "pending" : "deferred",
+        signal.aborted ? "task_cancelled" : "task_failed", run.error);
     }
   } finally {
     // Remove SIGINT handler to restore default behavior
-    process.removeListener("SIGINT", handleSignal);
+    cancellation.release();
   }
 
-  // Stop heartbeat before finalization
-  heartbeat.stop();
-
-  // Same completion standard as the CLI loop: a claim with no changes fails.
-  await rejectUnvalidatedCompletion({
-    run, store, taskId, projectDir, startingHead, baselineUntracked,
-    testCommand: brief.project.testCommand, selfHeal: config.selfHeal,
-    testMaxWorkers: config.testGate?.maxWorkers,
-    validationSlot: validationSlotFromConfig(config, projectDir, { signal: opts.abortSignal, print: info }),
-  });
-
-  // Shared: review gate
-  if (opts.approveDiff && run.status === "completed") {
-    await runReviewGate(projectDir, store, taskId, run, {
-      rollbackOnFailure: opts.rollbackOnFailure,
-      yes: opts.yes,
-      autonomous: opts.autonomous === true || config.autonomous === true,
-      baselineUntracked,
-      baselineDirectories,
-    });
-  }
-
-  // Shared: finalize run (build summary, memory stats, post-task tests, save)
-  // The guard's decisions outlive the process only if they are on the record.
-  if (toolCtx.guard.policy) run.guardAudit = toolCtx.guard.policy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
-
-  await finalizeRun({
-    claims: opts.claims,
-    configBackstop: opts.configBackstop,
-    abortSignal: opts.abortSignal,
-    run,
-    henchDir,
-    projectDir,
-    config,
+  await finishApiRun({
+    run, memoryCtx, heartbeat, guard: toolCtx.guard, config, store, taskId,
     testCommand: brief.project.testCommand,
-    heartbeat,
-    memoryCtx,
-    selfHeal: config.selfHeal,
-    rollbackOnFailure: opts.rollbackOnFailure,
-    yes: opts.yes,
-    autonomous: opts.autonomous === true || config.autonomous === true,
-    store,
-    autoCommit: config.autoCommit === true,
-    skipFullTestGate: config.skipFullTestGate,
-    baselineUntracked,
-    baselineDirectories,
-    baselineDirty,
-    startingHead,
+    startingHead, baselineUntracked, baselineDirectories, baselineDirty, opts,
   });
 
   return { run };

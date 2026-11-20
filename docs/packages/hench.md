@@ -39,6 +39,23 @@ ndx work --auto .
 ndx work --epic="Auth System" --auto --iterations=2 .
 ```
 
+## Direct OpenAI API tasks
+
+`n-dx work --provider=api --model=gpt-6-astra .` with `llm.vendor=codex`
+uses Responses with guarded tools and API credentials. The agent codec admits
+`gpt-6.1-sol` and `gpt-6-astra`; it requests encrypted reasoning for stateless
+history and resumes output-token exhaustion without executing or replaying calls
+from the truncated turn. Truncated compaction summaries remain rejected.
+
+`llm.autoFailover` is off by default. When enabled, the OpenAI-origin run can
+consume Codex light, Claude standard and Claude light once each. Each provider
+uses its own API credentials; no CLI fallback occurs. Each attempt has a deadline
+of two minutes plus `ceil(hench.maxTokens / 10)` seconds, clamped to 10–30 minutes,
+including body reads and primary retries. Refusals, malformed output, budget
+limits and caller aborts stop the chain; cancellation returns OpenAI and Claude
+API tasks to pending with `task_cancelled`. See
+[configuration](../guide/configuration.md#llm-vendor) for error rules and limits.
+
 ## Settings Saved on a Task
 
 A PRD item can carry a `run` block saying how `ndx work` should run it — written
@@ -70,8 +87,8 @@ own vendor is skipped with a warning (that would be self review).
 
 **A saved value that cannot be honoured never stops a run.** It is skipped with
 a warning naming the task, and resolution continues down the chain — a model the
-active vendor cannot run, a `provider` the vendor has no loop for (`api` on
-codex), a `review` the resolved provider cannot spawn a reviewer on, a
+active vendor cannot run, a `provider` the vendor has no loop for, a
+`review` the resolved provider cannot spawn a reviewer on, a
 `permissionMode` outside Claude. A block that fails rex's validator is ignored
 whole, with one warning. None of these is a refusal: one task's saved value must
 not strand every other task in a loop.

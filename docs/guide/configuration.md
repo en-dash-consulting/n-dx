@@ -125,13 +125,35 @@ For direct OpenAI tasks, use `n-dx work --provider=api --model=gpt-6-astra .`
 with `llm.vendor=codex` and OpenAI API authentication. The agent codec supports
 `gpt-6.1-sol` and `gpt-6-astra`; other model pins are refused, not replaced.
 `hench.provider=cli` with `llm.codex.auth=api` remains CLI execution authenticated
-with an API key. Direct API runs support diff approval and bounded model/vendor
-failover when `llm.autoFailover=true`: the configured light Codex model, then
-Claude standard and light models, with at most three fallback attempts per run.
-Each fallback still needs supported agent-turn models and that vendor's API
-credentials. The dashboard shows this chain even when automatic failover is off;
-Codex CLI does not use it. CLI self/pair review remains unavailable for direct
-API runs.
+with an API key. Direct API runs support diff approval; CLI self/pair review
+remains unavailable on this path.
+
+Direct OpenAI API failover is opt-in (`llm.autoFailover=true`, off by default).
+Starting from the selected OpenAI model, a run can try the configured Codex light
+model, then Claude standard, then Claude light. Each selection is consumed once
+across the run, including successful tool turns. Unsupported OpenAI fallback
+models are skipped; the codec's supported models do not expand. Claude needs its
+own API credentials. No attempt uses a CLI or changes saved vendor/model settings.
+Authentication, unavailable-model, rate-limit, network and timeout errors can
+advance the chain; refusals, malformed output, budget limits and caller cancellation
+stop it. Exhaustion restores the original selection and error. Usage and switch
+diagnostics identify the effective provider/model.
+
+Each attempt in this OpenAI-origin chain, including Claude fallbacks, has a whole
+request deadline: two minutes plus the configured `hench.maxTokens` budget at ten
+tokens/second (rounded up to seconds), clamped to 10–30 minutes. For 8,192 tokens
+that is 15 minutes 40 seconds. It covers response-body reads and primary-provider
+retries/backoff; secondary clients have no transport retries. This deadline is
+separate from retry delays, and healthy turns may exceed one minute. Caller abort
+wins over a simultaneous timeout and does not trigger a switch. Cancelled OpenAI
+and Claude API tasks return to pending with a `task_cancelled` event.
+
+Stateless Responses requests include encrypted reasoning for tool-history replay.
+Output-token exhaustion continues on the same model, including reasoning-only
+turns, and records reported usage. No function call or opaque continuation from
+that truncated turn is executed or replayed; the agent is asked to retry unfinished
+tools. Other incomplete/failed statuses and malformed terminal payloads fail
+safely. Context compaction still rejects truncated summaries.
 
 ## Claude Configuration
 
@@ -164,7 +186,7 @@ Hench's `apiKeyEnv`, the variable the API loop sends as the Anthropic key, follo
 
 `llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). `n-dx config` accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` and `ultra`; support depends on the model and client. Codex CLI can advertise `ultra`, while some API models support `none` or `minimal`.
 
-Codex CLI also honors these rules, including `agent.execute` and `agent.review`. It checks the selected binary's `model/list` catalog for the selected model's advertised reasoning efforts before sending `-c model_reasoning_effort=...`. An unsupported value, missing model, older client without effort metadata, or failed catalog probe prints a warning and leaves the client setting unchanged. A catalog entry describes client support, not account entitlement.
+Codex CLI also honors these rules, including `agent.execute` and `agent.review`. `agent.review` is effort-only: choose the reviewer with `llm.<vendor>.reviewModel` or a task’s saved `reviewTier` / `reviewModels`; `llm.routes.agent.review` does not select a reviewer. Settings shows the actual reviewer in its review section, separately from the tier table. It checks the selected binary's `model/list` catalog for the selected model's advertised reasoning efforts before sending `-c model_reasoning_effort=...`. An unsupported value, missing model, older client without effort metadata, or failed catalog probe prints a warning and leaves the client setting unchanged. A catalog entry describes client support, not account entitlement.
 
 OpenAI Chat Completions sends a supported rule as `reasoning_effort` in both blocking and streaming requests. Its model allowlist is separate from CLI support: `ultra` is not an API effort. Unknown models and unsupported values warn and omit the field. With no matching rule, neither Codex path forces a tier/reviewer recommendation: intentional CLI/profile pins and API defaults remain in effect. Set an explicit rule to adopt a recommendation; exact task-class pins outrank wildcard rules.
 
@@ -330,13 +352,21 @@ The escalated attempt runs on the vendor's CLI when it has one, else its API, an
 
 ### Review modes
 
-`hench.review.mode` sets how `ndx work` reviews a task's diff before it is committed.
+`hench.review.mode` sets how `n-dx work` reviews a task's diff before it is committed.
 
 | Mode | What it does |
 |------|--------------|
 | `off` (default) | No review. |
-| `self` | The executing vendor reviews its own work in a fresh session, as `--review` does. |
+| `self` | The executing vendor reviews its own work, as `--review` does. The CLI resumes the work session when eligible; otherwise the reviewer starts fresh with task context. |
 | `pair` | The other vendor's CLI reviews the diff in a fresh session and reports findings without editing any file. |
+
+**Self-review sessions.** Claude CLI resumes the captured work-session ID when
+available, including when the review model differs from the work model. Codex
+CLI resumes only when the selected binary supports resume and the explicit model,
+worktree, branch and execution identity still match; a different review model,
+missing ID or unavailable identity starts a fresh reviewer. Vendors without
+resume support also start fresh. Pair mode always gives the reviewer a fresh
+session independent of the executor's transcript.
 
 ```sh
 ndx config hench.review.mode pair .       # off, self or pair

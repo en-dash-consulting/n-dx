@@ -22,7 +22,9 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
+import { isRecord } from "../shared/index.js";
 import type { ProjectView } from "./hub.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 /** How often a project with a rule on is ticked. */
 export const TRACKER_TICK_INTERVAL_MS = 5 * 60_000;
@@ -32,8 +34,6 @@ export const TRACKER_TICK_PATH = "/api/tracker/sync/tick";
 const TICK_TIMEOUT_MS = 120_000;
 /** The rule modes that make a call or log a would-be one; anything else is off. */
 const ACTIVE_MODES: ReadonlySet<unknown> = new Set(["dry-run", "on"]);
-
-const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 
 /** Whether `repoRoot`'s local config sets any `trackerSync` rule to `dry-run` or `on`. */
 export function hasActiveTrackerRule(repoRoot: string): boolean {
@@ -61,9 +61,9 @@ export type TrackerTickPost = (projectId: string) => Promise<TrackerTickOutcome>
 export function proxiedTickPost(port: () => number, token: string | null): TrackerTickPost {
   return async (projectId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:${port()}/p/${encodeURIComponent(projectId)}${TRACKER_TICK_PATH}`, {
+      const res = await fetch(loopbackUrl(port(), `/p/${encodeURIComponent(projectId)}${TRACKER_TICK_PATH}`), {
         method: "POST",
-        headers: token ? { "X-Ndx-Token": token } : {},
+        headers: tokenHeaders(token),
         signal: AbortSignal.timeout(TICK_TIMEOUT_MS),
       });
       await res.arrayBuffer();
