@@ -22,6 +22,7 @@
  * @see packages/hench/src/agent/lifecycle/event-accumulator.ts — legacy mutation-based parsers
  */
 
+import { codexGuardLimitations } from "./codex-policy.js";
 import { CodexManagedUsage } from "./codex-managed-usage.js";
 import { createHash } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
@@ -127,6 +128,8 @@ import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
 import {
+  createCodexScratch,
+  assertCodexScratchEnvironment,
   codexSessionDriver,
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -937,13 +940,26 @@ export async function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<S
     const reason = describeAbortReason(opts.abortSignal.reason);
     return { ...emptySpawnResult(), error: reason, aborted: { reason } };
   }
-  const spawned = spawnVendorProcess(opts);
   const backstop = opts.configBackstop;
-  if (!backstop) return spawned;
-  return spawned.finally(() => {
-    const writes = backstop.restore();
-    if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
-  });
+  const scratch = opts.spawnConfig.withScratchDir ? createCodexScratch() : undefined;
+  try {
+    if (scratch) {
+      const spawnConfig = opts.spawnConfig.withScratchDir!(scratch.dir);
+      opts = { ...opts, spawnConfig, cliEnv: { ...opts.cliEnv, ...spawnConfig.env } };
+      await assertCodexScratchEnvironment({ binary: opts.cliBinary, args: spawnConfig.args,
+        cwd: opts.cwd, env: opts.cliEnv, scratchDir: scratch.dir, signal: opts.abortSignal });
+    }
+    return await spawnVendorProcess(opts);
+  } finally {
+    try {
+      scratch?.dispose();
+    } finally {
+      if (backstop) {
+        const writes = backstop.restore();
+        if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
+      }
+    }
+  }
 }
 
 function emptySpawnResult(): SpawnResult {
@@ -2700,6 +2716,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     return { run };
   }
 
+  const policyLimitations = codexGuardLimitations(vendor, "cli",
+    opts.reviewPass ? opts.reviewMode : "off", opts.reviewVendor);
+  if (policyLimitations) stream("Guard", policyLimitations);
+
   // Shared: transition task to in_progress
   // Confinement: Codex runs inside its own sandbox; the Claude CLI runs
   // inside ours, and an autonomous run never runs it unconfined by accident.
@@ -2773,6 +2793,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     ...(opts.loop ? { loop: opts.loop } : {}),
     ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
+
+  if (policyLimitations) {
+    run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: adapter.parseMode, notes: [] };
+    run.diagnostics.notes.push(policyLimitations);
+  }
 
   // The brief as sent: the run's commit trailers included, so the agent's own
   // commits carry N-DX-Item (the autoCommit path writes no trailers of hench's).

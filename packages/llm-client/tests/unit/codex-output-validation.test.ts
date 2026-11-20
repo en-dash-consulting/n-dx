@@ -40,20 +40,19 @@ describe("Codex model-pin assertion argv fixtures (simulated Windows)", () => {
 
 // ── Mock declarations (hoisted above imports by vitest) ──────────────────────
 
-const { mockReadFile, mockMkdtemp, mockRm, mockSpawn } = vi.hoisted(() => {
+const { mockReadFile, mockSpawn } = vi.hoisted(() => {
   const mockReadFile = vi.fn();
-  const mockMkdtemp = vi.fn(async () => "/tmp/ndx-codex-test-123");
-  const mockRm = vi.fn(async () => undefined);
   const mockSpawn = vi.fn();
 
-  return { mockReadFile, mockMkdtemp, mockRm, mockSpawn };
+  return { mockReadFile, mockSpawn };
 });
 
-vi.mock("node:fs/promises", () => ({
-  mkdtemp: mockMkdtemp,
+vi.mock("node:fs/promises", async importOriginal => ({
+  ...await importOriginal<typeof import("node:fs/promises")>(),
   readFile: mockReadFile,
-  rm: mockRm,
 }));
+
+vi.mock("../../src/codex-scratch-env.js", () => ({ assertCodexScratchEnvironment: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock("node:child_process", () => ({
   spawn: mockSpawn,
@@ -93,7 +92,7 @@ import { ClaudeClientError } from "../../src/types.js";
 
 describe("createCodexCliClient — output validation", () => {
   it("throws a retryable error when the output file is empty", async () => {
-    mockSpawn.mockReturnValue(mockProcess(0));
+    mockSpawn.mockImplementation(() => mockProcess(0));
     mockReadFile.mockResolvedValue("");
 
     const client = createCodexCliClient({ codexConfig: { cli_path: "codex" }, maxRetries: 0 });
@@ -112,7 +111,7 @@ describe("createCodexCliClient — output validation", () => {
   });
 
   it("throws a retryable error when the output file is whitespace-only", async () => {
-    mockSpawn.mockReturnValue(mockProcess(0));
+    mockSpawn.mockImplementation(() => mockProcess(0));
     mockReadFile.mockResolvedValue("   \n  ");
 
     const client = createCodexCliClient({ codexConfig: { cli_path: "codex" }, maxRetries: 0 });
@@ -130,7 +129,7 @@ describe("createCodexCliClient — output validation", () => {
   });
 
   it("throws a retryable error when the output file is missing (ENOENT)", async () => {
-    mockSpawn.mockReturnValue(mockProcess(0));
+    mockSpawn.mockImplementation(() => mockProcess(0));
     const enoent = Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
     mockReadFile.mockRejectedValue(enoent);
 
@@ -150,7 +149,7 @@ describe("createCodexCliClient — output validation", () => {
   });
 
   it("retains measured usage on an unwrapped non-ENOENT output read error", async () => {
-    mockSpawn.mockReturnValue(mockProcess(0, "", JSON.stringify({
+    mockSpawn.mockImplementation(() => mockProcess(0, "", JSON.stringify({
       type: "turn.completed", usage: { input_tokens: 100, cached_input_tokens: 80, output_tokens: 5 },
     })));
     const accessDenied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
@@ -164,7 +163,7 @@ describe("createCodexCliClient — output validation", () => {
   });
 
   it("returns exact text when the output file has content", async () => {
-    mockSpawn.mockReturnValue(mockProcess(0));
+    mockSpawn.mockImplementation(() => mockProcess(0));
     mockReadFile.mockResolvedValue('  [{"epic":{"title":"Auth"},"features":[]}]\n');
 
     const client = createCodexCliClient({ codexConfig: { cli_path: "codex" }, maxRetries: 0 });
@@ -177,7 +176,7 @@ describe("createCodexCliClient — output validation", () => {
 describe("Codex literal model execution", () => {
   it("sends an intentional API model pin unchanged", async () => {
     mockSpawn.mockClear();
-    mockSpawn.mockReturnValue(mockProcess(0));
+    mockSpawn.mockImplementation(() => mockProcess(0));
     mockReadFile.mockResolvedValue("ok");
     const client = createCodexCliClient({ codexConfig: { model: "gpt-5.4" } });
     await client.complete({ prompt: "test" });

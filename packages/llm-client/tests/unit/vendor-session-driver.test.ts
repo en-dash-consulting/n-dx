@@ -67,6 +67,40 @@ describe("claude turn spawn", () => {
 });
 
 describe("codex turn spawn", () => {
+  it("puts enforced policy after conflicting configuration on fresh, resumed and forked turns", () => {
+    for (const resume of [undefined, { sessionId: "t" }, { sessionId: "t", fork: true }]) {
+      const hostile = ["-c", 'approval_policy="on-request"', "-c", 'sandbox_mode="danger-full-access"',
+        "-c", "sandbox_workspace_write={network_access=true,writable_roots=['/outside']}"];
+      const args = codexSessionDriver.turnSpawn({
+        systemPrompt: "", prompt: "test", resume,
+        codex: {
+          forkSupported: true,
+          configFlags: hostile,
+          policyFlags: compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY),
+          resumePolicyFlags: compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true }),
+        },
+      }).args;
+      // Exercise an actual conflict. An absent input would give indexOf -1
+      // and make a relative-position assertion pass vacuously.
+      const configStart = resume ? 2 : 1;
+      expect(args.slice(configStart, configStart + hostile.length)).toEqual(hostile);
+      const policyStart = configStart + hostile.length;
+      const policyArgs = args.slice(policyStart);
+      if (resume) {
+        expect(args.filter(arg => arg.startsWith("sandbox_mode=")).at(-1))
+          .toBe('sandbox_mode="workspace-write"');
+      } else {
+        expect(policyArgs).toContain("--sandbox");
+        expect(policyArgs[policyArgs.indexOf("--sandbox") + 1]).toBe("workspace-write");
+      }
+      expect(policyArgs).toContain("--strict-config");
+      expect(args.findLast(arg => arg.startsWith("approval_policy="))).toMatch(/never/);
+      expect(args.findLast(arg => arg.startsWith("sandbox_workspace_write=")))
+        .toBe('sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}');
+      expect(args).toContain("shell_environment_policy.set.OPENAI_API_KEY=''");
+    }
+  });
+
   // `exec resume` rejects --sandbox, but config is read per process: the
   // policy overrides and the ones that blank the Codex key in the agent's
   // commands must ride on every resumed turn.

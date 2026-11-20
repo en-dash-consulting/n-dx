@@ -40,7 +40,7 @@ describe("analyze completion diagnostics stay with command totals across a time 
     const answer = JSON.stringify([{ epic: { title: "Authentication" }, features: [{ title: "Login", tasks: [{ title: "Implement login form", priority: "high" }] }] }]);
     const stream = status === "unavailable" ? "" : JSON.stringify({ type: "turn.completed",
       usage: { input_tokens: 100, cached_input_tokens: 80, output_tokens: 5 } }) + "\n{";
-    const cli = writeFakeCli(dir, { name: "codex", script: `
+    const cli = writeFakeCli(dir, { name: "codex", codexConfigRead: {}, script: `
       import fs from 'node:fs';
       for await (const chunk of process.stdin) { /* drain */ }
       const args = process.argv.slice(2);

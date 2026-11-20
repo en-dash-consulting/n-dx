@@ -271,11 +271,13 @@ export {
   DEFAULT_CODEX_MODEL,
   createCodexCliClient,
   compileCodexPolicyFlags,
+  createCodexScratch,
   codexShellEnvFlags,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
 } from "./codex-cli-provider.js";
 export type { CodexCliProviderOptions } from "./codex-cli-provider.js";
+export { assertCodexScratchEnvironment } from "./codex-scratch-env.js";
 
 export {
   CodexProjectConfigError,

@@ -23,8 +23,12 @@
 
 import { describe, it, expect } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { codexCliAdapter } from "../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 import {
+  assertCodexScratchEnvironment,
   compileCodexPolicyFlags,
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -100,11 +104,39 @@ const POLICIES: Array<[string, ExecutionPolicy]> = SANDBOXES.flatMap((sandbox) =
     sandbox === DEFAULT_EXECUTION_POLICY.sandbox && approvals === DEFAULT_EXECUTION_POLICY.approvals
       ? `${sandbox} + ${approvals} (the ndx work default)`
       : `${sandbox} + ${approvals}`,
-    { ...DEFAULT_EXECUTION_POLICY, sandbox, approvals },
+    { ...DEFAULT_EXECUTION_POLICY, sandbox, approvals,
+      networkAccess: sandbox === "danger-full-access",
+      writableRoots: sandbox === "danger-full-access" ? [] : ["."] },
   ]),
 );
 
 describe.skipIf(!HAS_CODEX)("codex flag surface (installed CLI)", () => {
+  it("checks native temp filters and reports exec-only selector incompatibility before model work", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-config-test-"));
+    try {
+      const home = join(root, "home"), scratchDir = join(root, "scratch");
+      await mkdir(home);
+      await mkdir(scratchDir);
+      const env = { ...process.env, HOME: home, CODEX_HOME: home, USERPROFILE: home,
+        OPENAI_API_KEY: undefined, CODEX_API_KEY: undefined, CODEX_ACCESS_TOKEN: undefined,
+        TMPDIR: scratchDir, TMP: scratchDir, TEMP: scratchDir };
+      const check = (extra: string[] = []) => assertCodexScratchEnvironment({
+        binary: "codex", cwd: root, env, scratchDir,
+        args: ["exec", ...extra, ...compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { scratchDir }), "-"],
+      });
+      await check();
+      await writeFile(join(home, "config.toml"), '[shell_environment_policy]\ninclude_only = ["PATH"]\n');
+      await expect(check()).rejects.toThrow(/include_only.*TMPDIR.*TMP.*TEMP/);
+      if (documents(helpText(["app-server"]), "--ignore-user-config")) {
+        await check(["--ignore-user-config"]);
+      } else {
+        await expect(check(["--ignore-user-config"])).rejects.toThrow(/app-server rejects --ignore-user-config/);
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("reports which codex it checked", () => {
     const version = execFileSync("codex", ["--version"], { encoding: "utf-8" }).trim();
     // Not an assertion about the version — a record of what the run verified.

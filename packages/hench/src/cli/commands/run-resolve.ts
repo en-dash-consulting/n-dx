@@ -17,6 +17,7 @@
  * refused run still exits 0 with a complete report.
  */
 
+import { codexGuardLimitations } from "../../agent/lifecycle/codex-policy.js";
 import { dirname } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem, RunSettings, V2Tree } from "../../prd/rex-gateway.js";
@@ -81,7 +82,7 @@ export type RunRefusalCode =
  * dashboard has no stderr anyone reads.
  */
 export interface RunWarning {
-  code: "untrusted-repository" | "planning-commit" | SettingWarningCode;
+  code: "untrusted-repository" | "planning-commit" | "policy-unsupported" | SettingWarningCode;
   message: string;
 }
 
@@ -453,6 +454,8 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
 
   // ── Provider ──────────────────────────────────────────
   const provider = settings.provider;
+  const policyLimitations = codexGuardLimitations(vendor, provider.value,
+    settings.reviewMode.value, settings.reviewVendor.value ?? undefined);
   if (provider.error) refuse("provider-unsupported", provider.error);
   if (!provider.error && !settings.model.mismatch && provider.value === "api" &&
       vendor === LLM_VENDOR.CODEX && !supportsOpenAiTurns(settings.model.value)) {
@@ -503,6 +506,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   // resolver's: nothing may save them on a task.
   const trustEvaluation = applyRepoTrust(config, dir, undefined).evaluation;
   const warnings: RunWarning[] = [
+    ...(policyLimitations ? [{ code: "policy-unsupported" as const, message: policyLimitations }] : []),
     ...(trustEvaluation.restricted
       ? [{
           code: "untrusted-repository" as const,

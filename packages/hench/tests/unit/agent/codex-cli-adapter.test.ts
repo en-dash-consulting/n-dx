@@ -78,6 +78,19 @@ describe("CodexCliAdapter: VendorAdapter interface", () => {
 // ── 2. buildSpawnConfig ──────────────────────────────────────────────────
 
 describe("CodexCliAdapter: buildSpawnConfig", () => {
+  it("binds private scratch on fresh, resumed and forked sessions without changing the base policy", () => {
+    for (const opts of [{}, { resumeSessionId: "parent" }, { resumeSessionId: "parent", forkSession: true, codexForkSupported: true }]) {
+      const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, opts);
+      const prepared = config.withScratchDir!("/private/scratch");
+      expect(prepared.args).toContain('sandbox_workspace_write={network_access=false,writable_roots=["/private/scratch"],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}');
+      expect(prepared.args).toContain('shell_environment_policy.set.TMPDIR="/private/scratch"');
+      expect(prepared.env).toMatchObject({ TMPDIR: "/private/scratch", TMP: "/private/scratch", TEMP: "/private/scratch" });
+      expect(config.args.join(" ")).not.toContain("/private/scratch");
+    }
+    const readOnly = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), READONLY_POLICY, {});
+    expect(readOnly.withScratchDir).toBeUndefined();
+  });
+
   it("returns a valid SpawnConfig", () => {
     const envelope = createStandardEnvelope();
     const config: SpawnConfig = codexCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
@@ -123,6 +136,11 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
 
     expect(config.args).toContain("--dangerously-bypass-approvals-and-sandbox");
     expect(config.args).not.toContain("--approval-policy");
+  });
+
+  it("refuses full-access with bounded writable roots before spawning", () => {
+    expect(() => codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), { ...FULL_ACCESS_POLICY, writableRoots: ["."] }, {}))
+      .toThrow(/cannot enforce writableRoots/);
   });
 
   it("places model override as -m flag", () => {
@@ -196,6 +214,9 @@ describe("CodexCliAdapter: snapshot parity", () => {
       "workspace-write",
       "-c",
       "approval_policy=never",
+      "--strict-config",
+      "-c",
+      'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}',
       ...SHELL_ENV,
       "--json",
       "--skip-git-repo-check",
@@ -212,6 +233,9 @@ describe("CodexCliAdapter: snapshot parity", () => {
       "workspace-write",
       "-c",
       "approval_policy=never",
+      "--strict-config",
+      "-c",
+      'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}',
       ...SHELL_ENV,
       "--json",
       "--skip-git-repo-check",

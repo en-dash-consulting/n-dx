@@ -76,6 +76,8 @@ describe("Codex warm-parent loop contract", () => {
     cli.script(() => result("parent"), works("one.ts", "child-one"), works("two.ts", "child-two"));
     const first = await run("task-1");
     const second = await run("task-2");
+    expect(first.run.diagnostics?.notes).toContainEqual(expect.stringContaining("does not enforce hench.guard.allowedCommands"));
+    expect(second.run.diagnostics?.notes).toContainEqual(expect.stringContaining("does not enforce hench.guard.allowedCommands"));
     expect(first.run.parentSessionId).toBe("parent");
     expect(second.run.parentSessionId).toBe("parent");
     expect(second.run.session?.outcome).toBe("hit");
