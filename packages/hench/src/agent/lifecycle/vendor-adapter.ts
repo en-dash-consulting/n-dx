@@ -53,6 +53,8 @@ import type { PermissionMode } from "../../schema/index.js";
  *   is portable and doesn't depend on Node.js typings.
  */
 export interface SpawnConfig {
+  /** Codex cumulative usage boundary, including inherited fork history. */
+  readonly usageResumeSessionId?: string;
   /** Path to the vendor CLI binary (e.g. "claude", "codex", or absolute path). */
   readonly binary: string;
 
@@ -98,8 +100,8 @@ export interface VendorSpawnOptions {
   /**
    * Effort level for the spawned session, already validated for this model.
    *
-   * Currently only honored by the Claude CLI adapter, which forwards it as
-   * `--effort <level>`. Other adapters silently ignore it. Undefined means no
+   * Claude forwards this as `--effort`; Codex as `model_reasoning_effort`,
+   * after the caller validates the selected client catalog. Undefined means no
    * `llm.effort` rule matched, and the vendor picks its own default.
    */
   readonly effort?: string;

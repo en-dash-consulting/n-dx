@@ -756,7 +756,7 @@ export function routesToTier(taskClass: string, config?: LLMConfig): boolean {
  *   tier for `gpt-6-astra`. Workload recommendations verified against
  *   https://learn.chatgpt.com/docs/models?surface=cli on 2026-11-16,
  *   not n-dx benchmarks or evidence of account access. Effort stays at the
- *   client's default until Codex effort plumbing is supported.
+ *   client's default unless an explicit supported effort rule applies.
  * - **google → `gemini-2.5-pro`.** The heavy tier; `gemini-3.7-flash` is the
  *   balanced execution default.
  * - **local → `""`.** LM Studio serves whichever model is loaded; there is no

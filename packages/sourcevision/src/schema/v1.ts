@@ -17,6 +17,11 @@ export interface ModuleInfo {
 
 /** Calls, tokens and wall-clock for one LLM task class in one analyze run. */
 export interface LLMClassUsage {
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+  /** Calls whose accounting is absent or incomplete. */
+  unmeasuredCalls?: number;
+  measuredCalls?: number;
   calls: number;
   inputTokens: number;
   outputTokens: number;
@@ -691,6 +696,8 @@ export interface TokenUsage {
 
 /** Aggregated token usage across one or more LLM calls. */
 export interface AnalyzeTokenUsage {
+  /** Measurement completeness, separate from model price attribution. Absent on legacy manifests. */
+  diagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Number of LLM calls made. */
   calls: number;
   /** Total input tokens across all calls. */

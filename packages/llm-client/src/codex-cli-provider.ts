@@ -20,6 +20,9 @@
  * @see docs/analysis/claude-codex-runtime-identity-discovery.md §7.1
  */
 
+import { codexEffortFlags, resolveCodexCliEffort } from "./codex-effort.js";
+
+import { CodexCliUsage } from "./codex-cli-usage.js";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -303,12 +306,16 @@ async function spawnOnce(
 ): Promise<CompletionResult> {
   const dir = await mkdtemp(join(tmpdir(), "ndx-codex-"));
   const outputPath = join(dir, "last-message.txt");
+  const usage = new CodexCliUsage();
 
   try {
     const effectivePolicy = policy ?? DEFAULT_EXECUTION_POLICY;
     const policyFlags = compileCodexPolicyFlags(effectivePolicy);
+    const effort = await resolveCodexCliEffort(request.model || resolveCodexModel(codexConfig), request.effort,
+      { binary: cliBinary, env, cwd: process.cwd() }, request.taskClass);
     const args = [
       "exec",
+      "--json",
       ...policyFlags,
       "--skip-git-repo-check",
       "-m",
@@ -316,6 +323,7 @@ async function spawnOnce(
       "-o",
       outputPath,
       ...(request.cliFlags ?? []),
+      ...codexEffortFlags(effort),
       "-",
     ];
     debugLog(`spawn start cli="${cliBinary}" model="${request.model || resolveCodexModel(codexConfig)}" promptChars=${request.prompt.length}`);
@@ -325,9 +333,12 @@ async function spawnOnce(
       // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
       // with a self-quoted verbatim command line instead of shell:true+args.
       const proc = spawnCli(cliBinary, args, {
-        stdio: ["pipe", "ignore", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"],
         env,
       });
+
+      proc.stdout?.setEncoding("utf8");
+      proc.stdout?.on("data", (chunk: string) => usage.push(chunk));
 
       // No-op stdin error guard: a fast-exiting cmd.exe shim can EPIPE the
       // prompt write before the close handler runs. Without a listener the
@@ -363,6 +374,7 @@ async function spawnOnce(
       });
 
       proc.on("close", (code) => {
+        usage.finish(); // Flush a final JSON event without a trailing newline.
         if (timeoutId) clearTimeout(timeoutId);
         if (timedOut) {
           reject(new ClaudeClientError(`codex exec timed out after ${timeoutMs}ms`, "timeout", true));
@@ -372,7 +384,7 @@ async function spawnOnce(
           resolve();
           return;
         }
-        const detail = stderr.trim() || `codex exited with code ${code}`;
+        const detail = usage.failureMessage || stderr.trim() || `codex exited with code ${code}`;
 
         // On Windows the cmd.exe shim spawns fine but exits non-zero with a
         // "not recognized" / "cannot find the path" message when the binary is
@@ -426,7 +438,10 @@ async function spawnOnce(
       );
     }
 
-    return { text };
+    return { text: rawText, ...usage.finish() };
+  } catch (error) {
+    if (error instanceof Error) Object.assign(error, usage.finish());
+    throw error;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -445,6 +460,33 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       let lastError: Error | undefined;
+      let total: CompletionResult["tokenUsage"];
+      let completeUsage = true;
+      let malformedUsage = false;
+      const account = (result: Pick<CompletionResult, "tokenUsage" | "usageStatus">) => {
+        malformedUsage ||= result.usageStatus === "malformed" || result.usageStatus === "partial";
+        completeUsage &&= result.usageStatus === "measured";
+        if (result.tokenUsage) {
+          total ??= { input: 0, output: 0, cacheReadInput: 0 };
+          total.input += result.tokenUsage.input;
+          total.output += result.tokenUsage.output;
+          total.cacheReadInput = (total.cacheReadInput ?? 0) + (result.tokenUsage.cacheReadInput ?? 0);
+        }
+      };
+      const accounting = () => ({ tokenUsage: total,
+        usageStatus: total ? (completeUsage ? "measured" as const : "partial" as const)
+          : malformedUsage ? "malformed" as const : "unavailable" as const });
+      const attemptOnce = async (env: NodeJS.ProcessEnv) => {
+        try {
+          const result = await spawnOnce(cliBinary, finalRequest, env, options.codexConfig, options.policy);
+          account(result);
+          return { ...result, ...accounting() };
+        } catch (error) {
+          account(error instanceof Error ? error as ClaudeClientError : {});
+          if (error instanceof Error) Object.assign(error, accounting());
+          throw error;
+        }
+      };
       const cliEnv = resolveVendorCliEnv({ vendor: "codex", codex: options.codexConfig });
       const finalRequest: CompletionRequest = {
         ...request,
@@ -455,7 +497,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         debugLog(`complete attempt=${attempt + 1}/${maxRetries + 1} model="${finalRequest.model}"`);
         try {
-          return await spawnOnce(cliBinary, finalRequest, cliEnv, options.codexConfig, options.policy);
+          return await attemptOnce(cliEnv);
         } catch (err) {
           lastError = err as Error;
           if (err instanceof ClaudeClientError) {
@@ -481,7 +523,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
             const env = { ...cliEnv };
             delete env.OPENAI_API_KEY;
             try {
-              return await spawnOnce(cliBinary, finalRequest, env, options.codexConfig, options.policy);
+              return await attemptOnce(env);
             } catch (retryErr) {
               lastError = retryErr as Error;
               debugLog(`retry without OPENAI_API_KEY failed: ${(retryErr as Error).message}`);
@@ -490,7 +532,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
 
           if (err instanceof ClaudeClientError && !err.retryable) {
             debugLog("non-retryable error; aborting retries");
-            throw err;
+            throw Object.assign(lastError ?? err, accounting());
           }
 
           if (attempt < maxRetries) {
@@ -514,12 +556,12 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
       // When all retries are exhausted due to rate limiting, throw an
       // actionable error rather than re-surfacing the raw provider message.
       if (lastError instanceof ClaudeClientError && lastError.reason === "rate-limit") {
-        throw new ClaudeClientError(
+        throw Object.assign(new ClaudeClientError(
           `Codex rate limit exceeded — all ${maxRetries + 1} attempts failed. ` +
           "Wait a few minutes and try again, or reduce request frequency.",
           "rate-limit",
           false,
-        );
+        ), accounting());
       }
 
       throw lastError;

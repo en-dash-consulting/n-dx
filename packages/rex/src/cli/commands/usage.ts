@@ -24,6 +24,10 @@ import { resolveRexPaths } from "../../store/index.js";
 const VALID_FORMATS = ["json", "tree"] as const;
 const VALID_GROUPS: TimePeriod[] = ["day", "week", "month"];
 
+function usageNote(status?: AggregateTokenUsage["diagnosticStatus"]): string {
+  return status && status !== "complete" ? ` (usage ${status}; recorded tokens only)` : "";
+}
+
 /** Format a number with locale-aware commas. */
 function fmt(n: number): string {
   return n.toLocaleString();
@@ -60,12 +64,12 @@ function formatPackageDetail(usage: AggregateTokenUsage): string[] {
 
   for (const { name, pkg, unit } of entries) {
     const total = totalTokens(pkg);
-    if (total === 0) continue;
+    if (total === 0 && pkg.calls === 0 && !pkg.diagnosticStatus) continue;
     // Hench's headline unit is runs; its calls count turns and stays available
     // in the JSON output rather than being printed under the wrong label.
     const count = unit === "runs" ? pkg.runs ?? pkg.calls : pkg.calls;
     lines.push(
-      `  ${name}: ${fmt(total)} tokens (${splitTokens(pkg)}) — ${count} ${unit}`,
+      `  ${name}: ${fmt(total)} tokens (${splitTokens(pkg)})${usageNote(pkg.diagnosticStatus)} — ${count} ${unit}`,
     );
   }
 
@@ -83,7 +87,7 @@ function formatCommandDetail(commands: CommandTokenUsage[]): string[] {
     const unit = cmd.package === "hench" ? "runs" : "calls";
     const count = cmd.package === "hench" ? cmd.runs ?? cmd.calls : cmd.calls;
     lines.push(
-      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${splitTokens(cmd)}) — ${count} ${unit}`,
+      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${splitTokens(cmd)})${usageNote(cmd.diagnosticStatus)} — ${count} ${unit}`,
     );
   }
 
@@ -102,11 +106,11 @@ function formatCostDetail(cost: CostEstimate): string[] {
   const lines: string[] = [];
 
   for (const line of cost.byModel) {
-    if (line.totalRaw === 0) continue;
+    if (line.totalRaw === 0 && !line.measurementStatus) continue;
     const label = line.known
       ? line.model
       : `${line.model} (priced as ${line.pricedAs})`;
-    lines.push(`  ${label}: $${line.totalRaw.toFixed(2)} — ${fmt(line.tokens)} tokens`);
+    lines.push(`  ${label}: ${line.total ?? `$${line.totalRaw.toFixed(2)}`} — ${fmt(line.tokens)} tokens`);
   }
 
   return lines;
@@ -197,6 +201,8 @@ export async function cmdUsage(
       // once more than one model is in play.
       byModel: cost.byModel,
       fullyAttributed: cost.fullyAttributed,
+      measurementStatus: cost.measurementStatus,
+      measurementComplete: cost.measurementComplete,
     };
 
     // Per-command breakdown
@@ -207,6 +213,10 @@ export async function cmdUsage(
       command: cmd.command,
       inputTokens: cmd.inputTokens,
       outputTokens: cmd.outputTokens,
+      cacheCreationTokens: cmd.cacheCreationTokens,
+      cacheReadTokens: cmd.cacheReadTokens,
+      diagnosticStatus: cmd.diagnosticStatus,
+      byModel: cmd.byModel,
       calls: cmd.calls,
       ...(cmd.runs !== undefined ? { runs: cmd.runs } : {}),
     }));
@@ -218,6 +228,8 @@ export async function cmdUsage(
         ...b.usage,
         estimatedCost: {
           total: b.estimatedCost.total,
+          measurementStatus: b.estimatedCost.measurementStatus,
+          measurementComplete: b.estimatedCost.measurementComplete,
           inputCost: b.estimatedCost.inputCost,
           outputCost: b.estimatedCost.outputCost,
           cacheWriteCost: b.estimatedCost.cacheWriteCost,
@@ -255,8 +267,8 @@ export async function cmdUsage(
   }
 
   // Detailed output (only when there is data)
-  const total = usage.totalInputTokens + usage.totalOutputTokens;
-  if (total > 0) {
+  const total = usage.totalInputTokens + usage.totalOutputTokens + usage.totalCacheCreationTokens + usage.totalCacheReadTokens;
+  if (total > 0 || usage.totalCalls > 0 || usage.diagnosticStatus) {
     // Per-package breakdown
     info("");
     info("By package:");

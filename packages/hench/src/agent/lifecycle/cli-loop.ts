@@ -22,6 +22,7 @@
  * @see packages/hench/src/agent/lifecycle/event-accumulator.ts — legacy mutation-based parsers
  */
 
+import { CodexManagedUsage } from "./codex-managed-usage.js";
 import { createHash } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RetryConfig, RunRecord, TokenUsage, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
@@ -119,7 +120,7 @@ import {
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveCodexCliEffort, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { prdLayout } from "../../prd/rex-gateway.js";
 import { reviewDedupeDir, reviewInboxDir } from "./uncommitted-work-gate.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
@@ -238,6 +239,7 @@ export interface CliLoopResult {
  * carries no stability guarantee.
  */
 export interface SpawnResult {
+  usageNotes?: string[];
   turns: number;
   toolCalls: ToolCallRecord[];
   tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
@@ -953,6 +955,11 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress, abortSignal,
   } = opts;
+  const codexUsage = adapter.vendor === LLM_VENDOR.CODEX
+    ? await CodexManagedUsage.start(spawnConfig.usageResumeSessionId, cliEnv, !!opts.forkParentId) : undefined;
+  // Resumes must never fall back to charging an unbounded session summary.
+  // Fresh legacy wrappers, however, still report invocation-local JSON/text.
+  let managedUsage = spawnConfig.usageResumeSessionId ? codexUsage : undefined;
   const pidHolder = liveProgress ?? opts.pidHolder;
   const timeoutMs = opts.timeoutMs !== undefined && opts.timeoutMs > 0 ? opts.timeoutMs : 0;
   const maxTurns = opts.maxTurns !== undefined && opts.maxTurns > 0 ? opts.maxTurns : 0;
@@ -994,7 +1001,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     const proc = spawnCli(inv.file, inv.args, {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: { ...spawnEnv, ...inv.env },
+      env: { ...spawnEnv, ...inv.env, NDX_MANAGED_USAGE: "1" },
     });
     if (sandbox) proc.once("close", () => sandbox.dispose());
 
@@ -1121,12 +1128,23 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       reject(err);
     });
 
-    proc.on("close", (code) => {
+    proc.on("close", async (code) => {
       settle();
       if (pidHolder) pidHolder.vendorPid = undefined;
       // Flush remaining buffered output
       if (lineBuffer.trim()) {
         processLine(lineBuffer);
+      }
+
+      const terminalUsage = await managedUsage?.finish(cliEnv, turnCounter.value || 1);
+      if (terminalUsage?.tokenUsage) {
+        if (useEventPipeline && accumulator) accumulator.push(terminalUsage);
+        else {
+          result.tokenUsage = addTokenUsage(result.tokenUsage, terminalUsage.tokenUsage);
+          result.turnTokenUsage.push({ ...terminalUsage.tokenUsage, turn: terminalUsage.turn,
+            vendor: tokenMetadata.vendor, model: tokenMetadata.model,
+            diagnosticStatus: terminalUsage.tokenDiagnosticStatus, cacheProvenance: terminalUsage.tokenCacheProvenance });
+        }
       }
 
       if (useEventPipeline && accumulator) {
@@ -1141,14 +1159,14 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           }
 
           // Codex-specific: extract token usage from raw stdout
-          if (adapter.vendor === LLM_VENDOR.CODEX) {
+          if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
             pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
         // Codex token usage fallback: structured events parsed but no usage
         if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
-          if (adapter.vendor === LLM_VENDOR.CODEX) {
+          if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
             pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
@@ -1194,7 +1212,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           }
 
           // Codex-specific: extract token usage from raw stdout via heuristic mapping
-          if (adapter.vendor === LLM_VENDOR.CODEX) {
+          if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -1253,7 +1271,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           // zero. Stays undefined on the text-format branch, which genuinely
           // has no presence information to offer.
           let mappedDiagnostic: TokenDiagnosticStatus | undefined;
-          if (fullStdout.trim()) {
+          if (fullStdout.trim() && !managedUsage) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -1320,6 +1338,10 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       if (!result.error && !result.planModeIntercept) {
         result.backgroundWait ??= unfinishedTracker?.signal();
       }
+      if (managedUsage?.notes.length) {
+        result.usageNotes = [...new Set(managedUsage.notes)];
+        info(result.usageNotes.join("\n"));
+      }
       resolve(result);
     });
 
@@ -1339,6 +1361,12 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
      */
     function captureSessionId(rawJson: unknown): void {
       unfinishedTracker?.observe(rawJson);
+      if (codexUsage && rawJson && typeof rawJson === "object") {
+        const type = (rawJson as Record<string, unknown>).type;
+        if (type === "thread.started" || type === "turn.started" || type === "turn.completed" || type === "turn.failed") {
+          managedUsage = codexUsage;
+        }
+      }
       if (result.sessionId) return;
       if (adapter.extractSessionId) {
         const id = adapter.extractSessionId(rawJson);
@@ -1462,7 +1490,9 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
         const rawJson = JSON.parse(line);
         captureSessionId(rawJson);
         if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
-        const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
+        const tokenEvent = managedUsage
+          ? managedUsage.observe(rawJson, turnCounter.value || 1)
+          : rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
         if (tokenEvent) {
           accumulator.push(tokenEvent);
           // Mirror the accumulator's own arithmetic (a plain sum over token
@@ -1480,7 +1510,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           if (typeof rawJson.cost_usd === "number") completionCostUsd = rawJson.cost_usd;
 
           // Fallback token usage from completion event
-          if (rawJson.usage && typeof rawJson.usage === "object") {
+          if (!managedUsage && rawJson.usage && typeof rawJson.usage === "object") {
             if (accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
               const fallback = parseStreamTokenUsage(rawJson);
               if (fallback) {
@@ -1510,12 +1540,20 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           const rawJson = JSON.parse(line);
           captureSessionId(rawJson);
           if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
-          extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
+          if (managedUsage) {
+            const event = managedUsage.observe(rawJson, turnCounter.value || 1);
+            if (event?.tokenUsage) {
+              result.tokenUsage = addTokenUsage(result.tokenUsage, event.tokenUsage);
+              result.turnTokenUsage.push({ ...event.tokenUsage, turn: event.turn,
+                vendor: tokenMetadata.vendor, model: tokenMetadata.model,
+                diagnosticStatus: event.tokenDiagnosticStatus, cacheProvenance: event.tokenCacheProvenance });
+            }
+          } else extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
 
           // Extract completion metadata (num_turns, cost_usd, fallback usage)
           const type = rawJson.type as string | undefined;
           if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
-            extractCompletionMetadata(rawJson, result);
+            if (!managedUsage) extractCompletionMetadata(rawJson, result);
           }
         } catch {
           // Not JSON — stream raw output for visibility if adapter didn't handle it
@@ -1604,6 +1642,7 @@ export interface ReviewPassContext {
   henchDir: string;
   /** Resolved review model. Empty string means "send no model flag" (local vendor). */
   reviewModel: string;
+  effort?: string;
   /** Permission posture for the reviewer. It must be able to apply must-fixes. */
   permissionMode: PermissionMode;
   /** True when no human is attached — the reviewer applies the verdict policy itself. */
@@ -1659,6 +1698,7 @@ export interface PairFixContext {
   mcpConfigPath?: string;
   /** `hench.review.rounds`: fix rounds the executor gets. */
   rounds: number;
+  effort?: string;
 }
 
 /**
@@ -1682,7 +1722,7 @@ export interface PairFixContext {
  */
 export function chargeReviewToRun(
   run: RunRecord,
-  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
+  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage" | "usageNotes">,
   reviewModel: string,
 ): void {
   // The review's own share, kept apart for the Live page's Review tab.
@@ -1697,6 +1737,12 @@ export function chargeReviewToRun(
   chargeSpawnToRun(run, result, reviewModel);
 }
 
+function noteUsageDiagnostics(run: RunRecord, result: Pick<SpawnResult, "usageNotes">): void {
+  if (!result.usageNotes?.length) return;
+  run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "json", notes: [] };
+  run.diagnostics.notes.push(...result.usageNotes);
+}
+
 /**
  * Add a spawn's tokens to the run's own usage, per turn and in total. The
  * executor's fix sessions use it directly: they are the run's own work, not
@@ -1704,9 +1750,10 @@ export function chargeReviewToRun(
  */
 function chargeSpawnToRun(
   run: RunRecord,
-  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
+  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage" | "usageNotes">,
   model: string,
 ): void {
+  noteUsageDiagnostics(run, result);
   run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
 
   if (result.turnTokenUsage.length === 0) return;
@@ -1809,6 +1856,7 @@ async function runExecutorFix(
   ]);
   const spawnConfig = fix.adapter.buildSpawnConfig(envelope, ctx.policy, {
     model: fix.spawnModel,
+    effort: fix.effort,
     // The executor has to edit; `plan` would leave it able to describe a fix only.
     permissionMode: "acceptEdits",
     resumeSessionId: sessionId,
@@ -1945,6 +1993,7 @@ export async function runAdversarialReviewPass(
 
   const spawnConfig = ctx.adapter.buildSpawnConfig(envelope, ctx.policy, {
     model: ctx.reviewModel || undefined,
+    effort: ctx.effort,
     permissionMode: ctx.permissionMode,
     resumeSessionId,
     mcpConfigPath: ctx.mcpConfigPath,
@@ -2059,6 +2108,7 @@ export async function runAdversarialReviewPass(
     const resumed = await spawnReviewer(
       ctx.adapter.buildSpawnConfig(resumeEnvelope, ctx.policy, {
         model: ctx.reviewModel || undefined,
+        effort: ctx.effort,
         permissionMode: ctx.permissionMode,
         resumeSessionId: reviewerSession,
         // Same pin as the first review spawn: a resumed session does not keep
@@ -2745,6 +2795,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     detail(line, { captureWhenQuiet: true });
   });
 
+  const configuredEffort = vendor === LLM_VENDOR.CODEX
+    ? resolveTaskModel("agent.execute", llmConfig).effort
+    : resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig);
+  const executionEffort = vendor === LLM_VENDOR.CODEX
+    ? await resolveCodexCliEffort(opts.spawnModel, configuredEffort, { binary: cliBinary, env: cliEnv, cwd: projectDir }, "agent.execute")
+    : configuredEffort;
+
   // Pin the spawned session's MCP servers to *this* project directory, so the
   // agent's PRD writes land in the worktree the run is executing in. Without
   // this the session inherits Claude Code's registrations for the repository,
@@ -2838,6 +2895,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
                 cliEnv,
                 model: eventModel,
                 spawnModel: opts.spawnModel,
+                effort: executionEffort,
                 mcpConfigPath,
                 rounds: opts.reviewRounds ?? config.review?.rounds ?? DEFAULT_REVIEW_ROUNDS,
               },
@@ -2849,6 +2907,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             reuseIdentity(reviewModel, reviewPolicy, permissionMode)),
         henchDir,
         reviewModel,
+        effort: reviewVendor === LLM_VENDOR.CODEX
+          ? await resolveCodexCliEffort(reviewModel, resolveTaskModel("agent.review", llmConfig).effort, {
+              binary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
+              env: pairVendor ? resolveSessionCliEnv({ ...llmConfig, vendor: pairVendor }, config, "review effort", (line) => detail(line, { captureWhenQuiet: true })) : cliEnv,
+              cwd: projectDir,
+            }, "agent.review")
+          : resolveAgentCliEffort(reviewModel, llmConfig, "agent.review"),
         // The reviewer has to be able to apply must-fixes and run the
         // project's checks. `plan` would leave it able to do neither, so the
         // review pass always runs with edit permission regardless of the
@@ -3328,8 +3393,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           model: opts.spawnModel,
           // A matching llm.effort rule for agent.execute, validated against
           // this model. Undefined leaves the flag off so the vendor applies
-          // its own default; non-Claude adapters ignore it either way.
-          effort: resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig),
+          // its own default.
+          effort: executionEffort,
           permissionMode: currentPermissionMode,
           // Fork the orientation session rather than continuing it, so the
           // parent stays reusable by the next task and this spawn gets its
@@ -3469,6 +3534,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
         if (result.sessionId) lastSessionId = result.sessionId;
 
+        noteUsageDiagnostics(run, result);
         accumulateResult(accumulated, result);
 
         // An unfinished session may have backgrounded work or emitted a

@@ -108,8 +108,9 @@ export interface CompletionRequest {
    * The Claude API provider reads it through `resolveClaudeApiEffort`, which
    * validates it and applies the per-model default. The Claude CLI provider
    * reads it through `resolveClaudeCliEffort` and passes `--effort`, sharing
-   * the validation but not the default — Claude Code picks its own. Other
-   * providers ignore it.
+   * the validation but not the default — Claude Code picks its own.
+   * Codex CLI validates against its advertised model catalog;
+   * OpenAI Chat Completions validates model support before sending reasoning_effort.
    */
   effort?: string;
   /** Task class of the call, named in effort warnings. */
@@ -122,6 +123,8 @@ export interface CompletionResult {
   text: string;
   /** Token usage from the call, if available. */
   tokenUsage?: TokenUsage;
+  /** Coverage of request accounting; absent on providers without provenance. */
+  usageStatus?: "measured" | "unavailable" | "malformed" | "partial";
 }
 
 /**
@@ -132,6 +135,9 @@ export type ErrorReason = "auth" | "timeout" | "rate-limit" | "not-found" | "net
 
 /** A classified error from a Claude call or CLI operation. */
 export class ClaudeClientError extends Error {
+  /** Spend retained even when completion fails. */
+  tokenUsage?: TokenUsage;
+  usageStatus?: CompletionResult["usageStatus"];
   readonly reason: ErrorReason;
   /** Whether this error is transient and the call could be retried. */
   readonly retryable: boolean;

@@ -32,6 +32,7 @@ export interface LLMCallRecord {
   vendor: string;
   model: string;
   tokenUsage?: TokenUsage;
+  usageStatus?: "measured" | "unavailable" | "malformed" | "partial";
   durationMs: number;
 }
 
@@ -107,6 +108,17 @@ export function recordLLMCall(rec: LLMCallRecord): void {
     model: rec.model,
   });
   bucket.calls++;
+  if (!rec.tokenUsage || (rec.usageStatus && rec.usageStatus !== "measured")) {
+    bucket.unmeasuredCalls = (bucket.unmeasuredCalls ?? 0) + 1;
+  } else {
+    bucket.measuredCalls = (bucket.measuredCalls ?? 0) + 1;
+  }
+  if (rec.tokenUsage?.cacheReadInput) {
+    bucket.cacheReadInputTokens = (bucket.cacheReadInputTokens ?? 0) + rec.tokenUsage.cacheReadInput;
+  }
+  if (rec.tokenUsage?.cacheCreationInput) {
+    bucket.cacheCreationInputTokens = (bucket.cacheCreationInputTokens ?? 0) + rec.tokenUsage.cacheCreationInput;
+  }
   bucket.inputTokens += rec.tokenUsage?.input ?? 0;
   bucket.outputTokens += rec.tokenUsage?.output ?? 0;
   bucket.durationMs += rec.durationMs;
@@ -166,10 +178,9 @@ export function snapshotRunLedger(): AnalysisRun {
  *   fallback rates and `known: false` rather than throwing, so pricing off its
  *   `pricing` field alone turns a guess into dollars. Local and unknown models
  *   land here.
- * - **A bucket has calls but no tokens.** {@link recordLLMCall} folds a missing
- *   `tokenUsage` in as `0`, so a provider that reported no usage is
- *   indistinguishable from one that spent nothing — and a call that spent
- *   nothing does not happen.
+ * - **A bucket has unmeasured calls.** Missing or partial accounting makes
+ *   the total unknown. Explicitly measured zero remains a known zero;
+ *   legacy buckets with zero tokens and no provenance remain unknown.
  *
  * One unknowable bucket makes the *run* total unknowable, so any of them ends
  * the walk. `costUsd` is a single number with no room to say "partly", and a
@@ -178,9 +189,7 @@ export function snapshotRunLedger(): AnalysisRun {
  * "not recorded", which sends an operator to look where "$0.00" closes the
  * question.
  *
- * Cache tokens are not broken out per task class in {@link LLMClassUsage}, so
- * they price as zero here; today's sourcevision call sites do not use prompt
- * caching. If one starts to, widen `LLMClassUsage` rather than approximating.
+ * Cache reads and writes are priced separately from fresh input.
  */
 export function priceRunLedger(run: AnalysisRun): number | undefined {
   const buckets = Object.values(run.llm.byTaskClass);
@@ -190,14 +199,15 @@ export function priceRunLedger(run: AnalysisRun): number | undefined {
   for (const bucket of buckets) {
     const { pricing, known } = resolveModelPricing(bucket.model);
     if (!known) return undefined;
-    if (bucket.calls > 0 && bucket.inputTokens + bucket.outputTokens === 0) return undefined;
+    if (bucket.unmeasuredCalls) return undefined;
+    if (bucket.measuredCalls === undefined && bucket.calls > 0 && bucket.inputTokens + bucket.outputTokens === 0) return undefined;
 
     total += priceTokens(
       {
         inputTokens: bucket.inputTokens,
         outputTokens: bucket.outputTokens,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
+        cacheCreationTokens: bucket.cacheCreationInputTokens ?? 0,
+        cacheReadTokens: bucket.cacheReadInputTokens ?? 0,
       },
       pricing,
     ).totalRaw;
@@ -210,7 +220,7 @@ export function formatRunLedger(run: AnalysisRun): string[] {
   const lines: string[] = [];
   const classes = Object.entries(run.llm.byTaskClass).sort(([a], [b]) => a.localeCompare(b));
   for (const [cls, u] of classes) {
-    const tokens = u.inputTokens + u.outputTokens;
+    const tokens = u.inputTokens + u.outputTokens + (u.cacheCreationInputTokens ?? 0) + (u.cacheReadInputTokens ?? 0);
     lines.push(
       `  ${cls}: ${u.calls} call${u.calls === 1 ? "" : "s"}, ${tokens.toLocaleString()} tokens, ` +
         `${(u.durationMs / 1000).toFixed(1)}s (${u.vendor} ${u.model})`,

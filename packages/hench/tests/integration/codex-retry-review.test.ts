@@ -8,10 +8,10 @@ import { cleanupProjectDir } from "../helpers/index.js";
 import { createScriptedClaudeCli, setupScriptedProject, type ScriptedClaudeCli, type ScriptedTurn } from "../helpers/scripted-claude-cli.js";
 import { loadConfig, saveConfig } from "../../src/store/config.js";
 
-const result = (id: string) => ({ lines: [
+const result = (id: string, input = 10) => ({ lines: [
   { type: "thread.started", thread_id: id },
   { type: "item.completed", item: { id: "answer", type: "agent_message", text: "Done." } },
-  { type: "turn.completed", usage: { input_tokens: 10, output_tokens: 5 } },
+  { type: "turn.completed", usage: { input_tokens: input, cached_input_tokens: 0, output_tokens: input / 2 } },
 ] });
 
 describe("Codex retry and self-review loop contract", () => {
@@ -77,6 +77,25 @@ describe("Codex retry and self-review loop contract", () => {
     { type: "error", message: "ECONNRESET" },
   ] });
 
+  it("carries distinct validated execution/review pins through retries and resumed self-review", async () => {
+    writeFileSync(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex",
+      effort: { "agent.*": "low", "agent.review": "max" },
+    } }));
+    execFileSync("git", ["add", ".n-dx.json"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "fixture effort"], { cwd: projectDir, stdio: "ignore" });
+    const gateway = await import("../../src/prd/llm-gateway.js");
+    const resolve = vi.spyOn(gateway, "resolveCodexCliEffort").mockImplementation(async (_model, effort) => effort);
+    cli.script(() => failed("work"), works("done.ts", "work"), () => failed("work"));
+    await run("task-1", "gpt-6-astra");
+    expect(resolve.mock.calls.map(call => [call[0], call[1], call[3]])).toEqual([
+      ["gpt-6-astra", "low", "agent.execute"], ["gpt-6-astra", "max", "agent.review"],
+    ]);
+    expect(cli.invocations).toHaveLength(3);
+    expect(cli.invocations.map(call => call.args.filter(arg => arg.startsWith("model_reasoning_effort="))))
+      .toEqual([['model_reasoning_effort="low"'], ['model_reasoning_effort="low"'], ['model_reasoning_effort="max"']]);
+    expect(cli.invocations[2].args.slice(0, 3)).toEqual(["exec", "resume", "work"]);
+  });
+
   it("retries the work thread with policy, model and credential hiding reapplied", async () => {
     cli.script(() => failed("work"), works("done.ts", "work"));
     const outcome = await run("task-1");
@@ -125,15 +144,33 @@ describe("Codex retry and self-review loop contract", () => {
     vi.spyOn(codexSessionDriver, "probeFork").mockImplementation(() => ({
       supported: true, reusable: true, identity, reason: "fixture", version: "fixture-version", orientationFlags: [],
     }));
-    cli.script(() => result("parent"), () => {
+    // Model the inherited rollout counters explicitly; this is protocol
+    // fixture evidence, not a claim about an installed vendor binary.
+    const sessionUsage = await import("../../src/store/session-usage.js");
+    const rollout = join(projectDir, "fixture-rollout.jsonl");
+    vi.spyOn(sessionUsage, "resolveTranscriptPath").mockResolvedValue(rollout);
+    const snapshot = (id: string, input: number) => writeFileSync(rollout, [
+      JSON.stringify({ type: "session_meta", payload: { id } }),
+      JSON.stringify({ type: "event_msg", payload: { type: "token_count", info: {
+        total_token_usage: { input_tokens: input, cached_input_tokens: 0, output_tokens: input / 2 },
+      } } }),
+    ].join("\n"));
+    cli.script(() => { snapshot("parent", 10); return result("parent", 10); }, () => {
       works("prior.ts", "child")({ args: [], stdin: "" });
-      return { code: 1, lines: [...result("child").lines, ...failed().lines] };
-    }, works("followup.ts", "child"));
+      snapshot("child", 20);
+      return { code: 1, lines: [...result("child", 20).lines, ...failed().lines] };
+    }, () => {
+      works("followup.ts", "child")({ args: [], stdin: "" });
+      snapshot("child", 30);
+      return result("child", 30);
+    });
     const outcome = await run("task-1");
     expect(cli.invocations.map(call => call.args.slice(0, 3))).toEqual([
       expect.any(Array), ["exec", "fork", "parent"], ["exec", "resume", "child"],
     ]);
-    expect(outcome.run.tokenUsage.input).toBeGreaterThanOrEqual(20);
+    expect(outcome.run.tokenUsage.input).toBe(20);
+    expect(outcome.run.tokenUsage.output).toBe(10);
+    expect(outcome.run.turnTokenUsage?.reduce((sum, turn) => sum + turn.input, 0)).toBe(20);
     expect(outcome.run.retryAttempts).toBe(1);
   });
 

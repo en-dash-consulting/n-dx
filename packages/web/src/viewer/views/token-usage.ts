@@ -51,7 +51,10 @@ const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web", "s
  * with captured JSON, and one absent number must not blank the whole page.
  * Absent always means "this source reported nothing", which reads as zero.
  */
+type UsageStatus = "complete" | "partial" | "unavailable" | "malformed";
+
 interface PackageTokenUsage {
+  diagnosticStatus?: UsageStatus;
   inputTokens: number;
   outputTokens: number;
   cacheCreationTokens?: number;
@@ -62,6 +65,7 @@ interface PackageTokenUsage {
 type ToolBreakdown = Partial<Record<TokenPackage, PackageTokenUsage>>;
 
 interface AggregateTokenUsage {
+  diagnosticStatus?: UsageStatus;
   packages: ToolBreakdown;
   totalInputTokens: number;
   totalOutputTokens: number;
@@ -79,6 +83,9 @@ interface AggregateTokenUsage {
 
 /** One model's contribution to the bill, as rex's `ModelCostLine` sends it. */
 interface ModelCostLine {
+  total?: string;
+  measurementStatus?: UsageStatus;
+  measurementComplete?: boolean;
   model: string;
   /** The catalog model whose rates were applied ("priced as X" when guessed). */
   pricedAs: string;
@@ -91,6 +98,8 @@ interface ModelCostLine {
 }
 
 interface CostEstimate {
+  measurementStatus?: UsageStatus;
+  measurementComplete?: boolean;
   total: string;
   totalRaw: number;
   inputCost: number;
@@ -305,7 +314,7 @@ function aggregateTotal(usage: AggregateTokenUsage): number {
 }
 
 /** Sum one field across every package in a breakdown. */
-function sumBreakdown(breakdown: ToolBreakdown, field: keyof PackageTokenUsage): number {
+function sumBreakdown(breakdown: ToolBreakdown, field: Exclude<keyof PackageTokenUsage, "diagnosticStatus">): number {
   let total = 0;
   for (const pkg of TOKEN_PACKAGES) total += breakdown[pkg]?.[field] ?? 0;
   return total;
@@ -454,7 +463,8 @@ function PeriodChart({ buckets }: { buckets: PeriodBucket[] }) {
 /** Package breakdown donut. */
 function PackageBreakdown({ usage }: { usage: AggregateTokenUsage }) {
   const total = aggregateTotal(usage);
-  if (total === 0) return h("div", { class: "token-empty" }, "No token usage recorded");
+  if (total === 0) return h("div", { class: "token-empty" }, usage.diagnosticStatus && usage.diagnosticStatus !== "complete"
+    ? `Usage ${usage.diagnosticStatus}; no measured tokens available` : usage.diagnosticStatus === "complete" ? "0 measured tokens" : "No token usage recorded");
 
   const pkgs = TOKEN_PACKAGES
     .map((key) => ({ key, total: pkgTotal(usage.packages[key]) }))
@@ -755,6 +765,12 @@ export function TokenUsageView() {
         )
       : null,
 
+    cost?.measurementComplete === false
+      ? h("p", { class: "token-description", role: "status" },
+          `Usage ${cost.measurementStatus}: token measurements are missing or incomplete. Costs cover recorded tokens only; missing usage is not free.`,
+        )
+      : null,
+
     // Summary metrics: two fixed rows — the headline figures, then the four
     // token classes that make up the total — rather than seven cards wrapping
     // wherever the width happens to break them.
@@ -763,7 +779,7 @@ export function TokenUsageView() {
           h("div", { class: "token-metrics-row token-metrics-row--headline" },
             h(MetricCard, {
               value: fmtTokens(aggregateTotal(usage)),
-              label: "Total Tokens",
+              label: cost?.measurementComplete === false ? "Recorded Tokens" : "Total Tokens",
             }),
             h(MetricCard, {
               value: cost?.total ?? "$0.00",
@@ -829,7 +845,7 @@ export function TokenUsageView() {
                 utilization.byVendorModel.map((row) =>
                   h("tr", { key: `${row.vendor}:${row.model}` },
                     h("td", null, row.vendor),
-                    h("td", null, row.model),
+                    h("td", null, row.model, row.diagnosticStatus && row.diagnosticStatus !== "complete" ? ` (usage ${row.diagnosticStatus})` : ""),
                     ...usageCells(row),
                   ),
                 ),
@@ -899,7 +915,7 @@ export function TokenUsageView() {
                         PKG_LABELS[c.package] ?? c.package,
                       ),
                     ),
-                    h("td", null, c.command),
+                    h("td", null, c.command, c.diagnosticStatus && c.diagnosticStatus !== "complete" ? ` (usage ${c.diagnosticStatus})` : ""),
                     ...usageCells(c),
                   ),
                 ),
@@ -988,7 +1004,7 @@ export function TokenUsageView() {
                     h("td", { class: "num" }, fmtTokens(bucket?.outputTokens ?? 0)),
                     h("td", { class: "num" }, fmtTokens(bucket?.cacheCreationTokens ?? 0)),
                     h("td", { class: "num" }, fmtTokens(bucket?.cacheReadTokens ?? 0)),
-                    h("td", { class: "num" }, `$${line.totalRaw.toFixed(2)}`),
+                    h("td", { class: "num" }, line.total ?? `$${line.totalRaw.toFixed(2)}`),
                   );
                 }),
               ),

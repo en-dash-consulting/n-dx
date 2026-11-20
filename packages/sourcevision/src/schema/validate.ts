@@ -14,6 +14,10 @@ const ModuleInfoSchema = z.object({
 });
 
 const LLMClassUsageSchema = z.object({
+  cacheCreationInputTokens: z.number().int().nonnegative().optional(),
+  cacheReadInputTokens: z.number().int().nonnegative().optional(),
+  unmeasuredCalls: z.number().int().nonnegative().optional(),
+  measuredCalls: z.number().int().nonnegative().optional(),
   calls: z.number().int().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),

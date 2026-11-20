@@ -233,7 +233,7 @@ export {
 export type { VendorModelResetResult, FailoverAttemptResult } from "@n-dx/llm-client";
 
 // ---- Claude API effort ------------------------------------------------------
-export { resolveClaudeApiEffort, resolveClaudeCliEffort } from "@n-dx/llm-client";
+export { resolveCodexCliEffort, resolveClaudeApiEffort, resolveClaudeCliEffort } from "@n-dx/llm-client";
 export type { ClaudeEffort } from "@n-dx/llm-client";
 
 // ---- Usage formatting -------------------------------------------------------

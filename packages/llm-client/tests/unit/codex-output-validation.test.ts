@@ -2,7 +2,7 @@
  * Tests for the codex-cli-provider output validation logic:
  * - empty output file → retryable ClaudeClientError
  * - missing output file (ENOENT) → retryable ClaudeClientError
- * - trimmed text returned when file has content
+ * - exact text returned when file has content
  *
  * These tests mock Node.js spawn and fs/promises to simulate Codex exiting 0
  * while producing no output — a failure mode that previously returned an
@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
-import type { Readable } from "node:stream";
+import { PassThrough, type Readable } from "node:stream";
 
 // Read the model from Codex's argv, or its quoted command behind cmd.exe.
 function codexModelPin(args: string[]): string | undefined {
@@ -65,19 +65,20 @@ vi.mock("node:child_process", () => ({
  * Build a minimal mock ChildProcess that exits with the given code after one
  * microtask tick. stderr emits no data.
  */
-function mockProcess(exitCode: number, stderr = "") {
+function mockProcess(exitCode: number, stderr = "", stdout = "") {
   const proc = new EventEmitter() as EventEmitter & {
     stderr: Readable;
-    stdout: null;
+    stdout: Readable | null;
     stdin: EventEmitter & { write: () => void; end: () => void };
   };
   proc.stderr = new EventEmitter() as unknown as Readable;
-  proc.stdout = null;
+  proc.stdout = stdout ? new PassThrough() : null;
   // stdin is a writable stream in production — the provider attaches an
   // 'error' listener (EPIPE guard), so the mock must be an EventEmitter.
   proc.stdin = Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() });
   process.nextTick(() => {
     if (stderr) proc.stderr.emit("data", Buffer.from(stderr));
+    if (stdout) proc.stdout!.emit("data", stdout);
     proc.emit("close", exitCode);
   });
   return proc;
@@ -148,26 +149,28 @@ describe("createCodexCliClient — output validation", () => {
     expect(clientErr.message).toMatch(/output file/i);
   });
 
-  it("re-throws non-ENOENT readFile errors without wrapping", async () => {
-    mockSpawn.mockReturnValue(mockProcess(0));
+  it("retains measured usage on an unwrapped non-ENOENT output read error", async () => {
+    mockSpawn.mockReturnValue(mockProcess(0, "", JSON.stringify({
+      type: "turn.completed", usage: { input_tokens: 100, cached_input_tokens: 80, output_tokens: 5 },
+    })));
     const accessDenied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
     mockReadFile.mockRejectedValue(accessDenied);
-
     const client = createCodexCliClient({ codexConfig: { cli_path: "codex" }, maxRetries: 0 });
-
-    await expect(client.complete({ prompt: "test", model: "gpt-5-codex" })).rejects.toThrow(
-      "EACCES",
-    );
+    const result = client.complete({ prompt: "test", model: "gpt-5-codex" });
+    await expect(result).rejects.toBe(accessDenied);
+    await expect(result).rejects.toMatchObject({
+      tokenUsage: { input: 20, output: 5, cacheReadInput: 80 }, usageStatus: "measured",
+    });
   });
 
-  it("returns trimmed text when the output file has content", async () => {
+  it("returns exact text when the output file has content", async () => {
     mockSpawn.mockReturnValue(mockProcess(0));
     mockReadFile.mockResolvedValue('  [{"epic":{"title":"Auth"},"features":[]}]\n');
 
     const client = createCodexCliClient({ codexConfig: { cli_path: "codex" }, maxRetries: 0 });
     const result = await client.complete({ prompt: "test", model: "gpt-5-codex" });
 
-    expect(result.text).toBe('[{"epic":{"title":"Auth"},"features":[]}]');
+    expect(result.text).toBe('  [{"epic":{"title":"Auth"},"features":[]}]\n');
   });
 });
 

@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NEWEST_MODELS, TIER_MODELS, setCredential } from "@n-dx/llm-client";
+import { ClaudeClientError, NEWEST_MODELS, TIER_MODELS, setCredential } from "@n-dx/llm-client";
 
 // ── Mock @n-dx/llm-client so we can intercept client.complete calls ──────────
 
@@ -224,3 +224,17 @@ describe("getJudgmentRoute", () => {
     }
   });
 });
+
+ it.each(["provider", "filesystem"])("records measured spend before rethrowing a Codex %s failure", async (kind) => {
+   const { startRunLedger, snapshotRunLedger } = await import("../../../src/analyzers/run-ledger.js");
+   startRunLedger();
+   setLLMConfig({ vendor: "codex" });
+   const error = Object.assign(kind === "provider" ? new ClaudeClientError("failed", "network", false) : new Error("EACCES: output file unreadable"), {
+     tokenUsage: { input: 20, output: 5, cacheReadInput: 80 }, usageStatus: "partial",
+   });
+   mockComplete.mockRejectedValueOnce(error);
+   await expect(callClaude("fixture")).rejects.toBe(error);
+   expect(snapshotRunLedger().llm.byTaskClass.unclassed).toMatchObject({
+     calls: 1, inputTokens: 20, outputTokens: 5, cacheReadInputTokens: 80, unmeasuredCalls: 1,
+   });
+ });

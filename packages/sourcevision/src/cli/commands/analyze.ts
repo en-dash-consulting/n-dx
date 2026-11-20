@@ -350,11 +350,27 @@ export function finalizeTokenUsage(
   ctx: AnalyzeContext,
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
 ): void {
+  const run = snapshotRunLedger();
+  const buckets = Object.values(run.llm.byTaskClass);
+  if (buckets.length) {
+    ctx.tokenUsage = buckets.reduce((sum, bucket) => ({
+      calls: sum.calls + bucket.calls,
+      inputTokens: sum.inputTokens + bucket.inputTokens,
+      outputTokens: sum.outputTokens + bucket.outputTokens,
+      cacheCreationInputTokens: (sum.cacheCreationInputTokens ?? 0) + (bucket.cacheCreationInputTokens ?? 0),
+      cacheReadInputTokens: (sum.cacheReadInputTokens ?? 0) + (bucket.cacheReadInputTokens ?? 0),
+    }), emptyAnalyzeTokenUsage());
+    const unmeasured = buckets.some(bucket => (bucket.unmeasuredCalls ?? 0) > 0);
+    const hasMeasurement = buckets.some(bucket => (bucket.measuredCalls ?? 0) > 0)
+      || ctx.tokenUsage.inputTokens + ctx.tokenUsage.outputTokens
+        + (ctx.tokenUsage.cacheCreationInputTokens ?? 0) + (ctx.tokenUsage.cacheReadInputTokens ?? 0) > 0;
+    ctx.tokenUsage.diagnosticStatus = unmeasured
+      ? (hasMeasurement ? "partial" : "unavailable") : "complete";
+  }
   const usageLine = formatTokenUsage(ctx.tokenUsage);
   if (usageLine) {
     info(`${dim("Token usage:")} ${usageLine}`);
   }
-  const run = snapshotRunLedger();
   for (const line of formatRunLedger(run)) info(dim(line));
 
   // Read after the phases have written: this is the state the next run will be
@@ -474,6 +490,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   if (ownsProgressFile) startAnalyzeProgress(svDir, ["sv analyze", ...extraArgs].join(" "));
   let completed = false;
   let phasesDone = false;
+  let usageFinalized = false;
 
   try {
     // Stop a narrator still working on the previous analysis before this one
@@ -520,6 +537,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     }
 
     finalizeTokenUsage(ctx, llmConfig);
+    usageFinalized = true;
 
     // Otherwise the results are on disk already; narration continues in a
     // detached child so this command can return.
@@ -554,6 +572,9 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     info(green("Done."));
     completed = true;
   } catch (err) {
+    if (!usageFinalized && Object.keys(snapshotRunLedger().llm.byTaskClass).length > 0) {
+      finalizeTokenUsage(ctx, llmConfig);
+    }
     // Phase failures were noted where they happened; this covers everything
     // after the last phase (outputs, PR markdown, narration scheduling), which
     // would otherwise leave the progress file failed with no reason.

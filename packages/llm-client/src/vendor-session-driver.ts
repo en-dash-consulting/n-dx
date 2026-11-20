@@ -20,6 +20,8 @@
  * @module llm-client/vendor-session-driver
  */
 
+import { codexEffortFlags } from "./codex-effort.js";
+
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -104,6 +106,8 @@ export interface ClaudeTurnFlags {
 
 /** Codex-only flags. Other drivers ignore them. */
 export interface CodexTurnFlags {
+  /** Explicit n-dx effort, already validated against the selected binary/model catalog. */
+  readonly effort?: string;
   /** Set only after probing the selected binary in its execution environment. */
   readonly forkSupported?: boolean;
   /**
@@ -604,6 +608,7 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
         "--json", "--skip-git-repo-check",
         ...withCodexShellEnvFlags(input.codex?.resumePolicyFlags ?? [], hiddenEnv),
         ...modelArgs,
+        ...codexEffortFlags(input.codex?.effort),
         "-", // resume reads the follow-up prompt from stdin
       ],
       stdin,
@@ -618,6 +623,7 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
       ...withCodexShellEnvFlags(input.codex?.policyFlags ?? [], hiddenEnv),
       "--json", "--skip-git-repo-check",
       ...modelArgs,
+      ...codexEffortFlags(input.codex?.effort),
       "-", // codex exec reads the prompt from stdin
     ],
     stdin,

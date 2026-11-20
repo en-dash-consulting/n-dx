@@ -2411,11 +2411,11 @@ describe("n-dx config", () => {
       expect(stderr).toMatch(/light.*standard.*heavy|tier/i);
     });
 
-    it("sets an effort level per class", async () => {
-      run(["llm.effort.agent.execute", "high", tmpDir]);
+    it.each(["none", "minimal", "high", "max", "ultra"])("sets effort %s per class for provider validation", async (effort) => {
+      run(["llm.effort.agent.execute", effort, tmpDir]);
 
       const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
-      expect(config.llm.effort["agent.execute"]).toBe("high");
+      expect(config.llm.effort["agent.execute"]).toBe(effort);
     });
 
     it("rejects an unknown effort level", async () => {

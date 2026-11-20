@@ -994,7 +994,7 @@ export async function initializeSmartAddLLM(
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
-  setProjectDir(dir);
+  setProjectDir(dir, "smart-add");
 
   const vendor = getLLMVendor();
   llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);

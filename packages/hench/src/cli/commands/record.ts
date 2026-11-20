@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import { saveRun } from "../../store/runs.js";
 import { loadConfig } from "../../store/config.js";
 import {
+  assistedSession,
+  transcriptUsageStatus,
+  snapshotTranscriptUsage,
+  usageCountersRegressed,
   EMPTY_CURSOR,
   loadUsageCursor,
   readUsageDelta,
@@ -50,7 +54,7 @@ const ZERO_USAGE: Required<TokenUsage> = {
 /**
  * Write a lightweight, assisted run record to `.hench/runs/`.
  *
- * Used by the skills so work driven through Claude Code is visible in run
+ * Used by the skills so work driven through Claude Code or Codex is visible in run
  * history and auditable after the fact — closing the gap where slash-command
  * work left no `.hench/runs/` entry (issue #271). The record is marked
  * `assisted: true` to distinguish it from a spawned hench agent's run.
@@ -81,14 +85,20 @@ const ZERO_USAGE: Required<TokenUsage> = {
  * typed timestamp is not a measurement, and the mark is. `--since` remains an
  * explicit override for the rare case that needs a time window.
  *
- * Zeros remain a valid outcome rather than an error: an unrecorded run is worse
- * than one recorded without its tokens, and `assisted` already marks the record
- * so analytics do not read a 0-token entry as an anomaly.
+ * Unavailable measurements retain zero fields for compatibility, with explicit
+ * unavailable diagnostics. Only a supported measurement can establish zero spend.
  */
 export async function cmdRecord(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  if (process.env.NDX_MANAGED_USAGE === "1") {
+    result(flags.format === "json"
+      ? JSON.stringify({ skipped: true, reason: "managed-execution-owns-usage" })
+      : "Usage belongs to the managed execution; assisted bookkeeping skipped.");
+    return;
+  }
+
   const henchDir = resolveHenchPaths(dir).henchDir;
 
   const taskId = flags.task;
@@ -129,13 +139,16 @@ export async function cmdRecord(
     startedAt: flags.startedAt || usage.markedAt || now,
     finishedAt: now,
     status,
-    // Each usage-bearing transcript message is one API call, which is what a turn
-    // counts — so the message count is a real turn count, not a stand-in.
+    // Counts usage observations. A truncated Codex rollout cannot recover the
+    // original number of requests; diagnostics mark that count as partial.
     turns: explicitTurns ?? usage.messages,
-    summary: flags.summary || "Assisted skill run (Claude Code).",
+    summary: flags.summary || "Assisted skill run.",
+    vendor: usage.vendor,
+    diagnostics: { tokenDiagnosticStatus: usage.diagnosticStatus ?? (usage.source === "none" ? "unavailable" : "complete"),
+      parseMode: "assisted-transcript", notes: [usage.note] },
     tokenUsage: usage.tokenUsage,
     toolCalls: [],
-    model: flags.model || usage.model || config.model,
+    model: flags.model || usage.model || (usage.vendor === "codex" ? "unknown" : config.model),
     invocationContext: "api",
     assisted: true,
     actor: await resolveActor(dir),
@@ -160,6 +173,7 @@ export async function cmdRecord(
           turns: run.turns,
           tokenUsage: run.tokenUsage,
           usageSource: usage.source,
+          diagnostics: run.diagnostics,
           ...(usage.span ? { span: usage.span } : {}),
         },
         null,
@@ -174,6 +188,8 @@ export async function cmdRecord(
 }
 
 interface ResolvedUsage {
+  vendor?: "claude" | "codex";
+  diagnosticStatus?: "complete" | "partial" | "unavailable";
   tokenUsage: Required<TokenUsage>;
   messages: number;
   model?: string;
@@ -213,7 +229,8 @@ async function resolveUsage(
   flags: Record<string, string>,
   explicitUsage: Required<TokenUsage> | null,
 ): Promise<ResolvedUsage> {
-  const sessionId = flags.session || process.env.CLAUDE_CODE_SESSION_ID || "";
+  const session = assistedSession(flags);
+  const sessionId = session.id;
   const transcriptDisabled = flags["no-tokens"] === "true";
 
   // Even under --no-tokens the transcript is still read, so the watermark can
@@ -225,6 +242,7 @@ async function resolveUsage(
   if (!transcript) {
     if (explicitUsage) {
       return {
+        vendor: session.vendor,
         tokenUsage: explicitUsage,
         messages: 0,
         source: "flags",
@@ -233,6 +251,7 @@ async function resolveUsage(
     }
     if (transcriptDisabled) {
       return {
+        vendor: session.vendor,
         tokenUsage: ZERO_USAGE,
         messages: 0,
         source: "none",
@@ -240,12 +259,13 @@ async function resolveUsage(
       };
     }
     return {
-      tokenUsage: ZERO_USAGE,
+      vendor: session.vendor,
+        tokenUsage: ZERO_USAGE,
       messages: 0,
       source: "none",
       note: sessionId
         ? `No transcript found for session ${sessionId} — recorded without token usage.`
-        : "No Claude Code session detected (CLAUDE_CODE_SESSION_ID unset) — recorded without token usage.",
+        : "No assisted session detected (CLAUDE_CODE_SESSION_ID / CODEX_THREAD_ID unset) — recorded without token usage.",
     };
   }
 
@@ -259,6 +279,24 @@ async function resolveUsage(
   // item it created.
   const markId = flags.mark || flags.task;
   const mark: UsageMark | undefined = !flags.since ? cursor.marks?.[markId] : undefined;
+
+  const measurement = transcriptUsageStatus(transcript.text);
+  if (measurement.vendor === "codex" && flags.since && !explicitUsage && !transcriptDisabled) {
+    throw new CLIError("--since is not supported for cumulative Codex rollout counters.",
+      "Use n-dx hench usage mark --task=<id> before the work, then n-dx hench record --task=<id>.");
+  }
+  const snapshot = snapshotTranscriptUsage(transcript.text);
+  const regressed = measurement.vendor === "codex" && usageCountersRegressed(snapshot.totals, cursor);
+  if (measurement.status === "unavailable" || regressed ||
+      (session.vendor && session.vendor !== measurement.vendor) ||
+      (measurement.vendor === "codex" && (!sessionId || (measurement.sessionId && measurement.sessionId !== sessionId)))) {
+    // Preserve the watermark and marks so a later complete read can recover.
+    return { tokenUsage: explicitUsage ?? ZERO_USAGE, messages: 0, vendor: session.vendor ?? measurement.vendor,
+      source: explicitUsage ? "flags" : "none", diagnosticStatus: explicitUsage ? "complete" : "unavailable",
+      note: explicitUsage ? "Token usage taken from flags; unreadable measurement boundary preserved."
+        : "Usage unavailable: unsupported/missing counters, counter reset, or session/vendor identity mismatch. No measured zero is claimed; usage marks and watermark are preserved.",
+    };
+  }
 
   const marked: MarkedUsageDelta | null = mark ? readUsageSinceMark(transcript.text, mark) : null;
   const delta: SessionUsageDelta = marked ?? readUsageDelta(transcript.text, cursor, flags.since);
@@ -287,14 +325,15 @@ async function resolveUsage(
       to: { lastUuid: delta.cursor.lastUuid, consumed: delta.cursor.consumed },
     });
     await saveUsageCursor(henchDir, sessionId, {
-      lastUuid: delta.cursor.lastUuid,
-      consumed: delta.cursor.consumed,
-      ...(Object.keys(marks).length > 0 ? { marks } : {}),
+      ...delta.cursor,
+      usagePartial: measurement.vendor === "codex" && measurement.status === "partial" ? true : undefined,
+      marks: Object.keys(marks).length > 0 ? marks : undefined,
     });
   }
 
   if (explicitUsage) {
     return {
+      vendor: measurement.vendor,
       tokenUsage: explicitUsage,
       messages: delta.messages,
       model: delta.model,
@@ -307,6 +346,8 @@ async function resolveUsage(
     // Burn, don't defer: the suppressed spend is deliberately unattributed,
     // and must not roll into whichever record happens to come next.
     return {
+      vendor: measurement.vendor,
+      model: measurement.vendor === "codex" ? delta.model : undefined,
       tokenUsage: ZERO_USAGE,
       messages: 0,
       source: "none",
@@ -334,7 +375,10 @@ async function resolveUsage(
         "The mark's message was missing from the transcript (it was rewritten, likely by compaction), so the delta is the difference of the two snapshots and approximate.",
       );
     }
-    if (marked.messages === 0) {
+    if (mark.usagePartial) {
+      notes.push("The start mark was read from an incomplete rollout, so this measurement remains partial.");
+    }
+    if (marked.messages === 0 && Object.values(marked.tokenUsage).every((n) => n === 0)) {
       notes.push(
         marked.excludedMessages > 0
           ? "Nothing was spent that an inner record had not already claimed."
@@ -346,6 +390,8 @@ async function resolveUsage(
       messages: marked.messages,
       model: marked.model,
       source: "mark",
+      vendor: measurement.vendor,
+      diagnosticStatus: measurement.status === "partial" || marked.resynced || mark.usagePartial ? "partial" : "complete",
       note: notes.join(" "),
       markedAt: mark.at || undefined,
       span: { from: marked.from, to: marked.to },
@@ -360,7 +406,10 @@ async function resolveUsage(
       "The previous watermark was missing from the transcript (it was rewritten, likely by compaction), so the delta is approximate.",
     );
   }
-  if (delta.messages === 0) {
+  if (cursor.usagePartial) {
+    notes.push("The previous watermark was read from an incomplete rollout, so this measurement remains partial.");
+  }
+  if (delta.messages === 0 && Object.values(delta.tokenUsage).every((n) => n === 0)) {
     notes.push("Nothing new since the last record for this session.");
   }
 
@@ -369,6 +418,8 @@ async function resolveUsage(
     messages: delta.messages,
     model: delta.model,
     source: "transcript",
+    vendor: measurement.vendor,
+    diagnosticStatus: measurement.status === "partial" || delta.resynced || cursor.usagePartial ? "partial" : "complete",
     note: notes.join(" "),
   };
 }
@@ -386,7 +437,7 @@ async function readTranscript(
   tolerateUnreadable = false,
 ): Promise<{ path: string; text: string } | null> {
   const explicitPath = flags.transcript;
-  const path = explicitPath || (sessionId ? await resolveTranscriptPath(sessionId) : null);
+  const path = explicitPath || (sessionId ? await resolveTranscriptPath(sessionId, { vendor: assistedSession(flags).vendor }) : null);
   if (!path) return null;
 
   try {

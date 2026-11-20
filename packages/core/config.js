@@ -1584,11 +1584,13 @@ const TASK_TIERS = new Set(["light", "standard", "heavy", "free"]);
 
 /**
  * Effort levels a `llm.effort.<class>` value may name — the vendor's
- * documented range for adaptive-thinking models. Light-tier models have no
- * effort parameter, so an effort entry for a light-routed class is inert
- * rather than invalid.
+ * documented vocabulary across clients. The provider validates support for
+ * the selected model before sending a configured effort.
  */
-const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
+const EFFORT_LEVELS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+
+// Review selects its model through reviewModel / saved reviewTier, not routes.
+export const EFFORT_ONLY_TASK_CLASSES = new Set(["agent.review"]);
 
 /**
  * Known task classes and the tier each routes to by default.
@@ -1709,6 +1711,11 @@ export function describeUnknownTaskClass(settingPath) {
 
   const taskClass = settingPath.slice(prefix.length);
   if (!taskClass || taskClass.includes("*")) return null;
+  if (EFFORT_ONLY_TASK_CLASSES.has(taskClass)) {
+    return prefix === "effort." ? null
+      : `Note: "${taskClass}" is effort-only; this route has no effect. ` +
+        "Set llm.<vendor>.reviewModel or the task's reviewTier instead.";
+  }
   if (Object.hasOwn(TASK_CLASSES, taskClass)) return null;
 
   const suggestion = nearestTaskClass(taskClass);
@@ -2653,10 +2660,12 @@ Task routing (which model serves which kind of call):
   Setting a route for a class not listed here still works — it may be a glob, or a
   class a newer n-dx defines — but ndx says so, and suggests the closest match.
 
-  llm.effort.<class>       string    Thinking effort for a class: low, medium, high, xhigh, or
-                                    max. Matched with the same exact-then-glob rules as routes.
-                                    Light-tier models have no effort parameter, so an entry for
-                                    a light-routed class is inert rather than an error.
+    Effort-only: agent.review (review model comes from llm.<vendor>.reviewModel)
+
+  llm.effort.<class>       string    Thinking effort: none, minimal, low, medium, high, xhigh,
+                                    max, or ultra. Uses the same exact-then-glob rules as routes.
+                                    Support depends on the model and client. Unsupported values
+                                    warn and leave the client default unchanged.
   llm.escalation.enabled   boolean   Retry a failed light-tier call once on the standard tier,
                                     with the validation error appended (default: true).
   llm.escalation.maxSteps  number    How many escalation steps a call may take (default: 1).

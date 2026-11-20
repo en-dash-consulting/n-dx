@@ -411,6 +411,7 @@ describe("hench → llm-client gateway contract", () => {
     "getAvailableMemory",
     "createAvailableMemoryReader",
     "resolveClaudeCliEffort",
+    "resolveCodexCliEffort",
     "vendorSessionDriver",
     "normalizeCodexResponse",
     "parseMaybeJson",
@@ -547,6 +548,7 @@ describe("web → rex gateway contract", () => {
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
     "estimateCostFromTotals",
+    "extractRexTokenEvents",
     "parseFolderTree",
     "resolveSiblingSlugs",
     "resolveStore",
@@ -967,6 +969,8 @@ describe("gateway export auto-detection", () => {
         // The CLI loop's counterpart: `--effort` on a spawned Claude Code run
         // follows the same llm.effort rule as the API turn loop.
         "resolveClaudeCliEffort",
+        // Codex validates the rule against the selected client's catalog.
+        "resolveCodexCliEffort",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage", "createPromptEnvelope", "assemblePrompt", "assemblePromptText",
         // Prompt section measurement. Lives in llm-client rather than hench so
@@ -1059,7 +1063,7 @@ describe("gateway export auto-detection", () => {
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",
-        "estimateCostFromTotals", "validateRunSettings",
+        "estimateCostFromTotals", "extractRexTokenEvents", "validateRunSettings",
         // rex-owned project settings the Workflow page edits, validated with
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.
