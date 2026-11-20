@@ -9,6 +9,31 @@ import { saveRun, listRuns } from "../../src/store/runs.js";
 import { parseDocument, serializeDocument } from "@n-dx/rex";
 import { cliSpawnsOnly } from "../helpers/index.js";
 
+// Read the model from Codex's argv, or its quoted command behind cmd.exe.
+function codexModelPin(args: string[]): string | undefined {
+  if (args[0] === "/d" && args.includes("/c")) {
+    return args.at(-1)?.match(/(?:^| )"-m" "([^"]*)"(?= |"$)/)?.[1];
+  }
+  const at = args.indexOf("-m");
+  return at === -1 ? undefined : args[at + 1];
+}
+
+describe("Codex model-pin assertion argv fixtures (simulated Windows)", () => {
+  it.each([
+    ["POSIX literal pin", ["exec", "-m", "gpt-5.4"], "gpt-5.4"],
+    ["Windows literal pin", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m" "gpt-5.4""'], "gpt-5.4"],
+    ["POSIX wrong pin", ["exec", "-m", "gpt-5.5"], "gpt-5.5"],
+    ["Windows wrong pin", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m" "gpt-5.5""'], "gpt-5.5"],
+    ["POSIX missing flag", ["gpt-5.4", "exec"], undefined],
+    ["Windows missing flag", ["/d", "/v:off", "/s", "/c", '"codex "exec" "gpt-5.4""'], undefined],
+    ["POSIX missing value", ["exec", "-m"], undefined],
+    ["Windows missing value", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m""'], undefined],
+  ] as const)("reads the exact model: %s", (_label, args, expected) => {
+    expect(codexModelPin([...args])).toBe(expected);
+    expect(codexModelPin([...args]) === "gpt-5.4").toBe(expected === "gpt-5.4");
+  });
+});
+
 function mockCliProcess(opts: { stdout?: string; stderr?: string; code: number }) {
   const proc = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter;
@@ -98,6 +123,28 @@ describe("codex token accounting integration", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("fails a ChatGPT model rejection once with an explicit migration choice", async () => {
+    const mockSpawn = vi.fn(() => mockCliProcess({ code: 1,
+      stderr: "The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account." }));
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
+    });
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+    const config = await loadConfig(henchDir);
+    const result = await cliLoop({ config: { ...config, model: "gpt-5.4" }, spawnModel: "gpt-5.4",
+      store: createStore("file", rexDir), projectDir, henchDir, taskId: "task-1" });
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    const args = mockSpawn.mock.calls[0] as unknown as [string, string[]];
+    expect(codexModelPin(args[1])).toBe("gpt-5.4");
+    expect(result.run.model).toBe("gpt-5.4");
+    expect(result.run.status).toBe("failed");
+    expect(result.run.error).toContain("explicitly update the originating model pin");
+    expect(result.run.error).toContain("n-dx config llm.codex.auth api");
   });
 
   it("accumulates Codex token totals across retries and enforces budget using cumulative totals", async () => {

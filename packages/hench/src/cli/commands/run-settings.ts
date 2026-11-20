@@ -774,20 +774,12 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // -- Model ---------------------------------------------------------------
   const routed = resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor });
   const cliModel = selectCliModelOverride(flags, vendor).value;
-  // Normalized the way every other model in the chain is: through
-  // `resolveTaskModel`, which applies the active vendor's own rules — Claude's
-  // aliases expand, and Codex's retired ids (`gpt-5.4`, `gpt-5-codex`, …) remap
-  // to the replacements OpenAI names. `resolveModel` alone knows only Claude's
-  // aliases, so a saved `gpt-5.4` passed the vendor check unchanged and the run
-  // was sent to a model Codex has withdrawn. Normalizing *before* the
-  // compatibility check also means the check judges the id that will actually
-  // be sent, not the one that was typed. `local` serves whatever LM Studio has
-  // loaded, so every string is legitimate there and the check does not apply.
+  // Normalize through the active vendor: Claude aliases expand, while
+  // intentional Codex IDs stay literal. Authentication-specific availability
+  // is checked by the provider rather than inferred from the tier catalog.
   const normalizeModel = (raw: string | undefined): { model: string | undefined; usable: boolean } => {
     const model = raw ? resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor, model: raw }).model : undefined;
-    const usable =
-      model !== undefined
-      && model.length > 0
+    const usable = model !== undefined && model.length > 0
       && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, model));
     return { model, usable };
   };

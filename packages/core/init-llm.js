@@ -33,17 +33,16 @@ const SUPPORTED_PROVIDERS = Object.values(LLM_PROVIDER);
  * Legacy model IDs treated as "known" during init so `validateInitFlags` does
  * not warn about model IDs shipped by prior versions.
  *
- * The `codex` list must stay in sync with the keys of `LEGACY_CODEX_MODEL_ALIASES`
- * in `packages/llm-client/src/config.ts` — that is where these IDs are actually
- * resolved to current models at runtime. This tier cannot import the foundation
- * layer, so the sets are duplicated by design.
+ * These IDs stay literal at runtime. Availability depends on the selected
+ * provider and authentication; being absent from the current picker does not
+ * make an intentional API model pin invalid.
  */
 const LEGACY_CATALOG_MODEL_ALIASES = {
   [LLM_PROVIDER.CODEX]: [
     "gpt-5-codex",
     "gpt-5.1-codex-max",
     "gpt-5.1-codex-mini",
-    // Retired / retiring from Codex — see LEGACY_CODEX_MODEL_ALIASES.
+    // Older IDs may remain available with API-key authentication.
     "gpt-5.4",
     "gpt-5.4-mini",
     "gpt-5.3-codex",
@@ -108,6 +107,7 @@ export function isInteractiveTerminal() {
  * @param {object} options.existingConfig    Values read from .n-dx.json
  * @param {string} [options.existingConfig.vendor]  llm.vendor
  * @param {string} [options.existingConfig.model]   llm.<vendor>.model
+ * @param {Record<string, string|undefined>} [options.existingConfig.models]  Pins by vendor
  * @param {boolean} options.isTTY            Whether stdin is a TTY (prompts allowed)
  *
  * @returns {{
@@ -145,6 +145,9 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
   if (flags.model) {
     result.model = flags.model;
     result.modelSource = "flag";
+  } else if (result.provider && existingConfig.models?.[result.provider]) {
+    result.model = existingConfig.models[result.provider];
+    result.modelSource = "config";
   } else if (result.provider && existingConfig.model && existingConfig.vendor === result.provider) {
     // Only carry over existing model when the provider hasn't changed.
     // Switching vendors (e.g. flag says codex but config had claude) means
@@ -282,6 +285,10 @@ async function promptModelEnquirer(provider, models, existingModel) {
     const { default: Enquirer } = await import("enquirer");
     const enquirer = new Enquirer();
 
+    // A catalog is a suggestion list, not an allowlist for intentional pins.
+    if (existingModel && !models.some((m) => m.id === existingModel)) {
+      models = [{ id: existingModel, label: `${existingModel} (current)`, recommended: false }, ...models];
+    }
     const recommended = getRecommendedModel(provider);
     // Pre-select the existing model when re-prompting; fall back to recommended.
     const initialIndex = (() => {
@@ -451,6 +458,7 @@ async function promptLocalModelFromServer(existingModel, host = "localhost", por
  * @param {() => Promise<string|undefined>}         [options.promptProvider]  Override provider prompt
  * @param {(provider: string) => Promise<string|undefined>}  [options.promptModel]  Override model prompt (non-local)
  * @param {(existing: string|undefined) => Promise<string|undefined>}  [options.promptLocalModel]  Override local model prompt
+ * @param {Record<string, string|undefined>} [options.existingModels]  Pins by vendor
  * @param {string}  [options.localHost]  Local LLM server hostname (default: "localhost")
  * @param {number}  [options.localPort]  Local LLM server port (default: 1234)
  * @returns {Promise<{ provider?: string, model?: string, providerSource?: string, modelSource?: string, cancelled: boolean }>}
@@ -465,10 +473,9 @@ export async function promptLLMSelection(resolution, options = {}) {
     const selected = await promptFn(provider);  // pass existing for pre-selection
     if (selected) {
       if (selected !== provider) {
-        // Vendor changed — old model belongs to the old vendor, reset it so
-        // the model prompt starts fresh for the new vendor.
-        model = undefined;
-        modelSource = undefined;
+        // Preselect the destination namespace's pin, never the old vendor's.
+        model = options.existingModels?.[selected];
+        modelSource = model ? "config" : undefined;
       }
       provider = selected;
       providerSource = "prompt";

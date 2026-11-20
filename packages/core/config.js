@@ -3520,11 +3520,8 @@ async function handleSetProjectSection(
     current[storagePkg] = {};
   }
 
-  // Vendor-change model reset: the old vendor is captured before it is overwritten.
   const oldVendor = isVendorWrite ? current[storagePkg].vendor : undefined;
-
   setByPath(current[storagePkg], storageSettingPath, coerced, storagePkg);
-
   const warningMessages = isVendorWrite
     ? await resetStaleVendorModels(current[storagePkg], oldVendor, coerced)
     : [];
@@ -3578,7 +3575,7 @@ async function handleSetProjectSection(
 
   // Print warnings for cleared models
   for (const warning of warningMessages) {
-    console.log(`  ⚠ ${warning.split("\n").join("\n  ")}`);
+    console.warn(`  ⚠ ${warning.split("\n").join("\n  ")}`);
   }
 
   if (isVendorWrite && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
@@ -3593,15 +3590,16 @@ async function handleSetProjectSection(
  * the write is done.
  */
 async function resetStaleVendorModels(llm, oldVendor, newVendor) {
-  const { resetStaleModel, formatVendorChangeWarning, NEWEST_MODELS } =
-    await import("@n-dx/llm-client");
+  if (oldVendor === newVendor) return [];
+  const { isModelCompatibleWithVendor } = await import("@n-dx/llm-client");
   const warnings = [];
+  // Each namespaced pin belongs to its own vendor, including when inactive.
   for (const vendor of [LLM_VENDOR.CLAUDE, LLM_VENDOR.CODEX]) {
-    const reset = resetStaleModel(oldVendor, llm[vendor]?.model, newVendor);
-    if (!reset.changed) continue;
-    if (llm[vendor]) delete llm[vendor].model;
-    const warning = formatVendorChangeWarning(reset, NEWEST_MODELS[vendor]);
-    if (warning) warnings.push(warning);
+    const model = llm[vendor]?.model;
+    if (model !== undefined && (typeof model !== "string" || !isModelCompatibleWithVendor(vendor, model))) {
+      delete llm[vendor].model;
+      warnings.push(`Cleared llm.${vendor}.model: "${model}" is not compatible with ${vendor}.`);
+    }
   }
   return warnings;
 }

@@ -13,6 +13,31 @@ import { describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import type { Readable } from "node:stream";
 
+// Read the model from Codex's argv, or its quoted command behind cmd.exe.
+function codexModelPin(args: string[]): string | undefined {
+  if (args[0] === "/d" && args.includes("/c")) {
+    return args.at(-1)?.match(/(?:^| )"-m" "([^"]*)"(?= |"$)/)?.[1];
+  }
+  const at = args.indexOf("-m");
+  return at === -1 ? undefined : args[at + 1];
+}
+
+describe("Codex model-pin assertion argv fixtures (simulated Windows)", () => {
+  it.each([
+    ["POSIX literal pin", ["exec", "-m", "gpt-5.4"], "gpt-5.4"],
+    ["Windows literal pin", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m" "gpt-5.4""'], "gpt-5.4"],
+    ["POSIX wrong pin", ["exec", "-m", "gpt-5.5"], "gpt-5.5"],
+    ["Windows wrong pin", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m" "gpt-5.5""'], "gpt-5.5"],
+    ["POSIX missing flag", ["gpt-5.4", "exec"], undefined],
+    ["Windows missing flag", ["/d", "/v:off", "/s", "/c", '"codex "exec" "gpt-5.4""'], undefined],
+    ["POSIX missing value", ["exec", "-m"], undefined],
+    ["Windows missing value", ["/d", "/v:off", "/s", "/c", '"codex "exec" "-m""'], undefined],
+  ] as const)("reads the exact model: %s", (_label, args, expected) => {
+    expect(codexModelPin([...args])).toBe(expected);
+    expect(codexModelPin([...args]) === "gpt-5.4").toBe(expected === "gpt-5.4");
+  });
+});
+
 // ── Mock declarations (hoisted above imports by vitest) ──────────────────────
 
 const { mockReadFile, mockMkdtemp, mockRm, mockSpawn } = vi.hoisted(() => {
@@ -40,7 +65,7 @@ vi.mock("node:child_process", () => ({
  * Build a minimal mock ChildProcess that exits with the given code after one
  * microtask tick. stderr emits no data.
  */
-function mockProcess(exitCode: number) {
+function mockProcess(exitCode: number, stderr = "") {
   const proc = new EventEmitter() as EventEmitter & {
     stderr: Readable;
     stdout: null;
@@ -51,7 +76,10 @@ function mockProcess(exitCode: number) {
   // stdin is a writable stream in production — the provider attaches an
   // 'error' listener (EPIPE guard), so the mock must be an EventEmitter.
   proc.stdin = Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() });
-  process.nextTick(() => proc.emit("close", exitCode));
+  process.nextTick(() => {
+    if (stderr) proc.stderr.emit("data", Buffer.from(stderr));
+    proc.emit("close", exitCode);
+  });
   return proc;
 }
 
@@ -140,5 +168,27 @@ describe("createCodexCliClient — output validation", () => {
     const result = await client.complete({ prompt: "test", model: "gpt-5-codex" });
 
     expect(result.text).toBe('[{"epic":{"title":"Auth"},"features":[]}]');
+  });
+});
+
+describe("Codex literal model execution", () => {
+  it("sends an intentional API model pin unchanged", async () => {
+    mockSpawn.mockClear();
+    mockSpawn.mockReturnValue(mockProcess(0));
+    mockReadFile.mockResolvedValue("ok");
+    const client = createCodexCliClient({ codexConfig: { model: "gpt-5.4" } });
+    await client.complete({ prompt: "test" });
+    const args = mockSpawn.mock.calls[0][1] as string[];
+    expect(codexModelPin(args)).toBe("gpt-5.4");
+  });
+  it("does not retry or substitute a rejected ChatGPT model", async () => {
+    mockSpawn.mockClear();
+    mockSpawn.mockImplementation(() => mockProcess(1, "The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account."));
+    const client = createCodexCliClient({ maxRetries: 2 });
+    await expect(client.complete({ prompt: "test", model: "gpt-5.4" })).rejects.toMatchObject({
+      retryable: false,
+      message: expect.stringContaining("explicitly update the originating model pin"),
+    });
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
   });
 });
