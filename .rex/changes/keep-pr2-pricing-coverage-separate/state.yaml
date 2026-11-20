@@ -1,6 +1,9 @@
 schema: "rex/v2"
 items:
   "9b84419e-8e81-4f09-826f-c5ec2edaef5d":
+    startedAt: "2026-11-19T16:54:39.227Z"
+    activeIntervals: [{"end":"2026-11-19T17:02:23.225Z","start":"2026-11-19T16:54:39.227Z"},{"end":"2026-11-19T17:41:16.547Z","start":"2026-11-19T17:05:21.281Z"},{"end":"2026-11-19T17:58:46.874Z","start":"2026-11-19T17:46:18.475Z"}]
+    failureReason: "Test gate failed [command: PATH=\"/private/tmp/ndx-parity-pr2-review-toolchain/bin:/Users/ryankeith/.nvm/versions/node/v22.22.2/bin:$PATH\" CODEX_HOME=/private/tmp/ndx-parity-pr2-review-gate-home VITEST_MAX_WORKERS=2 NDX_TEST_MAX_WORKERS=2 n…\nFailing tests (4):\n- signals the process the progress file names when its command line is an analyze\n- leaves no agent or vendor child alive (termination API fails: true)\n- tests/integration/live-analyze-route.test.ts > POST /api/live/analyze/stop > signals the process the progress file names when its command line is an analyze\n  AssertionError: expected 409 to be 200 // Object.is equality\n- tests/integration/manual-dashboard-cleanup.test.ts > manual flow interrupted during an agent run > leaves no agent or vendor child alive (termination API fails: true)\n  AssertionError: expected true to be false // Object.is equality"
     createdAt: "2026-11-19T16:52:10.993Z"
-    lastModified: "2026-11-19T16:52:10.993Z"
+    lastModified: "2026-11-20T16:30:31.748Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
