@@ -9,6 +9,7 @@ import {
 } from "../schema/index.js";
 import { toCanonicalJSON } from "../prd/llm-gateway.js";
 import { loadProjectOverrideSources, mergeWithOverrides } from "./project-config.js";
+import { RUNS_DIRNAME } from "./paths.js";
 import type { ProjectOverrideSource } from "./project-config.js";
 import type { HenchConfig, ProjectLanguage } from "../schema/index.js";
 
@@ -35,7 +36,7 @@ export async function ensureHenchDir(henchDir: string): Promise<void> {
   // Run records hold tool output; only the owner should be able to list or
   // read them. The mode applies on creation and leaves an existing directory
   // as it is.
-  await mkdir(join(henchDir, "runs"), { recursive: true, mode: 0o700 });
+  await mkdir(join(henchDir, RUNS_DIRNAME), { recursive: true, mode: 0o700 });
 }
 
 export interface LoadConfigOptions {

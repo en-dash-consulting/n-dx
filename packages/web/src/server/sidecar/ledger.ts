@@ -60,9 +60,10 @@ export function appendLedgerEntryAt(path: string, entry: LedgerEntry): void {
 /**
  * A server killed mid-append leaves a last line without its newline; the next
  * append would glue an entry onto it and leave a malformed line mid-file. Move
- * the fragment to `<file>.corrupt` and cut it from the ledger.
+ * the fragment to `<file>.corrupt` and cut it from the file. The ledger and the
+ * session transcripts (session-registry.ts) both append JSON lines this way.
  */
-function dropPartialTail(path: string): void {
+export function dropPartialTail(path: string): void {
   if (!existsSync(path)) return;
   const bytes = readFileSync(path);
   if (bytes.length === 0 || bytes[bytes.length - 1] === 0x0a) return;

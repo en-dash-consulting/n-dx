@@ -20,11 +20,11 @@ import type { HttpConnectionConfig } from "../connections/connection-config.js";
 import { defaultPolicy, TOOL_POLICIES, type ToolRunPolicy } from "../connections/tool-policy.js";
 import { loadServerProfile, type ProfileOptions } from "./server-profiles.js";
 import { loadTrackerSync } from "./sync-config.js";
+import { isRecord } from "../../shared/index.js";
 
 type Json = Record<string, unknown>;
 
-const asRecord = (value: unknown): Json | undefined =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as Json) : undefined;
+const asRecord = (value: unknown): Json | undefined => (isRecord(value) ? value : undefined);
 
 /** A write tool's policy from the connection's raw `tools` overrides, before the server lists it. */
 function writeToolPolicy(override: unknown): ToolRunPolicy {

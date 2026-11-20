@@ -10,20 +10,23 @@
  * GET    /api/hench/workflow/history            — suggestion decision history + stats
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readJsonBody, errorMessage } from "./response-utils.js";
 import {
   FORBIDDEN_CONFIG_SEGMENTS,
   completeConfigGroups,
   getConfigValue,
   setConfigValue,
   validateConfigConstraints,
+  henchConfigPath,
+  loadHenchConfig,
 } from "./hench-config-fields.js";
 import { contextWriteFloor, contextWriteFloorFromCompletedRun, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens } from "./token-cost.js";
+import { loadRuns, type RunData } from "./tuner-runs.js";
 
 const WORKFLOW_PREFIX = "/api/hench/workflow/";
 
@@ -96,21 +99,6 @@ interface SuggestionHistory {
   records: SuggestionRecord[];
 }
 
-interface RunData {
-  id: string;
-  taskId: string;
-  taskTitle: string;
-  startedAt: string;
-  finishedAt?: string;
-  status: string;
-  turns: number;
-  error?: string;
-  tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
-  toolCalls: unknown[];
-  model: string;
-  retryAttempts?: number;
-}
-
 interface HenchConfigData {
   maxTurns?: number;
   maxTokens?: number;
@@ -120,40 +108,6 @@ interface HenchConfigData {
 }
 
 // ── Data loading helpers ─────────────────────────────────────────────
-
-function loadRuns(projectDir: string): RunData[] {
-  const runsDir = join(henchDirIn(projectDir), "runs");
-  let files: string[];
-  try {
-    files = readdirSync(runsDir);
-  } catch {
-    return [];
-  }
-
-  const runs: RunData[] = [];
-  for (const file of files.filter((f) => f.endsWith(".json"))) {
-    try {
-      const raw = readFileSync(join(runsDir, file), "utf-8");
-      const data = JSON.parse(raw) as RunData;
-      if (data.id && data.startedAt) {
-        runs.push(data);
-      }
-    } catch {
-      // skip invalid files
-    }
-  }
-
-  return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-}
-
-function loadConfig(projectDir: string): HenchConfigData | null {
-  try {
-    const raw = readFileSync(join(henchDirIn(projectDir), "config.json"), "utf-8");
-    return JSON.parse(raw) as HenchConfigData;
-  } catch {
-    return null;
-  }
-}
 
 function loadSuggestionHistory(projectDir: string): SuggestionHistory {
   const path = join(henchDirIn(projectDir), "suggestions.json");
@@ -542,7 +496,7 @@ export function handleWorkflowRoute(
   // GET /api/hench/workflow/analysis — full analysis with suggestions
   if (path === "analysis" && method === "GET") {
     const runs = loadRuns(ctx.projectDir);
-    const config = loadConfig(ctx.projectDir);
+    const config = loadHenchConfig(ctx.projectDir) as HenchConfigData | null;
     const analysis = analyzeWorkflow(runs, config);
     const history = loadSuggestionHistory(ctx.projectDir);
 
@@ -607,14 +561,8 @@ async function handleSuggestionDecision(
   ctx: ServerContext,
   suggestionId: string,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const decision = body.decision as string;
   if (!decision || !["accepted", "rejected", "deferred"].includes(decision)) {
@@ -653,14 +601,8 @@ async function handleApplySuggestion(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const changes = body.changes as Record<string, unknown> | undefined;
   if (!changes || typeof changes !== "object" || Object.keys(changes).length === 0) {
@@ -680,7 +622,7 @@ async function handleApplySuggestion(
   // Preview mode: show what would change without applying
   const preview = body.preview === true;
 
-  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
   let config: Record<string, unknown>;
   try {
     config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;

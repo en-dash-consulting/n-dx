@@ -13,6 +13,7 @@ import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnTool } from "@n-dx/llm-client";
+import { DEFAULT_SERVE_PORT } from "../constants.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -37,7 +38,7 @@ function resolveWebCli(): string {
   );
 }
 
-export async function startServe(dir: string, port: number = 3117): Promise<void> {
+export async function startServe(dir: string, port: number = DEFAULT_SERVE_PORT): Promise<void> {
   const webCli = resolveWebCli();
   const result = await spawnTool(
     process.execPath,

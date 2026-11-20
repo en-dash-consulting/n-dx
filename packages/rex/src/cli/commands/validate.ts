@@ -1,8 +1,6 @@
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../../schema/index.js";
-import { validateDocument, validateConfig } from "../../schema/validate.js";
-import { validateDAG } from "../../core/dag.js";
+import { validateDocument } from "../../schema/validate.js";
 import { detectPostMergeIssues, repairPostMergeIssues, type PostMergeIssue } from "../../core/post-merge-validate.js";
 import { detectV2PostMergeIssues, isV2Tree, repairV2PostMergeIssues } from "../../core/post-merge-validate-v2.js";
 import { validateStructure, findEpiclessFeatures } from "../../core/structural.js";
@@ -22,6 +20,7 @@ import {
 } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { checkStaleReleasePlans } from "../../core/health.js";
+import { checkConfigSchema, checkDag, schemaIssueLines, structuralChecks } from "./prd-checks.js";
 
 import { info, result } from "../output.js";
 import { green, yellow, red } from "@n-dx/llm-client";
@@ -29,14 +28,7 @@ import { emitMigrationNotification } from "../migration-notification.js";
 import type { PRDDocument } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PromptFn } from "./validate-interactive.js";
-
-interface CheckResult {
-  name: string;
-  pass: boolean;
-  /** "warn" checks are displayed but do not cause exit(1). */
-  severity?: "error" | "warn";
-  errors: string[];
-}
+import type { CheckResult } from "./prd-checks.js";
 
 /**
  * Options for interactive validation behavior.
@@ -78,27 +70,7 @@ export async function cmdValidate(
     }
   }
 
-  // Check config.json schema
-  try {
-    const raw = await readFile(join(rexDir, "config.json"), "utf-8");
-    const parsed = JSON.parse(raw);
-    const result = validateConfig(parsed);
-    if (result.ok) {
-      checks.push({ name: "config.json schema", pass: true, errors: [] });
-    } else {
-      checks.push({
-        name: "config.json schema",
-        pass: false,
-        errors: result.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
-      });
-    }
-  } catch (err) {
-    checks.push({
-      name: "config.json schema",
-      pass: false,
-      errors: [(err as Error).message],
-    });
-  }
+  checks.push(await checkConfigSchema(rexDir));
 
   // Check PRD schema (folder-tree is authoritative; legacy migration ran above).
   // A migration failure short-circuits this check with the migration error.
@@ -128,7 +100,7 @@ export async function cmdValidate(
         checks.push({
           name: "PRD schema",
           pass: false,
-          errors: result.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+          errors: schemaIssueLines(result.errors),
         });
       }
     } catch (err) {
@@ -165,16 +137,7 @@ export async function cmdValidate(
 
   // DAG validation
   if (doc) {
-    const dagResult = validateDAG(doc.items);
-    if (dagResult.valid) {
-      checks.push({ name: "DAG integrity", pass: true, errors: [] });
-    } else {
-      checks.push({
-        name: "DAG integrity",
-        pass: false,
-        errors: dagResult.errors,
-      });
-    }
+    checks.push(checkDag(doc.items));
   }
 
   // The change layer's placement rule is changeLayerParentRule, enforced at
@@ -186,42 +149,7 @@ export async function cmdValidate(
   // Structural validation: orphans, cycles, stuck tasks
   if (doc) {
     const structural = validateStructure(doc.items);
-
-    if (!changeLayer) {
-      checks.push({
-        name: "hierarchy placement",
-        pass: structural.orphanedItems.length === 0,
-        errors: structural.orphanedItems.map(
-          (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
-        ),
-      });
-    }
-
-    checks.push({
-      name: "blockedBy cycles",
-      pass: structural.cycles.length === 0,
-      errors: structural.cycles.map((c) => c.join(" → ")),
-    });
-
-    checks.push({
-      name: "stuck tasks",
-      pass: structural.stuckItems.length === 0,
-      severity: "warn",
-      errors: structural.stuckItems.map(
-        (s) => `"${s.itemId}": ${s.reason}`,
-      ),
-    });
-
-    if (!changeLayer) {
-      checks.push({
-        name: "empty containers",
-        pass: structural.emptyContainers.length === 0,
-        severity: "warn",
-        errors: structural.emptyContainers.map(
-          (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
-        ),
-      });
-    }
+    checks.push(...structuralChecks(structural, changeLayer));
 
     // Categorise warnings by type for clearer reporting
     const blockedWarnings = structural.warnings.filter((w) => w.startsWith("Blocked without"));

@@ -42,6 +42,7 @@ import { closeSync, openSync, readFileSync, readSync, readdirSync, realpathSync,
 import { isAbsolute, join, relative } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { WebSocketBroadcaster } from "./websocket.js";
+import { isRecord } from "../shared/index.js";
 
 /** Poll interval for watched runs — keeps a frame within ~¼ s of a write. */
 export const RUN_TAIL_POLL_MS = 250;
@@ -280,8 +281,8 @@ export function readEventsAfter(path: string, after: number, max = MAX_EVENTS_PE
     next = i + 1;
     try {
       const parsed: unknown = JSON.parse(lines[i]!);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        events.push({ ...(parsed as Record<string, unknown>), seq: i + 1 });
+      if (isRecord(parsed)) {
+        events.push({ ...parsed, seq: i + 1 });
       }
     } catch {
       // Not JSON: the seq is spent, the line is skipped. See the doc comment.
@@ -319,7 +320,7 @@ export function readLastEvent(path: string): Record<string, unknown> | null {
       if (!line) continue;
       try {
         const parsed: unknown = JSON.parse(line);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+        if (isRecord(parsed)) return parsed;
       } catch {
         // A torn or malformed line: keep looking further back.
       }

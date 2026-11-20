@@ -10,7 +10,7 @@
  */
 
 import { realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { findActionableWork, indexTree, resolveStore, validateRunSettings } from "../../prd/rex-gateway.js";
 import type { V2Tree } from "../../prd/rex-gateway.js";
 import { listWorktrees, resolveTaskModel } from "../../prd/llm-gateway.js";

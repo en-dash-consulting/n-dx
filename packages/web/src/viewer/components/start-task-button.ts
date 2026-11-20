@@ -98,7 +98,7 @@ import { h } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
 import { appUrl } from "../base-path.js";
-import { PrepareTaskModal } from "./prepare-task-modal.js";
+import { PrepareTaskModal, workspaceRequest } from "./prepare-task-modal.js";
 import { QueuedNotice } from "./queued-notice.js";
 import { defaultsRunBlockOf, hasSavedRun } from "./prepare-task-model.js";
 import type { PrepResponse, QueuedReply } from "./prepare-task-model.js";
@@ -154,8 +154,6 @@ const DEFAULT_ITERATIONS = 3;
 /** How long a transient refusal stays on screen. */
 const TRANSIENT_ERROR_MS = 4000;
 
-type Reply = { ok: boolean; status: number; data: Record<string, unknown> };
-
 /** Settings the execute asks the server to save on the task once the start is accepted. */
 type SaveRun = { run: Record<string, unknown>; version: string };
 
@@ -192,21 +190,12 @@ export function StartTaskButton({ taskId, onStarted, label = "Start", workspace,
   }, []);
   useEffect(() => cancelClear, [cancelClear]);
 
-  // GET with no body, POST with one. The workspace header travels on both: a
-  // click for another worktree reads its settings and starts (saving them
+  // A click for another worktree reads its settings and starts (saving them
   // through the execute) in that worktree.
-  const request = useCallback(async (path: string, body?: unknown): Promise<Reply> => {
-    const headers: Record<string, string> = {};
-    if (body !== undefined) headers["Content-Type"] = "application/json";
-    if (workspace) headers["X-Ndx-Workspace"] = workspace;
-    const res = await fetch(path, {
-      method: body === undefined ? "GET" : "POST",
-      headers,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    return { ok: res.ok, status: res.status, data: data as Record<string, unknown> };
-  }, [workspace]);
+  const request = useCallback(
+    (path: string, body?: unknown) => workspaceRequest(workspace, path, body),
+    [workspace],
+  );
 
   const execute = useCallback(
     (payload: Record<string, unknown>) => request("/api/hench/execute", { taskId, ...payload }),

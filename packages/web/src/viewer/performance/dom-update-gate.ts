@@ -38,25 +38,16 @@
  * The Preact integration lives in the consumer (views/prd.ts etc.).
  */
 
+import { onDebouncedVisibilityChange, isTabVisible } from "../polling/index.js";
 import {
-  onVisibilityChange,
-  isTabVisible,
-  type TabVisibilitySnapshot,
-} from "../polling/index.js";
-import type { UpdateBatcher } from "./update-batcher.js";
+  composeUpdaters,
+  enqueueUpdater,
+  type AnySetter,
+  type SetterEntry,
+  type UpdateBatcher,
+} from "./update-batcher.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyUpdater = (prev: any) => any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySetter = (updater: (prev: any) => any) => void;
-
-/** Per-setter queue entry: the setter function and its accumulated updaters. */
-interface QueuedEntry {
-  setter: AnySetter;
-  updaters: AnyUpdater[];
-}
 
 /** Configuration for the DOM update gate. */
 export interface DomUpdateGateConfig {
@@ -132,10 +123,6 @@ export interface DomUpdateGate {
   dispose(): void;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const DEFAULT_RESUME_DEBOUNCE_MS = 100;
-
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -161,39 +148,15 @@ const DEFAULT_RESUME_DEBOUNCE_MS = 100;
 export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate {
   const batcher = config.batcher;
   const onResume = config.onResume;
-  const resumeDebounceMs = config.resumeDebounceMs ?? DEFAULT_RESUME_DEBOUNCE_MS;
 
   let open = true;
-  let deferredQueue = new Map<AnySetter, QueuedEntry>();
+  let deferredQueue = new Map<AnySetter, SetterEntry>();
   let queuedCount = 0;
   let totalDeferred = 0;
   let suspensionCount = 0;
-  let resumeTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
 
   // ─── Internal helpers ─────────────────────────────────────────────
-
-  function clearResumeTimer(): void {
-    if (resumeTimer !== null) {
-      clearTimeout(resumeTimer);
-      resumeTimer = null;
-    }
-  }
-
-  /**
-   * Compose all queued updaters for a single setter into one function call.
-   * Each updater receives the output of the previous — identical to
-   * sequential application, just like the update-batcher's composition.
-   */
-  function composeUpdaters(updaters: AnyUpdater[]): AnyUpdater {
-    return (prev) => {
-      let current = prev;
-      for (const updater of updaters) {
-        current = updater(current);
-      }
-      return current;
-    };
-  }
 
   /**
    * Replay all queued updates through the batcher, then flush.
@@ -249,25 +212,12 @@ export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate 
     replayQueue();
   }
 
-  function handleVisibilityChange(snapshot: TabVisibilitySnapshot): void {
-    if (disposed) return;
-
-    if (snapshot.isVisible) {
-      // Tab became visible — resume with debounce to prevent thrash.
-      clearResumeTimer();
-      resumeTimer = setTimeout(() => {
-        resumeTimer = null;
-        resume();
-      }, resumeDebounceMs);
-    } else {
-      // Tab became hidden — suspend immediately.
-      clearResumeTimer();
-      suspend();
-    }
-  }
-
-  // Subscribe to tab visibility changes.
-  const unsubVisibility = onVisibilityChange(handleVisibilityChange);
+  // Subscribe to tab visibility changes: suspend immediately when hidden,
+  // resume after the debounce when visible again.
+  const stopVisibility = onDebouncedVisibilityChange(
+    { onHidden: suspend, onVisible: resume },
+    config.resumeDebounceMs,
+  );
 
   // If the tab is currently hidden, suspend immediately.
   if (!isTabVisible()) {
@@ -289,13 +239,7 @@ export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate 
     }
 
     // Gate is closed — queue the updater for replay on resume.
-    const key = setter as AnySetter;
-    let entry = deferredQueue.get(key);
-    if (!entry) {
-      entry = { setter: key, updaters: [] };
-      deferredQueue.set(key, entry);
-    }
-    entry.updaters.push(updater as AnyUpdater);
+    enqueueUpdater(deferredQueue, setter, updater);
     queuedCount++;
     totalDeferred++;
   }
@@ -343,8 +287,7 @@ export function createDomUpdateGate(config: DomUpdateGateConfig): DomUpdateGate 
 
   function dispose(): void {
     disposed = true;
-    clearResumeTimer();
-    unsubVisibility();
+    stopVisibility();
     deferredQueue = new Map();
     queuedCount = 0;
   }

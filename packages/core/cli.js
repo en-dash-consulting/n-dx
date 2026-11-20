@@ -120,7 +120,12 @@ import {
   createLineSplitter,
   throttleDebugLines,
   INIT_PHASES,
+  bold,
+  cyan,
   dim,
+  green,
+  red,
+  yellow,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
 import { ensureGitignoreEntry, ensureWebRuntimeIgnores } from "./gitignore.js";
@@ -228,50 +233,6 @@ function suppressKnownDeprecations() {
   };
 
   process[FILTER_INSTALLED] = true;
-}
-
-let colorEnabled = null;
-
-function supportsColor() {
-  if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
-    return true;
-  }
-  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
-    return false;
-  }
-  return Boolean(process.stdout && process.stdout.isTTY);
-}
-
-function isColorEnabled() {
-  if (colorEnabled === null) {
-    colorEnabled = supportsColor();
-  }
-  return colorEnabled;
-}
-
-function ansi(code, text, reset) {
-  if (!isColorEnabled()) return text;
-  return `\x1b[${code}m${text}\x1b[${reset}m`;
-}
-
-function bold(text) {
-  return ansi("1", text, "22");
-}
-
-function cyan(text) {
-  return ansi("36", text, "39");
-}
-
-function yellow(text) {
-  return ansi("33", text, "39");
-}
-
-function green(text) {
-  return ansi("32", text, "39");
-}
-
-function red(text) {
-  return ansi("31", text, "39");
 }
 
 suppressKnownDeprecations();
@@ -1667,6 +1628,37 @@ function establishInitLayout(dir) {
   return target;
 }
 
+/**
+ * The git settings init writes for `layout`: the .gitignore entries for what
+ * n-dx keeps machine-local or derived, the .gitattributes rules, and the
+ * merge driver those rules name.
+ *
+ * @param {string} dir  Project root.
+ * @param {import("./layout.js").Layout} layout
+ */
+function ensureInitGitSettings(dir, layout) {
+  ensureGitignoreEntry(dir, relativeToRoot(layout, layout.localConfigFile));
+  // `ndx export` writes ./ndx-export inside the project by default; the site
+  // it produces carries PRD data and run summaries, so it must not be
+  // committable by accident.
+  ensureGitignoreEntry(dir, "ndx-export/");
+  // The dashboard's pid/port markers and spend ledger are machine-local.
+  ensureWebRuntimeIgnores(dir, layout);
+  // Every vendor-CLI invocation appends to claude_commands.log in the project
+  // (cli-log.js); left untracked it shows in every git status, and hench's
+  // uncommitted-work gate refuses to complete a task over it.
+  ensureGitignoreEntry(dir, `${CLI_LOG_FILENAME}*`);
+  // The Graview projection is derived from the PRD, the analysis and the runs
+  // and rebuilt by every `ndx graview` command, so it is never committed.
+  ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
+  // The dashboard's pid/port/spend files and the analysis caches are rewritten
+  // on every server start and analysis. Committed — by init's own commit, or a
+  // user's first `git add .` — they dirty the tree again and block `ndx work`.
+  for (const entry of machineLocalIgnoreEntries(dir)) ensureGitignoreEntry(dir, entry);
+  ensureGitattributesRules(dir, layout);
+  ensureMergeDriverRegistered(dir);
+}
+
 async function handleInit(rest) {
   const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
@@ -1712,26 +1704,7 @@ async function handleInit(rest) {
   const svExists = existsSync(layout.sourcevisionDir);
   const rexExists = existsSync(layout.rexDir);
   const henchExists = existsSync(layout.henchDir);
-  ensureGitignoreEntry(dir, relativeToRoot(layout, layout.localConfigFile));
-  // `ndx export` writes ./ndx-export inside the project by default; the site
-  // it produces carries PRD data and run summaries, so it must not be
-  // committable by accident.
-  ensureGitignoreEntry(dir, "ndx-export/");
-  // The dashboard's pid/port markers and spend ledger are machine-local.
-  ensureWebRuntimeIgnores(dir, layout);
-  // Every vendor-CLI invocation appends to claude_commands.log in the project
-  // (cli-log.js); left untracked it shows in every git status, and hench's
-  // uncommitted-work gate refuses to complete a task over it.
-  ensureGitignoreEntry(dir, `${CLI_LOG_FILENAME}*`);
-  // The Graview projection is derived from the PRD, the analysis and the runs
-  // and rebuilt by every `ndx graview` command, so it is never committed.
-  ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
-  // The dashboard's pid/port/spend files and the analysis caches are rewritten
-  // on every server start and analysis. Committed — by init's own commit, or a
-  // user's first `git add .` — they dirty the tree again and block `ndx work`.
-  for (const entry of machineLocalIgnoreEntries(dir)) ensureGitignoreEntry(dir, entry);
-  ensureGitattributesRules(dir, layout);
-  ensureMergeDriverRegistered(dir);
+  ensureInitGitSettings(dir, layout);
   // Independent of the Claude integration and of how it finds Claude: a
   // claudePath an older init discovered and wrote into .hench/config.json
   // reads as a repository-chosen binary and leaves this checkout untrusted.
@@ -2168,50 +2141,38 @@ async function handlePlan(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * Run the work behind one refresh step. Resolves to its exit code (0 for the
+ * in-process artifact step), or null for a step kind this runner does not know.
+ */
+async function runRefreshStepWork(step, plan, dir) {
+  switch (step.kind) {
+    case "sourcevision-analyze":
+      return run(tools.sourcevision, ["analyze", ...plan.analyzeFlags, dir]);
+    case "sourcevision-pr-markdown":
+      return run(tools.sourcevision, ["pr-markdown", ...plan.quietFlags, dir]);
+    case "sourcevision-dashboard-artifacts":
+      refreshSourcevisionDashboardArtifacts(dir);
+      return 0;
+    case "web-build":
+      return run(resolvePackageFile("packages/web", "build.js"), []);
+    default:
+      return null;
+  }
+}
+
 /** Execute one refresh pipeline step; returns true on success, false on failure. */
 async function runRefreshStep(step, plan, dir, stepStatuses) {
-  if (step.kind === "sourcevision-analyze") {
-    const code = await run(tools.sourcevision, ["analyze", ...plan.analyzeFlags, dir]);
-    if (code !== 0) {
-      const detail = `exit code ${code}`;
-      printRefreshStepTransition(step.kind, "failed", detail);
-      stepStatuses.push({ kind: step.kind, status: "failed", detail });
-      return false;
-    }
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
+  const code = await runRefreshStepWork(step, plan, dir);
+  if (code === null) return true;
+  if (code !== 0) {
+    const detail = `exit code ${code}`;
+    printRefreshStepTransition(step.kind, "failed", detail);
+    stepStatuses.push({ kind: step.kind, status: "failed", detail });
+    return false;
   }
-  if (step.kind === "sourcevision-pr-markdown") {
-    const code = await run(tools.sourcevision, ["pr-markdown", ...plan.quietFlags, dir]);
-    if (code !== 0) {
-      const detail = `exit code ${code}`;
-      printRefreshStepTransition(step.kind, "failed", detail);
-      stepStatuses.push({ kind: step.kind, status: "failed", detail });
-      return false;
-    }
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
-  }
-  if (step.kind === "sourcevision-dashboard-artifacts") {
-    refreshSourcevisionDashboardArtifacts(dir);
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
-  }
-  if (step.kind === "web-build") {
-    const code = await run(resolvePackageFile("packages/web", "build.js"), []);
-    if (code !== 0) {
-      const detail = `exit code ${code}`;
-      printRefreshStepTransition(step.kind, "failed", detail);
-      stepStatuses.push({ kind: step.kind, status: "failed", detail });
-      return false;
-    }
-    printRefreshStepTransition(step.kind, "succeeded");
-    stepStatuses.push({ kind: step.kind, status: "succeeded" });
-    return true;
-  }
+  printRefreshStepTransition(step.kind, "succeeded");
+  stepStatuses.push({ kind: step.kind, status: "succeeded" });
   return true;
 }
 
@@ -2887,6 +2848,41 @@ function readZoneMetrics(dir) {
   }
 }
 
+/**
+ * Self-heal's regression guard: print how code health moved since the previous
+ * iteration. Returns true, after printing why, when it got worse and self-heal
+ * must stop. Zone metrics are printed for information only.
+ */
+function reportSelfHealRegression(dir, shTag, iteration, baselineHealth, currentHealth) {
+  const circularDelta = currentHealth.circularDeps - baselineHealth.circularDeps;
+  const totalBefore = baselineHealth.circularDeps + baselineHealth.codeFindingCount + baselineHealth.unusedExports;
+  const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
+
+  if (circularDelta > 0) {
+    console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${iteration}:`)}`);
+    console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
+    console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+    console.log(`  ${red("Aborting self-heal — new circular dependencies introduced.")}`);
+    return true;
+  }
+
+  if (totalAfter > totalBefore) {
+    console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${iteration}:`)}`);
+    console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
+    console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
+    console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+    console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
+    console.log(`  ${red("Aborting self-heal — code health degraded instead of improving.")}`);
+    return true;
+  }
+
+  // Log zone metrics for information (not used as termination signals)
+  const zoneInfo = readZoneMetrics(dir);
+  const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
+  console.log(`${shTag} code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
+  return false;
+}
+
 async function handleSelfHeal(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["rex", "hench", "sourcevision"]);
@@ -2964,33 +2960,8 @@ async function handleSelfHeal(rest) {
     if (!captureOnly) {
       // Regression guard: compare file-level code health metrics to baseline
       const currentHealth = readCodeHealthMetrics(dir);
-      if (baselineHealth && currentHealth && i > 1) {
-        const circularDelta = currentHealth.circularDeps - baselineHealth.circularDeps;
-        const totalBefore = baselineHealth.circularDeps + baselineHealth.codeFindingCount + baselineHealth.unusedExports;
-        const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
-
-        if (circularDelta > 0) {
-          console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
-          console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
-          console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
-          console.log(`  ${red("Aborting self-heal — new circular dependencies introduced.")}`);
-          break;
-        }
-
-        if (totalAfter > totalBefore) {
-          console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
-          console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
-          console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
-          console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
-          console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
-          console.log(`  ${red("Aborting self-heal — code health degraded instead of improving.")}`);
-          break;
-        }
-
-        // Log zone metrics for information (not used as termination signals)
-        const zoneInfo = readZoneMetrics(dir);
-        const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
-        console.log(`${shTag} code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
+      if (baselineHealth && currentHealth && i > 1 && reportSelfHealRegression(dir, shTag, i, baselineHealth, currentHealth)) {
+        break;
       }
       // Update baseline for next iteration
       if (currentHealth) baselineHealth = currentHealth;
@@ -3390,6 +3361,22 @@ function handleRenamedCommand(oldName, newName, aliasName) {
   exitWithCleanup(1);
 }
 
+/**
+ * The id of the first pending task titled `title` in `items`, searched depth
+ * first, or null.
+ */
+function findPendingTaskId(items, title) {
+  if (!Array.isArray(items)) return null;
+  for (const item of items) {
+    if (item.status === "pending" && item.title === title) {
+      return item.id;
+    }
+    const found = findPendingTaskId(item.children, title);
+    if (found) return found;
+  }
+  return null;
+}
+
 async function handlePairProgramming(rest) {
   const flags = extractFlags(rest);
   const positionals = rest.filter((a) => !a.startsWith("-"));
@@ -3452,14 +3439,15 @@ async function handlePairProgramming(rest) {
     // ── Step 0: create temporary task in PRD ────────────────────────────────
     process.stderr.write("⚠ pair-programming: creating temporary task...\n");
 
-    // Get PRD status to find an epic to use as parent
-    const statusOutput = execFileSync(process.execPath, [
+    const readRexStatus = () => JSON.parse(execFileSync(process.execPath, [
       resolve(__dir, "../rex/dist/cli/index.js"),
       "status",
       "--format=json",
       dir,
-    ], { encoding: "utf-8", stdio: "pipe" });
-    const statusData = JSON.parse(statusOutput);
+    ], { encoding: "utf-8", stdio: "pipe" }));
+
+    // Get PRD status to find an epic to use as parent
+    const statusData = readRexStatus();
     const firstEpic = statusData.items?.find((item) => item.level === "epic");
     const epicId = firstEpic?.id;
     if (!epicId) {
@@ -3482,29 +3470,8 @@ async function handlePairProgramming(rest) {
       return;
     }
 
-    // Get the task ID by querying the PRD again and finding the newest pending task
-    const updatedStatusOutput = execFileSync(process.execPath, [
-      resolve(__dir, "../rex/dist/cli/index.js"),
-      "status",
-      "--format=json",
-      dir,
-    ], { encoding: "utf-8", stdio: "pipe" });
-    const updatedStatusData = JSON.parse(updatedStatusOutput);
-
-    // Find the task we just created by searching through all tasks
-    const findTask = (items) => {
-      if (!Array.isArray(items)) return null;
-      for (const item of items) {
-        if (item.status === "pending" && item.title === description) {
-          return item.id;
-        }
-        const found = findTask(item.children);
-        if (found) return found;
-      }
-      return null;
-    };
-
-    createdTaskId = findTask(updatedStatusData.items);
+    // Get the task ID by querying the PRD again for a pending task with this title
+    createdTaskId = findPendingTaskId(readRexStatus().items, description);
     if (!createdTaskId) {
       console.error("Error: could not determine created task ID");
       exitWithCleanup(1);

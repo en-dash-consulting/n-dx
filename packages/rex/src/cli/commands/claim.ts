@@ -19,7 +19,6 @@
  * @module rex/cli/commands/claim
  */
 
-import { join } from "node:path";
 import { CLIError, result } from "@n-dx/llm-client";
 import {
   openClaimsStore,

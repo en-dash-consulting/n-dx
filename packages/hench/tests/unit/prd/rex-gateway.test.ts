@@ -59,6 +59,7 @@ const EXPECTED_EXPORTS = [
   "openChangeTasks",
   // v2 agent brief
   "buildChangeBrief",
+  "listAttachments",
   // v2 completion — what update_task_status runs on a v2 tree
   "completeV2Work",
   // v2 applied changes — a failure after the completion keeps an applied change's completion

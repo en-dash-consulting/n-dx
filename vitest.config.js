@@ -15,7 +15,7 @@ export default defineConfig({
     include: ["tests/**/*.test.js"],
     globalSetup: ["tests/e2e/verify-build.js"],
     // Runs inside each worker before it loads any test module — early enough to
-    // beat the memoised color caches in help.js / cli.js. See the file header.
+    // beat the memoised color cache in cli-brand.js. See the file header.
     setupFiles: ["tests/setup-color-env.js", "tests/setup-session-env.js", "tests/setup-exit-trace.js", "tests/setup-ndx-home.js", "tests/setup-sandbox-env.js", "tests/setup-judgment-env.js"],
     // Must stay above the spawn guardrail in tests/e2e/e2e-helpers.js
     // (DEFAULT_TIMEOUT) so a hung CLI is reported as a precise spawn timeout

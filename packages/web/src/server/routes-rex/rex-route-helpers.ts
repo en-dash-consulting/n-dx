@@ -6,18 +6,20 @@
  */
 
 import { appendFileSync } from "node:fs";
+import type { ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { loadPRDSync } from "../prd-io.js";
+import type { CachedPRDDocument } from "../prd-io.js";
+import { errorResponse } from "../response-utils.js";
+import type { WebSocketBroadcaster } from "../websocket.js";
 
 import {
   type PRDItem,
-  type PRDDocument,
   type ItemStatus,
   type TreeEntry,
   VALID_STATUSES,
   findItem,
-  insertChild as rexInsertChild,
   updateInTree as rexUpdateInTree,
   findNextTask as rexFindNextTask,
   collectCompletedIds,
@@ -35,12 +37,21 @@ export const API_SETTABLE_STATUSES = new Set<string>(
   [...VALID_STATUSES].filter((s) => s !== "deleted"),
 );
 
+/**
+ * The PRD of the workspace the request addressed, or null once it has
+ * answered 404 "No PRD data found" because there is none.
+ */
+export function loadPRDOr404(ctx: ServerContext, res: ServerResponse): CachedPRDDocument | null {
+  const doc = loadPRDSync(ctx.rexDir);
+  if (!doc) errorResponse(res, 404, "No PRD data found");
+  return doc;
+}
+
 /** Find an item by ID, returning just the item (or null). */
 export function findItemById(items: PRDItem[], id: string): PRDItem | null {
   const entry = findItem(items, id);
   return entry ? entry.item : null;
 }
-
 
 /**
  * Update an item in the tree, automatically applying timestamp transitions
@@ -88,6 +99,14 @@ export function findNextTask(
 /** Extract the parent ID from a TreeEntry's parent chain. */
 export function parentIdOf(entry: TreeEntry): string | null {
   return entry.parents.length > 0 ? entry.parents[entry.parents.length - 1].id : null;
+}
+
+/**
+ * Tell the open viewers the PRD changed, stamped now, so the PRD views re-read
+ * it. Nothing to tell without a broadcaster.
+ */
+export function broadcastPrdChanged(broadcast: WebSocketBroadcaster | undefined): void {
+  broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
 }
 
 /** Append to execution log (sync, best-effort). */

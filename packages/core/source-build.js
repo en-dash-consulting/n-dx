@@ -24,6 +24,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, 
 import { dirname, join } from "node:path";
 import { packageBuildIdentity, packageRootOf } from "./build-identity.mjs";
 import { spawnSyncCli } from "./win-spawn.js";
+import { isPidAlive } from "./child-lifecycle.js";
 
 /** How long a rebuild may take before it is given up on. */
 export const REBUILD_TIMEOUT_MS = 10 * 60_000;
@@ -214,16 +215,6 @@ export function runRebuild(need, { spawnSync = spawnSyncCli, timeoutMs = REBUILD
   return { ok: result.status === 0, code: result.status ?? null, output };
 }
 
-/** Whether a pid names a live process (EPERM: alive, someone else's). */
-function pidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
-  }
-}
-
 /** A lock directory's `owner.json`, or null when it is missing or half-written. */
 function readLockOwner(dir) {
   try {
@@ -298,7 +289,7 @@ function claimStaleLock(dir, isAlive) {
  * @param {{ waitMs?: number, pollMs?: number, onWait?: () => void, isAlive?: (pid: number) => boolean }} [options]
  * @returns {Promise<(() => void) | null>}
  */
-export async function acquireRebuildLock(checkoutRoot, { waitMs = REBUILD_LOCK_WAIT_MS, pollMs = 500, onWait = () => {}, isAlive = pidAlive } = {}) {
+export async function acquireRebuildLock(checkoutRoot, { waitMs = REBUILD_LOCK_WAIT_MS, pollMs = 500, onWait = () => {}, isAlive = isPidAlive } = {}) {
   const dir = join(checkoutRoot, "node_modules", REBUILD_LOCK_DIRNAME);
   const deadline = Date.now() + waitMs;
   let announced = false;

@@ -18,6 +18,7 @@
 import { evaluateRepoTrust, loadLLMConfig, mergeWithOverrides } from "@n-dx/llm-client";
 import type { EnvPolicyConfig, LLMConfig } from "@n-dx/llm-client";
 import { readConfigSnapshot } from "../effective-agent-config.js";
+import { isRecord } from "../../shared/index.js";
 
 export interface SidecarSessionEnv {
   envPolicy?: EnvPolicyConfig;
@@ -25,9 +26,7 @@ export interface SidecarSessionEnv {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  return isRecord(value) ? value : {};
 }
 
 function asStrings(value: unknown): string[] | undefined {

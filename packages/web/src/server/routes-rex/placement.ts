@@ -54,6 +54,7 @@ import {
   withPrdModelTransaction,
 } from "../rex-gateway.js";
 import type { RuleNode, TreeIndex, V2Tree, RecordPlacementInput, RecordProposalInput } from "../rex-gateway.js";
+import { isRecord } from "../../shared/index.js";
 
 /** One change's rex suggestion, read off `suggestPlacements` so the gateway carries no extra type for it. */
 type PlacementSuggestion = Extract<
@@ -321,7 +322,7 @@ type Json = Record<string, unknown>;
 function parseJson(raw: string): Json | string {
   try {
     const body = JSON.parse(raw || "{}") as unknown;
-    return body && typeof body === "object" && !Array.isArray(body) ? (body as Json) : "Request body must be a JSON object.";
+    return isRecord(body) ? body : "Request body must be a JSON object.";
   } catch {
     return "Request body must be JSON.";
   }

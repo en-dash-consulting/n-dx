@@ -33,11 +33,11 @@
 
 import { getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef, useState, useCallback, useMemo } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useCliName, resolveCliLabel } from "./use-project-metadata.js";
 import type { ViewId } from "../types.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 export type ActiveOperationKind =
   | "hench" | "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "analyze" | "recommend" | "sidecar-command";
@@ -336,7 +336,6 @@ export function useActiveOperations(): JobTray {
       }
     })();
 
-    let ws: WebSocket | null = null;
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
       onMessage: (msg) => {
@@ -354,25 +353,14 @@ export function useActiveOperations(): JobTray {
       throttledTypes: [],
     });
 
-    try {
-      ws = openWebSocket();
-      ws.onmessage = (event) => {
-        if (!mountedRef.current) return;
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // ignore malformed messages
-        }
-      };
-    } catch {
-      // Polling-based sources still work if WebSocket is unavailable.
-    }
+    // Polling-based sources still work if WebSocket is unavailable.
+    const closeSocket = openFrameSocket((frame) => {
+      if (mountedRef.current) pipeline.push(frame);
+    });
 
     return () => {
       pipeline.dispose();
-      if (ws) {
-        try { ws.close(); } catch { /* ignore */ }
-      }
+      closeSocket();
     };
   }, []);
 

@@ -39,6 +39,7 @@ import { itemLinkRefs, type LinkFields } from "./link-refs.js";
 import type { TrackerEventRecord } from "./rules.js";
 import { readSourceProblems, writeSourceProblems, type SourceProblem } from "./source-problems.js";
 import type { FactSource, TrackerEvent } from "./server-profiles.js";
+import { isRecord } from "../../shared/index.js";
 
 /** Runs one command: the llm-client `exec` in production, a stub in tests. */
 export type TrackerEventExec = (cmd: string, args: string[], opts: ExecOptions) => Promise<ExecResult>;
@@ -79,7 +80,6 @@ interface Candidate {
 
 type SourceRead = { candidates: Candidate[]; cursors: EventCursors } | { problem: string };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const isString = (value: unknown): value is string => typeof value === "string" && value !== "";
 
 /** `value` as ms since the epoch, or null when it is not a date. */

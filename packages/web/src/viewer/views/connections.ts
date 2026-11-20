@@ -27,7 +27,6 @@ import { AddConnectionForm } from "./connections-add-form.js";
 import {
   connectionPath,
   connectionStateLabel,
-  errorText,
   readError,
   send,
   type ConnectionRow,
@@ -36,6 +35,7 @@ import {
 } from "./connections-api.js";
 import { ConnectionDetails } from "./connections-details.js";
 import { SyncRulesSection } from "./connections-sync.js";
+import { errorMessage } from "../utils/format.js";
 
 export { connectionStateLabel };
 export type { ConnectionRow };
@@ -142,7 +142,7 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
       setConfigFile(body.configFile ?? null);
       setLoadError(null);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : String(err));
+      setLoadError(errorMessage(err));
     }
   }, []);
 
@@ -192,7 +192,7 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
       // Same tab: the session credential lives in this tab's sessionStorage.
       navigate(authorizationUrl);
     } catch (err) {
-      setNotice({ kind: "error", text: `Could not start the sign-in to ${row.label}: ${err instanceof Error ? err.message : String(err)}` });
+      setNotice({ kind: "error", text: `Could not start the sign-in to ${row.label}: ${errorMessage(err)}` });
     } finally {
       setBusy(null);
     }
@@ -210,7 +210,7 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
       replaceRow(((await res.json()) as { connection: ConnectionRow }).connection);
       setNotice({ kind: "ok", text: `Signed out of ${row.label}.` });
     } catch (err) {
-      setNotice({ kind: "error", text: `Could not sign out of ${row.label}: ${err instanceof Error ? err.message : String(err)}` });
+      setNotice({ kind: "error", text: `Could not sign out of ${row.label}: ${errorMessage(err)}` });
     } finally {
       setBusy(null);
     }
@@ -231,7 +231,7 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
         ? { kind: "ok", text: `${connection.label} is connected: ${tools.length} tool${tools.length === 1 ? "" : "s"}.` }
         : { kind: "error", text: `${connection.label}: ${connectionStateLabel(connection)}` });
     } catch (err) {
-      setNotice({ kind: "error", text: `Could not test ${row.label}: ${errorText(err)}` });
+      setNotice({ kind: "error", text: `Could not test ${row.label}: ${errorMessage(err)}` });
     } finally {
       setBusy(null);
     }
@@ -251,7 +251,7 @@ export function ConnectionsSection({ navigate = assignLocation }: ConnectionsSec
       setRemoving(null);
       setNotice({ kind: "ok", text: `Removed ${row.label}${deleteCredential ? " and its stored token" : ""}.` });
     } catch (err) {
-      setNotice({ kind: "error", text: `Could not remove ${row.label}: ${errorText(err)}` });
+      setNotice({ kind: "error", text: `Could not remove ${row.label}: ${errorMessage(err)}` });
     } finally {
       setBusy(null);
     }

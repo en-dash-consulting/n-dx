@@ -11,8 +11,10 @@ import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
+import { DEFAULT_LOCAL_HOST, DEFAULT_LOCAL_PORT } from "../../agent/lifecycle/local-endpoint-defaults.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
-import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
+import { commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
+import { performPreRunCommitGateIfNeeded } from "../../agent/lifecycle/pre-run-commit-gate.js";
 import { commitFailForward } from "../../agent/lifecycle/fail-forward.js";
 import {
   PRD_COMMIT_PATHS,
@@ -44,7 +46,7 @@ import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
-import { section, detail } from "../../types/output.js";
+import { section, detail, formatDuration } from "../../types/output.js";
 import { ConfigBackstop, ConfigBackstopError, formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
@@ -145,11 +147,6 @@ export function createAttemptTracker(): AttemptTracker {
 // ---------------------------------------------------------------------------
 
 /**
- * Verify the loaded PRD document uses a schema version compatible with this
- * build of hench. Catches mismatches early (at startup) rather than letting
- * them surface as mysterious runtime failures deep in the agent loop.
- */
-/**
  * Snapshot the protected config for the run's backstop. A protected path that
  * cannot be read (a link loop, an unreadable `.claude/`) refuses the run with
  * a message naming it, rather than crashing the command.
@@ -165,6 +162,11 @@ export function captureConfigBackstop(dir: string): ConfigBackstop {
   }
 }
 
+/**
+ * Verify the loaded PRD document uses a schema version compatible with this
+ * build of hench. Catches mismatches early (at startup) rather than letting
+ * them surface as mysterious runtime failures deep in the agent loop.
+ */
 async function assertSchemaCompatibility(store: PRDStore): Promise<void> {
   const doc = await store.loadDocument();
   if (doc.schema !== SCHEMA_VERSION) {
@@ -179,14 +181,6 @@ async function assertSchemaCompatibility(store: PRDStore): Promise<void> {
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}m ${remaining}s`;
-}
 
 /**
  * Format an inter-task or inter-epic pause notification.
@@ -2150,8 +2144,8 @@ export async function cmdRun(
   // of a mid-run context-window or connection failure deep in the loop.
   if (llmVendor === LLM_VENDOR.LOCAL && !dryRun) {
     const localCfg = llmConfig?.local;
-    const host = localCfg?.host ?? "localhost";
-    const port = localCfg?.port ?? 1234;
+    const host = localCfg?.host ?? DEFAULT_LOCAL_HOST;
+    const port = localCfg?.port ?? DEFAULT_LOCAL_PORT;
     const baseUrl = `http://${host}:${port}/v1`;
     try {
       const res = await fetch(`${baseUrl}/models`, {

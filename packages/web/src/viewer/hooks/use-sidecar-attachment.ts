@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId } from "../types.js";
+import { getJson } from "../utils/json-requests.js";
 
 /** One entry of GET /api/sidecar/lenses. */
 export interface SidecarLensInfo {
@@ -216,15 +217,6 @@ export interface SidecarAttachment {
   removeItem: () => void;
 }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url);
-    return res.ok ? (await res.json()) as T : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * @param enabled  `web.sidecar` is on
  * @param open     the drawer is open; nothing is read while it is closed
@@ -246,7 +238,7 @@ export function useSidecarAttachment(enabled: boolean, open: boolean, page: Side
   useEffect(() => {
     if (!enabled || !open || registry) return;
     let live = true;
-    void fetchJson<{ lenses: SidecarLensInfo[] }>("/api/sidecar/lenses").then((body) => {
+    void getJson<{ lenses: SidecarLensInfo[] }>("/api/sidecar/lenses").then((body) => {
       if (live && Array.isArray(body?.lenses)) setRegistry(body.lenses);
     });
     return () => { live = false; };
@@ -256,7 +248,7 @@ export function useSidecarAttachment(enabled: boolean, open: boolean, page: Side
   useEffect(() => {
     if (!enabled || !open || !taskRef) return;
     let live = true;
-    void fetchJson<Array<{ status: string }> | { runs: Array<{ status: string }> }>(
+    void getJson<Array<{ status: string }> | { runs: Array<{ status: string }> }>(
       `/api/hench/runs?taskId=${encodeURIComponent(taskRef)}&limit=1`,
     ).then((body) => {
       if (!live) return;

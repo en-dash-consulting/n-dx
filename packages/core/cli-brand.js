@@ -16,6 +16,11 @@
 
 // ── Color support ──────────────────────────────────────────────────────
 
+/**
+ * Detect whether the terminal supports color output: FORCE_COLOR, then
+ * NO_COLOR, then whether stdout is a TTY. Mirrors the logic in
+ * @n-dx/llm-client/help-format; cli.js and help.js color through this copy.
+ */
 function supportsColor() {
   if (
     process.env.FORCE_COLOR !== undefined &&

@@ -8,8 +8,7 @@ import { CLIError, handleCLIError, requireRexDir } from "./errors.js";
 import { setQuiet, setVerbose, setDebug } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "@n-dx/llm-client";
 import { isItemLevel } from "../schema/index.js";
-import { join } from "node:path";
-import { resolveDir } from "./resolve-dir.js";
+import { resolveDir, resolveDirAfter } from "./resolve-dir.js";
 import { resolveRexPaths } from "../store/index.js";
 import { noteLegacyLayout } from "./legacy-layout-notice.js";
 
@@ -235,17 +234,14 @@ async function dispatchAdd(
   if (isManualMode) {
     // On a v2 tree every add is a change-layer node, and `change` is a type there.
     const typed = positionalLevel || firstArg === "change";
-    const v2Dir = positional.length > (typed ? 1 : 0) ? resolve(positional[positional.length - 1]) : process.cwd();
+    const v2Dir = resolveDirAfter(positional, typed ? 1 : 0);
     if (await isV2Project(v2Dir)) {
       const { cmdAddChange } = await import("./commands/add-change.js");
       await cmdAddChange(v2Dir, typed ? firstArg : undefined, flags, multiFlags);
       return;
     }
     const level = positionalLevel ? firstArg : flags.level;
-    const dir =
-      positional.length > (positionalLevel ? 1 : 0)
-        ? resolve(positional[positional.length - 1])
-        : process.cwd();
+    const dir = resolveDirAfter(positional, positionalLevel ? 1 : 0);
     const { cmdAdd } = await import("./commands/add.js");
     await cmdAdd(dir, level, flags, multiFlags);
     return;
@@ -380,10 +376,7 @@ async function dispatchRemove(
     );
   }
 
-  const removeDir =
-    positional.length > (removeLevel ? 2 : 1)
-      ? resolve(positional[positional.length - 1])
-      : process.cwd();
+  const removeDir = resolveDirAfter(positional, removeLevel ? 2 : 1);
   requireRexDir(removeDir);
 
   if (await isV2Project(removeDir)) {
@@ -461,8 +454,7 @@ async function dispatchCommand(
           "Usage: rex update <id> --status=<s> --priority=<p> --title=<t>",
         );
       }
-      const dir =
-        positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
+      const dir = resolveDirAfter(positional, 1);
       const { cmdUpdate } = await import("./commands/update.js");
       await cmdUpdate(dir, id, flags, multiFlags);
       break;
@@ -475,8 +467,7 @@ async function dispatchCommand(
           "Usage: rex move <id> --parent=<new-parent-id>",
         );
       }
-      const dir =
-        positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
+      const dir = resolveDirAfter(positional, 1);
       const { cmdMove } = await import("./commands/move.js");
       await cmdMove(dir, id, flags);
       break;
@@ -493,8 +484,7 @@ async function dispatchCommand(
           'Usage: rex log <event> [--item=<id>] [--detail="..."] [dir]',
         );
       }
-      const dir =
-        positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
+      const dir = resolveDirAfter(positional, 1);
       const { cmdLog } = await import("./commands/log.js");
       await cmdLog(dir, event, flags);
       break;

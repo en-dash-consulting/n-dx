@@ -101,16 +101,6 @@ const HIGH_GOD_THRESHOLD_ARCHETYPES = new Set(
     .map(a => a.id)
 );
 
-/** Basename patterns that identify types/constants files where unidirectional coupling is expected. */
-const TYPES_FILE_PATTERNS = [
-  /(?:^|\/)types\.[tj]sx?$/,
-  /(?:^|\/)constants\.[tj]sx?$/,
-  /(?:^|\/)enums\.[tj]sx?$/,
-  /\.types\.[tj]sx?$/,
-  /\.constants\.[tj]sx?$/,
-  /\.d\.ts$/,
-];
-
 /** Files where uncalled exports are expected (entry points, configs, etc.). */
 const ENTRY_POINT_PATTERNS = [
   /(?:^|\/)index\.[tj]sx?$/,
@@ -541,16 +531,6 @@ function expectsHighFanIn(filePath: string, archetypeMap?: Map<string, string | 
   }
   return HIGH_FANIN_PATH_SEGMENTS.some((seg) => filePath.includes(seg))
     || HIGH_FANIN_BASENAMES.some((p) => p.test(filePath));
-}
-
-/** Check if a file is a types/constants module (companion helper, not logic). */
-function isTypesFile(filePath: string, archetypeMap?: Map<string, string | null>): boolean {
-  if (archetypeMap?.size) {
-    const archetype = archetypeMap.get(filePath);
-    if (archetype === "types") return true;
-    if (archetype) return false; // classified as something else
-  }
-  return TYPES_FILE_PATTERNS.some((p) => p.test(filePath));
 }
 
 // ── Hub functions ───────────────────────────────────────────────────────────
