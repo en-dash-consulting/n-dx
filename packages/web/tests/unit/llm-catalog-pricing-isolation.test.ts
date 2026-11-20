@@ -14,8 +14,8 @@ vi.mock("../../src/server/llm-catalog.js", async (importOriginal) => ({
   getLiveVendorProbe: probe,
 }));
 
-// The exact catalog before PR2 refreshed pricing; independent of tier/price tables.
-const BUILT_IN_CODEX = ["gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"];
+// The retained catalog plus PR3's three explicit defaults, independent of price coverage.
+const BUILT_IN_CODEX = ["gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-luna", "gpt-6.1-sol"];
 const pricingOnly = Object.keys(MODEL_COSTS)
   .filter((id) => isModelCompatibleWithVendor("codex", id) && !BUILT_IN_CODEX.includes(id));
 const failedProbe: LiveVendorProbe = {
@@ -39,10 +39,10 @@ afterEach(async () => {
 });
 
 describe("Codex catalog pricing isolation", () => {
-  it.each(["API key not configured", "Model list request failed"])("keeps exactly five fallback models when %s", async (reason) => {
+  it.each(["API key not configured", "Model list request failed"])("keeps the explicit fallback models when %s", async (reason) => {
     probe.mockResolvedValue({ ...failedProbe, listing: { ok: false, reason } });
     const catalog = await buildLlmCatalog(projectDir, false);
-    expect(catalog.codex).toMatchObject({ models: BUILT_IN_CODEX, source: "built-in", reason, checkedAt: null });
+    expect(catalog.codex).toMatchObject({ models: BUILT_IN_CODEX, source: "built-in", reason, checkedAt: failedProbe.checkedAt });
     expect(pricingOnly.length).toBeGreaterThan(0);
     for (const model of pricingOnly) expect(catalog.codex.models).not.toContain(model);
   });
@@ -57,26 +57,26 @@ describe("Codex catalog pricing isolation", () => {
   it.each(pricingOnly)("refuses pricing-only %s for execution and review when the live probe fails", async (model) => {
     for (const key of ["model", "reviewModel"]) {
       expect(await validateRunOptions(projectDir, { review: true, [key]: model })).toEqual({
-        ok: false, key, error: `Run option "${key}": Model "${model}" is not in the codex catalog.`,
+        ok: false, key, error: `Run option "${key}": Cannot check model "${model}" in the codex catalog: Model list request failed`,
       });
     }
-    expect(probe).toHaveBeenCalledWith("codex", projectDir);
+    expect(probe).toHaveBeenCalledWith("codex", projectDir, { provider: "cli" });
   });
 
-  it.each(["gpt-6.1-sol", "gpt-live-only-9", "gpt-6.1-sol-20261116"])("accepts literal %s only when the live list reports it", async (model) => {
+  it.each(["gpt-client-only-9", "gpt-live-only-9", "gpt-6.1-sol-20261116"])("accepts literal %s only when the live list reports it", async (model) => {
     probe.mockResolvedValue({ ...failedProbe, listing: { ok: true, models: [model] } });
     expect((await buildLlmCatalog(projectDir, false)).codex).toMatchObject({ source: "live", models: [model] });
     expect(await validateRunOptions(projectDir, { model, review: true, reviewModel: model })).toEqual({
       ok: true, options: { model, review: true, reviewModel: model },
     });
     probe.mockResolvedValue(failedProbe);
-    expect(await validateCatalogModel(projectDir, "codex", model)).toBe(`Model "${model}" is not in the codex catalog.`);
+    expect(await validateCatalogModel(projectDir, "codex", model)).toBe(`Cannot check model "${model}" in the codex catalog: Model list request failed`);
   });
 
   it("refuses a pricing-only id omitted from a successful live listing", async () => {
     probe.mockResolvedValue({ ...failedProbe, listing: { ok: true, models: ["gpt-live-only-9"] } });
-    expect(await validateCatalogModel(projectDir, "codex", "gpt-6.1-sol"))
-      .toBe('Model "gpt-6.1-sol" is not in the codex catalog.');
+    expect(await validateCatalogModel(projectDir, "codex", "gpt-5.4"))
+      .toBe('Model "gpt-5.4" is not in the codex catalog.');
   });
 
   it("preserves a configured literal pin without adding it to the fallback list", async () => {
