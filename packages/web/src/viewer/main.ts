@@ -150,7 +150,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     () => createTripleClickDetector({ onTrigger: openNeolithic, requiredClicks: 7 }),
     [openNeolithic],
   );
-  const { data, loading, mode, serverError, refreshToast, showDrop } = useAppData({ pausePolling: isFeatureDisabled("autoRefresh") });
+  const { data, loading, analysisLoading, mode, serverError, refreshToast, showDrop } = useAppData({ pausePolling: isFeatureDisabled("autoRefresh") });
   // Read here rather than in the views that need it: the view renderers in
   // view-registry.ts are plain functions dispatched by `view`, so a hook called
   // inside one would be a conditional hook in this component. Problems and
@@ -406,7 +406,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, setOpenZone, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, analysisLoading, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, selectedTab, selectedArea, setOpenCapability, setOpenTask, setOpenZone, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   // The capture draft sits above the router, so Plan's capture tile, its modal
   // and the Add Items page (the modal's Open ↗) keep one text and one set of images.

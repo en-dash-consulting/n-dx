@@ -92,6 +92,8 @@ import {
 /** Props available to any view render function. */
 export interface ViewRenderContext {
   data: LoadedData;
+  /** The analysis modules read after the first paint are still on their way (`useAppData`). */
+  analysisLoading?: boolean;
   setDetail: (item: DetailItem | null) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setPrdDetailContent: (content: VNode<any> | null) => void;
@@ -170,7 +172,7 @@ function stage(id: StageId): ViewRenderer {
     navigateTo: ctx.navigateTo,
     // On a tiled stage the lead Overview drops what its tiles show.
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
-      ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
+      ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead", loading: ctx.analysisLoading })
       // A stage's own lead is its question, not a view the registry could render.
       : view === id
         ? h("p", { class: "stage-lead" }, "How should this project's workflow change?")
@@ -199,7 +201,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       ? h(AnalysisView, { navigateTo: ctx.navigateTo })
       : h(AnalysisView, { navigateTo: ctx.navigateTo, onMore: () => grid.openTile("capture") });
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
-    case "glance": return h(GlancePanel, { data: ctx.data, opened, setDetail: ctx.setDetail });
+    case "glance": return h(GlancePanel, { data: ctx.data, opened, setDetail: ctx.setDetail, loading: ctx.analysisLoading });
     case "recommendations": return h(RecommendationsPanel, { data: ctx.data, opened, navigateTo: ctx.navigateTo });
     case "process": return h(PlanProcess, { navigateTo: ctx.navigateTo });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
@@ -249,8 +251,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   // navigateTo is what lets the iso hero offer "Options" (→ the map's form);
   // without it the Overview hero had Rebuild and Expand but no way there.
-  "overview": ({ data, jobs, navigateTo }) =>
-    h(Overview, { data, jobs, navigateTo }),
+  "overview": ({ data, jobs, navigateTo, analysisLoading }) =>
+    h(Overview, { data, jobs, navigateTo, loading: analysisLoading }),
 
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),

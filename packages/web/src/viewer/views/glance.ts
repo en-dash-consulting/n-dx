@@ -19,7 +19,7 @@
 import { h } from "preact";
 import type { ComponentChild } from "preact";
 import type { DetailItem, LoadedData } from "../types.js";
-import { CodebaseStats, HealthDetail, HEALTH_ATTENTION_ID, HEALTH_CYCLES_ID, type StatKey } from "./overview.js";
+import { ANALYSIS_LOADING, CodebaseStats, HealthDetail, HEALTH_ATTENTION_ID, HEALTH_CYCLES_ID, type StatKey } from "./overview.js";
 import { DeliveryPanel, deliveryAnalysisStamp } from "./delivery.js";
 import { infraStatCards } from "./infra-arch.js";
 import { SummaryPanel } from "./summary-panel.js";
@@ -30,6 +30,11 @@ interface GlancePanelProps {
   opened?: boolean;
   /** Show a zone or file in the detail panel beside the opened tile. */
   setDetail?: (item: DetailItem) => void;
+  /**
+   * The inventory and import graph are still being read: the tile says so
+   * rather than drawing zeroes and "No inventory loaded".
+   */
+  loading?: boolean;
 }
 
 export function GlancePanel(props: GlancePanelProps): ComponentChild {
@@ -45,9 +50,14 @@ const STAT_SECTION: Record<StatKey, string> = {
   cycles: HEALTH_CYCLES_ID,
 };
 
-function GlanceBody({ data, opened = false, setDetail }: GlancePanelProps): ComponentChild {
+function GlanceBody({ data, opened = false, setDetail, loading = false }: GlancePanelProps): ComponentChild {
   const shared = useAnalyzeActions()!;
   const delivery = shared.delivery;
+
+  if (loading && (!data.inventory || !data.imports)) {
+    return h("div", { class: "glance-panel glance-panel--loading" },
+      h("p", { class: "stage-tile-empty", role: "status", "aria-live": "polite" }, ANALYSIS_LOADING));
+  }
 
   if (!opened) {
     const focus = { focus: shared.focus, items: shared.recommendations.items };

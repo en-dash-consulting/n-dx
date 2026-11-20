@@ -152,7 +152,16 @@ interface OverviewProps {
    * Default `full`.
    */
   variant?: "full" | "lead";
+  /**
+   * The analysis modules read after the first paint are still loading: what
+   * is missing may only be on its way, so Getting Started waits for them and a
+   * loading line stands in.
+   */
+  loading?: boolean;
 }
+
+/** Said while the analysis is still being read, in place of anything that reads its absence as "not analysed". */
+export const ANALYSIS_LOADING = "Loading the analysis…";
 
 const LANG_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
@@ -251,7 +260,7 @@ export function StatTile({ glyph, label, value, sub, tone, meter, info, onOpen, 
   );
 }
 
-export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }: OverviewProps) {
+export function Overview({ data, navigateTo, onSelect, jobs, variant = "full", loading = false }: OverviewProps) {
   const lead = variant === "lead";
   const { manifest, inventory, imports, zones } = data;
 
@@ -281,7 +290,9 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
 
   const hasZones = zones && zones.zones.length > 0;
   const hasImports = imports && imports.edges.length > 0;
-  const showGettingStarted = manifest && (!hasImports || !hasZones);
+  const incomplete = !!manifest && (!hasImports || !hasZones);
+  // Only once loading has finished does a missing graph or zone set mean the analysis lacks it.
+  const showGettingStarted = incomplete && !loading;
 
   const narration = manifest ? narrationNotice(manifest.narration) : null;
 
@@ -296,6 +307,10 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
           h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
           h("h2", { class: "view-title" }, "Overview"),
         ),
+
+    incomplete && loading
+      ? h("p", { class: "overview-meta overview-loading", role: "status", "aria-live": "polite" }, ANALYSIS_LOADING)
+      : null,
 
     // Getting Started guide for incomplete analysis
     showGettingStarted
