@@ -176,6 +176,8 @@ export interface VendorSessionDriver {
   readonly canFork: boolean;
   /** Dynamic support, never inferred from another binary on PATH. */
   probeFork?(binary: string, env?: NodeJS.ProcessEnv, cwd?: string): { supported: boolean; version?: string; identity?: string; reusable?: boolean; orientationFlags?: string[]; reason: string };
+  /** Selected-binary admission for retry and self-review continuation. */
+  probeResume?(binary: string, env?: NodeJS.ProcessEnv, cwd?: string): { supported: boolean; version?: string; identity?: string; reusable?: boolean; reason: string };
   /**
    * Build one turn's spawn.
    *
@@ -1276,6 +1278,24 @@ function codexForkContext(env: NodeJS.ProcessEnv, cwd: string): { identity: stri
 export const codexSessionDriver: VendorSessionDriver = {
   vendor: LLM_VENDOR.CODEX,
   canFork: false, // Availability is binary/version-specific, not vendor-wide.
+  probeResume(binary, env, cwd) {
+    const options = { env, cwd, timeout: 5_000, maxBuffer: 128 * 1024, stdio: ["ignore", "pipe", "pipe"] as ["ignore", "pipe", "pipe"] };
+    try {
+      const version = execFileSyncCli(binary, ["--version"], options).toString().trim();
+      const parsed = /^codex-cli (\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/.exec(version);
+      if (!parsed || (Number(parsed[1]) === 0 && Number(parsed[2]) < 167)) {
+        return { supported: false, version, reason: "unsupported Codex version (requires 0.167 or later)" };
+      }
+      const help = execFileSyncCli(binary, ["exec", "resume", "--help"], options).toString();
+      const supported = /Usage:.*codex exec resume.*\[SESSION_ID\]/.test(help) &&
+        ["--config", "--model", "--json", "--skip-git-repo-check"].every(flag => help.includes(flag));
+      return { supported, version, ...(supported ? codexForkContext(env ?? process.env, cwd ?? process.cwd()) : {}),
+        reason: supported ? "exec resume advertised" : "exec resume command surface unavailable" };
+    } catch (error) {
+      return { supported: false, reason: error instanceof CodexForkConfigurationError
+        ? error.message : "selected Codex binary unavailable or capability/configuration probe failed" };
+    }
+  },
   probeFork(binary, env, cwd) {
     const options = { env, cwd, timeout: 5_000, maxBuffer: 128 * 1024, stdio: ["ignore", "pipe", "pipe"] as ["ignore", "pipe", "pipe"] };
     try {

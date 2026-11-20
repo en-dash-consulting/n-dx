@@ -97,6 +97,7 @@ import {
   cacheEntryAgeMs,
   type BatchChainIdentity,
 } from "./session-cache.js";
+import { codexReuseIdentity, sameCodexSessionIdentity } from "./codex-session-reuse.js";
 import { buildTaskBoundaryDivider } from "./batch-divider.js";
 import {
   createSpawnLedger,
@@ -416,14 +417,15 @@ export function shouldSendRetryNotice(
 /**
  * Session a retry should resume, or undefined for a cold retry.
  *
- * Resume is Claude-CLI-only today; other vendors have no equivalent on this
- * path and fall back to a cold spawn, which is why the notice still exists.
+ * Codex additionally requires selected-binary and work-session identity admission.
  */
 export function resolveRetryResume(
   vendor: string,
   lastSessionId: string | undefined,
+  codexAdmitted = false,
 ): string | undefined {
-  return vendor === LLM_VENDOR.CLAUDE && lastSessionId ? lastSessionId : undefined;
+  return (vendor === LLM_VENDOR.CLAUDE || (vendor === LLM_VENDOR.CODEX && codexAdmitted))
+    ? lastSessionId : undefined;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -1043,6 +1045,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       proc.stdin.end();
     }
 
+    const unfinishedTracker = adapter.createUnfinishedSessionTracker?.();
     const result: SpawnResult = {
       turns: 0,
       toolCalls: [],
@@ -1314,6 +1317,9 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
         result.error = formatCloseError({ code, stderr, vendor: adapter.vendor, cliBinary });
       }
 
+      if (!result.error && !result.planModeIntercept) {
+        result.backgroundWait ??= unfinishedTracker?.signal();
+      }
       resolve(result);
     });
 
@@ -1332,6 +1338,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
      * Claude shape, which is what this function used to hardcode.
      */
     function captureSessionId(rawJson: unknown): void {
+      unfinishedTracker?.observe(rawJson);
       if (result.sessionId) return;
       if (adapter.extractSessionId) {
         const id = adapter.extractSessionId(rawJson);
@@ -1587,6 +1594,8 @@ function syncRunFromAccumulated(
  * half a dozen unused ones.
  */
 export interface ReviewPassContext {
+  /** Rechecks the actual work session against the reviewer execution identity. */
+  canResumeCodex?: (sessionId: string, model: string, policy: ExecutionPolicy, permissionMode: PermissionMode) => boolean;
   adapter: VendorAdapter;
   vendor: LLMVendor;
   cliBinary: string;
@@ -1838,12 +1847,9 @@ async function runExecutorFix(
 /**
  * Run the adversarial review pass for a completed task.
  *
- * The pass never fails the task. By the time it runs, completion validation
- * has already passed and the work is real; a reviewer that crashes, times out,
- * or writes an unparseable report tells us nothing about the work's quality,
- * so the failure is reported and the run continues. The alternative — treating
- * a broken reviewer as a broken task — would make `--review` strictly riskier
- * than not reviewing at all, which is the fastest way to get it switched off.
+ * Completion validation has already passed. A failed pass records its outcome;
+ * finalizeRun refuses reviewed completion without a usable report, preserving
+ * the work. The explicit review-optional setting allows best-effort review.
  *
  * What the pass *can* change is the working tree: a must-fix repair lands
  * before the commit prompt, so it ships in the same commit as the work it
@@ -1864,12 +1870,12 @@ export async function runAdversarialReviewPass(
       : "Adversarial review",
   );
 
-  // Resume only when the adapter can actually honor it. Codex, Google, and
-  // local have no `--resume` equivalent here, so they get a fresh reviewer
-  // seeded with the full task context instead. A pair reviewer is a different
-  // vendor's CLI and cannot resume the executor's session at all.
-  const resumeSessionId =
-    !pair && ctx.vendor === LLM_VENDOR.CLAUDE && inv.sessionId ? inv.sessionId : undefined;
+  // A pair reviewer never continues the executor. Codex self-review must match
+  // the identity captured before the work spawn, including the model and policy.
+  const resumeSessionId = !pair && inv.sessionId
+    ? resolveRetryResume(ctx.vendor, inv.sessionId,
+        ctx.canResumeCodex?.(inv.sessionId, ctx.reviewModel, ctx.policy, ctx.permissionMode) === true)
+    : undefined;
 
   const reportPath = reviewStepReportPath(ctx.henchDir, inv.run.id, step?.round ?? 0);
   // Remove a stale report from a previous pass at this path before spawning.
@@ -2012,13 +2018,22 @@ export async function runAdversarialReviewPass(
     return failed;
   };
 
+  const reviewerIdentity = () => ctx.vendor === "codex" ? codexReuseIdentity({
+    binary: ctx.cliBinary, env: ctx.cliEnv, cwd: inv.projectDir,
+    model: ctx.reviewModel, policy: ctx.policy, permissionMode: ctx.permissionMode,
+  }) : undefined;
+  const firstReviewerIdentity = reviewerIdentity();
   const first = await spawnReviewer(spawnConfig);
   if (!first.ok) return failReview(first);
+  if (ctx.vendor === "codex" && resumeSessionId && first.spawned.sessionId !== resumeSessionId) {
+    return failReview({ ok: false, reason: "spawn-failed",
+      detail: "Codex review did not confirm the work session id; refusing to accept its report" });
+  }
 
   let outcome = await readReviewReport(reportPath);
 
-  // A reviewer that ended waiting on a background command, with no report
-  // written, is resumed once and told to write the report now. It had usually
+  // A Codex reviewer with no report, or a Claude reviewer that ended waiting
+  // on a background command, is resumed once to write the report now. It had usually
   // done the review — run 01d15d75's reviewer printed its findings and then
   // deferred the file for a suite that would never report back.
   const reviewerSession = ctx.adapter.resumesUnfinishedSessions
@@ -2026,11 +2041,15 @@ export async function runAdversarialReviewPass(
     : undefined;
   if (
     !outcome.ok && outcome.reason === "no-report" && reviewerSession &&
-    (first.spawned.backgroundWait !== undefined || inv.inheritedBackgroundWait === true)
+    (ctx.vendor === "codex" || first.spawned.backgroundWait !== undefined || inv.inheritedBackgroundWait === true)
   ) {
+    if (ctx.vendor === "codex" && !sameCodexSessionIdentity(firstReviewerIdentity, reviewerIdentity())) {
+      return failReview({ ok: false, reason: "no-report",
+        detail: "Codex reviewer wrote no report and its session cannot be safely resumed. Check CLI resume support and execution identity, then rerun the review." });
+    }
     backgroundResumed = true;
     info(
-      "⚠ The reviewer ended waiting on a background command without writing its report. " +
+      "⚠ The reviewer ended without writing its required report. " +
         "Resuming it once to write the report now.",
     );
     const resumeEnvelope = createPromptEnvelope([
@@ -2048,10 +2067,16 @@ export async function runAdversarialReviewPass(
       }),
     );
     if (!resumed.ok) return failReview(resumed);
+    if (ctx.vendor === "codex" && resumed.spawned.sessionId !== reviewerSession) {
+      return failReview({ ok: false, reason: "spawn-failed",
+        detail: "Codex review continuation did not confirm the reviewer session id; rerun the review." });
+    }
     outcome = await readReviewReport(reportPath);
   }
 
-  if (!outcome.ok) return failReview(outcome);
+  if (!outcome.ok) return failReview(backgroundResumed ? {
+    ...outcome, detail: `${outcome.detail} Review continuation failed to produce a valid report; rerun the review.`,
+  } : outcome);
 
   // A re-review does not repeat the lesser findings of the round before it, so
   // they are copied in: the last report is the whole review.
@@ -2452,6 +2477,8 @@ interface ErrorContext {
   taskId: string;
   retryConfig: RetryConfig;
   vendor: string;
+  /** A failed Codex continuation cannot resume again or replay the task cold. */
+  codexContinuation?: "retry" | "unfinished-work";
 }
 
 /**
@@ -2522,6 +2549,20 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
     run.summary = result.summary;
     run.error = `${diagnosis.message} ${diagnosis.suggestion}`;
     await handleRunFailure(store, taskId, "deferred", "auth_error", run.error);
+    return "break";
+  }
+
+  if (ctx.codexContinuation) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    const transient = isTransientError(result.error!);
+    run.status = transient ? "error_transient" : "failed";
+    run.summary = result.summary;
+    run.error =
+      `Codex ${ctx.codexContinuation} continuation failed during attempt ${attempt + 1}/${retryConfig.maxRetries + 1}. ` +
+      "Stopping recovery without another resume or cold replay. " +
+      `Last error: ${result.error}`;
+    info(`\n${run.error}`);
+    await handleRunFailure(store, taskId, transient ? "pending" : "deferred", "codex_continuation_failed", run.error);
     return "break";
   }
 
@@ -2767,6 +2808,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     ...(spendGate ? { spendGate } : {}),
   };
 
+  let codexWorkSession: { id: string; identity: string | undefined } | undefined;
+  const reuseIdentity = (spawnModel: string, spawnPolicy: ExecutionPolicy, permissionMode: string) =>
+    codexReuseIdentity({ binary: cliBinary, env: cliEnv, cwd: projectDir,
+      model: spawnModel, policy: spawnPolicy, permissionMode });
+
   const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
         // A pair reviewer is the other vendor's CLI: its own adapter, binary
@@ -2798,6 +2844,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             }
           : {}),
         policy,
+        canResumeCodex: (id, reviewModel, reviewPolicy, permissionMode) =>
+          id === codexWorkSession?.id && sameCodexSessionIdentity(codexWorkSession?.identity,
+            reuseIdentity(reviewModel, reviewPolicy, permissionMode)),
         henchDir,
         reviewModel,
         // The reviewer has to be able to apply must-fixes and run the
@@ -3168,8 +3217,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
    */
   let lastSessionId: string | undefined;
   /**
-   * Session to resume because it ended waiting on a background command with
-   * its work uncommitted. Set for exactly one spawn, then cleared.
+   * Session to resume because it ended unfinished with its work uncommitted.
+   * Set for exactly one spawn, then cleared.
    *
    * Once per task: a session that ends the same way after being told nothing
    * will notify it is not going to be talked out of it by a second message,
@@ -3188,6 +3237,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries - planRespawnsChargedToRetries; attempt++) {
       let result!: SpawnResult;
+      let codexContinuation: ErrorContext["codexContinuation"];
       let attemptAccumulator: EventAccumulator | undefined;
 
       // Inner re-spawn loop: handles plan-mode interceptions without
@@ -3195,6 +3245,23 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // triggering ExitPlanMode (or when the plan-respawn cap is hit / the
       // user rejects the plan).
       while (true) {
+        const expectedContinuationSession = backgroundResumeSessionId ?? retryResumeSessionId;
+        const codexSpawnIdentity = vendor === "codex"
+          ? reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits") : undefined;
+        if (vendor === "codex" && backgroundResumeSessionId &&
+            !sameCodexSessionIdentity(codexWorkSession?.identity, codexSpawnIdentity)) {
+          throw new Error("Codex unfinished session identity changed; refusing to replay work. Restore the execution identity and rerun the task.");
+        }
+        // Recheck immediately before using a retry handle; backoff may outlive
+        // a checkout, credential, model or execution-policy change.
+        if (vendor === "codex" && attempt > 0) {
+          const admitted = sameCodexSessionIdentity(codexWorkSession?.identity,
+            codexSpawnIdentity);
+          retryResumeSessionId = admitted ? retryResumeSessionId : undefined;
+          // A retry must never return to the shared parent or previous task.
+          warmParentId = undefined;
+          batchResumeId = undefined;
+        }
         // Batch turns after the first arrive in a conversation that already
         // finished a task, so the brief needs an explicit boundary or it
         // reads as a continuation of the previous one.
@@ -3292,7 +3359,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
 
         if (backgroundResumeSessionId) {
-          subsection("Resuming the session: it ended waiting on a background command");
+          subsection("Resuming the unfinished session");
         } else if (readOnlyRetryPending) {
           subsection("Re-spawn cold after a read-only refusal");
         } else if (attempt > 0 && planRespawns === 0) {
@@ -3326,6 +3393,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
         recordSpawn(spawnLedger, nextSpawnReason);
 
+        codexContinuation = vendor === "codex"
+          ? backgroundResumeSessionId ? "unfinished-work" : retryResumeSessionId ? "retry" : undefined
+          : undefined;
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
         resetLiveSpawnProgress(liveProgress);
         result = await withHeartbeat(
@@ -3376,7 +3446,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // about the parent.
         if (
           result.error && !result.livelock && !stoppedByRunBound(result) && !wasBackgroundResume &&
-          warmParentId && !forkFallbackUsed
+          forkingWarmParent && warmParentId && !forkFallbackUsed &&
+          (vendor !== "codex" || (!result.sessionId && result.turns === 0 && result.toolCalls.length === 0))
         ) {
           forkFallbackUsed = true;
           nextSpawnReason = "fork-fallback";
@@ -3390,33 +3461,41 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           continue;
         }
 
+        if (vendor === "codex") {
+          codexWorkSession = result.sessionId ? { id: result.sessionId, identity: codexSpawnIdentity } : undefined;
+          if (codexContinuation && !result.error && result.sessionId !== expectedContinuationSession) {
+            result.error = "Codex did not confirm the resumed work session id; refusing to replay this task";
+          }
+        }
         if (result.sessionId) lastSessionId = result.sessionId;
 
         accumulateResult(accumulated, result);
 
-        // Background wait: the session handed work to the background and then
-        // ended, and nothing will ever notify it. Only a session that left its
-        // work uncommitted needs anything — one that backgrounded a command
-        // but still committed has finished.
+        // An unfinished session may have backgrounded work or emitted a
+        // truncated stream. Only uncommitted work needs a continuation.
         if (
           result.backgroundWait && !result.error && !result.planModeIntercept &&
           (await hasUnfinishedWork({ projectDir, autoCommit: config.autoCommit === true }))
         ) {
           const signal = result.backgroundWait;
-          const resumeId = adapter.resumesUnfinishedSessions ? result.sessionId : undefined;
+          const resumeId = adapter.resumesUnfinishedSessions && (vendor !== "codex" ||
+            sameCodexSessionIdentity(codexWorkSession?.identity,
+              reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits")))
+            ? result.sessionId : undefined;
           if (backgroundResumes === 0 && resumeId) {
             backgroundResumes++;
             backgroundResumeSessionId = resumeId;
             nextSpawnReason = "background-resume";
             run.backgroundResume = { ...signal };
             info(
-              `\n⚠ The session ended waiting on a background command (${signal.tool}` +
+              `\n⚠ The session ended unfinished (${signal.tool}` +
                 `${signal.detail ? `: ${signal.detail}` : ""}) with its work uncommitted. ` +
                 "Resuming it once to finish in the foreground.",
             );
             await toolRexAppendLog(store, taskId, {
               event: "background_wait_resumed",
-              detail: `Session ${resumeId.slice(0, 8)} ended waiting on ${signal.tool}; resumed once.`,
+              detail: `Session ${resumeId.slice(0, 8)} ended unfinished (last: ${signal.tool}` +
+                `${signal.detail ? `: ${signal.detail}` : ""}); resumed once.`,
             });
             continue;
           }
@@ -3516,17 +3595,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       } else {
         const action = await processErrorResult({
           run, result, accumulated, attempt,
-          store, taskId, retryConfig, vendor,
+          store, taskId, vendor,
+          retryConfig, codexContinuation,
         });
         if (action === "break") break;
         // action === "retry" → continue loop.
         //
-        // Resume the failed session on vendors that can, so the retry keeps
-        // what the attempt already did instead of rediscovering it. Only the
-        // Claude CLI honors resume today; elsewhere this stays undefined and
-        // the retry is a cold spawn carrying the retry notice.
         nextSpawnReason = "retry";
-        retryResumeSessionId = resolveRetryResume(vendor, lastSessionId);
+        retryResumeSessionId = resolveRetryResume(vendor,
+          vendor === "codex" ? result.sessionId : lastSessionId,
+          vendor === "codex" && sameCodexSessionIdentity(codexWorkSession?.identity,
+            reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits")));
+        if (vendor === "codex" && !retryResumeSessionId) {
+          detail("Codex retry: resume unavailable or execution identity changed; using prior-attempt context");
+        }
       }
     }
   } catch (err) {

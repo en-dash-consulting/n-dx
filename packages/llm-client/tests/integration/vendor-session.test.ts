@@ -534,3 +534,31 @@ describe("Codex fork protocol", () => {
     expect(existsSync(log)).toBe(false);
   });
 });
+
+// These are executable fixtures, not evidence from an installed Codex model.
+describe("Codex resume admission", () => {
+  function binary(version = "0.167.0-alpha.3.2", surface = "resume") {
+    return writeFakeCli(dir, { name: "selected-resume-codex", script: `
+      const args = process.argv.slice(2);
+      console.log(args[0] === "--version" ? "codex-cli ${version}" :
+        "Usage: codex exec ${surface} [OPTIONS] [SESSION_ID] [PROMPT] --config --model --json --skip-git-repo-check");
+    ` });
+  }
+  it("checks the selected resume surface and rechecks credential identity", () => {
+    const selected = binary();
+    const env = { ...process.env, CODEX_HOME: dir };
+    writeFileSync(join(dir, "auth.json"), '{"token":"fixture-a"}');
+    const before = codexSessionDriver.probeResume!(selected, env, dir);
+    expect(before.supported).toBe(true);
+    expect(before.reusable).toBe(true);
+    writeFileSync(join(dir, "auth.json"), '{"token":"fixture-b"}');
+    expect(codexSessionDriver.probeResume!(selected, env, dir).identity).not.toBe(before.identity);
+  });
+  it.each([["0.166.0", "resume"], ["0.167.0", "fork"], ["unknown", "resume"]])(
+    "rejects unsupported version/surface %s %s", (version, surface) => {
+      expect(codexSessionDriver.probeResume!(binary(version, surface), { ...process.env, CODEX_HOME: dir }, dir).supported).toBe(false);
+    });
+  it("does not substitute PATH when the selected binary is missing", () => {
+    expect(codexSessionDriver.probeResume!(join(dir, "absent"), {}, dir).supported).toBe(false);
+  });
+});

@@ -61,7 +61,7 @@ import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import {
   formatMissingReviewRefusal,
   formatUnresolvedMustFixRefusal,
-  reviewNeverRan,
+  reviewHasNoUsableReport,
 } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { appendTrailerBlock } from "./commit-trailers.js";
@@ -4126,7 +4126,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // know, which is a config fix and a re-run. `gated` carries that to
   // stuck-task detection (agent/analysis/stuck.ts).
   let reviewGateRefused = false;
-  if (run.status === "completed" && opts.reviewOptional !== true && reviewNeverRan(run.review)) {
+  if (run.status === "completed" && opts.reviewOptional !== true && reviewHasNoUsableReport(run.review)) {
     reviewGateRefused = true;
     run.status = "failed";
     run.error = formatMissingReviewRefusal(run.review);

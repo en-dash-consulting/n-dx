@@ -46,10 +46,35 @@ export type {
 export const codexCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CODEX,
   parseMode: "json",
-  // `codex exec resume` exists (the batch chain and transient retries use it
-  // through their own paths), but resuming a session that ended unfinished is
-  // not enabled for Codex yet: nothing here detects that it ended waiting.
-  resumesUnfinishedSessions: false,
+  resumesUnfinishedSessions: true,
+
+  createUnfinishedSessionTracker() {
+    let turnOpen = false;
+    let failed = false;
+    const commands = new Set<string>();
+    return {
+      observe(raw: unknown) {
+        if (!raw || typeof raw !== "object") return;
+        const event = raw as Record<string, unknown>;
+        if (event.type === "turn.started") turnOpen = true;
+        if (event.type === "turn.completed") turnOpen = false;
+        if (event.type === "turn.failed" || event.type === "error") failed = true;
+        const item = event.item as Record<string, unknown> | undefined;
+        if (!item || item.type !== "command_execution" || typeof item.id !== "string") return;
+        if ((event.type === "item.started" || event.type === "item.updated") && item.status === "in_progress") {
+          commands.add(item.id);
+        } else if (event.type === "item.completed") {
+          commands.delete(item.id);
+        }
+      },
+      signal() {
+        if (failed) return undefined;
+        if (commands.size) return { tool: "command_execution", detail: "command has no completion event" };
+        if (turnOpen) return { tool: "turn.started", detail: "turn has no completion event" };
+        return undefined;
+      },
+    };
+  },
 
   buildSpawnConfig(
     envelope: PromptEnvelope,
