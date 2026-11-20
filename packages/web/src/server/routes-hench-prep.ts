@@ -123,6 +123,12 @@ export interface ReadyTask {
   title: string;
   /** Plain-language summary for non-coders; the row shows it in place of the title when present. */
   summary?: string;
+  /**
+   * The start of the item's description, whitespace collapsed and cut at
+   * {@link READY_DESCRIPTION_MAX} characters; absent when it has none. The card
+   * shows it under the title, as the Up next card did.
+   */
+  description?: string;
   status: string;
   priority: string | null;
   itemType: string;
@@ -138,6 +144,15 @@ export interface ReadyTask {
   liveRun: boolean;
   /** The task carries its own run settings, which `ndx work` applies. */
   saved: boolean;
+}
+
+/** Characters of description a ready card carries: two lines at most. */
+export const READY_DESCRIPTION_MAX = 200;
+
+function descriptionField(item: { description?: unknown }): { description?: string } {
+  const text = typeof item.description === "string" ? item.description.replace(/\s+/g, " ").trim() : "";
+  if (!text) return {};
+  return { description: text.length > READY_DESCRIPTION_MAX ? `${text.slice(0, READY_DESCRIPTION_MAX - 1).trimEnd()}…` : text };
 }
 
 function tail(text: string): string {
@@ -630,6 +645,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
       id: item.id,
       title: item.title,
       ...summaryField(item),
+      ...descriptionField(item),
       status: item.status,
       priority: item.priority ?? null,
       itemType: itemTypeOf(item),

@@ -69,6 +69,7 @@ export { emptyAnalyzeTokenUsage, formatTokenUsage } from "../analyzers/token-usa
 export {
   setLLMConfig,
   setProjectDir,
+  setStaticOnly,
   getAuthMode,
   getLLMVendor,
   DEFAULT_MODEL,

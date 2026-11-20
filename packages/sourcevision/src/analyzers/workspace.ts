@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import type {
   Manifest,
@@ -143,6 +143,21 @@ function realpathOrResolve(p: string): string {
   }
 }
 
+/** Is `p` itself a symbolic link (or junction)? A path that cannot be lstat'd is not. */
+function isSymlink(p: string): boolean {
+  try {
+    return lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/** Is the resolved path `p` the resolved root `rootReal` or inside it? */
+function isWithin(p: string, rootReal: string): boolean {
+  const prefix = rootReal.endsWith(sep) ? rootReal : rootReal + sep;
+  return p === rootReal || p.startsWith(prefix);
+}
+
 /**
  * Registered git worktrees nested strictly inside `rootDir`.
  *
@@ -211,6 +226,12 @@ function findSubSvDirs(
     if (SKIP_DIRS.has(entry)) continue;
 
     const fullPath = join(currentDir, entry);
+    // A symlinked directory is never walked, as the inventory walk never
+    // walks one: its target may be another project (whose zones would be
+    // promoted here, and which --deep would analyze and write into) or an
+    // ancestor (two such links make the walk branch without end).
+    if (isSymlink(fullPath)) continue;
+
     let stat;
     try {
       stat = statSync(fullPath);
@@ -241,7 +262,7 @@ function findSubSvDirs(
 
     // Check for .sourcevision inside this directory
     const svPath = resolveSourcevisionPaths(fullPath).svDir;
-    if (existsSync(svPath) && statSync(svPath).isDirectory()) {
+    if (existsSync(svPath) && !isSymlink(svPath) && statSync(svPath).isDirectory()) {
       results.push(fullPath);
       // Don't recurse into sub-analyzed directories (they manage their own children)
       continue;
@@ -303,8 +324,14 @@ export function detectSubAnalyses(rootDir: string): SubAnalysis[] {
   // Resolved once per scan, not per directory.
   findSubSvDirs(rootDir, rootDir, subDirs, listNestedWorktrees(rootDir));
 
+  // Belt and braces for links the walk cannot see (a symlinked `.ndx`
+  // container, a link above the root): a candidate whose analysis resolves
+  // outside the root is never loaded, so --deep never analyzes it either.
+  const rootReal = realpathOrResolve(rootDir);
   const results: SubAnalysis[] = [];
   for (const subDir of subDirs) {
+    const svReal = realpathOrResolve(resolveSourcevisionPaths(subDir).svDir);
+    if (!isWithin(realpathOrResolve(subDir), rootReal) || !isWithin(svReal, rootReal)) continue;
     const sub = loadSubAnalysis(rootDir, subDir);
     if (sub) {
       results.push(sub);

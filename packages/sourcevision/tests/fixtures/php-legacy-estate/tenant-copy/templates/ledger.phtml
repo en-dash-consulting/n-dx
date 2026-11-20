@@ -1,0 +1,11 @@
+<html>
+<body>
+<h1>Ledger</h1>
+<table>
+<? foreach ($entries as $entry) { ?>
+  <tr><td><?= $entry['memo'] ?></td><td><?= $entry['amount'] ?></td></tr>
+<? } ?>
+</table>
+<p>Total: <% echo $total; %></p>
+</body>
+</html>

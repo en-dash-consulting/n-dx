@@ -127,6 +127,18 @@ describe("formatTokenUsage", () => {
     expect(result).not.toContain("across");
   });
 
+  it("appends cached tokens before the call count, outside the total", () => {
+    const result = formatTokenUsage({
+      calls: 3,
+      inputTokens: 5000,
+      outputTokens: 1200,
+      cacheCreationInputTokens: 1000,
+      cacheReadInputTokens: 2000,
+    });
+
+    expect(result).toBe("6,200 tokens (5,000 in / 1,200 out) + 3,000 cached across 3 LLM calls");
+  });
+
   it("formats multiple calls with call count", () => {
     const usage: AnalyzeTokenUsage = {
       calls: 3,

@@ -1,0 +1,2 @@
+# System crontab: a user field before the command.
+0 * * * * www-data php /srv/app/bin/migrate.php

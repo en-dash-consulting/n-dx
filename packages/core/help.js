@@ -861,6 +861,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--codex-only", description: "Provision only Codex surfaces (equivalent to --no-claude)" },
       { flag: "--assistants=<list>", description: "Comma-separated list of assistants to provision (e.g. --assistants=claude,codex)" },
       { flag: "--mcp-scope=local", description: "Register Claude MCP servers via 'claude mcp add --scope local' instead of the tracked .mcp.json default" },
+      { flag: "--no-llm", description: "Static-only, for batch runs: spawn no vendor CLI and make no model or network call (no auth check, no claude MCP lookup, no update check, no provider or model prompt); the vendor is recorded only from --provider or existing config" },
     ],
     examples: [
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
@@ -877,6 +878,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx init --no-codex .", description: "Initialize without Codex integration" },
       { command: "ndx init --assistants=claude .", description: "Initialize with only Claude surfaces" },
       { command: "ndx init --mcp-scope=local .", description: "Register Claude MCP servers via local scope instead of tracked .mcp.json" },
+      { command: "ndx init --no-llm --no-commit .", description: "Initialize with no model, vendor CLI or network call (batch scans)" },
     ],
     related: ["plan", "status", "config"],
   },
@@ -888,6 +890,11 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--deep", description: "Enable AI-enriched zone analysis (slower, richer findings)" },
       { flag: "--full", description: "Re-analyze all phases, ignoring cache" },
       { flag: "--lite", description: "File-name-only scan (faster, less detail)" },
+      { flag: "--fast", description: "Static only: no model or network calls, the update check included (for batch scans)" },
+      { flag: "--include-minified", description: "Map minified bundles (*.min.js, long-line files) in callgraph.json too" },
+      { flag: "--third-party=<glob>", description: "Treat files matching <glob> as copied-in third-party code (repeatable; !<glob> denies)" },
+      { flag: "--third-party-file=<path>", description: "Read third-party globs from a file (one per line, or a JSON array)" },
+      { flag: "--include-third-party", description: "Map third-party and mirror-copy files in callgraph.json too" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
     examples: [

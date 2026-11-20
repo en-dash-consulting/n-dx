@@ -14,7 +14,7 @@ export const HENCH_SCHEMA_VERSION = "hench/v1";
  * Supported project languages for language-aware guard configuration.
  * "auto" triggers detection during `hench init`.
  */
-export type ProjectLanguage = "typescript" | "javascript" | "go" | "swift";
+export type ProjectLanguage = "typescript" | "javascript" | "go" | "swift" | "php";
 
 /**
  * Configurable subset of policy limits (all optional, defaults applied at runtime).
@@ -768,12 +768,26 @@ const SWIFT_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("swift", {
 });
 
 /**
+ * Guard defaults for PHP projects: `php`, `composer` and `vendor/bin/phpunit`
+ * are admitted, and `vendor/` is blocked like every dependency directory.
+ * The checks hench itself runs on the agent's PHP changes (`php -l`,
+ * `composer validate`, PHPUnit) are in `tools/php-guards.ts`.
+ */
+const PHP_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("php", {
+  commandTimeout: 30000,
+  maxFileSize: 1048576,
+  spawnTimeout: 300000,          // 5 minutes
+  maxConcurrentProcesses: 3,
+});
+
+/**
  * Returns the language-appropriate guard defaults.
  * Falls back to JS/TS defaults for unknown languages.
  */
 export function guardDefaultsForLanguage(language?: ProjectLanguage): GuardConfig {
   if (language === "go") return { ...GO_GUARD_DEFAULTS };
   if (language === "swift") return { ...SWIFT_GUARD_DEFAULTS };
+  if (language === "php") return { ...PHP_GUARD_DEFAULTS };
   return { ...JS_TS_GUARD_DEFAULTS };
 }
 

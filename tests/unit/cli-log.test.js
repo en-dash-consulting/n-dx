@@ -17,6 +17,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import * as llm from "../../packages/llm-client/src/cli-log.ts";
 import * as core from "../../packages/core/cli-log.js";
+import * as llmExec from "../../packages/llm-client/src/exec.ts";
+import * as coreSpawn from "../../packages/core/win-spawn.js";
 
 const TWINS = [
   ["llm-client", llm],
@@ -180,5 +182,42 @@ describe("cli-log twin parity: llm-client === core", () => {
     }
     expect(core.CLI_LOG_MAX_BYTES).toBe(llm.CLI_LOG_MAX_BYTES);
     expect(core.CLI_LOG_FILENAME).toBe(llm.CLI_LOG_FILENAME);
+  });
+});
+
+describe.each([
+  ["llm-client", llmExec],
+  ["core", coreSpawn],
+])("execFileSyncCli logInvocation (%s twin)", (_name, mod) => {
+  const saved = {};
+  afterEach(() => {
+    for (const key of ["NDX_CLI_LOG", "NDX_CLI_LOG_PATH"]) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  function withLog() {
+    for (const key of ["NDX_CLI_LOG", "NDX_CLI_LOG_PATH"]) saved[key] = process.env[key];
+    const path = join(scratch(), "claude_commands.log");
+    process.env.NDX_CLI_LOG = "1";
+    process.env.NDX_CLI_LOG_PATH = path;
+    return path;
+  }
+
+  it("logs a call by default", () => {
+    const path = withLog();
+    mod.execFileSyncCli(process.execPath, ["-e", ""], { stdio: "ignore" });
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it("logs nothing for logInvocation: false, and does not pass the option on", () => {
+    const path = withLog();
+    const out = mod.execFileSyncCli(process.execPath, ["-e", "process.stdout.write('ok')"], {
+      encoding: "utf-8",
+      logInvocation: false,
+    });
+    expect(out).toBe("ok");
+    expect(existsSync(path)).toBe(false);
   });
 });

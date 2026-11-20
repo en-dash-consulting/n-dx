@@ -1,0 +1,41 @@
+schema: "rex/v2"
+items:
+  "4335fd54-3711-4677-a070-e14fefefa998":
+    status: "completed"
+    startedAt: "2026-11-14T06:31:51.002Z"
+    completedAt: "2026-11-14T06:31:51.002Z"
+    endedAt: "2026-11-14T06:31:51.002Z"
+    activeIntervals: [{"end":"2026-11-14T06:31:51.002Z","start":"2026-11-14T06:31:51.002Z"}]
+    appliedAt: "2026-11-14T06:31:51.002Z"
+    appliedAmendsHash: "a85e72bc8206f55bbc31eaa1899d2e19bdcf907f49e2649497723c28f1a8479e"
+    createdAt: "2026-11-14T05:17:51.059Z"
+    lastModified: "2026-11-14T06:31:51.002Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6af46475-e55a-465d-8d91-f0e91136ab1b":
+    status: "completed"
+    startedAt: "2026-11-14T06:27:59.578Z"
+    completedAt: "2026-11-14T06:31:51.002Z"
+    endedAt: "2026-11-14T06:31:51.002Z"
+    activeIntervals: [{"end":"2026-11-14T06:31:51.002Z","start":"2026-11-14T06:27:59.578Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Weak PHP marker now includes index.php in public/web/htdocs/www/public_html (PHP_DOCROOT_DIRECTORIES); PHP source (.php/.phtml/.php3-5) counts as fallback source so markerless PHP-below-root + .tf stays TypeScript+Terraform."
+    lastModified: "2026-11-14T06:31:51.002Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "84fe6ecb-f2d1-4d1e-8121-725fc70ca4df":
+    status: "completed"
+    startedAt: "2026-11-14T06:23:07.481Z"
+    completedAt: "2026-11-14T06:27:23.763Z"
+    endedAt: "2026-11-14T06:27:23.763Z"
+    activeIntervals: [{"end":"2026-11-14T06:27:23.763Z","start":"2026-11-14T06:23:07.481Z"}]
+    lastModified: "2026-11-14T06:27:23.763Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94b212f6-fac0-4adb-8a12-814d38e792f9":
+    status: "completed"
+    startedAt: "2026-11-14T06:07:10.184Z"
+    completedAt: "2026-11-14T06:21:15.739Z"
+    endedAt: "2026-11-14T06:21:15.739Z"
+    activeIntervals: [{"end":"2026-11-14T06:21:15.739Z","start":"2026-11-14T06:07:10.184Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added phpConfig to lang-kit with composer.json / root .php detection, repository-scoped .inc/.module/.install, skipOnlyBeside (vendor) and *.ext markers; wired into sourcevision inventory and walk, and the core/web language lists."
+    lastModified: "2026-11-14T06:21:15.739Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

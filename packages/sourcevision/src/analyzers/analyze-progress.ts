@@ -428,6 +428,8 @@ export function readProcessCommandLine(pid: number): string | null {
       encoding: "utf-8",
       timeout: 2_000,
       stdio: ["ignore", "pipe", "ignore"],
+      // Not a vendor CLI: keep it out of the project's claude_commands.log.
+      logInvocation: false,
     }));
   } catch {
     // ps exits 1 for a pid with no process; missing ps or a timeout lands here too.

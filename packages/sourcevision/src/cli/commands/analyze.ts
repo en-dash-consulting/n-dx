@@ -20,14 +20,15 @@ import {
   detectSubAnalyses,
   setLLMConfig,
   setProjectDir,
+  setStaticOnly,
   getAuthMode,
   getLLMVendor,
 } from "../sourcevision-core.js";
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
-import type { RiskAssessmentOptions, RiskJustificationEntry, ZoneType, Zones } from "../sourcevision-core.js";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, resolveLayout, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn, spawnTool, createProgressReporter, setActiveProgressReporter, getActiveProgressReporter, configureJudgmentCache, jevAvailability, setJevObserver, JEV_VENDOR } from "@n-dx/llm-client";
+import type { Inventory, RiskAssessmentOptions, RiskJustificationEntry, ZoneType, Zones } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
   runImportsPhase,
@@ -44,15 +45,20 @@ import {
 } from "./analyze-phases.js";
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
+import { markOutboundThirdParty, outsideStructurePredicate, parseThirdPartyGlobFile } from "../../analyzers/third-party.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { enrichTerraformInfrastructure } from "../../analyzers/terraform-infrastructure.js";
+import { setJevRequestByteCeiling } from "../../analyzers/jev-split.js";
 import { terraformConfig } from "@n-dx/lang-kit";
 import { loadInventoryConfig } from "../../language/detect.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
+import { packConfigData, writeConfigData } from "../../analyzers/pack-config-facts.js";
+import { packLegacyData, writeLegacyData } from "../../analyzers/pack-legacy-files.js";
+import { packEcosystem, withEcosystem } from "../../analyzers/pack-ecosystem.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { ANALYSIS_HISTORY_FILE, startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -124,6 +130,57 @@ export function resolveAnalyzeTokenEventMetadata(
   };
 }
 
+/**
+ * Third-party globs from the command line, in order: each `--third-party=<glob>`
+ * as written, and the globs in each `--third-party-file=<path>` (one per line,
+ * or a JSON array; relative to the project). A file that cannot be read is an
+ * error: a catalogue that silently did not apply would put the libraries back
+ * into the map.
+ */
+export function parseThirdPartyGlobs(extraArgs: string[], absDir: string): string[] {
+  const globs: string[] = [];
+  for (const a of extraArgs) {
+    if (a.startsWith("--third-party=")) {
+      const glob = a.slice("--third-party=".length).trim();
+      if (glob !== "") globs.push(glob);
+    } else if (a.startsWith("--third-party-file=")) {
+      const path = resolve(absDir, a.slice("--third-party-file=".length));
+      let text: string;
+      try {
+        text = readFileSync(path, "utf-8");
+      } catch (err) {
+        throw new Error(`--third-party-file: cannot read ${path} (${err instanceof Error ? err.message : String(err)})`);
+      }
+      globs.push(...parseThirdPartyGlobFile(text));
+    }
+  }
+  return globs;
+}
+
+/** outbound.json's dependencies with third-party calls marked and mirror-copy calls dropped (third-party.ts). */
+function applicationOutbound<D extends { dependencies: { file: string; thirdParty?: string }[] }>(data: D, inventory: Inventory): D {
+  const dependencies = markOutboundThirdParty(data.dependencies, inventory.files);
+  return dependencies === data.dependencies ? data : { ...data, dependencies };
+}
+
+/**
+ * One line counting outbound targets by how they were found: resolved
+ * (`literal`), named (`env`, `config`, or `unknown` with the expression as
+ * written) and blank, e.g. `  outbound targets: 13 literal, 6 env, 2 config,
+ * 58 unknown (4 blank)`; undefined with no dependency.
+ */
+export function describeOutboundTargets(deps: readonly { target: string; targetSource: string }[]): string | undefined {
+  if (deps.length === 0) return undefined;
+  const counts: Record<string, number> = { literal: 0, env: 0, config: 0, unknown: 0 };
+  let blank = 0;
+  for (const d of deps) {
+    counts[d.targetSource] = (counts[d.targetSource] ?? 0) + 1;
+    if (d.target === "") blank++;
+  }
+  const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([source, n]) => `${n} ${source}`);
+  return `  outbound targets: ${parts.join(", ")}${blank > 0 ? ` (${blank} blank)` : ""}`;
+}
+
 function parsePhaseFilter(extraArgs: string[]): PhaseFilter {
   for (const a of extraArgs) {
     if (a.startsWith("--phase=")) {
@@ -176,6 +233,7 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   configureJudgmentCache(cacheOwner);
   configureRerunLog(cacheOwner);
   configureRuleCache(cacheOwner);
+  setJevRequestByteCeiling(loadJevRequestByteCeiling(resolveLayout(absDir).configFile));
   // The Jev client is foundation-tier and cannot import the run ledger, so the
   // accounting is handed to it here — once, beside the cache it also owns.
   setJevObserver({ onCall: recordLLMCall, onCacheStats: recordJudgmentCache });
@@ -310,7 +368,9 @@ async function scheduleDetachedNarration(absDir: string, svDir: string, zoneIds:
       ...(nameZoneIds.length > 0 ? [`naming ${bold(String(nameZoneIds.length))} zone${nameZoneIds.length === 1 ? "" : "s"}`] : []),
     ];
     info(`${cyan("Background:")} ${parts.join(", ")} — results above are complete; names and insights land in zones.json when it finishes.`);
-    info(`  ${dim(`log: ${narrationLog} · pass --wait to block instead`)}`);
+    // A batch script (no TTY, often --quiet) must still learn that model work outlives the command, so this one line ignores --quiet.
+    if (process.stdout.isTTY) info(`  ${dim(`log: ${narrationLog} · pass --wait to block instead`)}`);
+    else process.stderr.write(`  background zone narration continues after analyze exits; log: ${narrationLog}. Pass --wait to keep it in the run.\n`);
   } catch (err) {
     const manifest = readManifest(absDir);
     manifest.narration = { status: "failed", zones: zoneIds, ...(nameZoneIds.length > 0 ? { names: nameZoneIds } : {}), startedAt, reason: `could not spawn narrator: ${err instanceof Error ? err.message : String(err)}` };
@@ -433,19 +493,27 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     );
   }
 
+  const fastMode = extraArgs.includes("--fast");
+  // --fast is static-only: no judgment route and no model call in any phase,
+  // whatever keys or config exist. One switch in the LLM bridge, not a check
+  // at each call site, so a phase added later cannot forget it.
+  setStaticOnly(fastMode);
   const { svDir, llmConfig } = await initAndLoadLLMConfig(absDir);
   const filter = parsePhaseFilter(extraArgs);
 
   startRunLedger(
-    extraArgs.includes("--fast") ? "fast" : extraArgs.includes("--narrate") ? "narrate" : "generative",
+    fastMode ? "fast" : extraArgs.includes("--narrate") ? "narrate" : "generative",
   );
   const ctx: AnalyzeContext = {
     absDir,
     svDir,
     fullMode: extraArgs.includes("--full"),
-    fastMode: extraArgs.includes("--fast"),
+    fastMode,
     narrate: extraArgs.includes("--narrate"),
     wait: extraArgs.includes("--wait"),
+    includeMinified: extraArgs.includes("--include-minified"),
+    includeThirdParty: extraArgs.includes("--include-third-party"),
+    thirdPartyGlobs: parseThirdPartyGlobs(extraArgs, absDir),
     targetPass: parseTargetPass(extraArgs),
     tokenUsage: emptyAnalyzeTokenUsage(),
     inventoryResult: null,
@@ -623,6 +691,11 @@ async function generatePrMarkdownStep(ctx: AnalyzeContext): Promise<void> {
 
 // ── Output generation ────────────────────────────────────────────────
 
+/** Successful calls this run made to a text model (any vendor but TypeSafe's judgment service). */
+export function textModelCalls(run: { llm: { byTaskClass: Record<string, { calls: number; vendor?: string }> } }): number {
+  return Object.values(run.llm.byTaskClass).reduce((n, b) => n + (b.vendor !== undefined && b.vendor !== JEV_VENDOR ? b.calls : 0), 0);
+}
+
 /**
  * Distil and persist the startup primer, best-effort.
  *
@@ -659,13 +732,15 @@ async function writePrimerIfPossible(
       }
       return;
     }
-    // The cascade's calls are judgments, not generation: they prove a Jev
-    // key works, not that a text model is reachable. The primer is prose,
-    // so it is generated only by a generative run (`--narrate`, or the
-    // default without a judgment route); a cached primer is still served.
-    if (snapshotRunLedger().mode === "cascade") {
+    // The cascade's own calls are judgments, not generation: they prove a
+    // Jev key works, not that a text model is reachable. The primer is prose,
+    // so a cascade run generates it only when the run also reached a text
+    // model (its escalations and enrichment scans are recorded on the ledger
+    // under a vendor other than TypeSafe); a cached primer is still served.
+    const ledger = snapshotRunLedger();
+    if (ledger.mode === "cascade" && textModelCalls(ledger) === 0) {
       if (!cachedPrimer) {
-        info(`${dim("[primer]")} skipped — cascade mode; run with --narrate to generate it`);
+        info(`${dim("[primer]")} skipped — cascade mode made no text-model calls; run with --narrate to generate it`);
       }
       return;
     }
@@ -786,11 +861,20 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // each claim carrying the file that proves it. Its own bounded walk,
     // because the inventory's codeOnly filter drops the YAML, TOML and
     // Dockerfiles this reads. Deterministic: no LLM call and no network.
-    const sdlcProfile = await buildSdlcProfile(ctx.absDir);
+    // Language packs' version floors and legacy constructs join it as
+    // `ecosystem`, only when a pack that produces them ran over files of its language.
+    const packFacts = await packFrameworkFacts(ctx, inventory);
+    const sdlcProfile = withEcosystem(
+      await buildSdlcProfile(ctx.absDir, { exclude: outsideStructurePredicate(inventory.files) }),
+      packEcosystem(packFacts, inventory),
+    );
     writeFileSync(
       join(ctx.svDir, DATA_FILES.sdlcProfile),
       toCanonicalJSON(stripSdlcProfileForDisk(sdlcProfile)),
     );
+    // The same facts per file: each file's floor and legacy-construct uses,
+    // only when a pack found any; otherwise a stale legacy.json is removed.
+    writeLegacyData(ctx.svDir, packLegacyData(packFacts, inventory));
 
     // The judgement computed from that profile, persisted so a reader that
     // only wants the headline — the dashboard's status poll, the hub card —
@@ -809,10 +893,15 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // Deterministic and LLM-free, so it runs on every analysis including
     // `--fast`, and is written canonically for the same reason as the file
     // above it. Language packs' outbound calls join the detectors' entries.
-    writeFileSync(
-      join(ctx.svDir, DATA_FILES.outbound),
-      toCanonicalJSON(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory))),
-    );
+    const outbound = applicationOutbound(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, packFacts), inventory);
+    writeFileSync(join(ctx.svDir, DATA_FILES.outbound), toCanonicalJSON(outbound));
+    const targetsLine = describeOutboundTargets(outbound.dependencies);
+    if (targetsLine) info(targetsLine);
+
+    // Config reads and flag checks, only when a language pack produced them:
+    // without one there is no config.json, and a stale one from a run that
+    // had a producing pack is removed rather than left to mislead.
+    writeConfigData(ctx.svDir, packConfigData(packFacts, inventory));
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
     writeFileSync(join(ctx.svDir, SUPPLEMENTARY_FILES[0]), llmsTxt);
@@ -894,6 +983,27 @@ export function loadZoneTypes(configPath: string): Record<string, ZoneType> | un
     }
   } catch {
     // Invalid config — no zone types
+  }
+  return undefined;
+}
+
+/**
+ * Load the Jev request byte ceiling from the project config (synchronous).
+ *
+ * Takes the resolved config path, for the reason given on
+ * {@link loadRiskJustifications}.
+ *
+ * Returns `sourcevision.jev.requestByteCeiling` when it is a positive integer,
+ * else undefined (the default ceiling applies).
+ */
+export function loadJevRequestByteCeiling(configPath: string): number | undefined {
+  try {
+    if (!existsSync(configPath)) return undefined;
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const ceiling = data?.sourcevision?.jev?.requestByteCeiling;
+    if (Number.isInteger(ceiling) && ceiling > 0) return ceiling as number;
+  } catch {
+    // Invalid config — default ceiling
   }
   return undefined;
 }

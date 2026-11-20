@@ -191,15 +191,29 @@
 .prep-btn-primary:hover:not(:disabled) { background: var(--accent-dim); }
 
 /* ── Ready to run (Work page) ── */
-.ready-to-run { margin-bottom: var(--space-5); }
-.ready-title-head { font-size: var(--font-lg); margin: 0 0 var(--space-2); }
-.ready-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.ready-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); }
-.ready-row + .ready-row { border-top: 1px solid var(--border); }
-.ready-main { flex: 1; min-width: 0; }
-.ready-title { all: unset; cursor: pointer; font-weight: 600; color: var(--text); }
+/* Ready to run wears the Up next card (rex-dashboard.css: .rex-dash-next,
+   .rex-dash-next-card and their parts); these rules only fit it to a list. */
+.ready-to-run {
+  margin-bottom: var(--space-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+.ready-title-head { font-size: var(--font-lg); margin: 0; }
+.ready-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2-5, 10px); }
+.ready-row { display: flex; flex-direction: column; min-width: 0; }
+.ready-title { all: unset; cursor: pointer; color: var(--text); overflow-wrap: anywhere; }
 .ready-title:hover, .ready-title:focus-visible { text-decoration: underline; }
-.ready-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--text-muted); font-size: var(--font-sm); }
+.ready-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+/* --text-dim, not --text-muted: muted falls under 4.5:1 on the cards' tinted fill. */
+.ready-meta { color: var(--text-dim); font-size: var(--font-sm); }
+.ready-chain { font-size: var(--font-sm); color: var(--text-dim); }
+/* The lead card shows two lines of description; the ones after it, one. */
+.ready-desc { margin: var(--space-1-5) 0 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+.ready-row--lead .ready-desc { -webkit-line-clamp: 2; }
+.ready-row:not(.ready-row--lead) { padding-block: var(--space-3); }
+.ready-row:not(.ready-row--lead) .rex-dash-next-link { font-size: var(--font-base); }
 .ready-resume { color: var(--accent); }
 .ready-empty { color: var(--text-muted); margin: 0; }
 .ready-more {

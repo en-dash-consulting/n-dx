@@ -68,6 +68,19 @@ describe("run ledger", () => {
     expect(byTaskClass["zone.enrich-scan"]).toMatchObject({ calls: 1, inputTokens: 0, outputTokens: 0, durationMs: 9000, vendor: "claude" });
   });
 
+  it("keeps cache tokens per bucket, omitted when zero, and shows them in the line", () => {
+    recordLLMCall({ taskClass: "zone.enrich-scan", vendor: "claude", model: "claude-haiku-4-5", tokenUsage: { input: 3000, output: 22, cacheCreationInput: 40_000, cacheReadInput: 8000 }, durationMs: 2000 });
+    recordLLMCall({ taskClass: "code.classify", vendor: "typesafe", model: "jev-1.13.0", tokenUsage: { input: 10, output: 1, cacheCreationInput: 0 }, durationMs: 1 });
+
+    const run = snapshotRunLedger();
+    expect(run.llm.byTaskClass["zone.enrich-scan"]).toMatchObject({ cacheCreationTokens: 40_000, cacheReadTokens: 8000 });
+    expect(run.llm.byTaskClass["code.classify"]).not.toHaveProperty("cacheCreationTokens");
+    expect(run.llm.byTaskClass["code.classify"]).not.toHaveProperty("cacheReadTokens");
+    expect(formatRunLedger(run)[1]).toBe(
+      "  zone.enrich-scan: 1 call, 3,022 tokens + 48,000 cached, 2.0s (claude claude-haiku-4-5)",
+    );
+  });
+
   it("keeps a class served by two vendors in one bucket per vendor", () => {
     recordLLMCall({ taskClass: "code.classify", vendor: "typesafe", model: "jev-1.13.0", tokenUsage: { input: 1000, output: 10 }, durationMs: 100 });
     recordLLMCall({ taskClass: "code.classify", vendor: "claude", model: "claude-haiku-4-5", durationMs: 9000 });
@@ -160,6 +173,24 @@ describe("priceRunLedger", () => {
 
   it("omits the cost when nothing ran", () => {
     expect(priceRunLedger(snapshotRunLedger())).toBeUndefined();
+  });
+
+  it("prices cache tokens at the model's cache rates", () => {
+    recordLLMCall({ taskClass: "a", vendor: "claude", model: "claude-haiku-4-5", tokenUsage: { input: 1000, output: 100 }, durationMs: 1 });
+    const plain = priceRunLedger(snapshotRunLedger())!;
+
+    startRunLedger("fast");
+    recordLLMCall({
+      taskClass: "a", vendor: "claude", model: "claude-haiku-4-5",
+      tokenUsage: { input: 1000, output: 100, cacheCreationInput: 88_000, cacheReadInput: 245_000 },
+      durationMs: 1,
+    });
+    expect(priceRunLedger(snapshotRunLedger())!).toBeGreaterThan(plain);
+  });
+
+  it("prices a call that reported only cache tokens", () => {
+    recordLLMCall({ taskClass: "a", vendor: "claude", model: "claude-haiku-4-5", tokenUsage: { input: 0, output: 0, cacheReadInput: 5000 }, durationMs: 1 });
+    expect(priceRunLedger(snapshotRunLedger())).toBeGreaterThan(0);
   });
 
   it("prices a dated model id, which is what the clients actually report", () => {

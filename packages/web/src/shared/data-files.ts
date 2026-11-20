@@ -34,6 +34,10 @@ export const DATA_FILES = {
   readiness: "readiness.json",
   infrastructure: "infrastructure.json",
   outbound: "outbound.json",
+  /** Written only when a language pack produced config reads or flag checks. */
+  config: "config.json",
+  /** Written only when a language pack produced version floors or legacy-construct uses. */
+  legacy: "legacy.json",
 } as const;
 
 export const ALL_DATA_FILES = Object.values(DATA_FILES);
