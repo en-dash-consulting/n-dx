@@ -1907,6 +1907,41 @@ a.tracker-link {
 .cp-card-effects dt { font-weight: 600; }
 .cp-card-effects dd { margin: 0; }
 
+/* Touches / Amends: two bordered options, the chosen one toned like a checked
+   target. The native radio stays, so arrows, Tab and Space work as before;
+   focus rings the whole option. */
+.cp-relation-option {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-2-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cp-relation-option:hover {
+  border-color: var(--text-dim);
+}
+
+.cp-relation-option:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+}
+
+.cp-relation-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cp-relation-option input[type="radio"] {
+  margin: 0.2em 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .cp-relation-body {
   display: inline-flex;
   flex-direction: column;
@@ -2095,12 +2130,36 @@ a.tracker-link {
   color: var(--text-muted);
 }
 
+/* The dashboard's text-input style (.filter-input), themed through its tokens. */
 .cp-search-input,
 .cp-input {
   width: 100%;
   box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
   font: inherit;
   font-size: var(--font-sm);
+  appearance: none;
+}
+
+.cp-search-input::placeholder,
+.cp-input::placeholder {
+  color: var(--text-muted);
+}
+
+.cp-search-input:focus-visible,
+.cp-input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.cp-search-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .cp-search-results {
