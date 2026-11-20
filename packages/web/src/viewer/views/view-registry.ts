@@ -63,7 +63,8 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { LifecycleStrip } from "./lifecycle-strip.js";
-import { PlanProcess } from "./plan-process.js";
+import { RunningNow, UpNext } from "./work-now.js";
+import { AgentSettingsPanel } from "./agent-settings.js";
 import { ChangesGlance } from "./changes-glance.js";
 import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
@@ -84,7 +85,6 @@ import {
   CommandReferenceView,
   RobotWranglerView,
   ProjectView,
-  ToolingPanel,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -159,26 +159,28 @@ function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
   return ctx.validViews ?? buildValidViewsForScope(null);
 }
 
-/** Tune's folded tiles: Spend shows its essentials; the rest preview their view. */
-function tuneTileSummary(tile: StageTile): ComponentChild | null {
+/** Work's folded tiles: Spend (on Tune) shows its essentials; the rest preview their view. */
+function workTileSummary(tile: StageTile): ComponentChild | null {
   return tile.view === "token-usage" && !tile.panel ? h(SpendSummary, null) : null;
 }
 
-/** A stage page, rendering each of its sections and tiles through this registry. */
-function stage(id: StageId): ViewRenderer {
+/**
+ * A stage page, rendering each of its sections and tiles through this registry.
+ * `route` is the view that opened it when that is one of the stage's modes
+ * (`tune` opens Work on Tune).
+ */
+function stage(id: StageId, route: ViewId = id): ViewRenderer {
   const page: ViewRenderer = (ctx) => h(StagePage, {
     stage: id,
+    view: route,
     validViews: validViewsOf(ctx),
     navigateTo: ctx.navigateTo,
     // On a tiled stage the lead Overview drops what its tiles show.
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
       ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead", loading: ctx.analysisLoading })
-      // A stage's own lead is its question, not a view the registry could render.
-      : view === id
-        ? h("p", { class: "stage-lead" }, "How should this project's workflow change?")
-        : renderActiveView(view, { ...ctx, inSection: true })),
+      : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
-    renderSummary: id === "tune" ? tuneTileSummary : undefined,
+    renderSummary: id === "work" ? workTileSummary : undefined,
     detailOpen: ctx.detailOpen ?? false,
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
@@ -203,13 +205,14 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
     case "glance": return h(GlancePanel, { data: ctx.data, opened, setDetail: ctx.setDetail, loading: ctx.analysisLoading });
     case "recommendations": return h(RecommendationsPanel, { data: ctx.data, opened, navigateTo: ctx.navigateTo });
-    case "process": return h(PlanProcess, { navigateTo: ctx.navigateTo });
     case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
     case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);
     case "outcomes": return h(OutcomesPanel, null);
-    case "tooling": return h(ToolingPanel, { navigateTo: ctx.navigateTo });
+    case "running": return h(RunningNow, { navigateTo: ctx.navigateTo });
+    case "up-next": return h(UpNext, { navigateTo: ctx.navigateTo });
+    case "agent-settings": return h(AgentSettingsPanel, { navigateTo: ctx.navigateTo });
   }
 }
 
@@ -219,7 +222,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "analyze": stage("analyze"),
   "plan": stage("plan"),
-  "tune": stage("tune"),
+  // Work's Tune mode: the Work page, opened on Tune.
+  "tune": stage("work", "tune"),
   // `/work/prep/<taskId>` is the Work page with the Prepare task modal open
   // over it; closing returns to `/work`, a start hands off to Live.
   "work": (ctx) => h(Fragment, null,

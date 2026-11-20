@@ -285,10 +285,11 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
   });
 
   it("a bounded scroll region is reachable by keyboard", async () => {
-    // No stage section sets `scroll` now that the run history and log are Tune
-    // tabs, so give one the option for this test.
-    const audit = STAGES.work.sections.find((s) => s.view === "hench-audit")!;
-    Object.assign(audit, { scroll: true });
+    // Every stage draws tiles now, so no page stacks sections: give Work a
+    // stacked scroll section for this test, and put its modes back after.
+    const work = STAGES.work as { sections: unknown; modes: unknown };
+    const saved = { sections: work.sections, modes: work.modes };
+    Object.assign(work, { sections: [{ view: "hench-audit", scroll: true }], modes: undefined });
     try {
       await mount(h(StagePage, {
         stage: "work", validViews: VALID, navigateTo: () => {}, renderView: () => null,
@@ -301,7 +302,7 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
       expect(body, "the scroll section did not open").not.toBeNull();
       expect(body!.getAttribute("tabindex")).toBe("0");
     } finally {
-      Object.assign(audit, { scroll: undefined });
+      Object.assign(work, saved);
     }
   });
 });

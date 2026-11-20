@@ -33,7 +33,9 @@ import {
   isLiveView,
   ENRICHMENT_THRESHOLDS,
   stageForView,
+  stageTiles,
   stageViews,
+  modeForView,
   tilePlacesView,
   type StageId,
 } from "../../../src/viewer/views/index.js";
@@ -95,11 +97,11 @@ function placementsOf(view: ViewId): string[] {
   if ((STAGE_ORDER as readonly string[]).includes(view)) places.push(`stage:${view}`);
   for (const stage of STAGE_ORDER) {
     for (const section of STAGES[stage].sections) {
-      // A stage's lead may be its own question (Tune): that is the stage page
-      // itself, already counted above, not a second placement.
       if (section.view === view && view !== stage) places.push(`section:${stage}`);
     }
-    for (const tile of STAGES[stage].tiles ?? []) {
+    // A mode's route (Tune) opens the stage page on that mode: a placement.
+    if ((STAGES[stage].modes ?? []).some((m) => m.view === view && view !== stage)) places.push(`mode:${stage}`);
+    for (const tile of stageTiles(stage)) {
       if (tile.view === view && tilePlacesView(tile)) places.push(`tile:${stage}`);
       if (tile.tabs?.some((t) => t.view === view)) places.push(`tab:${stage}`);
     }
@@ -118,22 +120,34 @@ describe("navigation model: placement", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("loops through four stages: Analysis, Plan, Work, Tune", () => {
-    expect([...STAGE_ORDER]).toEqual(["analyze", "plan", "work", "tune"]);
-    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work", "Tune"]);
-    expect(resolveCliLabel(viewBlurb("tune"), "ndx")).toBe("Fit the ndx workflow to this project and the tools you have.");
+  it("loops through three stages: Analysis, Plan, Work", () => {
+    expect([...STAGE_ORDER]).toEqual(["analyze", "plan", "work"]);
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
   });
 
-  it("renders Tune as a lead plus a tile grid, with no stacked sections", () => {
-    expect(STAGES.tune.sections.map((s) => s.view)).toEqual(["tune"]);
-    expect((STAGES.tune.tiles ?? []).length).toBeGreaterThan(0);
+  it("splits Plan into Create and Preparation, and Work into Now and Tune", () => {
+    expect((STAGES.plan.modes ?? []).map((m) => [m.id, m.label, m.focus])).toEqual([
+      ["create", "Create", "How, why and what"],
+      ["prepare", "Preparation", "Who and when"],
+    ]);
+    expect((STAGES.work.modes ?? []).map((m) => [m.id, m.label, m.view])).toEqual([
+      ["now", "Now", "work"],
+      ["tune", "Tune", "tune"],
+    ]);
+    // Tune is a mode of Work, not a stage: its route opens Work on it.
+    expect(stageForView("tune")).toBe("work");
+    expect(modeForView("work", "tune")).toBe("tune");
+    expect(modeForView("work", "work")).toBe("now");
+    for (const mode of [...(STAGES.plan.modes ?? []), ...(STAGES.work.modes ?? [])]) {
+      expect(mode.tiles.length, mode.id).toBeGreaterThan(0);
+    }
   });
 
-  it("gives each stage at most one lead section, first; only Plan, whose capture is a tile, has none", () => {
+  it("gives each stage at most one lead section, first; Plan and Work, split into modes, have none", () => {
     for (const stage of STAGE_ORDER) {
       const sections = STAGES[stage].sections;
       const leads = sections.filter((s) => s.plain);
-      expect(leads.length, stage).toBe(stage === "plan" ? 0 : 1);
+      expect(leads.length, stage).toBe(STAGES[stage].modes ? 0 : 1);
       if (leads.length) expect(sections[0].plain, stage).toBe(true);
     }
   });
@@ -160,19 +174,17 @@ describe("navigation model: labels", () => {
     expect(viewLabel("activity")).toBe("Execution Log");
   });
 
-  // Spend lives on Tune and the command list in Settings › Commands; a stage
-  // blurb that still offers them sends users to the wrong stage (#961).
-  it("stage blurbs do not advertise what moved to Tune and Settings", () => {
+  // The command list lives in Settings › Commands; a stage blurb that still
+  // offers it sends users to the wrong place (#961).
+  it("stage blurbs do not advertise what moved to Settings", () => {
     expect(viewBlurb("plan")).not.toMatch(/planning commands/i);
-    expect(viewBlurb("work")).not.toMatch(/costs?|spend/i);
-    // The Runs list is a Tune tile.
-    expect(stageViews("tune")).toContain("hench-runs");
-    expect(viewBlurb("work")).not.toMatch(/\bruns\b/i);
+    // The Runs list is a tile of Work's Tune mode.
+    expect(stageViews("work")).toContain("hench-runs");
   });
 
-  it("the home blurb counts the four stages", () => {
-    expect(viewBlurb("home")).toMatch(/four stages/i);
-    expect(viewBlurb("home")).not.toMatch(/three/i);
+  it("the home blurb counts the three stages", () => {
+    expect(viewBlurb("home")).toMatch(/three stages/i);
+    expect(viewBlurb("home")).not.toMatch(/four/i);
   });
 
   // No label carries the placeholder today (the settings pages that did were
@@ -384,7 +396,8 @@ describe("rendered surfaces take their labels from the model", () => {
     });
     await settle();
     // The lifecycle band has no full-screen; every other tile opens by its key (panel, else view).
-    const tiles = (STAGES.plan.tiles ?? []).filter((t) => !t.band);
+    // The page opens on Create, its first mode.
+    const tiles = (STAGES.plan.modes?.[0]?.tiles ?? []).filter((t) => !t.band);
     const views = tiles.map((t) => t.view);
     for (const tile of tiles) {
       act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${tile.panel ?? tile.view}"] .stage-tile-head`)?.click(); });
@@ -397,14 +410,14 @@ describe("rendered surfaces take their labels from the model", () => {
     expect(opened).toEqual(expect.arrayContaining(["changes", "validation"]));
   });
 
-  it("Tune shows the Your tooling tile on a server and omits it from a static export", async () => {
-    // The tile reads /api/llm/* and /api/commands/auth, none of which an export
-    // writes, so deployed it would only ever report a read error.
-    const tooling = () => root.querySelector('.stage-tile[data-tile="tooling"]');
+  it("Tune shows the Agent settings tile on a server and omits it from a static export", async () => {
+    // The tile reads and writes /api/llm/config, /api/hench/config and the
+    // agent prompt, none of which an export serves.
+    const tooling = () => root.querySelector('.stage-tile[data-tile="agent-settings"]');
     const mountTune = async () => {
       act(() => {
         render(h(StagePage, {
-          stage: "tune", validViews: buildValidViews(null), navigateTo: () => {}, renderView: () => null,
+          stage: "work", view: "tune", validViews: buildValidViews(null), navigateTo: () => {}, renderView: () => null,
         }), root);
       });
       await settle();
@@ -552,9 +565,10 @@ describe("the Analysis stage is a tile dashboard", () => {
     // placement.
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
       ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
-      ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
+      ...stageTiles(stage).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
     ]);
-    expect(serverBuilt.sort()).toEqual(["analysis", "ask", "changes", "inbox", "workspaces"]);
+    // Workspaces left Work's page (Live shows every worktree); its route stays.
+    expect([...new Set(serverBuilt)].sort()).toEqual(["analysis", "ask", "changes", "inbox"]);
   });
 });
 

@@ -277,7 +277,7 @@ describe("a growing tile (Plan's capture)", () => {
     vi.unstubAllGlobals();
   });
 
-  const capture = STAGES.plan.tiles!.find((t) => t.panel === "capture")!;
+  const capture = STAGES.plan.modes![0]!.tiles.find((t) => t.panel === "capture")!;
   const span = () => tile("capture").style.gridRow;
 
   it("spans past its configured row to fit its content", () => {

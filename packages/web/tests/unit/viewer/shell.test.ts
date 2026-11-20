@@ -96,8 +96,8 @@ const ALL = buildValidViews(null);
 // ── The layout as data ─────────────────────────────────────────
 
 describe("stages.ts", () => {
-  it("orders the loop Analysis → Plan → Work → Tune", () => {
-    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work", "Tune"]);
+  it("orders the loop Analysis → Plan → Work", () => {
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
   });
 
   it("lists only real views, each with a registry renderer", () => {
@@ -121,9 +121,13 @@ describe("stages.ts", () => {
     ]);
   });
 
-  it("puts PRD items and the audit at the top of Work", () => {
-    const work = STAGES.work.sections.map((s) => s.view);
-    expect(work.slice(0, 2)).toEqual(["rex-dashboard", "hench-audit"]);
+  it("opens Work on what is running and what is next; its old sections keep their routes under Work", () => {
+    expect(STAGES.work.modes?.[0]?.tiles.map((t) => t.panel)).toEqual(["running", "up-next"]);
+    // Their numbers are on Live and Plan; the pages still open, lit as Work's.
+    for (const view of ["rex-dashboard", "hench-audit", "workspaces"] as const) {
+      expect(stageForView(view), view).toBe("work");
+      expect(STAGES.work.modes!.flatMap((m) => m.tiles).some((t) => t.view === view), view).toBe(false);
+    }
     expect(STAGES.analyze.sections.map((s) => s.view)).not.toContain("rex-dashboard");
   });
 
@@ -136,23 +140,24 @@ describe("stages.ts", () => {
     expect(stageForView("zones")).toBe("analyze");
     expect(stageForView("iso-map")).toBe("analyze"); // the dashboard's hero tile
     expect(stageForView("graph")).toBe("analyze"); // off the page, still the stage's
-    expect(stageForView("hench-runs")).toBe("tune");
+    expect(stageForView("hench-runs")).toBe("work");
     expect(stageForView("rex-dashboard")).toBe("work");
     expect(stageForView("work")).toBe("work");
+    // Tune is Work's second mode.
+    expect(stageForView("tune")).toBe("work");
     expect(stageForView("home")).toBeNull();
     expect(stageForView("robot-wrangler")).toBeNull();
-    // Token Usage is on Tune only; a Rex viewer's borrowed Tune does not show
-    // global views, so there it lights no stage.
-    expect(stageForView("token-usage")).toBe("tune");
+    expect(stageForView("token-usage")).toBe("work");
+    // A Rex viewer has no Work stage, so Spend lights none there.
     expect(stageForView("token-usage", buildValidViews("rex"))).toBeNull();
-    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("tune");
+    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("work");
   });
 
-  it("places the PRD Graph and Execution Log on Tune in a Rex viewer", () => {
+  it("keeps the PRD Graph and Execution Log valid in a Rex viewer, which has no Work stage", () => {
     const rex = buildValidViews("rex");
-    expect(stageForView("merge-graph", rex)).toBe("tune");
-    expect(stageForView("activity", rex)).toBe("tune");
-    // Hench's own Tune views are not in a Rex viewer at all.
+    expect(rex.has("merge-graph")).toBe(true);
+    expect(rex.has("activity")).toBe(true);
+    expect(stageForView("merge-graph", rex)).toBeNull();
     expect(stageForView("hench-runs", rex)).toBeNull();
   });
 
@@ -169,11 +174,10 @@ describe("stages.ts", () => {
   });
 
   it("gives a scoped viewer only its own stage", () => {
-    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work", "tune"]);
+    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work"]);
     expect(visibleStages(buildValidViews("sourcevision"))).toEqual(["analyze"]);
-    // Rex borrows Tune for the PRD Graph and Execution Log.
-    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan", "tune"]);
-    expect(visibleStages(buildValidViews("hench"))).toEqual(["work", "tune"]);
+    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan"]);
+    expect(visibleStages(buildValidViews("hench"))).toEqual(["work"]);
   });
 });
 
@@ -187,10 +191,10 @@ describe("TopNav", () => {
   const tabLabels = () => Array.from(root.querySelectorAll(".topnav-tab[data-stage] .topnav-tab-label")).map((el) => el.textContent);
   const activeTab = () => root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent ?? null;
 
-  it("shows exactly the four stages, under the View navigation landmark", async () => {
+  it("shows exactly the three stages, under the View navigation landmark", async () => {
     await mount(nav("home"));
     expect(root.querySelector('nav[aria-label="View navigation"]')).not.toBeNull();
-    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work", "Tune"]);
+    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work"]);
     expect(activeTab()).toBeNull();
     expect(root.querySelector(".topnav-brand")?.getAttribute("aria-current")).toBe("page");
   });
@@ -350,11 +354,9 @@ describe("StageLinks", () => {
 
   it("points each stage at its neighbours, wrapping around the loop", async () => {
     await mount(h(StageLinks, { stage: "analyze", validViews: ALL, onNavigate: vi.fn() }));
-    expect(links()).toEqual(["tune", "plan"]);
+    expect(links()).toEqual(["work", "plan"]);
     await act(async () => { render(h(StageLinks, { stage: "work", validViews: ALL, onNavigate: vi.fn() }), root); });
-    expect(links()).toEqual(["plan", "tune"]);
-    await act(async () => { render(h(StageLinks, { stage: "tune", validViews: ALL, onNavigate: vi.fn() }), root); });
-    expect(links()).toEqual(["work", "analyze"]);
+    expect(links()).toEqual(["plan", "analyze"]);
   });
 
   it("navigates on click and labels both directions", async () => {
@@ -385,16 +387,38 @@ describe("StagePage", () => {
 
   beforeEach(() => { rendered.length = 0; });
 
-  it("stacks the stage's sections in order and mounts only the open ones", async () => {
+  /**
+   * Every stage draws tiles now, so no page stacks collapsible sections. The
+   * stacked layout stays for a stage that lists sections and no tiles; these
+   * tests give Work such a layout and put its modes back afterwards.
+   */
+  const STACKED = [
+    { view: "rex-dashboard", plain: true },
+    { view: "hench-audit" },
+    { view: "workspaces", requiresServer: true },
+  ];
+  let savedWork: { sections: unknown; modes: unknown } | null = null;
+  const stackWork = () => {
+    const work = STAGES.work as { sections: unknown; modes: unknown };
+    savedWork = { sections: work.sections, modes: work.modes };
+    Object.assign(work, { sections: STACKED.map((s) => ({ ...s })), modes: undefined });
+  };
+  afterEach(() => {
+    if (savedWork) Object.assign(STAGES.work, savedWork);
+    savedWork = null;
+  });
+
+  it("stacks a stage's sections in order and mounts only the open ones", async () => {
+    stackWork();
     await mount(page("work"));
-    expect(sectionViews()).toEqual(STAGES.work.sections.map((s) => s.view));
-    // Only "Up next" opens on arrival, so only it has rendered.
+    expect(sectionViews()).toEqual(STACKED.map((s) => s.view));
+    // Only the plain lead is shown on arrival, so only it has rendered.
     expect([...new Set(rendered)]).toEqual(["rex-dashboard"]);
   });
 
   it("shows each stage's lead section in the page itself, with no dropdown", async () => {
-    // Plan has no lead: its capture is a tile.
-    for (const stage of STAGE_ORDER.filter((s) => s !== "plan")) {
+    // Plan and Work have no lead: they open on their modes' tiles.
+    for (const stage of STAGE_ORDER.filter((s) => !STAGES[s].modes)) {
       const lead = STAGES[stage].sections[0];
       expect(lead.plain, `${stage} lead is plain`).toBe(true);
       expect(STAGES[stage].sections.filter((s) => s.plain)).toHaveLength(1);
@@ -410,6 +434,7 @@ describe("StagePage", () => {
   });
 
   it("opens and closes a section, remembering the choice", async () => {
+    stackWork();
     await mount(page("work"));
     const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="hench-audit"] .stage-section-toggle')!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
@@ -428,6 +453,7 @@ describe("StagePage", () => {
   // No stage section sets `scroll` now that the run history and log are Tune
   // tabs, so the option is exercised on a section given it for this test.
   it("keeps a scroll section a bounded region until Expand, remembering the choice", async () => {
+    stackWork();
     const audit = STAGES.work.sections.find((s) => s.view === "hench-audit")!;
     Object.assign(audit, { scroll: true });
     try {
@@ -560,33 +586,57 @@ describe("StagePage", () => {
     expect(stageForView("prd")).toBe("plan");
   });
 
-  it("renders Tune as a tile grid after its lead, with Spend, Shipped and Outcomes beside Runs", async () => {
-    await mount(page("tune"));
-    expect(sectionViews()).toEqual(["tune"]);
-    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes", "tooling"]);
+  const tileKeys = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+  const modeTabs = () => Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-modes [role="tab"]'));
+
+  it("opens Work on Now: what is running and what is next, under a Now / Tune toggle", async () => {
+    await mount(page("work"));
+    expect(sectionViews()).toEqual([]);
+    expect(modeTabs().map((t) => t.querySelector(".stage-mode-label")?.textContent)).toEqual(["Now", "Tune"]);
+    expect(modeTabs()[0]!.getAttribute("aria-selected")).toBe("true");
+    expect(tileKeys()).toEqual(["running", "up-next"]);
   });
 
-  it("a Rex viewer's Tune draws the Execution Log (promoted from Runs' tab) and the PRD Graph, and no Spend", async () => {
-    await mount(page("tune", buildValidViews("rex")));
-    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["activity", "merge-graph"]);
+  it("opens Work on Tune from the tune route, and the toggle navigates between the two", async () => {
+    const navigateTo = vi.fn();
+    await mount(h(StagePage, { stage: "work", view: "tune", validViews: ALL, navigateTo, renderView }));
+    expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(tileKeys()).toEqual(["agent-settings", "hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes"]);
+    act(() => { modeTabs()[0]!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("work");
   });
 
-  it("gives a Rex viewer a Tune tab that lights on the PRD Graph and Execution Log", async () => {
-    const rex = buildValidViews("rex");
-    for (const view of ["merge-graph", "activity"] as const) {
-      await mount(h(TopNav, { view, validViews: rex, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
-      expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
-    }
+  it("splits Plan into Create and Preparation, remembering the mode picked", async () => {
+    stubApi([], STATUS);
+    await mount(page("plan"));
+    expect(modeTabs().map((t) => [t.querySelector(".stage-mode-label")?.textContent, t.querySelector(".stage-mode-focus")?.textContent])).toEqual([
+      ["Create", "How, why and what"],
+      ["Preparation", "Who and when"],
+    ]);
+    act(() => { modeTabs()[1]!.click(); });
+    await act(async () => {});
+    expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector('.stage-tile[data-tile="changes"]')).not.toBeNull();
+    expect(root.querySelector('.stage-tile[data-tile="capture"]')).toBeNull();
+    expect(JSON.parse(localStorage.getItem("ndx.stage-mode")!)).toMatchObject({ plan: "prepare" });
+
+    render(null, root);
+    root.remove();
+    await mount(page("plan"));
+    expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
   });
 
-  it("keeps Tune lit on the pages of its tiles", async () => {
+  it("keeps Work lit on the pages of its Tune tiles", async () => {
     await mount(h(TopNav, { view: "token-usage", validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
-    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
+    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Work");
+    render(null, root);
+    root.remove();
+    await mount(h(TopNav, { view: "tune", validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
+    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Work");
   });
 
   it("drops sections outside the viewer's scope", async () => {
+    stackWork();
     await mount(page("work", buildValidViews("hench")));
     // Up next is Rex's dashboard: not in a Hench-only viewer.
     expect(sectionViews()).not.toContain("rex-dashboard");
@@ -597,11 +647,11 @@ describe("StagePage", () => {
 // ── Landing ────────────────────────────────────────────────────
 
 describe("HomeView", () => {
-  it("shows the four stages as columns in loop order, each going to its stage", async () => {
+  it("shows the three stages as columns in loop order, each going to its stage", async () => {
     const navigateTo = vi.fn();
     await mount(h(HomeView, { validViews: ALL, navigateTo }));
     const cards = Array.from(root.querySelectorAll<HTMLButtonElement>(".stage-card"));
-    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work", "Tune"]);
+    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work"]);
     expect(cards.every((c) => c.querySelector(".stage-card-mark img"))).toBe(true);
     act(() => { cards[1].click(); });
     expect(navigateTo).toHaveBeenCalledWith("plan");
@@ -634,14 +684,14 @@ describe("HomeView next-step panel", () => {
     rex: { ...STATUS.rex, exists: true, stats: { ...STATUS.rex.stats, total: 0 }, nextTaskTitle: null },
   };
 
-  it("names `init` on a never-touched project, above the four stage cards", async () => {
+  it("names `init` on a never-touched project, above the three stage cards", async () => {
     stubApi([], NOT_INITIALIZED);
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     const panel = root.querySelector(".next-step-panel");
     expect(panel?.getAttribute("data-state")).toBe("not-initialized");
     expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
-    // The panel replaces no stage content — all four cards are still there.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
+    // The panel replaces no stage content — all three cards are still there.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
     const panelIndex = Array.from(root.querySelector(".home")!.children).indexOf(panel!);
     const stagesIndex = Array.from(root.querySelector(".home")!.children).findIndex((el) => el.classList.contains("home-stages"));
     expect(panelIndex).toBeLessThan(stagesIndex);
@@ -714,7 +764,7 @@ describe("HomeView next-step panel", () => {
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     expect(root.querySelector(".next-step-panel")).toBeNull();
     // Home itself still renders — the cards just carry no numbers.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
   });
 });
 

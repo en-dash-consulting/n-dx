@@ -26,7 +26,9 @@ export type { ItemImpact, ImpactMap } from "./impact-tags.js";
 export type { ReadyToRunProps } from "./ready-to-run.js";
 export { AssigneeFilter, AssigneeFilterPending, AssigneePicker, saveAssignee, useAssigneeFilter, usePeople } from "./assignee.js";
 export type { AssigneeFilterState, AssigneePickerProps } from "./assignee.js";
-export { pickerChoices } from "./assignee-model.js";
+export { pickerChoices, personLabel } from "./assignee-model.js";
+export { EstimateChip, TypicalRun, estimateFor, estimateLine, estimateBasis, formatDuration, formatTokens as formatTokenCount, useRunEstimates } from "./run-estimate.js";
+export type { RunEstimate, RunEstimates } from "./run-estimate.js";
 export type { AssignableRow } from "./assignee-model.js";
 
 // ── Banners ──────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ export {
 export { CopyTextButton, type CopyTextButtonProps } from "./copy-text-button.js";
 export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from "./config-footer.js";
 export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
-export { ElapsedTime } from "./elapsed-time.js";
+export { ElapsedTime, elapsedUntilNow } from "./elapsed-time.js";
 export { ActionIcon } from "./action-icon.js";
 export type { ActionIconName } from "./action-icon.js";
 export { updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT } from "./favicon.js";

@@ -1,8 +1,12 @@
 /**
  * The dashboard's layout, as data.
  *
- * Four stages in a loop — Analysis → Plan → Work → Tune → Analysis — each a page
- * that composes existing product views as collapsible sections. Every view
+ * Three stages in a loop — Analysis → Plan → Work → Analysis — each a page
+ * that composes existing product views as collapsible sections or tiles. Plan
+ * and Work each split into two modes, toggled at the top of the page: Plan's
+ * Create (how, why and what) and Preparation (who and when), Work's Now (what
+ * is running, by whom, what is next and what a run costs) and Tune (how the
+ * agent runs, with the settings that steer it). Every view
  * keeps its own route (`/zones`, `/hench-runs/<id>`, …); a section is a
  * window onto it with an "Open" link to the full page. Settings views are not
  * part of any stage: they open as a full overlay from the bottom bar's cog.
@@ -25,7 +29,7 @@ import { VIEW_META } from "./view-meta.js";
 
 export * from "./view-meta.js";
 
-export type StageId = "analyze" | "plan" | "work" | "tune";
+export type StageId = "analyze" | "plan" | "work";
 
 export type StageProduct = "sourcevision" | "rex" | "hench";
 
@@ -92,7 +96,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`): the Analyze tiles' visuals
  * and recommended fixes, Plan's strips and glances.
  */
-export type StagePanelId = "capture" | "map" | "glance" | "recommendations" | "process" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
+export type StagePanelId = "capture" | "map" | "glance" | "recommendations" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "running" | "up-next" | "agent-settings";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -168,9 +172,35 @@ export interface StageTile {
   hiddenWhenDeployed?: boolean;
 }
 
+/** The modes a stage page toggles between. */
+export type StageModeId = "create" | "prepare" | "now" | "tune";
+
+/**
+ * One half of a stage page that splits in two (Plan, Work). The page shows a
+ * toggle under its head and the active mode's tiles beneath it. A mode with a
+ * `view` is addressed by that view's route (`/tune` opens Work on Tune), so
+ * the toggle navigates; one without is remembered per stage in the browser.
+ */
+export interface StageMode {
+  id: StageModeId;
+  label: string;
+  /** The question the mode answers, shown beside its label ("How, why and what"). */
+  focus: string;
+  /** The route that opens the stage on this mode; the stage's own id for its default mode. */
+  view?: ViewId;
+  tiles: readonly StageTile[];
+  /** Tiles drawn instead of the mode's `v2Only` ones on a v1 project, as `StageDef.v1Tiles`. */
+  v1Tiles?: readonly StageTile[];
+}
+
 export interface StageDef {
   id: StageId;
   sections: readonly StageSection[];
+  /**
+   * The page is split into these modes, each with its own tiles; `tiles` and
+   * `v1Tiles` are then unset. The first mode is the default.
+   */
+  modes?: readonly StageMode[];
   /**
    * When set, the stage page renders these as a dashboard grid after its
    * plain lead section, instead of the stacked collapsible `sections`.
@@ -205,7 +235,7 @@ export function tilePlacesView(tile: StageTile): boolean {
  * sits above the grid, so a v2-only band (Plan's process steps) is dropped
  * without moving the v1 tiles ahead of the grid tiles that precede that slot.
  */
-export function tilesForLayout(def: StageDef, layout: "v1" | "v2"): readonly StageTile[] {
+export function tilesForLayout(def: Pick<StageDef, "tiles" | "v1Tiles">, layout: "v1" | "v2"): readonly StageTile[] {
   const tiles = def.tiles ?? [];
   if (layout === "v2" || !def.v1Tiles) return tiles;
   const first = tiles.findIndex((t) => t.v2Only && !t.band);
@@ -217,7 +247,7 @@ export function tilesForLayout(def: StageDef, layout: "v1" | "v2"): readonly Sta
 }
 
 /** Loop order. The side stage links step through it and wrap. */
-export const STAGE_ORDER: readonly StageId[] = ["analyze", "plan", "work", "tune"];
+export const STAGE_ORDER: readonly StageId[] = ["analyze", "plan", "work"];
 
 export const STAGES: Readonly<Record<StageId, StageDef>> = {
   analyze: {
@@ -245,36 +275,56 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
   },
   plan: {
     id: "plan",
-    // No lead section: capture is a tile. The Inbox sits beneath it, beside
-    // Open changes, which carries the PRD tree and the Product page as tabs.
+    // No lead section. Two modes: Create holds writing and shaping the work
+    // (what it is, why, and how it fits the product); Preparation holds who
+    // takes it and when (assignees, releases, priority, where it stands).
     sections: [],
-    tiles: [
-      // How planning works, step by step, with the step to do next. A v1 tree
-      // has no Inbox, placement or apply, so it draws no steps.
-      { view: "changes", panel: "process", title: "How planning works", band: true, v2Only: true, requiresServer: true },
-      // On both layouts: a v1 tree reads Pending, In progress and Next.
-      { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
-      // One input row. Its More, like the tile's header, opens the whole Add
-      // Items view as the tile's modal. A static export cannot add anything.
-      { view: "analysis", panel: "capture", embedsView: true, cols: 4, grow: true, requiresServer: true },
-      // No product area map: readers could not tell what its blocks meant. The
-      // Product page is a tab of Open changes, and its routes still open it.
-      // Open changes comes before the Inbox so dense packing puts it beside
-      // the capture tile, and the Inbox in the column beneath capture.
-      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
-      // Its rows' Place buttons and "Place best guesses" work in the tile; the header opens the Inbox page.
-      { view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true },
-      // The last check as lights; full-screen and "Open" show the whole Validation view.
-      // Up to two rows: tiles shrink to their content, so this only lets the check's buttons show.
-      { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 4, rows: 2 },
-      // Gaps in the open changes, each a link to the filtered list. Open changes is placed by its own tile.
-      { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 4, v2Only: true, requiresServer: true },
-    ],
-    // A v1 tree has no Inbox, changes or product map: Tasks stands in for them.
-    // Product stays, because its tablist is how a v1 project reaches Requirements.
-    v1Tiles: [
-      { view: "prd", cols: 8, rows: 2 },
-      { view: "product", cols: 4, rows: 2, requiresServer: true, requiresPrd: true },
+    modes: [
+      {
+        id: "create",
+        label: "Create",
+        focus: "How, why and what",
+        tiles: [
+          // One input row. Its More, like the tile's header, opens the whole Add
+          // Items view as the tile's modal. A static export cannot add anything.
+          { view: "analysis", panel: "capture", embedsView: true, cols: 4, grow: true, requiresServer: true },
+          // Open changes comes before the Inbox so dense packing puts it beside
+          // the capture tile, and the Inbox in the column beneath capture. The
+          // Product page is a tab of Open changes, and its routes still open it.
+          // The full Changes list is placed by Preparation's tile; this glance
+          // links to it.
+          { view: "changes", panel: "changes-glance", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
+          // Its rows' Place buttons and "Place best guesses" work in the tile; the header opens the Inbox page.
+          { view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true },
+          // The last check as lights; full-screen and "Open" show the whole Validation view.
+          { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 4, rows: 2 },
+          // Gaps in the open changes, each a link to the filtered list. Open changes is placed by its own tile.
+          { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 4, v2Only: true, requiresServer: true },
+        ],
+        // A v1 tree has no Inbox, changes or product map: Tasks stands in for them.
+        // Product stays, because its tablist is how a v1 project reaches Requirements.
+        v1Tiles: [
+          { view: "prd", cols: 8, rows: 2 },
+          { view: "product", cols: 4, rows: 2, requiresServer: true, requiresPrd: true },
+        ],
+      },
+      {
+        id: "prepare",
+        label: "Preparation",
+        focus: "Who and when",
+        tiles: [
+          // Where the work stands, and rex's next pick. On both layouts: a v1
+          // tree reads Pending, In progress and Next.
+          { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
+          // The full list: each open change with its assignee picker, release
+          // and priority, under the assignee filter.
+          { view: "changes", title: "Assign and schedule", cols: 12, rows: 3, v2Only: true, requiresServer: true },
+        ],
+        // A v1 tree assigns and prioritises in the task tree's detail panel.
+        v1Tiles: [
+          { view: "prd", title: "Assign and schedule", cols: 12, rows: 3 },
+        ],
+      },
     ],
     // A tab of the Product page; its route still opens that tab. Tasks (`prd`)
     // keeps its route and breadcrumb under Plan as a tab of Open changes.
@@ -282,31 +332,46 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
   },
   work: {
     id: "work",
-    sections: [
-      { view: "rex-dashboard", plain: true },
-      { view: "hench-audit" },
-      { view: "workspaces", requiresServer: true },
+    sections: [],
+    modes: [
+      {
+        // What is happening and what happens next: the runs going now and who
+        // they are for, the queue `ndx work` picks from, and what a run
+        // typically takes. Counts and health live on Live and Plan, not here.
+        id: "now",
+        label: "Now",
+        focus: "Who is working on what, and what is next",
+        view: "work",
+        tiles: [
+          { view: "hench-runs", panel: "running", title: "Running now", cols: 12, grow: true, requiresServer: true },
+          { view: "hench-runs", panel: "up-next", title: "Up next", cols: 12, rows: 3, grow: true, requiresServer: true },
+        ],
+      },
+      {
+        // How the agent runs: the settings that steer it, then what its runs
+        // produced and cost. Reached at `/tune`.
+        id: "tune",
+        label: "Tune",
+        focus: "How the agent runs",
+        view: "tune",
+        tiles: [
+          // Editable here and in Settings: the same endpoints, each section
+          // linking to the Settings page that holds the rest.
+          { view: "hench-optimization", panel: "agent-settings", title: "Agent settings", cols: 12, rows: 3, grow: true, requiresServer: true },
+          // Tile titles, not view labels: "Suggestions" is the Analysis view's
+          // label and labels are unique.
+          { view: "hench-runs", cols: 8, rows: 2, tabs: [{ view: "activity" }] },
+          { view: "token-usage", title: "Spend" },
+          { view: "hench-optimization", title: "Suggestions", tabs: [{ view: "hench-adaptive" }] },
+          { view: "merge-graph", title: "Shipped" },
+          // Panel tile: "Open" goes to the Runs view, whose records it summarises.
+          { view: "hench-runs", panel: "outcomes", title: "Outcomes by tier", rows: 2 },
+        ],
+      },
     ],
-  },
-  tune: {
-    id: "tune",
-    // The lead is the stage's own question (rendered by the registry); tiles
-    // reuse existing views, as Analysis does.
-    sections: [{ view: "tune", plain: true }],
-    tiles: [
-      // Tile titles, not view labels: "Suggestions" is the Analysis view's
-      // label and labels are unique, and "Tuning" would read Tune › Tuning.
-      { view: "hench-runs", cols: 8, rows: 2, tabs: [{ view: "activity" }] },
-      { view: "token-usage", title: "Spend" },
-      { view: "hench-optimization", title: "Suggestions", tabs: [{ view: "hench-adaptive" }] },
-      { view: "merge-graph", title: "Shipped" },
-      // Panel tile: "Open" goes to the Runs view, whose records it summarises.
-      { view: "hench-runs", panel: "outcomes", title: "Outcomes by tier", rows: 2 },
-      // Read-only. A settings page cannot be a stage view, so the tile borrows
-      // Suggestions' view for its glyph and "Open"; each line links to the
-      // Settings page that edits it.
-      { view: "hench-optimization", panel: "tooling", title: "Your tooling", rows: 2, requiresServer: true },
-    ],
+    // Their numbers are on Live (runs, machine, worktrees) and Plan (the PRD's
+    // counts and health); their routes still open them under Work.
+    alsoOwns: ["rex-dashboard", "hench-audit", "workspaces"],
   },
 };
 
@@ -372,7 +437,7 @@ export function isStageId(view: ViewId): view is StageId {
  * the answer never depends on where the user came from — a view listed twice
  * would light the first stage in loop order even when opened from the second.
  * Given `validViews`, only what a stage shows in this viewer counts
- * (`stageShowsView`): Token Usage is on Tune, and a Rex viewer's borrowed Tune
+ * (`stageShowsView`): Token Usage is on Work, and a Rex viewer's borrowed Work
  * does not show it, so there it is in no stage. Null for home, settings, and
  * anything no (available) stage lists.
  */
@@ -387,7 +452,7 @@ export function stageForView(view: ViewId, validViews?: ReadonlySet<ViewId>): St
 
 /**
  * Whether this viewer's copy of the stage shows the view. The stage and the
- * view must both be valid. A stage another scope borrows (Tune, hench's, in a
+ * view must both be valid. A stage another scope borrows (Work, hench's, in a
  * Rex viewer) shows only product views: a global view it lists (Spend) belongs
  * to the viewers that have the stage's own product, so a borrowed stage draws
  * no tile for it and opening it lights no stage. A viewer has a product when
@@ -418,15 +483,38 @@ export function tileForScope(stage: StageId, tile: StageTile, validViews: Readon
 
 /**
  * Every view a stage lists, once each: its sections, its tiles and their tabs
- * (a panel tile's view included — it is where "Open" goes), and `alsoOwns`.
+ * (a panel tile's view included — it is where "Open" goes) in every mode, the
+ * routes of its modes (`tune`), and `alsoOwns`.
  */
 export function stageViews(id: StageId): ViewId[] {
   const def = STAGES[id];
+  const modes = def.modes ?? [];
+  const tiles = [def, ...modes].flatMap((part) => [...(part.tiles ?? []), ...(part.v1Tiles ?? [])]);
   return [...new Set<ViewId>([
     ...def.sections.map((s) => s.view),
-    ...[...(def.tiles ?? []), ...(def.v1Tiles ?? [])].flatMap((t) => [t.view, ...(t.tabs ?? []).map((x) => x.view)]),
+    ...tiles.flatMap((t) => [t.view, ...(t.tabs ?? []).map((x) => x.view)]),
+    ...modes.flatMap((m) => (m.view && m.view !== id ? [m.view] : [])),
     ...(def.alsoOwns ?? []),
   ])];
+}
+
+/** Every tile a stage draws on a v2 project, across its modes, in order. */
+export function stageTiles(id: StageId): StageTile[] {
+  const def = STAGES[id];
+  return [def, ...(def.modes ?? [])].flatMap((part) => [...(part.tiles ?? [])]);
+}
+
+/**
+ * The mode a route opens a stage on: the mode whose `view` it is (`tune` →
+ * Work's Tune), else null — the page then shows its remembered or first mode.
+ */
+export function modeForView(id: StageId, view: ViewId): StageModeId | null {
+  return STAGES[id].modes?.find((m) => m.view === view)?.id ?? null;
+}
+
+/** True for a route that opens a stage on one of its modes rather than a page of its own (`tune`). */
+export function isStageModeView(view: ViewId): boolean {
+  return STAGE_ORDER.some((id) => !isStageId(view) && modeForView(id, view) !== null);
 }
 
 /** Stages with a page in this scope — the stage id is only a valid view in its own scope. */

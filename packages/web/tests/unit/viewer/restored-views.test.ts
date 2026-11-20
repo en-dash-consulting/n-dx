@@ -20,7 +20,7 @@ import {
   REX_SCOPE_VIEWS,
   buildValidViews,
 } from "../../../src/shared/index.js";
-import { STAGES, viewLabel, stageForView } from "../../../src/viewer/views/index.js";
+import { STAGES, viewLabel, stageForView, stageTiles, tilePlacesView } from "../../../src/viewer/views/index.js";
 import { tileTitle } from "../../../src/viewer/views/stage-tiles.js";
 
 const emptyData: LoadedData = {
@@ -97,35 +97,37 @@ describe("restored views: navigation entries", () => {
   });
 
   it("analysis is a tile of the Plan stage", () => {
-    expect((STAGES.plan.tiles ?? []).map((t) => t.view)).toContain("analysis");
+    expect(stageTiles("plan").map((t) => t.view)).toContain("analysis");
   });
 });
 
-describe("views moved into Tune", () => {
+describe("views on Work's Tune mode", () => {
   const MOVED: ViewId[] = ["hench-runs", "activity", "token-usage", "hench-optimization", "hench-adaptive", "merge-graph"];
+  const tune = () => STAGES.work.modes!.find((m) => m.id === "tune")!;
 
-  it.each(MOVED)("%s still resolves, renders, and sits under Tune", (view) => {
+  it.each(MOVED)("%s still resolves, renders, and sits under Work", (view) => {
     expect(buildValidViews(null).has(view)).toBe(true);
     expect(renderActiveView(view, makeCtx())).toBeTruthy();
-    expect(stageForView(view)).toBe("tune");
+    expect(stageForView(view)).toBe("work");
     expect(viewLabel("tune")).toBe("Tune");
   });
 
-  it("Plan and Work no longer list them", () => {
-    const listed = [...STAGES.plan.sections, ...STAGES.work.sections].map((s) => s.view);
-    for (const view of MOVED) expect(listed).not.toContain(view);
+  it("Plan and Work's Now mode do not place them", () => {
+    // Now's panels open the Runs view through "Open" without placing it.
+    const placed = [...stageTiles("plan"), ...STAGES.work.modes![0]!.tiles]
+      .flatMap((t) => [...(tilePlacesView(t) ? [t.view] : []), ...(t.tabs ?? []).map((x) => x.view)]);
+    for (const view of MOVED) expect(placed).not.toContain(view);
   });
 
-  it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Shipped, Outcomes by tier and Your tooling", () => {
-    const tiles = STAGES.tune.tiles!;
-    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier", "Your tooling"]);
-    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([["activity"], [], ["hench-adaptive"], [], [], []]);
-    expect(tiles[0]).toMatchObject({ cols: 8, rows: 2 });
+  it("Tune's tiles are Agent settings, Runs (Execution Log tab), Spend, Suggestions (Adaptive), Shipped and Outcomes by tier", () => {
+    const tiles = tune().tiles;
+    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Agent settings", "Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier"]);
+    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([[], ["activity"], [], ["hench-adaptive"], [], []]);
+    // Agent settings edits Settings' own endpoints, so it needs a server; a settings page cannot be a stage view.
+    expect(tiles[0]).toMatchObject({ view: "hench-optimization", panel: "agent-settings", cols: 12, requiresServer: true });
+    expect(tiles[1]).toMatchObject({ cols: 8, rows: 2 });
     // Outcomes is a 4×2 panel tile whose "Open" goes to the Runs view.
-    expect(tiles[4]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
-    expect(tiles[4].cols ?? 4).toBe(4);
-    // Your tooling is a 4×2 read-only panel; its lines link to Settings, which cannot be a stage view.
-    expect(tiles[5]).toMatchObject({ view: "hench-optimization", panel: "tooling", rows: 2 });
+    expect(tiles[5]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
     expect(tiles[5].cols ?? 4).toBe(4);
   });
 });

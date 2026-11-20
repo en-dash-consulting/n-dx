@@ -26,7 +26,7 @@ export {
   viewProduct,
   viewProductLabel,
 } from "./view-meta.js";
-export type { StageId, StageDef, StageSection, StageTab, StageTile, StagePanelId, TileCols, TileRows, StageProduct, SettingsEntry } from "./stages.js";
+export type { StageId, StageDef, StageMode, StageModeId, StageSection, StageTab, StageTile, StagePanelId, TileCols, TileRows, StageProduct, SettingsEntry } from "./stages.js";
 export {
   STAGES,
   STAGE_ORDER,
@@ -37,7 +37,9 @@ export {
   LIVE_VIEWS,
   stageForView,
   stageProduct,
+  stageTiles,
   stageViews,
+  modeForView,
   tilePlacesView,
   visibleStages,
 } from "./stages.js";

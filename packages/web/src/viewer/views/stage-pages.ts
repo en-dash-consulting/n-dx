@@ -1,5 +1,5 @@
 /**
- * The landing page and the three stage pages.
+ * The landing page and the stage pages.
  *
  * A stage page is a stack of collapsible sections, one per product view the
  * stage lists in stages.ts. Each section renders the real view — nothing is
@@ -26,11 +26,14 @@ import {
   viewBlurbFor,
   viewGlyph,
   type StageId,
+  type StageMode,
+  type StageModeId,
   type StageSection,
   type StageTab,
   type StageTile,
+  type StageDef,
 } from "./stages.js";
-import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
+import { ProductLogoPng, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, useStatusLayout, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
@@ -171,6 +174,11 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
 
 export interface StagePageProps {
   stage: StageId;
+  /**
+   * The route that opened the page: the stage itself, or a mode's route
+   * (`tune` opens Work on Tune). Defaults to the stage.
+   */
+  view?: ViewId;
   validViews: ReadonlySet<ViewId>;
   navigateTo: NavigateTo;
   renderView: RenderView;
@@ -189,7 +197,71 @@ export interface StagePageProps {
 const NO_PANEL: RenderPanel = () => null;
 const NO_SUMMARY: RenderSummary = () => null;
 
-export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null }: StagePageProps) {
+// ── Modes ──────────────────────────────────────────────────────
+
+const MODE_KEY = "ndx.stage-mode";
+
+function readMode(stage: StageId): StageModeId | null {
+  try {
+    const raw = localStorage.getItem(MODE_KEY);
+    return raw ? ((JSON.parse(raw) as Record<string, StageModeId>)[stage] ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeMode(stage: StageId, mode: StageModeId): void {
+  try {
+    const raw = localStorage.getItem(MODE_KEY);
+    const all = raw ? (JSON.parse(raw) as Record<string, StageModeId>) : {};
+    all[stage] = mode;
+    localStorage.setItem(MODE_KEY, JSON.stringify(all));
+  } catch { /* storage unavailable — the choice lasts for this page */ }
+}
+
+/**
+ * The toggle between a stage's modes: one button per mode, its label and the
+ * question it answers. A routed mode navigates to its view, so the address bar
+ * and the breadcrumb follow; an unrouted one is remembered per stage.
+ */
+function ModeToggle({ stage, modes, active, onPick }: {
+  stage: StageId;
+  modes: readonly StageMode[];
+  active: StageModeId;
+  onPick: (mode: StageMode) => void;
+}) {
+  return h("div", { class: "stage-modes", role: "tablist", "aria-label": `${viewLabel(stage)} sections` },
+    modes.map((mode) => {
+      const selected = mode.id === active;
+      return h("button", {
+        key: mode.id,
+        type: "button",
+        role: "tab",
+        id: `stage-mode-${stage}-${mode.id}`,
+        class: selected ? "stage-mode stage-mode--active" : "stage-mode",
+        "data-mode": mode.id,
+        "aria-selected": String(selected),
+        "aria-controls": `stage-mode-panel-${stage}`,
+        tabIndex: selected ? 0 : -1,
+        onClick: () => onPick(mode),
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+          e.preventDefault();
+          const i = modes.findIndex((m) => m.id === active);
+          const next = modes[(i + (e.key === "ArrowRight" ? 1 : modes.length - 1)) % modes.length]!;
+          onPick(next);
+          (e.currentTarget as HTMLElement).parentElement
+            ?.querySelector<HTMLElement>(`[data-mode="${next.id}"]`)?.focus();
+        },
+      },
+        h("span", { class: "stage-mode-label" }, mode.label),
+        h("span", { class: "stage-mode-focus" }, mode.focus),
+      );
+    }),
+  );
+}
+
+export function StagePage({ stage, view, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
   const cliName = useCliName();
@@ -203,11 +275,35 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
     && (!s.featureGate || gates[s.featureGate])
     && !(s.requiresServer && deployed),
   );
-  const tilesFor = (layout: "v1" | "v2") => tilesForLayout(def, layout).flatMap((t) => tileForScope(stage, t, validViews) ?? []).filter((t) =>
-    (!t.featureGate || gates[t.featureGate])
-    && !(t.requiresServer && deployed)
-    && !(t.hiddenWhenDeployed && deployed),
-  );
+  function tilesShown(source: Pick<StageDef, "tiles" | "v1Tiles">, layout: "v1" | "v2"): StageTile[] {
+    return tilesForLayout(source, layout).flatMap((t) => tileForScope(stage, t, validViews) ?? []).filter((t) =>
+      (!t.featureGate || gates[t.featureGate])
+      && !(t.requiresServer && deployed)
+      && !(t.hiddenWhenDeployed && deployed),
+    );
+  }
+
+  // The stage's modes, each kept only while it has a tile this viewer can show.
+  const shownModes = (def.modes ?? []).filter((m) => tilesShown(m, "v2").length > 0 || tilesShown(m, "v1").length > 0);
+  const routedModes = shownModes.some((m) => m.view !== undefined);
+  const [stored, setStored] = useState<StageModeId | null>(() => readMode(stage));
+  // A routed stage (Work) shows the mode its route names; an unrouted one
+  // (Plan) the mode last picked. Either way, the first shown mode otherwise.
+  const mode = (routedModes
+    ? shownModes.find((m) => m.view === (view ?? stage))
+    : shownModes.find((m) => m.id === stored))
+    ?? shownModes[0]
+    ?? null;
+  const pickMode = (next: StageMode) => {
+    if (next.view !== undefined) {
+      navigateTo(next.view);
+      return;
+    }
+    setStored(next.id);
+    writeMode(stage, next.id);
+  };
+  const part: Pick<StageDef, "tiles" | "v1Tiles"> = mode ?? def;
+  const tilesFor = (layout: "v1" | "v2") => tilesShown(part, layout);
   const tabsOf = (tile: StageTile): StageTab[] =>
     [{ view: tile.view, label: tile.tabLabel }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
 
@@ -223,26 +319,31 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       ),
       headActions ? h("div", { class: "stage-page-actions" }, headActions) : null,
     ),
-    // Starting a run is the Work stage's job; the list sits above its sections.
-    stage === "work" && !deployed
-      ? h(ReadyToRun, {
-          onPrepare: (taskId: string) => navigateTo("work", { taskId }),
-          onOpenLive: (taskId: string) => navigateTo("live-task", { taskId }),
-          onOpenPrd: () => navigateTo("prd"),
-        })
+    mode && shownModes.length > 1
+      ? h(ModeToggle, { stage, modes: shownModes, active: mode.id, onPick: pickMode })
       : null,
     sections.map((s) => {
       if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
       // A tiled stage keeps only its plain lead section; the tiles replace the rest.
-      if (def.tiles) return null;
+      if (part.tiles) return null;
       return h(s.badge ? BadgedSection : Section, { key: s.view, stage, section: s, navigateTo, renderView });
     }),
-    def.tiles
-      ? def.v1Tiles
-        ? h(LayoutTileGrid, {
-            stage, tiles: tilesFor("v2"), v1Tiles: tilesFor("v1"), deployed, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo,
-          })
-        : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo })
+    part.tiles
+      ? h("div", {
+          // Keyed by mode: switching mode starts the other mode's grid afresh
+          // rather than reusing one tile's open state for another's.
+          key: mode?.id ?? "tiles",
+          class: "stage-mode-panel",
+          ...(mode && shownModes.length > 1
+            ? { id: `stage-mode-panel-${stage}`, role: "tabpanel", "aria-labelledby": `stage-mode-${stage}-${mode.id}`, "data-mode": mode.id }
+            : {}),
+        },
+          part.v1Tiles
+            ? h(LayoutTileGrid, {
+                stage, tiles: tilesFor("v2"), v1Tiles: tilesFor("v1"), deployed, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo,
+              })
+            : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo }),
+        )
       : null,
   );
 }
@@ -309,17 +410,12 @@ function stageFacts(stage: StageId, status: Partial<ProjectStatus> | null): Fact
     if (!rex?.exists || !rex.stats) return [["—", "no PRD yet"]];
     return [[rex.stats.total.toLocaleString(), "items"], [`${Math.round(rex.percentComplete)}%`, "complete"], [String(rex.stats.pending), "pending"]];
   }
-  if (stage === "work") {
-    const hench = status.hench;
-    if (!hench) return [];
-    return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
-  }
-  // Tune has no number of its own yet (S5 adds Outcomes by tier). Repeating
-  // Work's run counts here would read as a bug, so the card shows none.
   // Every stage is named above, so a new one cannot fall through to hench.
-  const _exhaustive: "tune" = stage;
+  const _exhaustive: "work" = stage;
   void _exhaustive;
-  return [];
+  const hench = status.hench;
+  if (!hench) return [];
+  return [[hench.totalRuns.toLocaleString(), "runs"], [String(hench.activeRuns), "live"], [String(hench.staleRuns), "stale"]];
 }
 
 // ── Next-step panel ────────────────────────────────────────────
@@ -407,7 +503,7 @@ export function HomeView({ validViews, navigateTo }: HomeViewProps) {
   return h("div", { class: "home" },
     h("div", { class: "home-head" },
       h("h1", null, "n-dx"),
-      h("p", null, "Four stages in a loop — understand the code, decide what to build, let the agent build it, then tune the workflow."),
+      h("p", null, "Three stages in a loop — understand the code, decide what to build, then let the agent build it and tune how it works."),
     ),
     h(NextStepPanel, { status }),
     // Reserved for A8's preflight card — intentionally empty until then.

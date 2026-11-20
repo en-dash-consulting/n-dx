@@ -8,7 +8,8 @@
 
 export type ViewId =
   // Shell pages: the landing page and the three stage pages that compose
-  // the product views below into the analyze → plan → work → tune loop.
+  // the product views below into the analyze → plan → work loop (`tune`
+  // opens Work on its Tune mode).
   | "home"
   | "analyze"
   | "plan"

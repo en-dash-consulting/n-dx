@@ -17,4 +17,3 @@ export { RobotWranglerView } from "./robot-wrangler.js";
 export { ProjectView } from "./project.js";
 export { AgentPromptSection } from "./agent-prompt.js";
 export type { AgentPromptSectionProps } from "./agent-prompt.js";
-export { ToolingPanel } from "./tooling-panel.js";

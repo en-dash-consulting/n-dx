@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The Home Tune card does not repeat the Work card's run numbers.
+ * Home's Work card carries the run numbers once. Tune is a mode of Work, so it
+ * has no card of its own to repeat them on.
  *
  * Own file: `useProjectStatus` caches its first body at module level.
  */
@@ -41,7 +42,7 @@ describe("Home stage card facts with a valid status", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows run facts on Work but not the same facts on Tune", async () => {
+  it("shows run facts on Work, and no Tune card repeats them", async () => {
     act(() => {
       render(h(HomeView, { validViews: buildValidViews(null), navigateTo: () => {} }), root);
     });
@@ -52,7 +53,6 @@ describe("Home stage card facts with a valid status", () => {
       root.querySelector(`.stage-card[data-stage="${stage}"] .stage-card-facts`)?.textContent ?? null;
 
     expect(facts("work")).toBe("7runs1live2stale");
-    expect(facts("tune")).not.toBe(facts("work"));
-    expect(facts("tune")).toBeNull();
+    expect(root.querySelector('.stage-card[data-stage="tune"]')).toBeNull();
   });
 });

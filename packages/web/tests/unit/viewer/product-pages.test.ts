@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render, type FunctionComponent } from "preact";
 import { act } from "preact/test-utils";
 import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-pages.js";
-import { STAGES, stageViews } from "../../../src/viewer/views/index.js";
+import { STAGES, stageTiles, stageViews } from "../../../src/viewer/views/index.js";
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
 import { isAppliedStage } from "../../../src/viewer/views/product-model.js";
 import { _primePeopleForTests, _resetPeopleForTests } from "../../../src/viewer/components/assignee.js";
@@ -86,9 +86,9 @@ afterEach(() => {
 
 describe("routing", () => {
   it("places Changes on the Plan stage, with Product as its tab and no area map tile", () => {
-    const plan = STAGES.plan.tiles!.filter((t) => !t.band && (t.view === "product" || t.view === "changes"));
+    const plan = STAGES.plan.modes![0]!.tiles.filter((t) => !t.band && (t.view === "product" || t.view === "changes"));
     expect(plan).toEqual([
-      { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
+      { view: "changes", panel: "changes-glance", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
       { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 4, v2Only: true, requiresServer: true },
     ]);
     expect(buildValidViews("rex").has("product")).toBe(true);
@@ -96,7 +96,7 @@ describe("routing", () => {
   });
 
   it("Plan no longer lists Requirements, yet still owns its route and keeps it valid", () => {
-    expect(STAGES.plan.tiles!.map((t) => t.view)).not.toContain("requirements");
+    expect(stageTiles("plan").map((t) => t.view)).not.toContain("requirements");
     expect(stageViews("plan")).toContain("requirements");
     expect(buildValidViews(null).has("requirements")).toBe(true);
     expect(buildValidViews("rex").has("requirements")).toBe(true);

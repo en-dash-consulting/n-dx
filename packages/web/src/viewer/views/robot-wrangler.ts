@@ -20,6 +20,7 @@ import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { responseError } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
+import { announceSettingsSaved, useSettingsSaved } from "./settings-sync.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -1926,6 +1927,10 @@ export function RobotWranglerView() {
   }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
+  // Work › Tune saved a model: re-read, unless this page holds edits of its own.
+  const editsRef = useRef(false);
+  editsRef.current = Object.keys(editValues).length > 0 || Object.keys(editToggles).length > 0 || pendingVendor !== undefined;
+  useSettingsSaved(["llm"], "robot-wrangler", () => { if (!editsRef.current) void loadConfig(); });
 
   // A deep link (`?section=models`) scrolls once the sections exist.
   const sectionScrolled = useRef(false);
@@ -2131,6 +2136,7 @@ export function RobotWranglerView() {
         }
         const json = await res.json() as { config: LlmConfigResponse };
         setData(json.config);
+        announceSettingsSaved("llm", "robot-wrangler");
         // The llm part is saved: clear it, but keep a pending provider edit so
         // a failed second write leaves exactly that field dirty.
         setEditValues((prev) => {
@@ -2153,6 +2159,7 @@ export function RobotWranglerView() {
           return;
         }
         setHenchProvider(provider.value);
+        announceSettingsSaved("hench", "robot-wrangler");
         setEditValues((prev) => {
           const { [PROVIDER_KEY]: _saved, ...rest } = prev;
           return rest;
@@ -2322,3 +2329,11 @@ export function RobotWranglerView() {
    ),
   );
 }
+
+// ── Shared with Work › Tune ───────────────────────────────────────────
+//
+// The Agent settings tile edits the same tier rows through the same endpoint;
+// it imports the key mapping from here so the two cannot disagree on where a
+// tier's model is saved.
+export { tierKey, tierConfigPath, savedTierValue, tierLabel, AGENT_KEY_PREFIX };
+export type { LlmConfigResponse, LlmCatalog, TierRow, TierName, ViewerLLMVendor };

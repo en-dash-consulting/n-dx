@@ -51,7 +51,7 @@ describe("Tasks row in a narrowed column", () => {
 });
 
 describe("Tune panels in a narrowed column", () => {
-  it.each([".outcomes-panel", ".tooling-panel", ".delivery-panel"])("%s has min-width: 0", (sel) => {
+  it.each([".outcomes-panel", ".agent-settings", ".delivery-panel"])("%s has min-width: 0", (sel) => {
     expect(declarations(tiles, sel)).toMatch(/min-width:\s*0/);
   });
 
@@ -59,7 +59,7 @@ describe("Tune panels in a narrowed column", () => {
     expect(declarations(tiles, sel)).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   });
 
-  it(".tooling-vendors tracks never exceed the container", () => {
-    expect(declarations(tiles, ".tooling-vendors")).toMatch(/minmax\(min\(9rem,\s*100%\),\s*1fr\)/);
+  it(".as-tiers tracks never exceed the container", () => {
+    expect(declarations(tiles, ".as-tiers")).toMatch(/minmax\(0,\s*1fr\)/);
   });
 });

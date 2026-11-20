@@ -11,7 +11,7 @@
 
 import { h } from "preact";
 import type { ViewId } from "../types.js";
-import { VIEW_META, isStageId, isLiveView, viewLabelFor, viewBlurbFor, viewGlyph, useStatusLayout } from "../api.js";
+import { VIEW_META, STAGES, isStageId, isLiveView, viewLabelFor, viewBlurbFor, viewGlyph, useStatusLayout } from "../api.js";
 import type { ViewMeta } from "../api.js";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
@@ -21,7 +21,10 @@ export function PageTitle({ view }: { view: ViewId }) {
   // Looked up rather than asserted: a restored navigation state can name a
   // view a newer build removed (see project-context.ts).
   const meta = VIEW_META[view] as ViewMeta | undefined;
-  if (!meta || view === "home" || isStageId(view) || isLiveView(view)) return null;
+  // A stage page, or a route that opens one on a mode (`tune` opens Work on
+  // Tune), carries its own head; a second title above it would repeat it.
+  const opensStage = Object.values(STAGES).some((def) => def.modes?.some((m) => m.view === view));
+  if (!meta || view === "home" || isStageId(view) || opensStage || isLiveView(view)) return null;
   return h("div", { class: "page-title" },
     h("span", { class: "page-title-glyph", "aria-hidden": "true" }, viewGlyph(view)),
     h("h1", { class: "page-title-text" }, resolveCliLabel(viewLabelFor(view, layout), cliName)),

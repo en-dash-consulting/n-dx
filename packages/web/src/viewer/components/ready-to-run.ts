@@ -1,5 +1,9 @@
 /**
- * Ready to run — the tasks `ndx work --auto` would pick next, at the top of Work.
+ * Ready to run — the tasks `ndx work --auto` would pick next: Work's Up next.
+ *
+ * Each row says who it is assigned to and, given `estimates`, what a run of it
+ * typically takes (`run-estimate.ts`), so the queue answers who and how much
+ * before anything starts.
  *
  * Fed by `GET /api/hench/ready`, shown in the order returned: the top rows, then
  * "Show all N", with a text search and priority, change and tag filters over
@@ -20,6 +24,8 @@ import { shellWord } from "./prepare-task-model.js";
 import { QueuedNotice } from "./queued-notice.js";
 import { ImpactTags, displayTitle, titleTooltip, useItemImpacts } from "./impact-tags.js";
 import type { QueuedReply } from "./prepare-task-model.js";
+import { personLabel } from "./assignee-model.js";
+import { EstimateChip, type RunEstimates } from "./run-estimate.js";
 
 /** Rows shown before "Show all N": the next few picks, not the whole queue. */
 export const READY_TOP_ROWS = 3;
@@ -53,6 +59,10 @@ export interface ReadyTask {
    * defaults. Absent from a server that predates them.
    */
   saved?: boolean;
+  /** Who it is assigned to (its own assignee, else its nearest assigned ancestor's). Absent from an older server. */
+  assignee?: string | null;
+  /** The task's saved run tier; null runs on the project default. Absent from an older server. */
+  tier?: string | null;
 }
 
 interface ReadyReply {
@@ -102,6 +112,10 @@ export interface ReadyToRunProps {
   onOpenLive: (taskId: string) => void;
   /** Open the PRD, for the empty state's link. */
   onOpenPrd: () => void;
+  /** What a run typically takes; each row shows its tier's figure. Absent shows none. */
+  estimates?: RunEstimates | null;
+  /** Draw the list's own "Ready to run" heading. False inside a tile that names it. Default true. */
+  heading?: boolean;
 }
 
 const STATUS_ICON: Record<string, { icon: string; label: string }> = {
@@ -109,7 +123,7 @@ const STATUS_ICON: Record<string, { icon: string; label: string }> = {
   in_progress: { icon: "◐", label: "In progress" },
 };
 
-export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps) {
+export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null, heading = true }: ReadyToRunProps) {
   const [tasks, setTasks] = useState<ReadyTask[] | null>(null);
   const [dir, setDir] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -320,7 +334,12 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
                 h("span", { class: `prd-status-icon prd-status-${task.status}`, title: status.label, "aria-label": status.label }, status.icon),
                 task.itemType ? h("span", { class: `prd-level-badge prd-level-${task.itemType}` }, itemTypeLabel(task.itemType)) : null,
                 task.priority ? h("span", { class: `prd-priority-badge prd-priority-${task.priority}` }, task.priority) : null,
+                task.assignee !== undefined
+                  ? h("span", { class: task.assignee ? "ready-assignee" : "ready-assignee ready-assignee-none", title: task.assignee ?? "Nobody is assigned" },
+                      task.assignee ? personLabel(task.assignee) : "Unassigned")
+                  : null,
                 h("span", { class: "ready-criteria" }, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
+                h(EstimateChip, { estimates, tier: task.tier, ownTier: true, class: "ready-estimate" }),
                 task.resume ? h("span", { class: "ready-resume" }, "in progress · no live run") : null,
               ),
               h("div", { class: "ready-split" },
@@ -381,13 +400,15 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
 
   // The Up next panel (styled as .rex-dash-next, without that class: the
   // scroll reveal fades .rex-dash-next in, and this list must never wait on it).
-  return h("section", { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" },
-    h("div", { class: "rex-dash-section-header" },
-      h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
-      total > 0
-        ? h("span", { class: "rex-dash-section-meta" }, `${total} ready · in the order the agent picks them`)
-        : null,
-    ),
+  return h("section", heading ? { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" } : { class: "ready-to-run", "aria-label": "Up next" },
+    heading
+      ? h("div", { class: "rex-dash-section-header" },
+          h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
+          total > 0
+            ? h("span", { class: "rex-dash-section-meta" }, `${total} ready · in the order the agent picks them`)
+            : null,
+        )
+      : null,
     controls,
     body,
     more,

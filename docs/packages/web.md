@@ -186,9 +186,17 @@ change matches when it or any of its open tasks is assigned to the person (chang
 rows carry `taskAssignees`, the open tasks' and subtasks' assignees), as
 `ndx work --mine` selects a task by its own assignee. It hides rows only.
 
-## Tune tiles: Outcomes by tier and Your tooling
+## Work › Tune: Agent settings and Outcomes by tier
 
-Two read-only tiles on the Tune page. Neither writes anything.
+Tune is the second mode of the Work page (`/tune`).
+
+**Agent settings.** The settings that steer an agent run, editable in place:
+
+- **Models.** The model per tier of the active vendor and what each tier is used for. Saved through `PUT /api/llm/config`, with the same keys as Settings › Robot Wrangler (the agent tier as `hench.models.<vendor>`). Vendor, failover and review stay in Robot Wrangler, which the section links to.
+- **Rules.** Allowed commands and git subcommands, blocked paths, project skills, the test gate commands, review mode and the per-run and per-day spend caps. Saved through `PUT /api/hench/config` with the Workflow page's field editor; the section links to Workflow for every other work setting.
+- **Agent prompt.** The project's prompt file, added to the system prompt of every hench run, its reviewer and the Sidecar (see the configuration guide).
+
+A save here makes an open Settings page re-read, and a save in Settings makes the tile re-read, unless the other side holds unsaved edits.
 
 **Outcomes by tier.** The gate pass rate per vendor and tier: the share of gated runs whose test gate passed.
 
@@ -197,7 +205,6 @@ Two read-only tiles on the Tune page. Neither writes anything.
 - **Keyed on vendor and tier.** Never on model name, since models are renamed and retired. A row's tooltip lists the resolved models for audit.
 - **No gate result.** A run with no gate result stays out of the rate and is counted separately ("N runs without a gate result, not in the rate"). A row with no gated run shows `–`, not 0%.
 
-**Your tooling.** A summary of what this project can run on: connected vendor CLIs, the model for each tier, review pairing and per-command route overrides. Editing stays in Settings. Vendor, tier and review lines link to the matching section of Settings › Robot Wrangler. No Settings field edits `llm.routes`, so the route line names `ndx config` instead of linking. The tile never runs a credential check, because the check sends a real prompt to the vendor CLI. It shows the result of the last check from Robot Wrangler when one exists. Otherwise it shows the vendor's catalog state.
 
 ## Sidecar on Plan and Tune
 
@@ -214,7 +221,7 @@ With `web.sidecar` on, Plan and Tune offer the Sidecar drawer as a second way to
 | Open changes rows | **Describe in Sidecar** | The Describe lens on the change. |
 | Tune, Runs tile | **Diagnose in Sidecar** on a task's newest failed run | The Diagnose run lens on that task. |
 
-On Tune, the run classifier's verdict chip on a failed run shows whether or not the Sidecar is on. Your tooling also lists the Sidecar's vendor, model, mode and caps and each connection's sign-in state; Spend carries the Sidecar's own bucket.
+On Tune, the run classifier's verdict chip on a failed run shows whether or not the Sidecar is on. Spend carries the Sidecar's own bucket; the Sidecar's vendor, model, mode and caps are in Settings › Workflow.
 
 **One placement surface.** One place decides a change's placement at a time. While the drawer holds that change's placement card, the placement panel shrinks to one line, "Placing with Sidecar · decide in the drawer", and the spec map follows the card's selected row, both ways. **Place by hand** reopens the panel with the card's selection. It also covers the card's withdrawal after 60 seconds.
 

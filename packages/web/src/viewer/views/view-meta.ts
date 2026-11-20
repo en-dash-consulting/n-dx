@@ -67,7 +67,7 @@ export const VIEW_META = {
     label: "Home",
     glyph: "⌂",
     product: "global",
-    blurb: "The four stages of the loop, side by side, each with its headline numbers.",
+    blurb: "The three stages of the loop, side by side, each with its headline numbers.",
   },
 
   // ── Live ─────────────────────────────────────────────────────
@@ -109,13 +109,13 @@ export const VIEW_META = {
     label: "Work",
     glyph: "▶",
     product: "hench",
-    blurb: "Get it done: hand the next task to the agent, pick a run mode, see what each worktree is running.",
+    blurb: "Get it done: who is working on what, what is up next and what it will take, and the settings that steer the agent.",
   },
   tune: {
     label: "Tune",
     glyph: "◑",
     product: "hench",
-    blurb: "Fit the {cli} workflow to this project and the tools you have.",
+    blurb: "How the agent runs: its models, rules and prompt, and what its runs produced and cost.",
   },
 
   // ── SourceVision ─────────────────────────────────────────────

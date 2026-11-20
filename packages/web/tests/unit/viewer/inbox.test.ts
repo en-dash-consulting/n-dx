@@ -117,10 +117,10 @@ afterEach(() => {
 
 describe("the Plan tile", () => {
   it("sits beneath the capture tile and beside Open changes, server-backed, with the Inbox badge", () => {
-    // The lifecycle strip leads, above the grid; it is a band, not a view tile.
-    // Open changes is listed before the Inbox so dense packing puts the Inbox beneath capture.
-    expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["analysis", "changes", "inbox", "validation", "changes"]);
-    expect(STAGES.plan.tiles!.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true });
+    // On Plan's Create mode. Open changes is listed before the Inbox so dense
+    // packing puts the Inbox beneath capture.
+    expect(STAGES.plan.modes![0]!.tiles.filter((t) => !t.band).map((t) => t.view)).toEqual(["analysis", "changes", "inbox", "validation", "changes"]);
+    expect(STAGES.plan.modes![0]!.tiles.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true });
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
     expect(viewBlurb("inbox")).toBe("Changes with no place on the product map yet. {cli} work skips their tasks until each is placed.");
