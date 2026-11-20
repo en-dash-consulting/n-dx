@@ -982,6 +982,7 @@ describe("gateway export auto-detection", () => {
         "dominantPromptSections", "formatPromptSectionCosts",
         "mapErrorReasonToFailureCategory", "mapRunFailureToCategory", "classifyVendorError",
         "failureCategoryLabel", "compileCodexPolicyFlags", "mapSandboxToCodexFlag",
+        "createCodexScratch", "assertCodexScratchEnvironment",
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry", "createOpenAiApiProvider", "supportsOpenAiTurns",
