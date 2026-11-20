@@ -34,7 +34,7 @@ import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from
 import { useFeatureToggle, useCliName, useStatusLayout, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
-import { TileGrid, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
+import { TileGrid, tileKey, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -254,7 +254,10 @@ type LayoutTileGridProps = TileGridProps & { v1Tiles: readonly StageTile[]; depl
  * so only a stage with `v1Tiles` subscribes. A static export has no status and
  * no server-backed v2 tiles, so it takes the v1 set. Before the first status
  * arrives the layout is unknown: only the layout-agnostic tiles mount, because
- * a v2 tile's preview fires v2-only requests a v1 project cannot answer. A
+ * a v2 tile's preview fires v2-only requests a v1 project cannot answer. The
+ * v2 tiles hold their slots as placeholders meanwhile, so the grid is in its
+ * v2 order from the first paint rather than packing without them and jumping
+ * when they arrive (a v1 project then swaps them for its own tiles). A
  * project with no PRD (`rex.exists === false`, which carries no layout) takes
  * the v1 set without its PRD-only tiles, so Tasks shows its "no PRD yet" empty
  * state and nothing says to migrate. A later null (a failed poll, a server
@@ -267,9 +270,11 @@ function LayoutTileGrid({ v1Tiles, deployed, tiles, ...grid }: LayoutTileGridPro
   if (status) known.current = status.rex?.exists === false ? "none" : status.rex?.layout ?? "v2";
   const shown = deployed || known.current === "v1" ? v1Tiles
     : known.current === "none" ? v1Tiles.filter((t) => !t.requiresPrd)
-    : known.current === "v2" ? tiles
-    : tiles.filter((t) => !t.v2Only);
-  return h(TileGrid, { ...grid, tiles: shown });
+    : tiles;
+  const pending = !deployed && known.current === undefined
+    ? new Set(tiles.filter((t) => t.v2Only).map(tileKey))
+    : undefined;
+  return h(TileGrid, { ...grid, tiles: shown, pending });
 }
 
 // ── Landing ────────────────────────────────────────────────────

@@ -440,6 +440,11 @@
   font-size: 13px;
 }
 
+/* A placeholder holding a tile's slot until it can load: a head, not a control. */
+.stage-tile--pending .stage-tile-head {
+  cursor: default;
+}
+
 /* Overview pieces inside a tile: the tile is the card. */
 .stage-tile .overview-section::after {
   content: none;

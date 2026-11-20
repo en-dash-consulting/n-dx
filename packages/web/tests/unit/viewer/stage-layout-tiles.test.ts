@@ -36,6 +36,8 @@ function mount() {
 }
 
 const tiles = () => [...root.querySelectorAll("[data-tile]")].map((e) => e.getAttribute("data-tile"));
+/** Tiles drawing their content: not the placeholders that hold a slot before the layout is known. */
+const live = () => [...root.querySelectorAll("[data-tile]:not([data-pending])")].map((e) => e.getAttribute("data-tile"));
 
 beforeEach(() => {
   status = null;
@@ -54,12 +56,18 @@ describe("Plan tiles before the first status", () => {
   // Tiles are keyed by panel when they have one (Open changes glance).
   const V2_ONLY = ["inbox", "changes-glance"];
 
-  it("mounts no v2-only tile with null status, then a v1 status", () => {
+  it("mounts no v2-only tile with null status, only its placeholder, then a v1 status", () => {
     status = null;
     mount();
     // Validation sits on Plan as the Plan health panel tile.
-    expect(tiles()).toContain("plan-health");
-    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
+    expect(live()).toContain("plan-health");
+    for (const v of V2_ONLY) {
+      expect(live()).not.toContain(v);
+      // The placeholder holds the slot and renders nothing that reads.
+      const slot = root.querySelector(`[data-tile="${v}"][data-pending]`);
+      expect(slot?.querySelector("[role=status]")?.textContent).toBe("Loading...");
+    }
+    expect(root.querySelector(".view-inbox, .view-changes")).toBeNull();
 
     status = withLayout("v1");
     mount();
@@ -74,7 +82,19 @@ describe("Plan tiles before the first status", () => {
     mount();
     status = withLayout("v2");
     mount();
-    for (const v of V2_ONLY) expect(tiles()).toContain(v);
+    for (const v of V2_ONLY) expect(live()).toContain(v);
+    expect(root.querySelector("[data-pending]")).toBeNull();
+  });
+
+  it("draws the tiles in their v2 order while the layout loads, so nothing moves when it lands", () => {
+    status = null;
+    mount();
+    const loading = tiles();
+    status = withLayout("v2");
+    mount();
+    expect(loading).toEqual(tiles());
+    expect(loading.indexOf("capture")).toBeLessThan(loading.indexOf("changes-glance"));
+    expect(loading.indexOf("changes-glance")).toBeLessThan(loading.indexOf("inbox"));
   });
 
   it("shows Tasks, and no tile that says to migrate, when status arrives with no PRD", () => {

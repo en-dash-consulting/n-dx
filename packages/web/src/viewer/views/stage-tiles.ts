@@ -308,6 +308,33 @@ export function useOverflowing(ref: { current: HTMLElement | null }): boolean {
   return overflowing;
 }
 
+/**
+ * A tile whose content cannot be drawn yet (Plan's v2 tiles before project
+ * status names the layout): it holds the tile's slot, title and size, so the
+ * grid has its final order from the first paint, and draws nothing that
+ * reads. A band holds its slot empty, as its panel does while it loads.
+ */
+function PendingTile({ tile, stage }: { tile: StageTile; stage: StageId }) {
+  const key = tileKey(tile);
+  const layout = useStatusLayout();
+  const title = tileTitle(tile, layout);
+  if (tile.band) return h("section", { class: "stage-band", "data-tile": key, "data-pending": "true", "aria-label": title });
+  const idBase = `stage-tile-${stage}-${key}`;
+  return h("section", {
+    class: `stage-tile stage-tile--pending stage-tile--c${tile.cols ?? 4} stage-tile--r${tile.rows ?? 1}`,
+    "data-tile": key,
+    "data-pending": "true",
+    "aria-labelledby": `${idBase}-title`,
+    "aria-busy": "true",
+  },
+    h("div", { class: "stage-tile-head" },
+      h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
+      h("span", { class: "stage-tile-title", id: `${idBase}-title` }, title),
+    ),
+    h("div", { class: "stage-tile-body" }, h("p", { class: "stage-tile-empty", role: "status" }, "Loading...")),
+  );
+}
+
 interface TileProps {
   grid: TileGridApi;
   stage: StageId;
@@ -402,9 +429,11 @@ export interface TileGridProps {
   besideDetail?: boolean;
   /** Gives each full-screen tile an Open ↗ to its own page. */
   navigateTo?: NavigateTo;
+  /** Keys of tiles drawn as placeholders in their slots (`PendingTile`) until their content can load. */
+  pending?: ReadonlySet<string>;
 }
 
-export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false, navigateTo }: TileGridProps) {
+export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false, navigateTo, pending }: TileGridProps) {
   const [fullScreen, setFullScreen] = useState<{ key: string; focus: TileFocus | null } | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
@@ -430,6 +459,8 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
   // Bands sit above the grid: its rows are one fixed height, a strip is not.
   const tileOf = (tile: StageTile) => {
     const key = tileKey(tile);
+    // A different component under the same key: the real tile mounts fresh (and measures its fit) in the placeholder's slot.
+    if (pending?.has(key)) return h(PendingTile, { key, tile, stage });
     return h(Tile, {
       key,
       grid,
