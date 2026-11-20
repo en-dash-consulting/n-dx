@@ -201,14 +201,19 @@ export function tilePlacesView(tile: StageTile): boolean {
 
 /**
  * The tiles a stage draws for a project's PRD layout: on v1 the `v2Only` tiles
- * give way to `v1Tiles`, which take the first such tile's place.
+ * give way to `v1Tiles`, which take the first such grid tile's place. A band
+ * sits above the grid, so a v2-only band (Plan's process steps) is dropped
+ * without moving the v1 tiles ahead of the grid tiles that precede that slot.
  */
 export function tilesForLayout(def: StageDef, layout: "v1" | "v2"): readonly StageTile[] {
   const tiles = def.tiles ?? [];
   if (layout === "v2" || !def.v1Tiles) return tiles;
-  const first = tiles.findIndex((t) => t.v2Only);
+  const first = tiles.findIndex((t) => t.v2Only && !t.band);
   const kept = tiles.filter((t) => !t.v2Only);
-  return first < 0 ? kept : [...kept.slice(0, first), ...def.v1Tiles, ...kept.slice(first)];
+  if (first < 0) return tiles.some((t) => t.v2Only) ? [...kept, ...def.v1Tiles] : kept;
+  // Where the slot falls among the kept tiles: those listed before it.
+  const at = tiles.slice(0, first).filter((t) => !t.v2Only).length;
+  return [...kept.slice(0, at), ...def.v1Tiles, ...kept.slice(at)];
 }
 
 /** Loop order. The side stage links step through it and wrap. */

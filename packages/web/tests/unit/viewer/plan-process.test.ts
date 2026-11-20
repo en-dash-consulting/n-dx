@@ -334,4 +334,10 @@ describe("Plan layout", () => {
   it("drops the process on v1, which has no Inbox, placement or apply", () => {
     expect(bands("v1")).toEqual(["flow"]);
   });
+
+  it("puts the v1 tiles where the first v2 grid tile was, after the capture tile, whatever bands lead", () => {
+    const grid = (layout: "v1" | "v2") => tilesForLayout(STAGES.plan, layout).filter((t) => !t.band).map((t) => t.panel ?? t.view);
+    expect(grid("v1")).toEqual(["capture", "prd", "product", "plan-health"]);
+    expect(grid("v2")).toEqual(["capture", "changes-glance", "inbox", "plan-health", "spec-gaps"]);
+  });
 });
