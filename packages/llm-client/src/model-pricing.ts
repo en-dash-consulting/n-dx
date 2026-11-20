@@ -74,7 +74,7 @@ function toPricing(cost: ModelCost): ModelTokenPricing {
  * back with `known: false`.
  */
 export function resolveModelPricing(modelId?: string): ResolvedModelPricing {
-  const raw = modelId?.trim();
+  const raw = modelId?.trim().toLowerCase();
   if (raw) {
     // A dated snapshot is priced as the model it is a snapshot of. Vendors ship
     // ids like `claude-haiku-4-5-20251001` while the table is keyed on
@@ -83,9 +83,9 @@ export function resolveModelPricing(modelId?: string): ResolvedModelPricing {
     // miss produced plausible dollars at the wrong model’s rates rather than
     // anything that looked wrong. Pricing only: model *selection* keeps the id
     // it was given.
-    const undated = raw.replace(/-\d{8}$/, "");
+    const undated = raw.replace(/-(?:\d{8}|\d{4}-\d{2}-\d{2})$/, "");
     for (const candidate of [raw, resolveModel(raw), undated, raw.toLowerCase()]) {
-      const cost = MODEL_COSTS[candidate];
+      const cost = Object.hasOwn(MODEL_COSTS, candidate) ? MODEL_COSTS[candidate] : undefined;
       if (cost) return { modelId: candidate, pricing: toPricing(cost), known: true };
     }
   }

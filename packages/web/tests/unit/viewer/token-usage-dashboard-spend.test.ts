@@ -148,6 +148,11 @@ describe("LLM Utilization view — dashboard spend", () => {
     return Array.from(row.cells).map((c) => c.textContent ?? "");
   }
 
+  it("identifies the pricing basis without presenting subscription charges", () => {
+    expect(root.textContent).toContain("API list-price estimates, not subscription charges.");
+    expect(root.textContent).toContain("standard short-context rates and default cache duration");
+  });
+
   it("labels the dashboard bucket rather than folding it into Sourcevision", () => {
     const badges = Array.from(root.querySelectorAll(".pkg-badge")).map((b) => b.textContent);
     expect(badges).toContain("Dashboard");

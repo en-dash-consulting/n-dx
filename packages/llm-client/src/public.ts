@@ -930,3 +930,7 @@ export type { RepoCommandEnvOptions } from "./repo-command-env.js";
 // The file name is public so consumers that classify a project's files (hench's
 // uncommitted-work gate, ndx init's gitignore) name the log the writer writes.
 export { CLI_LOG_FILENAME } from "./cli-log.js";
+
+// Dated OpenAI API metadata; surface limits and subscription billing stay distinct.
+export { OPENAI_MODEL_METADATA, resolveOpenAIModel, resolveOpenAICost } from "./openai-model-metadata.js";
+export type { ModelSurface, OpenAIProcessingMode, ModelEstimateOptions, OpenAIModelMetadata } from "./openai-model-metadata.js";

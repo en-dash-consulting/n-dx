@@ -5,6 +5,7 @@
  * in hench, rex, and sourcevision into a single shared implementation.
  */
 
+import { OPENAI_MODEL_COSTS, OPENAI_CONTEXT_WINDOWS } from "./openai-model-metadata.js";
 import { resolveLayout } from "./layout.js";
 import { warn } from "./output.js";
 import { deepMerge, loadJSONFile } from "./project-config.js";
@@ -132,8 +133,8 @@ export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
  * Per-model context window sizes in tokens.
  *
  * Used by budget preflight to estimate whether a prompt fits within a model's
- * context window. Values are conservative minimums — actual limits may be higher
- * depending on the API tier or region.
+ * context window. OpenAI entries are API maxima; surface defaults and input limits live in
+ * openai-model-metadata.ts and are applied separately by budget preflight.
  *
  * ~4 chars per token is the standard approximation for English prose.
  */
@@ -154,12 +155,7 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "claude-sonnet-5": 1_000_000,
   "claude-sonnet-4-6": 1_000_000,
   "claude-opus-4-7": 1_000_000,
-  // Codex / OpenAI
-  "gpt-5.6-sol": 1_050_000,
-  "gpt-5.6-terra": 1_050_000,
-  "gpt-5.6-luna": 1_050_000,
-  "gpt-5.4-mini": 128_000,
-  "gpt-5.5": 200_000,
+  ...OPENAI_CONTEXT_WINDOWS,
 };
 
 /** All four billed token kinds for one model, in USD per million tokens. */
@@ -178,7 +174,8 @@ export interface ModelCost {
  * The single price table for the monorepo. Budget preflight reads the input
  * rate; `resolveModelPricing` in `model-pricing.ts` serves every other caller
  * (`ndx usage`, the dashboard's spend views). Values are approximate public
- * list pricing as of 2026-08 and should be updated when vendors change rates.
+ * list pricing; OpenAI was verified 2026-11-16 (see openai-model-metadata.ts).
+ * Other vendors retain their existing 2026-08 estimates.
  * Gemini Pro has tiered rates; the values here are the standard (higher) tier
  * so estimates never under-report.
  *
@@ -190,7 +187,7 @@ export interface ModelCost {
  * | Vendor | Cache write | Cache read |
  * |--------|-------------|------------|
  * | Claude | 1.25x input | 0.1x input (exceptions: Opus 5.5 0.05x, Fable 5.1 0.025x) |
- * | OpenAI | 1x input (caching is automatic and carries no write premium) | 0.1x input |
+ * | OpenAI | Model/duration-specific; see openai-model-metadata.ts | Model-specific |
  * | Google | 1x input (explicit cache write is billed as input) | 0.25x input |
  *
  * Two known inaccuracies, both of which under-report and neither of which the
@@ -200,7 +197,7 @@ export interface ModelCost {
  *   1.25x. Recorded token counts carry no TTL, so a run using the long TTL is
  *   priced as though it used the 5-minute one.
  * - **Long-context surcharge.** Several models charge a higher rate above
- *   200K input tokens in a single request. Aggregates are summed across
+ *   their per-request input threshold in a single request. Aggregates are summed across
  *   requests, so per-request input size is not recoverable here.
  */
 export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
@@ -269,27 +266,7 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
     inputPerMToken: 5.00, outputPerMToken: 25.00,
     cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
   },
-  // Codex / OpenAI — no cache-write premium, read at 0.1x.
-  "gpt-5.6-sol": {
-    inputPerMToken: 4.00, outputPerMToken: 20.00,
-    cacheWritePerMToken: 4.00, cacheReadPerMToken: 0.40,
-  },
-  "gpt-5.6-terra": {
-    inputPerMToken: 2.00, outputPerMToken: 12.00,
-    cacheWritePerMToken: 2.00, cacheReadPerMToken: 0.20,
-  },
-  "gpt-5.6-luna": {
-    inputPerMToken: 0.20, outputPerMToken: 1.20,
-    cacheWritePerMToken: 0.20, cacheReadPerMToken: 0.02,
-  },
-  "gpt-5.4-mini": {
-    inputPerMToken: 0.40, outputPerMToken: 1.60,
-    cacheWritePerMToken: 0.40, cacheReadPerMToken: 0.04,
-  },
-  "gpt-5.5": {
-    inputPerMToken: 7.00, outputPerMToken: 21.00,
-    cacheWritePerMToken: 7.00, cacheReadPerMToken: 0.70,
-  },
+  ...OPENAI_MODEL_COSTS,
 };
 
 /**

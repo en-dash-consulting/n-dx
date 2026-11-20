@@ -107,7 +107,7 @@ describe("resolveModelPricing", () => {
 
   it("does not attribute replacement-model prices to an older literal pin", () => {
     const resolved = resolveModelPricing("gpt-5.1-codex-mini");
-    expect(resolved.known).toBe(false);
+    expect(resolved).toMatchObject({ known: true, pricing: { inputPerMillion: 0.25, outputPerMillion: 2 } });
   });
 
   it("prices a dated model snapshot at its base model", () => {
