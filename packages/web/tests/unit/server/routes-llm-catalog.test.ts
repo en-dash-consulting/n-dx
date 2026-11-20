@@ -205,6 +205,21 @@ describe("GET /api/llm/catalog — live model list", () => {
     expect(await validateCatalogModel(projectDir, "codex", "gpt-client-new")).toBeNull();
   });
 
+  it("shares Codex probes across HTTP reads and validation, until an explicit refresh", async () => {
+    execMock.mockResolvedValue({ stdout: "codex-cli 0.167.0", stderr: "", exitCode: 0, launched: true });
+    codexListMock.mockResolvedValue({ ok: true, models: ["gpt-client-new"] });
+    const catalogs = await Promise.all([getCatalog(), getCatalog(), getCatalog()]);
+    expect(catalogs.every((catalog) => catalog.codex.models.includes("gpt-client-new"))).toBe(true);
+    const reason = "Codex model/list timed out; check CLI login and connectivity, then refresh.";
+    codexListMock.mockResolvedValue({ ok: false, reason });
+    expect(await validateCatalogModel(projectDir, "codex", "gpt-client-new")).toBeNull();
+    expect(codexListMock).toHaveBeenCalledTimes(1);
+    expect(execMock.mock.calls.filter(([binary]) => binary === "codex")).toHaveLength(1);
+    expect((await getCatalog("?refresh=true")).codex).toMatchObject({ source: "built-in", reason });
+    expect(await validateCatalogModel(projectDir, "codex", "gpt-client-new")).toContain(reason);
+    expect(codexListMock).toHaveBeenCalledTimes(2);
+  });
+
   it("falls back to the built-in list with a reason when no key resolves", async () => {
     const body = await getCatalog();
 
@@ -247,7 +262,7 @@ describe("GET /api/llm/catalog — live model list", () => {
     vi.advanceTimersByTime(CATALOG_CACHE_TTL_MS - 1000);
     await getCatalog();
     expect(vendorCalls("anthropic")).toBe(1);
-    expect(execMock).toHaveBeenCalledTimes(3); // Claude cached; Codex rechecks account/config/binary
+    expect(execMock).toHaveBeenCalledTimes(3); // Claude cached; Codex's shorter TTL expired.
 
     vi.advanceTimersByTime(2000);
     await getCatalog();
