@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { RunRecord } from "../../src/schema/v1.js";
-import { initConfig } from "../../src/store/config.js";
+import { initConfig, saveConfig } from "../../src/store/config.js";
 import { saveRun, listRuns } from "../../src/store/runs.js";
 import { parseDocument, serializeDocument } from "@n-dx/rex";
 import { cliSpawnsOnly } from "../helpers/index.js";
@@ -60,7 +60,9 @@ async function setupProjectDir(): Promise<{
   const henchDir = join(projectDir, ".hench");
   const rexDir = join(projectDir, ".rex");
 
-  await initConfig(henchDir);
+  // These fixtures measure task spawns; orientation has dedicated fork tests.
+  const initial = await initConfig(henchDir);
+  await saveConfig(henchDir, { ...initial, sessionStrategy: "cold" });
   await mkdir(rexDir, { recursive: true });
 
   await writeFile(
@@ -219,14 +221,12 @@ describe("codex token accounting integration", () => {
       { turn: 1, input: 40, output: 10, vendor: "codex", model: "sonnet", diagnosticStatus: "complete", cacheProvenance: "unavailable" },
       { turn: 1, input: 70, output: 30, vendor: "codex", model: "sonnet", diagnosticStatus: "complete", cacheProvenance: "unavailable" },
     ]);
-    // Every run says which strategy it ran under and why, even one that never
-    // consulted a cache: Codex's CLI cannot resume a session by id, so the
-    // default fork strategy degrades to cold — which is a different fact from
-    // cold having been configured, and the reason is what tells them apart.
+    // This token-accounting fixture explicitly selects cold sessions; the
+    // fork contract suite separately covers unsupported-binary fallback.
     expect(result.run.session).toEqual({
       strategy: "cold",
       outcome: "miss",
-      reason: "fork-unsupported",
+      reason: "configured-cold",
     });
     expect(result.run.tokens?.cachedProvenance).toBe("unavailable");
 

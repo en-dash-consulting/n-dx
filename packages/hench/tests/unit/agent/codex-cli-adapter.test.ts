@@ -1173,3 +1173,14 @@ describe("codexCliAdapter turn cap", () => {
     expect(config.args.join(" ")).not.toMatch(/turn/i);
   });
 });
+
+ it("requires capability evidence and preserves policy on a warm-parent fork", () => {
+   const opts = { resumeSessionId: "parent", forkSession: true, model: "pinned-model" };
+   expect(() => codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), STANDARD_POLICY, opts)).toThrow(/capability probe/);
+   const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), STANDARD_POLICY,
+     { ...opts, codexForkSupported: true });
+   expect(config.args.slice(0, 3)).toEqual(["exec", "fork", "parent"]);
+   expect(config.args).toEqual(expect.arrayContaining([
+     'sandbox_mode="workspace-write"', 'approval_policy="never"', "-m", "pinned-model", ...SHELL_ENV,
+   ]));
+ });

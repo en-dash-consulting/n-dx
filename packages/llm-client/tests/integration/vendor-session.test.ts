@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -21,9 +21,11 @@ import {
   startVendorSession,
 } from "../../src/vendor-session.js";
 import type { VendorSessionOptions } from "../../src/vendor-session.js";
+import { DEFAULT_EXECUTION_POLICY } from "../../src/runtime-contract.js";
 import type { RuntimeEvent } from "../../src/runtime-contract.js";
+import { codexSessionDriver } from "../../src/vendor-session-driver.js";
 import { spawnCli } from "../../src/exec.js";
-import { codexShellEnvFlags } from "../../src/codex-cli-provider.js";
+import { codexShellEnvFlags, compileCodexPolicyFlags } from "../../src/codex-cli-provider.js";
 
 function fakeScript(vendor: "claude" | "codex", log: string): string {
   return `
@@ -302,8 +304,7 @@ describe("codex sessions", () => {
     ]);
   });
 
-  it("resumes a stored thread and refuses to fork", async () => {
-    expect(() => resumeVendorSession("t", { vendor: "codex", cwd: dir, fork: true })).toThrow(/cannot fork/);
+  it("resumes a stored thread", async () => {
     const session = resumeVendorSession("thread-9", { vendor: "codex", cwd: dir, binary: fake("codex") });
     expect((await session.sendTurn("x")).sessionId).toBe("thread-9");
   });
@@ -442,5 +443,94 @@ describe("child environment", () => {
 describe("unsupported vendors", () => {
   it("have no resumable CLI session", () => {
     expect(() => startVendorSession({ vendor: "openai", cwd: "." })).toThrow(/No resumable CLI session/);
+  });
+});
+
+// Protocol fixtures, not installed-CLI evidence.
+describe("Codex fork protocol", () => {
+  function forkBinary(mode = "child", version = "0.167.0-alpha.3.2") {
+    return writeFakeCli(dir, { name: "selected-codex", script: `
+      const args = process.argv.slice(2);
+      if (args[0] === "--version") { console.log("codex-cli ${version}"); process.exit(0); }
+      if (args.includes("--help")) { console.log("Usage: codex exec fork [OPTIONS] <SESSION_ID> [PROMPT] --config --model --json --skip-git-repo-check --ignore-user-config"); process.exit(0); }
+      const fs = await import("node:fs");
+      const prompt = fs.readFileSync(0, "utf8");
+      fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ argv: args, stdin: prompt }) + "\\n");
+      const id = args[1] === "fork" ? ${JSON.stringify(mode)} : args[2];
+      if (id !== "missing") console.log(JSON.stringify({ type: "thread.started", thread_id: id }));
+      console.log(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 1, output_tokens: 1 } }));
+    ` });
+  }
+  function options(binary: string) {
+    return { vendor: "codex" as const, binary, cwd: dir, fork: true, env: { ...process.env, CODEX_HOME: dir },
+      codex: { resumePolicyFlags: compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY, { resume: true }) } };
+  }
+  it("invalidates identity when credentials, config or child environment change", () => {
+    const binary = forkBinary();
+    const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: dir };
+    writeFileSync(join(dir, "auth.json"), JSON.stringify({ token: "fixture-a" }));
+    const probe = (e = env) => codexSessionDriver.probeFork!(binary, e, dir);
+    const first = probe();
+    expect(first.supported).toBe(true);
+    expect(probe().identity).toBe(first.identity);
+    writeFileSync(join(dir, "auth.json"), JSON.stringify({ token: "fixture-b" }));
+    const second = probe();
+    expect(second.identity).not.toBe(first.identity);
+    writeFileSync(join(dir, "config.toml"), 'model="intentional-pin"');
+    expect(probe().identity).not.toBe(second.identity);
+    expect(probe().orientationFlags).toEqual(expect.arrayContaining(["--ignore-user-config", "features.apps=false", "features.shell_snapshot=false", 'model="intentional-pin"']));
+    expect(probe({ ...env, CODEX_API_KEY: "fixture-key" }).identity).not.toBe(probe().identity);
+    expect(JSON.stringify(probe())).not.toContain("fixture-b");
+    const beforeProject = probe().identity;
+    mkdirSync(join(dir, ".codex"));
+    writeFileSync(join(dir, ".codex", "config.toml"), 'model_reasoning_effort="high"');
+    expect(probe().identity).not.toBe(beforeProject);
+  });
+  it("does not reuse opaque keychain identity or strip a custom provider silently", () => {
+    const binary = forkBinary();
+    const env = { ...process.env, CODEX_HOME: dir };
+    writeFileSync(join(dir, "config.toml"), 'cli_auth_credentials_store="keyring"');
+    const a = codexSessionDriver.probeFork!(binary, env, dir);
+    expect(a.reusable).toBe(false);
+    expect(codexSessionDriver.probeFork!(binary, env, dir).identity).not.toBe(a.identity);
+    writeFileSync(join(dir, "config.toml"), 'model_provider="custom-fixture"');
+    expect(codexSessionDriver.probeFork!(binary, env, dir).supported).toBe(false);
+  });
+  it.each([
+    '"cli_auth_credentials_store" = "keyring"',
+    "'cli_auth_credentials_store' = 'auto'",
+    'cli_auth_credentials_store = """keyring"""',
+  ])("rejects opaque identity with a stale auth file: %s", (config) => {
+    const binary = forkBinary();
+    const env = { ...process.env, CODEX_HOME: dir };
+    writeFileSync(join(dir, "auth.json"), JSON.stringify({ token: "stale-file-account" }));
+    writeFileSync(join(dir, "config.toml"), config);
+    const probe = () => codexSessionDriver.probeFork!(binary, env, dir);
+    expect(probe().reusable).toBe(false);
+    expect(probe().identity).not.toBe(probe().identity);
+  });
+  it("refuses an unavailable selected binary", async () => {
+    const session = resumeVendorSession("parent", options(join(dir, "absent-codex")));
+    await expect(session.sendTurn("task")).rejects.toThrow(/selected Codex binary unavailable/);
+    expect(existsSync(log)).toBe(false);
+  });
+  it("forks the selected binary once and resumes only its child", async () => {
+    const session = resumeVendorSession("parent", options(forkBinary()));
+    expect((await session.sendTurn("task one")).sessionId).toBe("child");
+    expect((await session.sendTurn("followup")).sessionId).toBe("child");
+    expect(calls().map(call => call.argv.slice(0, 3))).toEqual([["exec", "fork", "parent"], ["exec", "resume", "child"]]);
+    expect(calls()[0].argv).toContain('approval_policy="never"');
+    expect(calls()[0].argv).toContain("shell_environment_policy.set.CODEX_API_KEY=''");
+  });
+  it.each(["parent", "missing"])("rejects invalid child identity: %s", async mode => {
+    const session = resumeVendorSession("parent", options(forkBinary(mode)));
+    const result = await session.sendTurn("task");
+    expect(result.status).toBe("failed");
+    expect(result.error).toMatch(/distinct child/);
+  });
+  it("refuses an older selected binary even if another Codex is installed", async () => {
+    const session = resumeVendorSession("parent", options(forkBinary("child", "0.100.0")));
+    await expect(session.sendTurn("task")).rejects.toThrow(/unsupported Codex version/);
+    expect(existsSync(log)).toBe(false);
   });
 });

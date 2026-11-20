@@ -2246,8 +2246,10 @@ Hench settings (.hench/config.json):
                                                task re-pays cold-start context or re-explores the repo
                                        batch — run up to hench.tasksPerSession tasks in one session
                                        cold  — a fresh spawn per task
-                                     Forking needs a CLI that resumes by session id (Claude today);
-                                     other vendors and hench.provider=api fall back to "cold".
+                                     Forking supports Claude CLI and Codex CLI when its
+                                     capability and identity checks pass. Unsupported CLIs,
+                                     unverifiable Codex identities and hench.provider=api
+                                     fall back to "cold".
   hench.tasksPerSession    number    Tasks per session under the "batch" strategy (default: 4)
   hench.parentMaxAgeHours  number    How long a cached orientation session may be forked before it
                                      is rebuilt (default: 24). Re-analyzing the repo invalidates it

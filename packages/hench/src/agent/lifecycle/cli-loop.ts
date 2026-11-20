@@ -22,6 +22,7 @@
  * @see packages/hench/src/agent/lifecycle/event-accumulator.ts — legacy mutation-based parsers
  */
 
+import { createHash } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RetryConfig, RunRecord, TokenUsage, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
@@ -124,6 +125,7 @@ import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
 import {
+  codexSessionDriver,
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
   type ExecutionPolicy,
@@ -782,6 +784,8 @@ function addTokenUsage(
 // ── Generic adapter-based spawn ───────────────────────────────────────────
 
 export interface SpawnWithAdapterOptions {
+  /** A fork must never execute under the shared parent identity. */
+  forkParentId?: string;
   adapter: VendorAdapter;
   spawnConfig: SpawnConfig;
   cliBinary: string;
@@ -1003,7 +1007,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       void terminateTrackedVendorProcess(proc);
     };
     /** Whichever bound stopped this spawn first; later ones defer to it. */
-    let stopReason: "aborted" | "timeout" | "turn-cap" | undefined;
+    let stopReason: "aborted" | "timeout" | "turn-cap" | "fork-identity" | undefined;
     const settle = (): void => {
       untrack();
       if (stopTimer) clearTimeout(stopTimer);
@@ -1291,7 +1295,9 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       // the exit code is our own signal, and "exited with code 143" reads as
       // transient. The Claude CLI's own --max-turns stop arrives as a result
       // line rather than a kill, and is labelled the same way.
-      if (result.aborted) {
+      if (stopReason === "fork-identity") {
+        result.error = "Codex fork did not report a distinct child session id";
+      } else if (result.aborted) {
         result.error = result.aborted.reason;
       } else if (result.timedOut) {
         result.error =
@@ -1329,6 +1335,12 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       if (result.sessionId) return;
       if (adapter.extractSessionId) {
         const id = adapter.extractSessionId(rawJson);
+        if (id && id === opts.forkParentId) {
+          stopReason = "fork-identity";
+          result.error = "Codex fork did not report a distinct child session id";
+          void terminateTrackedVendorProcess(proc);
+          return;
+        }
         if (id) result.sessionId = id;
         return;
       }
@@ -1346,6 +1358,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     }
 
     function processLine(line: string): void {
+      if (stopReason === "fork-identity") return;
       // Step 1: Parse the line through the adapter for event classification.
       // One line can carry several events (a Claude `user` line answering two
       // tool calls), so every step below runs per event.
@@ -2935,7 +2948,15 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // it, so no task re-pays cold-start context or re-explores the repo.
   // `cliLoop` runs once per task, so the cache — not loop plumbing — is what
   // makes orientation happen once per loop and persist across invocations.
+  const forkCapability = vendor === "codex" && config.provider === "cli" &&
+    config.sessionStrategy !== "batch" && config.sessionStrategy !== "cold"
+    ? codexSessionDriver.probeFork?.(cliBinary, cliEnv, projectDir) : undefined;
+  if (forkCapability && (!forkCapability.supported || !forkCapability.reusable)) {
+    const reason = forkCapability.supported ? "Codex account identity is opaque" : forkCapability.reason;
+    detail(`Warm session: ${reason}; continuing with cold spawns`);
+  }
   const sessionStrategy = resolveSessionStrategy({
+    codexForkSupported: forkCapability?.supported === true && forkCapability.reusable === true,
     vendor,
     provider: config.provider,
     configured: config.sessionStrategy,
@@ -2994,11 +3015,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         ? "not-consulted"
         : config.sessionStrategy === "cold"
           ? "configured-cold"
-          // `resolveSessionStrategy` degrades to cold for any vendor or
-          // provider that cannot resume a session by id. Saying so is the
-          // difference between "forking is off" and "forking was asked for and
-          // this vendor cannot do it".
-          : "fork-unsupported",
+          // Forking needs a supported CLI surface and a reusable identity;
+          // resume support alone does not make a warm parent safe to fork.
+          : forkCapability?.supported && !forkCapability.reusable
+            ? "identity-unavailable"
+            : "fork-unsupported",
   };
 
   if (sessionStrategy === "batch" && batchIdentity) {
@@ -3036,7 +3057,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   }
 
   if (sessionStrategy === "fork") {
+    // Codex binds orientation to the full execution identity without persisting
+    // credentials. Preserve Claude's historical parent admission checks.
+    const identityHash = vendor === "codex" ? createHash("sha256").update(JSON.stringify([
+      run.worktreeRoot ?? projectDir, chainRefIdentity(run), policyFingerprint(policy),
+      cliBinary, forkCapability?.version, forkCapability?.identity, config.permissionMode,
+      Object.entries(cliEnv ?? process.env).sort(([a], [b]) => a.localeCompare(b)),
+    ])).digest("hex") : undefined;
     const decision = await ensureWarmParent({
+      identityHash,
+      codexOrientationFlags: forkCapability?.orientationFlags,
       adapter,
       vendor,
       cliBinary,
@@ -3184,6 +3214,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // A fork inherits the orientation transcript, which declares itself
         // read-only. Lift that before the brief; a resume continues a session
         // that already left orientation, so it never gets the sentence.
+        // Recheck after orientation and on retries: auth/config may have changed
+        // while the model was running. Never fork a parent admitted under a
+        // different account, binary version or configuration snapshot.
+        if (warmParentId && vendor === "codex" && !retryResumeSessionId && !backgroundResumeSessionId) {
+          const current = codexSessionDriver.probeFork?.(cliBinary, cliEnv, projectDir);
+          if (!current?.supported || !current.reusable || current.version !== forkCapability?.version ||
+            current.identity !== forkCapability?.identity) {
+            await clearSessionCache(henchDir);
+            warmParentId = undefined;
+            run.parentSessionId = undefined;
+            run.session = { strategy: "cold", outcome: "miss", reason: "identity-changed" };
+            detail("Warm session: Codex execution identity changed; continuing with a cold spawn");
+          }
+        }
         const forkingWarmParent =
           !backgroundResumeSessionId && !retryResumeSessionId && !!warmParentId;
         const briefContent =
@@ -3235,6 +3279,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           resumeSessionId:
             backgroundResumeSessionId ?? retryResumeSessionId ?? warmParentId ?? batchResumeId,
           forkSession: forkingWarmParent ? true : undefined,
+          codexForkSupported: forkCapability?.supported,
           mcpConfigPath,
           maxTurns,
         });
@@ -3286,6 +3331,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         result = await withHeartbeat(
           `waiting on ${vendor} CLI`,
           spawnWithAdapter({
+            forkParentId: forkingWarmParent && vendor === "codex" ? warmParentId : undefined,
             adapter,
             spawnConfig,
             cliBinary,
@@ -3301,6 +3347,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             configBackstop: opts.configBackstop,
           }),
         );
+        if (forkingWarmParent && vendor === "codex" && !result.error &&
+          (!result.sessionId || result.sessionId === warmParentId)) {
+          result.error = "Codex fork did not report a distinct child session id";
+        }
         // This attempt's numbers are about to be added to `accumulated`; the
         // live counters must stop claiming them or the two would be summed.
         resetLiveSpawnProgress(liveProgress);

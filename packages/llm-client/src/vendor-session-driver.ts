@@ -20,6 +20,12 @@
  * @module llm-client/vendor-session-driver
  */
 
+import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { codexProjectMcpDisableFlags, codexProjectConfigPaths } from "./codex-project-config.js";
+import { codexUserConfigPath, parseCodexConfigStrings } from "./codex-user-config.js";
+import { execFileSyncCli } from "./exec.js";
 import type { LLMVendor } from "./provider-interface.js";
 import { LLM_VENDOR } from "./provider-interface.js";
 import type {
@@ -98,6 +104,8 @@ export interface ClaudeTurnFlags {
 
 /** Codex-only flags. Other drivers ignore them. */
 export interface CodexTurnFlags {
+  /** Set only after probing the selected binary in its execution environment. */
+  readonly forkSupported?: boolean;
   /**
    * Sandbox and approval flags for a fresh `codex exec`
    * (`compileCodexPolicyFlags(policy)`). Not sent on resume, where
@@ -166,6 +174,8 @@ export interface VendorSessionDriver {
   readonly vendor: LLMVendor;
   /** Whether a session can be branched by id (Claude `--fork-session`). */
   readonly canFork: boolean;
+  /** Dynamic support, never inferred from another binary on PATH. */
+  probeFork?(binary: string, env?: NodeJS.ProcessEnv, cwd?: string): { supported: boolean; version?: string; identity?: string; reusable?: boolean; orientationFlags?: string[]; reason: string };
   /**
    * Build one turn's spawn.
    *
@@ -575,21 +585,20 @@ function codexTurnSpawn(input: SessionTurnInput): SessionTurnSpawn {
   const configFlags = [...(input.codex?.configFlags ?? []), ...(input.codex?.turnConfigFlags?.() ?? [])];
   const hiddenEnv = input.codex?.hiddenEnv ?? [];
 
-  // Codex cannot fork, so a resume always appends to the thread. Two
-  // differences from a fresh exec, both dictated by `codex exec resume`:
-  //   1. The policy travels as `-c sandbox_mode=` / `-c approval_policy=`
-  //      overrides (resumePolicyFlags): resume rejects `-s/--sandbox`, and the
-  //      thread does not keep its starting policy — resume takes sandbox and
-  //      approval from this invocation's config. The shell-environment
-  //      overrides go too: config is read per process, so without them a
-  //      resumed agent's commands would see the Codex key.
-  //   2. The id is always explicit, never `--last`, which picks the newest
-  //      session on the machine and would let any other codex run capture it.
+  // Both continuation forms reapply policy and shell credential isolation.
+  // Fork is never implemented as resume: resume mutates the parent transcript.
+  if (input.resume?.fork && !input.codex?.forkSupported) {
+    throw new Error("Codex fork requires a successful capability probe of the selected binary");
+  }
+  if (input.resume?.fork && !["sandbox_mode=", "approval_policy="].every(key =>
+    input.codex?.resumePolicyFlags?.some(flag => flag.startsWith(key)))) {
+    throw new Error("Codex fork requires explicit sandbox and approval policy overrides");
+  }
   if (input.resume) {
     return {
       binary: "codex",
       args: [
-        "exec", "resume", ...configFlags, input.resume.sessionId,
+        "exec", input.resume.fork ? "fork" : "resume", ...configFlags, input.resume.sessionId,
         "--json", "--skip-git-repo-check",
         ...withCodexShellEnvFlags(input.codex?.resumePolicyFlags ?? [], hiddenEnv),
         ...modelArgs,
@@ -1203,9 +1212,89 @@ function codexUsageEvent(
   return tokenUsageEvent(LLM_VENDOR.CODEX, turn, mapCodexUsageToTokenUsage(raw));
 }
 
+class CodexForkConfigurationError extends Error {}
+
+/** Secret inputs are hashed, never returned or written to diagnostics. */
+function codexForkContext(env: NodeJS.ProcessEnv, cwd: string): { identity: string; reusable: boolean; orientationFlags: string[] } {
+  const configPath = codexUserConfigPath(env, env.HOME ?? env.USERPROFILE);
+  const hash = createHash("sha256").update(configPath);
+  let authPresent = false;
+  let config = "";
+  for (const path of [configPath, join(dirname(configPath), "auth.json")]) {
+    try {
+      const contents = readFileSync(path);
+      hash.update(contents);
+      if (path === configPath) config = contents.toString();
+      else authPresent = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      hash.update("missing");
+    }
+  }
+  // Keychain-backed identity is opaque here. Do not reuse an on-disk parent
+  // when we cannot observe account changes (including keychain auto mode).
+  const values = parseCodexConfigStrings(config);
+  // Quoted TOML keys are valid too. If the setting is present in a form our
+  // string reader cannot decode (for example a multiline string), stay cold
+  // rather than mistaking a leftover auth.json for the active account.
+  const opaqueCredentialStore = config.includes("cli_auth_credentials_store") &&
+    values.get(JSON.stringify(["cli_auth_credentials_store"])) !== "file";
+  const reusable = !(opaqueCredentialStore ||
+    (!authPresent && !env.CODEX_API_KEY && !env.OPENAI_API_KEY && !env.CODEX_ACCESS_TOKEN));
+  if (!reusable) hash.update(randomUUID());
+  hash.update(JSON.stringify(Object.entries(env).sort(([a], [b]) => a.localeCompare(b))));
+  for (const path of codexProjectConfigPaths(cwd)) {
+    hash.update(path);
+    try { hash.update(readFileSync(path)); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      hash.update("missing");
+    }
+  }
+  const profile = values.get(JSON.stringify(["profile"]));
+  const setting = (key: string) => (profile ? values.get(JSON.stringify(["profiles", profile, key])) : undefined)
+    ?? values.get(JSON.stringify([key]));
+  const provider = setting("model_provider");
+  if ((provider && provider !== "openai") || /\b(?:model_providers|chatgpt_base_url)\b/.test(config)) {
+    throw new CodexForkConfigurationError("Codex warm-parent forks are unavailable for custom-provider configuration");
+  }
+  const orientationFlags = [
+    "--ignore-user-config",
+    "-c", "features.apps=false",
+    "-c", "features.shell_snapshot=false",
+    ...codexProjectMcpDisableFlags(cwd),
+  ];
+  // Preserve explicit user/profile model pins even though orientation does not
+  // load user MCP servers. An explicit turn -m still takes precedence.
+  for (const key of ["model", "model_reasoning_effort"]) {
+    const value = setting(key);
+    if (value) orientationFlags.push("-c", `${key}=${JSON.stringify(value)}`);
+  }
+  return { identity: hash.digest("hex"), reusable, orientationFlags };
+}
+
 export const codexSessionDriver: VendorSessionDriver = {
   vendor: LLM_VENDOR.CODEX,
-  canFork: false,
+  canFork: false, // Availability is binary/version-specific, not vendor-wide.
+  probeFork(binary, env, cwd) {
+    const options = { env, cwd, timeout: 5_000, maxBuffer: 128 * 1024, stdio: ["ignore", "pipe", "pipe"] as ["ignore", "pipe", "pipe"] };
+    try {
+      const version = execFileSyncCli(binary, ["--version"], options).toString().trim();
+      const parsed = /^codex-cli (\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/.exec(version);
+      // First locally audited command surface. Older builds are deliberately cold.
+      if (!parsed || (Number(parsed[1]) === 0 && Number(parsed[2]) < 167)) {
+        return { supported: false, version, reason: "unsupported Codex version (requires 0.167 or later)" };
+      }
+      const help = execFileSyncCli(binary, ["exec", "fork", "--help"], options).toString();
+      const supported = /Usage:.*codex exec fork.*<SESSION_ID>/.test(help) &&
+        ["--config", "--model", "--json", "--skip-git-repo-check", "--ignore-user-config"].every(flag => help.includes(flag));
+      return { supported, version, ...(supported ? codexForkContext(env ?? process.env, cwd ?? process.cwd()) : {}), reason: supported ? "exec fork advertised" : "exec fork command surface unavailable" };
+    } catch (error) {
+      // Do not echo stderr: wrappers may include environment secrets in errors.
+      return { supported: false, reason: error instanceof CodexForkConfigurationError
+        ? error.message : "selected Codex binary unavailable or capability/configuration probe failed" };
+    }
+  },
   turnSpawn: codexTurnSpawn,
   parseLine: parseCodexLine,
   parseLineEvents: (line, turn, options) => {

@@ -123,11 +123,12 @@ export interface VendorSpawnOptions {
    * Set by the warm-parent session strategy, where one orientation session
    * is forked per task: every fork inherits the same byte-identical prefix,
    * which is both the cache-read win and the reason no task re-explores the
-   * repo. Only honored by the Claude CLI adapter (`--fork-session`), and
-   * only alongside {@link resumeSessionId}; other adapters ignore it and the
-   * strategy falls back to cold spawns for them.
+   * repo. Claude uses `--fork-session`; capability-gated Codex uses `exec fork`.
+   * Both require {@link resumeSessionId}. Unsupported binaries use cold spawns.
    */
   readonly forkSession?: boolean;
+  readonly codexForkSupported?: boolean;
+  readonly codexOrientationFlags?: readonly string[];
   /**
    * Path to a file that becomes the spawned session's only source of MCP
    * servers, naming this run's project directory absolutely.
