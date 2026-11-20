@@ -60,7 +60,7 @@ describe("Codex catalog pricing isolation", () => {
         ok: false, key, error: `Run option "${key}": Cannot check model "${model}" in the codex catalog: Model list request failed`,
       });
     }
-    expect(probe).toHaveBeenCalledWith("codex", projectDir);
+    expect(probe).toHaveBeenCalledWith("codex", projectDir, { provider: "cli" });
   });
 
   it.each(["gpt-client-only-9", "gpt-live-only-9", "gpt-6.1-sol-20261116"])("accepts literal %s only when the live list reports it", async (model) => {

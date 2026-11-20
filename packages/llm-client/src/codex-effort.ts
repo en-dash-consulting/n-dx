@@ -50,7 +50,7 @@ export function resolveOpenAiEffort(
   const levels = id && Object.hasOwn(MODELS, id) ? MODELS[id] : undefined;
   if (levels?.includes(configured)) return configured;
   warn(`llm.effort "${configured}"${taskClass ? ` for task class "${taskClass}"` : ""} was not sent: ` +
-    `${model || "the unspecified model"} on OpenAI Chat Completions ` +
+    `${model || "the unspecified model"} on the OpenAI API ` +
     (levels ? `supports ${levels.join(", ")}.` : "has no verified effort capability; leaving the client default unchanged."));
   return undefined;
 }

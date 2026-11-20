@@ -1285,6 +1285,8 @@ export async function runPostTaskTestsIfNeeded(
  * entries for vendor="codex").
  */
 async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): Promise<void> {
+  // Direct API turns already carry request-scoped usage; quota totals are not run usage.
+  if (run.invocationContext === "api") return;
   // Check if any turn used Codex as the vendor
   const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
   if (!isCodexRun) {

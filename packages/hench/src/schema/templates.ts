@@ -204,7 +204,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
   {
     id: "api-direct",
     name: "API Direct",
-    description: "Use Anthropic API directly instead of Claude Code CLI for headless environments",
+    description: "Use Claude or OpenAI APIs directly for headless environments",
     useCases: [
       "CI/CD pipeline integration",
       "Headless server environments",

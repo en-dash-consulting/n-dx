@@ -1,15 +1,37 @@
 schema: "rex/v2"
 items:
   "1fcb43cc-2d0a-4f0e-af5e-4ef6aad90829":
-    lastModified: "2026-11-11T21:06:12.485Z"
+    status: "completed"
+    startedAt: "2026-11-17T20:53:22.204Z"
+    completedAt: "2026-11-17T21:25:20.626Z"
+    endedAt: "2026-11-17T21:25:20.626Z"
+    activeIntervals: [{"end":"2026-11-17T21:25:20.626Z","start":"2026-11-17T20:53:22.204Z"}]
+    lastModified: "2026-11-17T21:25:20.626Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6512dd4c-adad-4e77-a136-6a743bc55e6f":
-    lastModified: "2026-11-11T21:06:19.904Z"
+    status: "completed"
+    startedAt: "2026-11-18T00:29:26.306Z"
+    completedAt: "2026-11-18T00:39:58.322Z"
+    endedAt: "2026-11-18T00:39:58.322Z"
+    activeIntervals: [{"end":"2026-11-18T00:39:58.322Z","start":"2026-11-18T00:29:26.306Z"}]
+    lastModified: "2026-11-18T00:39:58.322Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eb1e2cbe-d12f-4e5d-8038-9aefb0136be4":
-    lastModified: "2026-11-11T21:06:16.398Z"
+    status: "completed"
+    startedAt: "2026-11-17T21:27:08.846Z"
+    completedAt: "2026-11-18T00:27:48.105Z"
+    endedAt: "2026-11-18T00:27:48.105Z"
+    activeIntervals: [{"end":"2026-11-17T22:10:10.280Z","start":"2026-11-17T21:27:08.846Z"},{"end":"2026-11-17T22:24:01.922Z","start":"2026-11-17T22:11:44.555Z"},{"end":"2026-11-18T00:27:48.105Z","start":"2026-11-18T00:22:53.404Z"}]
+    lastModified: "2026-11-18T00:27:50.855Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ee45742e-70be-47ff-a5af-22fa9b711412":
+    status: "completed"
+    startedAt: "2026-11-18T00:39:58.322Z"
+    completedAt: "2026-11-18T00:39:58.322Z"
+    endedAt: "2026-11-18T00:39:58.322Z"
+    activeIntervals: [{"end":"2026-11-18T00:39:58.322Z","start":"2026-11-18T00:39:58.322Z"}]
+    appliedAt: "2026-11-18T00:39:58.322Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-11T21:06:08.556Z"
-    lastModified: "2026-11-11T21:06:19.904Z"
+    lastModified: "2026-11-18T00:39:58.322Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

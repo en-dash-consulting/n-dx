@@ -362,12 +362,12 @@ export function resolveRunPermissionMode(params: {
  * The provider a run uses, and the refusal when there is none it can.
  *
  * VENDOR_PROVIDERS (provider-support.ts) is the single source of truth:
- * claude accepts cli or api; codex only cli (no API loop); google and local
+ * claude and codex accept cli or api; google and local
  * only api (no CLI binary exists). A vendor that rejects "cli" always accepts
  * "api", so an unsupported "cli" switches silently (`switched`) — ndx config /
  * ndx init persist hench.provider=api when local or google is selected, so
  * this is a safety net for projects configured outside those flows. An
- * unsupported "api" (codex only), or a value that is neither, has no fallback.
+ * unknown provider value has no fallback.
  */
 export function resolveRunProvider(
   requested: string,
@@ -389,7 +389,7 @@ export function resolveRunProvider(
     provider: requested,
     switched: false,
     error: new CLIError(
-      "Hench API provider is only supported for vendor=claude or vendor=google.",
+      `Provider "${requested}" is not supported for vendor="${vendor}".`,
       "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
     ),
   };
@@ -858,7 +858,7 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   }
 
   // -- Provider ------------------------------------------------------------
-  // A saved provider the active vendor has no loop for (`api` on codex) is
+  // A saved provider the active vendor has no loop for (an unsupported provider) is
   // skipped like an incompatible saved model: warn, fall back to the project's
   // provider, and carry on. Refusing instead would end a whole `--loop` on one
   // task's saved value, and saved blocks are vendor-agnostic by design — a task

@@ -275,7 +275,7 @@ const PROVIDER_KEY = "provider";
  *
  * A pending edit is honoured only while the vendor still offers it — switching
  * vendor drops an edit the new vendor refuses. When the saved provider is not
- * on offer (codex saved as `api`) the first choice is shown and counts as a
+ * on offer the first choice is shown and counts as a
  * change, since `ndx work` would refuse the saved value. Api-only vendors are
  * the exception: hench forces `api` for them whatever is saved, so there is
  * nothing to write until the user picks something. `saved` is null when hench
@@ -1315,7 +1315,7 @@ function RunCard({
           h("ul", null,
             problems.map((p) => h("li", { key: p.field },
               p.message,
-              h("span", { class: "llm-runcard-fix" }, runCardFix(p, vendor)))),
+              h("span", { class: "llm-runcard-fix" }, runCardFix(p)))),
             codexCliMissing
               ? h("li", { key: "codex-cli" },
                   entry?.readiness?.summary ?? "The Codex CLI was not found.",
@@ -1330,12 +1330,10 @@ function RunCard({
   );
 }
 
-/** The fix that applies to a server problem. Codex has no API connection, so it is never offered. */
-function runCardFix(problem: EffectiveProblem, vendor: ViewerLLMVendor): string {
+/** The fix that applies to a server problem. */
+function runCardFix(problem: EffectiveProblem): string {
   if (problem.field === "model") return "Pick a model in Models below.";
-  return vendor === VIEWER_LLM_VENDOR.CODEX
-    ? "Codex runs on its CLI only."
-    : "Pick a connection in Connection below.";
+  return "Pick a connection in Connection below.";
 }
 
 // ── Test connection ────────────────────────────────────────────────────

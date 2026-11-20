@@ -97,6 +97,11 @@
 
 // Generic provider interface (vendor-agnostic)
 export type {
+  ProviderToolCall,
+  ProviderMessage,
+  ProviderTurnRequest,
+  ProviderTurnResult,
+  ProviderTurnEvent,
   ProviderAuthMode,
   ProviderCapability,
   ProviderInfo,
@@ -279,6 +284,8 @@ export {
 } from "./codex-project-config.js";
 
 export { codexUserConfigPath, codexUserModelProvider } from "./codex-user-config.js";
+
+export { supportsOpenAiTurns } from "./openai-responses.js";
 
 export {
   createOpenAiApiProvider,

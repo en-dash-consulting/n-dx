@@ -1,4 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { setTimeout as delay } from "node:timers/promises";
+import { OpenAiFailover } from "./openai-failover.js";
+import { OpenAiAgentTurn } from "./openai-agent-turn.js";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails, createToolSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
@@ -22,7 +25,7 @@ import {
   resolveLLMVendor,
   withVendorOverride,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, createOpenAiApiProvider, supportsOpenAiTurns, resolveTaskModel, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -73,6 +76,7 @@ import type { MemoryContext, SharedLoopOptions } from "./shared.js";
 import type { Heartbeat } from "./heartbeat.js";
 import {
   detectPlanOnlyIteration,
+  runHasCodeModifications,
   createExecutionReminder,
 } from "../analysis/plan-only-detection.js";
 
@@ -159,20 +163,25 @@ async function rejectUnvalidatedCompletion(args: {
 async function callWithRetry(
   client: Anthropic,
   params: Anthropic.MessageCreateParamsNonStreaming,
+  signal: AbortSignal,
 ): Promise<Anthropic.Message> {
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    signal.throwIfAborted();
     try {
-      return await client.messages.create(params);
+      const response = await client.messages.create(params, { signal });
+      signal.throwIfAborted();
+      return response;
     } catch (err) {
+      signal.throwIfAborted();
       lastError = err as Error;
       const status = (err as { status?: number }).status;
 
       if (status && RETRY_STATUS_CODES.has(status) && attempt < MAX_RETRIES) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
+        stream("Retry", `retry ${attempt + 1}/${MAX_RETRIES}: API returned ${status}, waiting ${delayMs}ms`);
+        await delay(delayMs, undefined, { signal });
         continue;
       }
 
@@ -208,14 +217,16 @@ async function callWithFailover(
   taskId: string,
   testCommand: string | undefined,
   startingHead: string | undefined,
+  signal: AbortSignal,
 ): Promise<Anthropic.Message> {
   let client = currentClient;
   let currentVendor = originalVendor;
   let currentModel = originalModel;
 
   try {
-    return await callWithRetry(client, params);
+    return await callWithRetry(client, params, signal);
   } catch (originalError) {
+    signal.throwIfAborted();
     // If failover is disabled, rethrow immediately (no-op path)
     if (!llmConfig.autoFailover) {
     throw originalError;
@@ -236,6 +247,7 @@ async function callWithFailover(
     let attemptNumber = 1;
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      signal.throwIfAborted();
       const failoverResult = getNextFailoverAttempt(attemptNumber, originalVendor as any, llmConfig);
 
       if (failoverResult.isExhausted) {
@@ -263,7 +275,7 @@ async function callWithFailover(
         // Only the client is taken; the loop's own tool context keeps its backstop.
         const apiResources = await initApiResources(
           provider, config, henchDir, projectDir, store, taskId,
-          testCommand, startingHead, undefined, undefined,
+          testCommand, startingHead, undefined, signal,
         );
         client = apiResources.client;
         currentVendor = apiResources.vendor;
@@ -277,8 +289,9 @@ async function callWithFailover(
         if (nextEffort) updatedParams.output_config = { effort: nextEffort };
 
         // Try the call with the new client/model
-        return await callWithRetry(client, updatedParams);
+        return await callWithRetry(client, updatedParams, signal);
       } catch (failoverError) {
+        signal.throwIfAborted();
         // This failover attempt failed; continue to next in chain
         attemptNumber++;
       }
@@ -298,11 +311,8 @@ interface ApiResources {
 /**
  * Initialize API resources from a resolved LLM provider.
  *
- * Accepts any {@link LLMProvider} from the registry. Currently the API loop
- * requires the raw Anthropic SDK for its multi-turn tool-use pattern, so
- * only Claude-compatible providers are supported. Non-Claude providers will
- * be supported when the loop is refactored to use the generic LLMProvider
- * completion interface with tool schemas.
+ * Build the Claude branch's raw Anthropic SDK client. Other API vendors use
+ * their own turn codecs and share the guarded tool context and finalization.
  */
 async function initApiResources(
   provider: LLMProvider,
@@ -318,13 +328,11 @@ async function initApiResources(
 ): Promise<ApiResources> {
   const vendor = provider.info.vendor;
 
-  // The API loop currently requires the raw Anthropic SDK for multi-turn
-  // tool-use. Non-Claude providers will be supported when the loop is
-  // refactored to use LLMProvider.complete() with tool schemas.
+  // This resource builder belongs to the Claude SDK branch only.
   if (vendor !== LLM_VENDOR.CLAUDE) {
     throw new Error(
       `Hench API loop requires a Claude-compatible provider (got "${vendor}"). ` +
-      "Non-Claude API providers are not yet supported. Use provider=cli for non-Claude vendors.",
+      "Use the vendor's dedicated API turn path.",
     );
   }
 
@@ -385,6 +393,7 @@ function buildToolContext(
     testMaxWorkers: config.testGate?.maxWorkers,
     validationSlot: validationSlotFromConfig(config, projectDir, { signal: abortSignal, print: info }),
     configBackstop,
+    abortSignal,
   };
 }
 
@@ -607,12 +616,13 @@ function announceApiRun(model: string, opts: AgentLoopOptions): void {
  * its next turn boundary, a second one exits. `release()` restores the default
  * handling once the loop is over.
  */
-function trapCancellation(): { readonly requested: boolean; release(): void } {
+function trapCancellation(onCancel?: () => void): { readonly requested: boolean; release(): void } {
   let requested = false;
   const handleSignal = () => {
     // Second Ctrl+C: force exit
     if (requested) process.exit(1);
     requested = true;
+    onCancel?.();
   };
   process.on("SIGINT", handleSignal);
   return {
@@ -709,11 +719,13 @@ async function executeToolCalls(
   turn: number,
   run: RunRecord,
   detector: LivelockDetector,
+  signal?: AbortSignal,
 ): Promise<Anthropic.ToolResultBlockParam[]> {
   const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
   for (const block of assistantContent) {
     if (block.type !== "tool_use") continue;
+    signal?.throwIfAborted();
 
     const startMs = Date.now();
     stream("Tool", `${block.name}(${JSON.stringify(block.input).slice(0, 100)})`);
@@ -732,6 +744,7 @@ async function executeToolCalls(
       type: "tool_result",
       tool_use_id: block.id,
       content: output,
+      is_error: /^(\[GUARD\]|\[ERROR\]|Unknown tool:)/.test(output),
     });
 
     recordToolResult(run, detector, {
@@ -1920,9 +1933,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Read on the host now, so confined commands are handed the slot directory.
   if (sandboxPosture.state === "confined") startHostIdentityLookup();
 
-  // Shared: transition task to in_progress
-  await transitionToInProgress(store, taskId, brief.task.status);
-
+  const llmConfig = withVendorOverride(await loadLLMConfig(henchDir), opts.vendorOverride);
+  const effectiveVendor = resolveLLMVendor(llmConfig);
   // API-specific: resolve provider, API key, build client and tool context
   const startingHead = captureStartingHead(projectDir);
   // Snapshot untracked files before the agent runs, so a rollback removes only
@@ -1933,17 +1945,13 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // apart from the operator's at commit time (see stageRunWork).
   const baselineDirty = await captureBaselineDirty(projectDir);
 
-  // Resolve provider — registry or legacy path based on config flag
-  // An escalated attempt runs on another vendor (see cli-loop.ts).
-  const llmConfig = withVendorOverride(await loadLLMConfig(henchDir), opts.vendorOverride);
-  const effectiveVendor = resolveLLMVendor(llmConfig);
-
   // The previous run failed only at the test gate with its work committed:
   // re-run the gate instead of an agent loop (#539). Placed before provider
   // resolution, so it covers every API vendor and needs no API client. The API
   // loop has no review pass, so there is no review to inherit or run.
   const gateOnly = await planGateOnlyRetry({ projectDir, taskId, runHistory: opts.runHistory, claims: opts.claims });
   if (gateOnly) {
+    await transitionToInProgress(store, taskId, brief.task.status);
     const { run, memoryCtx } = await initApiRunRecord(opts, {
       taskId,
       taskTitle: brief.task.title,
@@ -1976,9 +1984,21 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     return { run };
   }
 
+  const codexProvider = effectiveVendor === "codex"
+    ? createOpenAiApiProvider({ codexConfig: { ...llmConfig.codex, model }, maxTokens: config.maxTokens })
+    : undefined;
+  if (codexProvider && !codexProvider.info.capabilities.includes("function-calling")) {
+    throw new Error(`OpenAI model "${model}" has no verified agent-turn support. Select a supported API model explicitly.`);
+  }
+
+  // Shared: transition task to in_progress
+  await transitionToInProgress(store, taskId, brief.task.status);
+
   let provider: LLMProvider;
 
-  if (config.useRegistryProvider || effectiveVendor === "google" || effectiveVendor === "local") {
+  if (effectiveVendor === "codex") {
+    provider = codexProvider!;
+  } else if (config.useRegistryProvider || effectiveVendor === "google" || effectiveVendor === "local") {
     // New path: ProviderRegistry resolution.
     // Google and local always use the registry (they have no legacy API path).
     provider = defaultRegistry.getActiveProvider(llmConfig);
@@ -1986,8 +2006,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     // Legacy path: manual vendor check with original error message
     if (effectiveVendor !== "claude") {
       throw new Error(
-        `Hench API mode requires llm.vendor=claude. Current vendor: ${effectiveVendor}. ` +
-        "Use provider=cli for Codex.",
+        `Unsupported API vendor: ${effectiveVendor}. Select claude, codex, google or local.`,
       );
     }
     provider = defaultRegistry.create("claude", llmConfig);
@@ -2022,9 +2041,18 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       : await runLocalToolLoop(loopParams);
   }
 
-  const { client, vendor, toolCtx } = await initApiResources(
+  const openAi = effectiveVendor === "codex" ? new OpenAiFailover(provider, model, llmConfig, config) : undefined;
+  const controller = new AbortController();
+  const signal = opts.abortSignal
+    ? AbortSignal.any([opts.abortSignal, controller.signal]) : controller.signal;
+  const resources = openAi ? undefined : await initApiResources(
     provider, config, henchDir, projectDir, store, taskId,
-    brief.project.testCommand, startingHead, opts.configBackstop, opts.abortSignal,
+    brief.project.testCommand, startingHead, opts.configBackstop, signal,
+  );
+  const vendor = effectiveVendor;
+  const toolCtx = resources?.toolCtx ?? buildToolContext(
+    config, projectDir, store, taskId, brief.project.testCommand,
+    startingHead, opts.configBackstop, signal,
   );
 
   // Shared: initialize run record + capture start memory snapshot
@@ -2033,7 +2061,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     taskTitle: brief.task.title,
     model,
     vendor,
-    parseMode: "api-sdk",
+    parseMode: openAi ? "openai-responses" : "api-sdk",
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
@@ -2041,9 +2069,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     { role: "user", content: briefText },
   ];
 
-  // Resolved once per run, not per turn. initApiResources has already
-  // rejected any vendor but Claude, so this is always a Claude API request.
-  const effort = resolveAgentApiEffort(model, llmConfig);
+  // Claude request effort; the OpenAI codec validates its own effort dialect.
+  const effort = openAi ? undefined : resolveAgentApiEffort(model, llmConfig);
 
   // Batched, summarizing prune. Cutting the oldest turns every turn — the old
   // behavior — changed the prompt prefix on every request and made the cache
@@ -2051,7 +2078,19 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const pruner = new ConversationPruner(
     anthropicPruneShape(),
     createContextSummarizer({
-      provider,
+      provider: openAi ? {
+        complete: request => {
+          const summaryModel = request.model ?? model;
+          // Preserve Responses-only deployments for previously supported pins.
+          if (supportsOpenAiTurns(summaryModel)) {
+            return provider.completeTurn!({
+              model: summaryModel, messages: [{ role: "user", content: request.prompt }],
+              tools: [], effort: request.effort, taskClass: request.taskClass, signal,
+            });
+          }
+          return provider.complete({ ...request, signal });
+        },
+      } : provider,
       llmConfig,
       vendor,
       taskTitle: brief.task.title,
@@ -2107,16 +2146,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   };
 
   // Graceful cancellation on SIGINT
-  const cancellation = trapCancellation();
+  const cancellation = trapCancellation(() => controller.abort());
 
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       // Check if cancellation was requested
-      if (cancellation.requested) {
-        run.status = "cancelled";
-        stream("Cancelled", "Run interrupted by user");
-        break;
-      }
+      signal.throwIfAborted();
       if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
       run.turns = turn + 1;
@@ -2124,12 +2159,48 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
       recordPruneUsage(run, await pruner.prune(messages), turn + 1, vendor, model);
+      if (openAi) {
+        signal.throwIfAborted();
+        const budgetAfterPrune = checkTokenBudget(run.tokenUsage, tokenBudget);
+        if (budgetAfterPrune.exceeded) {
+          await handleBudgetExceeded(store, taskId, run, budgetAfterPrune);
+          break;
+        }
+        if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
+      }
 
       const t0 = Date.now();
-      const response = await withHeartbeat(
-        `waiting on ${vendor}/${model} response`,
-        callWithFailover(
-          client,
+      const response = await withHeartbeat<Anthropic.Message | Awaited<ReturnType<OpenAiAgentTurn["call"]>>>(
+        `waiting on ${openAi?.selection.vendor ?? vendor}/${openAi?.selection.model ?? model} response`,
+        openAi ? openAi.call({
+          model, systemPrompt, messages, signal,
+          effort: resolveTaskModel("agent.execute", llmConfig).effort,
+        }, {
+          beforeAttempt: async () => {
+            const budget = checkTokenBudget(run.tokenUsage, tokenBudget);
+            if (budget.exceeded) {
+              await handleBudgetExceeded(store, taskId, run, budget);
+              throw new Error("Token budget exceeded during failover");
+            }
+            if (await stopOnSpendCap(spendGate, run, store, taskId)) {
+              throw new Error("Spend cap exceeded during failover");
+            }
+          },
+          failed: (error, selection) => {
+            const accounting = error as Partial<Awaited<ReturnType<OpenAiAgentTurn["call"]>>["accounting"]> | null;
+            if (!llmConfig.autoFailover && !accounting?.tokenUsage) return;
+            recordTurnTokenUsageNormalized(run, accounting?.tokenUsage ?? { input: 0, output: 0 },
+              turn + 1, selection.vendor, selection.model);
+            run.turnTokenUsage!.at(-1)!.diagnosticStatus = accounting?.usageStatus === "measured"
+              ? "complete" : accounting?.tokenUsage ? "partial" : "unavailable";
+          },
+          switched: (from, to, reason) => {
+            const note = `failover:${from.vendor}/${from.model} → ${to.vendor}/${to.model}: ${reason}; recorded cost USD ${priceRunUsd(run)}`;
+            run.diagnostics?.notes.push(note);
+            stream("Failover", note);
+          },
+        }) : callWithFailover(
+          resources!.client,
           buildCachedMessageRequest({
             model,
             maxTokens: config.maxTokens,
@@ -2150,18 +2221,41 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
           taskId,
           brief.project.testCommand,
           startingHead,
+          signal,
         ),
       );
       const latencyMs = Date.now() - t0;
 
+      // Attribute each attempt to the provider/model actually used, including after a switch.
+      const turnVendor = openAi?.selection.vendor ?? vendor;
+      const turnModel = openAi?.selection.model ?? model;
+      run.vendor = turnVendor;
+      run.model = turnModel;
       // Track token usage for this turn
-      const rawUsage = response.usage as unknown as Record<string, unknown>;
-      recordTurnTokenUsage(run, rawUsage, turn + 1, vendor, model);
+      if ("accounting" in response) {
+        recordTurnTokenUsageNormalized(run, response.accounting.tokenUsage ?? { input: 0, output: 0 }, turn + 1, turnVendor, response.accounting.model);
+        if (response.accounting.effort && run.diagnostics) {
+          const note = `openai_effort:${response.accounting.effort}`;
+          if (!run.diagnostics.notes.includes(note)) run.diagnostics.notes.push(note);
+        }
+        const last = run.turnTokenUsage!.at(-1)!;
+        last.diagnosticStatus = response.accounting.usageStatus === "measured" ? "complete"
+          : response.accounting.tokenUsage ? "partial" : "unavailable";
+      } else {
+        recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, turnVendor, turnModel);
+      }
+      signal.throwIfAborted();
+      if (response.stop_reason === "refusal") throw new Error(`${turnVendor === "codex" ? "OpenAI" : "Claude"} refused the agent request`);
 
       // Emit tok/s metric — parsed by the web server for live dashboard display
-      const outTokens = rawUsage?.["output_tokens"];
-      if (typeof outTokens === "number" && outTokens > 0 && latencyMs > 0) {
-        detail(formatTokPerSec(outTokens, latencyMs));
+      {
+        const outTokens = "accounting" in response ? response.accounting.tokenUsage?.output
+          : (response.usage as unknown as Record<string, unknown>)?.["output_tokens"];
+        const _outTok = typeof outTokens === "number" ? outTokens : 0;
+        if (_outTok > 0 && latencyMs > 0) {
+          const _tokPerSec = Math.round((_outTok / latencyMs) * 1000 * 10) / 10;
+          detail(`⚡ ${_tokPerSec} tok/s (${latencyMs}ms, ${_outTok} out)`);
+        }
       }
 
       // Shared: check token budget
@@ -2173,12 +2267,17 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       // Process response content
       const assistantContent = response.content;
-      messages.push({ role: "assistant", content: assistantContent });
+      // A reasoning-only token limit leaves no assistant content for either
+      // provider to replay. Claude rejects an empty message in its history.
+      if (assistantContent.length || response.stop_reason !== "max_tokens") {
+        messages.push({ role: "assistant", content: assistantContent });
+      }
 
-      streamAssistantText(assistantContent, formatModelLabel(model));
+      streamAssistantText(assistantContent, formatModelLabel(turnModel));
 
       // Detect plan-only iterations before handling completion
-      const planDetection = detectPlanOnlyIteration(assistantContent);
+      const planDetection = openAi && runHasCodeModifications(run.toolCalls)
+        ? { isPlanOnly: false } : detectPlanOnlyIteration(assistantContent);
 
       // Handle stop reasons
       if (response.stop_reason === "end_turn") {
@@ -2224,7 +2323,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       }
 
       // Process tool calls
-      const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run, livelock);
+      const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run, livelock, signal);
+      signal.throwIfAborted();
       if (await failOnLivelock(livelock, run, store, taskId)) break;
       messages.push({ role: "user", content: toolResults });
 
@@ -2233,17 +2333,25 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     }
 
     if (run.status === "running") {
+      signal.throwIfAborted();
       run.status = "timeout";
       run.error = `Exceeded max turns (${maxTurns})`;
 
-      await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+      await handleRunFailure(store, taskId, openAi ? "pending" : "deferred", "task_failed", run.error);
     }
   } catch (err) {
-    run.status = "failed";
-    run.error = (err as Error).message;
-    console.error(`[Error] ${run.error}`);
+    if (openAi) {
+      run.vendor = openAi.selection.vendor;
+      run.model = openAi.selection.model;
+    }
+    if (signal.aborted || run.status !== "budget_exceeded") {
+      run.status = signal.aborted ? "cancelled" : "failed";
+      run.error = signal.aborted ? "Run interrupted by user" : (err as Error).message;
+      console.error(`[Error] ${run.error}`);
 
-    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+      await handleRunFailure(store, taskId, signal.aborted || openAi ? "pending" : "deferred",
+        signal.aborted ? "task_cancelled" : "task_failed", run.error);
+    }
   } finally {
     // Remove SIGINT handler to restore default behavior
     cancellation.release();

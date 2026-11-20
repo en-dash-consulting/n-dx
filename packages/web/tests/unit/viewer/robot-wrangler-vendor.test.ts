@@ -28,7 +28,7 @@ function catalog(overrides: Json = {}): Json {
       readiness: { state: "ready", summary: "Ready · CLI 2.1.0", apiKey: false },
     },
     codex: {
-      models: ["gpt-5.5", "gpt-5.6-sol"], providers: ["cli"], defaultModel: "gpt-5.5",
+      models: ["gpt-5.5", "gpt-5.6-sol"], providers: ["cli", "api"], defaultModel: "gpt-5.5",
       source: "built-in", checkedAt: null, reason: "No OPENAI_API_KEY", cli: { found: false, version: null, path: null },
       readiness: { state: "needs-setup", summary: "CLI not found" },
     },
@@ -103,7 +103,7 @@ function stubApi(opts: { config: Json; catalog?: Json; henchProvider?: string; f
     if (u.includes("/api/hench/config")) {
       if (method === "PUT") {
         return opts.failHench
-          ? { ok: false, status: 400, json: async () => ({ error: 'Provider "api" is not supported for vendor "codex".' }) }
+          ? { ok: false, status: 400, json: async () => ({ error: "Fixture provider save failed." }) }
           : ok({ applied: [] });
       }
       return ok({ config: { provider: opts.henchProvider ?? "cli" } });
@@ -325,7 +325,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     expect(select("agent.claude")).toBeNull();
     expect(select("agent.codex")).toBeNull();
     expect(root.querySelector(".llm-tier-pending")?.textContent).toBe("Save the vendor change to choose models for codex.");
-    expect(root.querySelectorAll(".llm-connection-cards [role=radio]")).toHaveLength(1);
+    expect(root.querySelectorAll(".llm-connection-cards [role=radio]")).toHaveLength(2);
     expect(connection("cli").getAttribute("aria-checked")).toBe("true");
     expect(api.calls.filter((c) => c.url.includes("/api/llm/catalog"))).toHaveLength(1);
   });
@@ -495,16 +495,29 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     });
 
     it("saves the vendor switch first so the hench route validates provider against it", async () => {
+      const api = stubApi({ config: config("claude"), henchProvider: "cli" });
+      await mount();
+
+      await act(async () => { card("codex").click(); });
+      await pickConnection("api");
+      await save();
+
+      // Validate the explicit API selection against the newly saved vendor.
+      expect(api.puts().map((c) => c.url)).toEqual(["/api/llm/config", "/api/hench/config"]);
+      expect(api.puts()[0].body).toEqual({ changes: { "llm.vendor": "codex" } });
+      expect(api.puts()[1].body).toEqual({ changes: { provider: "api" } });
+    });
+
+    it("preserves the API provider when switching from Claude to Codex", async () => {
       const api = stubApi({ config: config("claude"), henchProvider: "api" });
       await mount();
 
       await act(async () => { card("codex").click(); });
+      expect(connection("api").getAttribute("aria-checked")).toBe("true");
       await save();
 
-      // codex is cli-only and the saved provider is api, so the page moves it to cli.
-      expect(api.puts().map((c) => c.url)).toEqual(["/api/llm/config", "/api/hench/config"]);
+      expect(api.puts().map((c) => c.url)).toEqual(["/api/llm/config"]);
       expect(api.puts()[0].body).toEqual({ changes: { "llm.vendor": "codex" } });
-      expect(api.puts()[1].body).toEqual({ changes: { provider: "cli" } });
     });
 
     it("after the second write fails, the llm part is clean and the provider stays dirty with its error", async () => {
@@ -517,7 +530,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
 
       expect(api.puts()).toHaveLength(2);
       expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Provider → api");
-      expect(root.textContent).toContain('Provider "api" is not supported for vendor "codex".');
+      expect(root.textContent).toContain("Fixture provider save failed.");
       expect(root.querySelector(".llm-field-dirty .llm-connection-cards")).not.toBeNull();
       expect(root.querySelector(`.llm-field-dirty select[id="agent.claude"]`)).toBeNull();
 

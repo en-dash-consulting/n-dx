@@ -245,6 +245,7 @@ export async function dispatchTool(
   input: Record<string, unknown>,
   rexHandlers?: RexToolHandlers,
 ): Promise<string> {
+  ctx.abortSignal?.throwIfAborted();
   const output = await dispatchUnchecked(ctx, name, input, rexHandlers);
   const writes = ctx.configBackstop?.restore() ?? [];
   if (writes.length === 0) return output;
@@ -295,6 +296,7 @@ async function dispatchUnchecked(
           ctx.guard,
           ctx.projectDir,
           input as { command: string; cwd?: string; timeout?: number },
+          ctx.abortSignal,
         );
 
       case "git":
@@ -302,6 +304,7 @@ async function dispatchUnchecked(
           ctx.guard,
           ctx.projectDir,
           input as { subcommand: string; args?: string },
+          ctx.abortSignal,
         );
 
       case "rex_update_status":

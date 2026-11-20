@@ -99,8 +99,10 @@ export interface CompletionRequest {
   outputFormat?: "json" | "stream-json";
   /** Additional CLI flags to pass (only used in CLI mode). */
   cliFlags?: string[];
-  /** Timeout in milliseconds (only used in CLI mode). */
+  /** Timeout in milliseconds (CLI mode and OpenAI blocking text completions). */
   timeoutMs?: number;
+  /** Cancellation for OpenAI blocking text completions. */
+  signal?: AbortSignal;
   /**
    * The `llm.effort` value matched for this call's task class
    * (`TaskModelResolution.effort`).

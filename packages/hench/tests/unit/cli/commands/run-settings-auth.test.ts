@@ -25,6 +25,7 @@ beforeEach(() => {
   vi.stubEnv("NDX_HOME", home);
   vi.stubEnv("ANTHROPIC_API_KEY", undefined);
   vi.stubEnv("GEMINI_API_KEY", undefined);
+  vi.stubEnv("OPENAI_API_KEY", undefined);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -106,6 +107,16 @@ describe("provider=api against llm.<vendor>.auth", () => {
     expect(r.provider.error).toBeUndefined();
     expect(r.warnings.map((w) => w.code)).toContain("saved-provider-unavailable");
     expect(r.warnings.find((w) => w.code === "saved-provider-unavailable")?.message).toContain("llm.claude.auth");
+  });
+
+  it("keeps Codex CLI API-key authentication separate from direct API execution", () => {
+    const llm: LLMConfig = { vendor: "codex", codex: { auth: "api", api_key: "fixture-key" } };
+    for (const provider of ["cli", "api"] as const) {
+      const r = resolveFor({ vendor: "codex", provider, llm });
+      expect(r.provider.value).toBe(provider);
+      expect(r.provider.error).toBeUndefined();
+    }
+    expect(resolveFor({ vendor: "codex", provider: "api", llm: { vendor: "codex", codex: { auth: "cli" } } }).provider.error).toBeDefined();
   });
 
   it("google (no CLI login) runs its api loop on a stored key", () => {

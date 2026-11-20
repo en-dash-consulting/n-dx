@@ -210,7 +210,7 @@ export const FORBIDDEN_CONFIG_SEGMENTS = new Set(["__proto__", "constructor", "p
  */
 export const VENDOR_PROVIDERS: Readonly<Record<"claude" | "codex" | "google" | "local", readonly ("cli" | "api")[]>> = {
   claude: ["cli", "api"],
-  codex: ["cli"],
+  codex: ["cli", "api"],
   google: ["api"],
   local: ["api"],
 };

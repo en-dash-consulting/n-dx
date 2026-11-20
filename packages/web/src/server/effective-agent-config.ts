@@ -31,10 +31,9 @@
  *
  * ## This reports a resolution, not a verdict
  *
- * Two configurations resolve here but would refuse to run: `vendor=codex` with
- * `provider=api` (hench throws — codex has no API loop), and a model pinned for
+ * A configuration can resolve here but refuse to run: a model pinned for
  * a vendor that cannot run it (hench throws from `assertModelVendorCompatible`).
- * Neither throws here, because a settings page that 500s on a bad saved value
+ * This does not throw here, because a settings page that 500s on a bad saved value
  * is a settings page you cannot use to fix it. The caller reports what the
  * config resolves to; `validateProviderForVendor` (`hench-config-fields.ts`)
  * and `isModelCompatibleWithVendor` (`@n-dx/llm-client`) are how the UI marks
@@ -87,8 +86,8 @@ export interface EffectiveAgentConfig {
  * The provider hench would run this vendor on.
  *
  * Mirrors `cmdRun`'s gate: a vendor that rejects `"cli"` always accepts
- * `"api"`, so an unsupported `"cli"` silently auto-switches. An unsupported
- * `"api"` — codex only, which has no API loop — has no such fallback and hench
+ * `"api"`, so an unsupported `"cli"` silently auto-switches. An unknown
+ * provider has no such fallback and hench
  * fails loudly instead. There is nothing to switch it *to*, so it is reported
  * unchanged; see the note on verdicts in this file's header for who flags it.
  */

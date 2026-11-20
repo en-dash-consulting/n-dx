@@ -94,7 +94,7 @@ describe("GET /api/llm/catalog", () => {
     const res = await fetch(`${baseUrl}/api/llm/catalog`);
     const body = await res.json();
     expect(body.claude.providers).toEqual(["cli", "api"]);
-    expect(body.codex.providers).toEqual(["cli"]);
+    expect(body.codex.providers).toEqual(["cli", "api"]);
     expect(body.google.providers).toEqual(["api"]);
     expect(body.local.providers).toEqual(["api"]);
   });
@@ -512,6 +512,18 @@ describe("GET /api/llm/catalog — readiness", () => {
 
     execMock.mockResolvedValue(MISSING_CLI);
     expect((await getCatalog("?refresh=true")).codex.readiness).toEqual({ state: "needs-setup", summary: "CLI not found" });
+  });
+
+  it("Codex API readiness uses its key even without a CLI", async () => {
+    execMock.mockResolvedValue(MISSING_CLI);
+    vi.stubEnv("OPENAI_API_KEY", SECRET);
+    await writeConfig({ hench: { provider: "api" }, llm: { vendor: "codex" } });
+    vendorFetch.mockResolvedValue(jsonOk({ data: [{ id: "gpt-6-astra" }] }));
+    const { codex } = await getCatalog();
+    expect(codex.readiness).toEqual({ state: "ready", summary: "Ready · API key set", apiKey: true });
+    expect(codex.provenance).toBe("vendor-api");
+    expect(codex.providers).toEqual(["cli", "api"]);
+    expect(execMock.mock.calls.some(([binary]) => binary === "codex")).toBe(false);
   });
 
   it("google is ready when a key resolves from config or its env var", async () => {

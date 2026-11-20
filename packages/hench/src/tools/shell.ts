@@ -5,6 +5,7 @@ export async function toolRunCommand(
   guard: ToolGuard,
   projectDir: string,
   params: { command: string; cwd?: string; timeout?: number },
+  signal?: AbortSignal,
 ): Promise<string> {
   guard.checkCommand(params.command);
 
@@ -15,5 +16,5 @@ export async function toolRunCommand(
 
   // The guard's env has credential-shaped variables stripped (guard/env.ts);
   // a guard without one (lightweight test doubles) falls back to process.env.
-  return execShell({ command: params.command, cwd, timeout, env: guard.childEnv, sandbox: guard.sandbox });
+  return execShell({ command: params.command, cwd, timeout, env: guard.childEnv, sandbox: guard.sandbox, signal });
 }

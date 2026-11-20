@@ -119,7 +119,41 @@ ndx config llm.vendor claude .    # or: codex
 | Vendor | Rex Behavior | Hench Behavior | Token Accounting |
 |--------|-------------|----------------|------------------|
 | `claude` | Shared LLM client; API when key configured, CLI fallback | Both `api` and `cli` providers | Full support |
-| `codex` | Codex CLI adapter (`codex exec`) | CLI-only (`api` rejected) | Limited (CLI doesn't return usage) |
+| `codex` | CLI or OpenAI API, selected by authentication mode | Both `cli` and direct Responses `api` providers | Request usage on API; reported CLI usage |
+
+For direct OpenAI tasks, use `n-dx work --provider=api --model=gpt-6-astra .`
+with `llm.vendor=codex` and OpenAI API authentication. The agent codec supports
+`gpt-6.1-sol` and `gpt-6-astra`; other model pins are refused, not replaced.
+`hench.provider=cli` with `llm.codex.auth=api` remains CLI execution authenticated
+with an API key. Direct API runs support diff approval; CLI self/pair review
+remains unavailable on this path.
+
+Direct OpenAI API failover is opt-in (`llm.autoFailover=true`, off by default).
+Starting from the selected OpenAI model, a run can try the configured Codex light
+model, then Claude standard, then Claude light. Each selection is consumed once
+across the run, including successful tool turns. Unsupported OpenAI fallback
+models are skipped; the codec's supported models do not expand. Claude needs its
+own API credentials. No attempt uses a CLI or changes saved vendor/model settings.
+Authentication, unavailable-model, rate-limit, network and timeout errors can
+advance the chain; refusals, malformed output, budget limits and caller cancellation
+stop it. Exhaustion restores the original selection and error. Usage and switch
+diagnostics identify the effective provider/model.
+
+Each attempt in this OpenAI-origin chain, including Claude fallbacks, has a whole
+request deadline: two minutes plus the configured `hench.maxTokens` budget at ten
+tokens/second (rounded up to seconds), clamped to 10–30 minutes. For 8,192 tokens
+that is 15 minutes 40 seconds. It covers response-body reads and primary-provider
+retries/backoff; secondary clients have no transport retries. This deadline is
+separate from retry delays, and healthy turns may exceed one minute. Caller abort
+wins over a simultaneous timeout and does not trigger a switch. Cancelled OpenAI
+and Claude API tasks return to pending with a `task_cancelled` event.
+
+Stateless Responses requests include encrypted reasoning for tool-history replay.
+Output-token exhaustion continues on the same model, including reasoning-only
+turns, and records reported usage. No function call or opaque continuation from
+that truncated turn is executed or replayed; the agent is asked to retry unfinished
+tools. Other incomplete/failed statuses and malformed terminal payloads fail
+safely. Context compaction still rejects truncated summaries.
 
 ## Claude Configuration
 

@@ -328,6 +328,7 @@ describe("hench → llm-client gateway contract", () => {
   });
 
   const GATEWAY_FUNCTIONS = [
+    "createOpenAiApiProvider", "supportsOpenAiTurns",
     "loadClaudeConfig",
     "loadLLMConfig",
     "compileEnvPolicy",
@@ -674,7 +675,7 @@ describe("web → sourcevision gateway contract", () => {
  * The dashboard's per-vendor model/provider catalog (`GET /api/llm/catalog`
  * in `packages/web/src/server/routes-llm.ts`) and its hench-config save path
  * must offer exactly the providers hench itself accepts — claude cli or api,
- * codex cli only, google api, local api (`cmdRun`'s provider gates in
+ * codex cli/api, google api, local api (`cmdRun`'s provider gates in
  * `packages/hench/src/cli/commands/run.ts`, driven by `VENDOR_PROVIDERS` in
  * `packages/hench/src/cli/commands/provider-support.ts`).
  *
@@ -698,11 +699,11 @@ describe("hench ↔ web provider-support contract", () => {
     expect(webFields.VENDOR_PROVIDERS).toEqual(henchPublic.VENDOR_PROVIDERS);
   });
 
-  it("pins the exact rule set: claude cli/api, codex cli only, google api, local api", async () => {
+  it("pins the exact rule set: claude cli/api, codex cli/api, google api, local api", async () => {
     const henchPublic = await import("../../packages/hench/dist/public.js");
     expect(henchPublic.VENDOR_PROVIDERS).toEqual({
       claude: ["cli", "api"],
-      codex: ["cli"],
+      codex: ["cli", "api"],
       google: ["api"],
       local: ["api"],
     });
@@ -982,7 +983,7 @@ describe("gateway export auto-detection", () => {
         "failureCategoryLabel", "compileCodexPolicyFlags", "mapSandboxToCodexFlag",
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
-        "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
+        "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry", "createOpenAiApiProvider", "supportsOpenAiTurns",
         "classifyLLMError", "isAuthError", "parseLmStudioError", "resolveLocalTimeoutMs", "fetchLocalCompletion",
         "getNextFailoverAttempt", "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli", "terminateProcessTree",
         "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor",

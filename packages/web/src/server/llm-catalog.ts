@@ -1,9 +1,9 @@
 /**
  * Per-vendor live model list and installed-CLI probe behind GET /api/llm/catalog.
  *
- * Codex uses the selected CLI's model/list client catalog, which is not proof
- * of inference access. Claude uses its vendor API. Codex probes share a short
- * cache keyed by effective config, environment, binary and auth-file metadata.
+ * Codex CLI uses model/list with a short identity-aware cache. Direct API
+ * discovery retains its separate uncached vendor-model path. Neither proves
+ * inference access. Claude uses its vendor API.
  */
 
 import { createHash } from "node:crypto";
@@ -172,6 +172,23 @@ async function probeCli(projectDir: string, { binary, env }: ProbeContext): Prom
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };
 }
 
+/** Direct API discovery retains its credential-safe uncached path, independent of CLI settings. */
+async function probeCodexApi(config: LLMConfig): Promise<LiveVendorProbe> {
+  // Catalog probes only contact the public vendor URL. A custom endpoint's
+  // credential belongs to that endpoint and cannot be used for this probe.
+  if (config.codex?.api_endpoint && config.codex.api_endpoint.replace(/\/+$/, "") !== "https://api.openai.com/v1") {
+    return {
+      listing: { ok: false, reason: "Live discovery is unavailable for custom OpenAI endpoints." },
+      checkedAt: new Date().toISOString(), cli: { found: false, version: null, path: null },
+    };
+  }
+  const auth = resolveVendorAuth(LLM_VENDOR.CODEX, config);
+  const listing: LiveVendorProbe["listing"] = auth.mode === "api" && auth.key
+    ? await listVendorModels(LLM_VENDOR.CODEX, { ...config, codex: { ...config.codex, api_key: auth.key.value } })
+    : { ok: false, reason: "OpenAI API key unavailable under llm.codex.auth; configure API authentication before refreshing." };
+  return { listing, checkedAt: new Date().toISOString(), cli: { found: false, version: null, path: null } };
+}
+
 /**
  * Probe the binary and filtered environment captured for this lookup. The
  * loader clamps untrusted binary settings. Codex model/list also requires
@@ -214,8 +231,12 @@ async function probeVendor(
 export async function getLiveVendorProbe(
   vendor: ListableVendor,
   projectDir: string,
-  options: { refresh?: boolean } = {},
+  options: { refresh?: boolean; provider?: "cli" | "api" } = {},
 ): Promise<LiveVendorProbe> {
+  // API discovery must neither reuse a CLI catalog nor inspect native CLI config.
+  if (vendor === LLM_VENDOR.CODEX && options.provider === "api") {
+    return probeCodexApi(await loadLLMConfig(projectDir));
+  }
   const key = cacheKey(projectDir, vendor);
   let entry = options.refresh ? undefined : cache.get(key);
   if (!entry) entry = { requested: 0, prepared: 0, expiresAt: 0 };
@@ -290,9 +311,11 @@ export function claudeReadiness(
   return { ...cliReadiness(cli), apiKey: hasKey };
 }
 
-/** Codex has no API provider, so only its CLI counts. */
-export function codexReadiness(cli: CliInfo): VendorReadiness {
-  return cliReadiness(cli);
+/** Direct OpenAI execution needs an API key; CLI execution keeps its own readiness. */
+export function codexReadiness(cli: CliInfo, provider = "cli", config: LLMConfig = {}): VendorReadiness {
+  if (provider !== "api") return cliReadiness(cli);
+  const auth = resolveVendorAuth(LLM_VENDOR.CODEX, config);
+  return apiKeyReadiness(auth.mode === "api" && auth.key !== undefined);
 }
 
 /** Gemini runs on the API alone, from `llm.google.api_key` or `GEMINI_API_KEY` (config never carries an env-var name). */

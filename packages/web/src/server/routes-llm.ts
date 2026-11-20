@@ -31,6 +31,8 @@ import {
   isModelCompatibleWithVendor,
   resolveClaudeConfig,
   parseLLMConfig,
+  loadLLMConfig,
+  supportsOpenAiTurns,
   resolveLayout,
   getNextFailoverAttempt,
   DEFAULT_LOCAL_HOST,
@@ -583,6 +585,10 @@ function findEffectiveProblems(effective: EffectiveAgentConfig): EffectiveProble
       message: `Model "${effective.model}" is not a ${effective.vendor} model.`,
     });
   }
+  if (effective.vendor === LLM_VENDOR.CODEX && effective.provider === "api" &&
+      problems.every(problem => problem.field !== "model") && !supportsOpenAiTurns(effective.model)) {
+    problems.push({ field: "model", message: `OpenAI model "${effective.model}" has no verified agent-turn support.` });
+  }
   return problems;
 }
 
@@ -1012,7 +1018,7 @@ export interface VendorCatalogEntry {
 
 /** A vendor entry whose CLI is installed locally, with what `<binary> --version` reported. */
 export interface CliVendorCatalogEntry extends VendorCatalogEntry {
-  cli: CliInfo;
+  cli?: CliInfo;
 }
 
 /**
@@ -1078,15 +1084,20 @@ export async function validateCatalogModel(
   projectDir: string,
   vendor: string | null,
   model: string,
+  providerOverride?: "cli" | "api",
 ): Promise<string | null> {
   if (vendor === LLM_VENDOR.LOCAL) return null;
   if (vendor !== LLM_VENDOR.CLAUDE && vendor !== LLM_VENDOR.CODEX && vendor !== LLM_VENDOR.GOOGLE) {
     return `No LLM vendor is configured (llm.vendor), so model "${model}" cannot be checked.`;
   }
   if (!isModelCompatibleWithVendor(vendor, model)) return `Model "${model}" is not a ${vendor} model.`;
+  const provider = providerOverride ?? resolveEffectiveProvider(vendor, readHenchAgentSettings(readConfigSnapshot(projectDir)).provider);
+  if (vendor === LLM_VENDOR.CODEX && provider === "api" && !supportsOpenAiTurns(model)) {
+    return `OpenAI model "${model}" has no verified agent-turn support.`;
+  }
   if (cloudVendorModels(vendor).includes(model)) return null;
   if (vendor !== LLM_VENDOR.GOOGLE) {
-    const live = await getLiveVendorProbe(vendor, projectDir);
+    const live = await getLiveVendorProbe(vendor, projectDir, { provider });
     if (live.listing.ok && live.listing.models.includes(model)) return null;
     if (!live.listing.ok) return `Cannot check model "${model}" in the ${vendor} catalog: ${live.listing.reason}`;
   }
@@ -1108,11 +1119,12 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   // through the same chain as `effective`, minus the hench override rung.
   const defaultModel = (vendor: LLMVendor): string =>
     resolveEffectiveAgentModel(vendor, undefined, llmConfig).model;
+  const henchProvider = readHenchAgentSettings(snapshot).provider;
+  const codexProvider = resolveEffectiveProvider(LLM_VENDOR.CODEX, henchProvider);
   const [claudeProbe, codexProbe] = await Promise.all([
     getLiveVendorProbe(LLM_VENDOR.CLAUDE, projectDir, { refresh }),
-    getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh }),
+    getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh, provider: codexProvider }),
   ]);
-  const henchProvider = readHenchAgentSettings(snapshot).provider;
   const cliEntry = (
     vendor: ListableVendor,
     probe: LiveVendorProbe,
@@ -1120,16 +1132,18 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   ): CliVendorCatalogEntry => {
     const builtIn = cloudVendorModels(vendor);
     const live = probe.listing.ok;
+    const models = probe.listing.ok ? probe.listing.models : builtIn;
+    const directOpenAi = vendor === LLM_VENDOR.CODEX && codexProvider === "api";
     return {
-      models: probe.listing.ok ? probe.listing.models : builtIn,
+      models: directOpenAi ? models.filter(supportsOpenAiTurns) : models,
       providers: [...VENDOR_PROVIDERS[vendor]],
       defaultModel: defaultModel(vendor),
       source: live ? "live" : "built-in",
-      provenance: live ? (vendor === LLM_VENDOR.CODEX ? "codex-client-catalog" : "vendor-api") : "built-in",
+      provenance: live ? (vendor === LLM_VENDOR.CODEX && codexProvider === "cli" ? "codex-client-catalog" : "vendor-api") : "built-in",
       checkedAt: probe.checkedAt,
       ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
       readiness,
-      cli: probe.cli,
+      ...(!directOpenAi && { cli: probe.cli }),
     };
   };
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
@@ -1149,7 +1163,7 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       claudeProbe,
       claudeReadiness(resolveEffectiveProvider(LLM_VENDOR.CLAUDE, henchProvider), claudeProbe.cli, llmConfig),
     ),
-    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe, codexReadiness(codexProbe.cli)),
+    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe, codexReadiness(codexProbe.cli, codexProvider, await loadLLMConfig(projectDir))),
     google: {
       models: cloudVendorModels(LLM_VENDOR.GOOGLE),
       providers: [...VENDOR_PROVIDERS.google],

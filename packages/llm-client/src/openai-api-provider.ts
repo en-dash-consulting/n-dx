@@ -2,9 +2,11 @@
  * OpenAI API provider — calls OpenAI-compatible APIs via native fetch.
  *
  * Implements the generic {@link LLMProvider} interface for the "codex" vendor
- * in "api" mode. Uses the OpenAI Chat Completions API format:
+ * in "api" mode. Text completions retain the Chat Completions format;
+ * completeTurn/streamTurn use Responses for verified tool-capable models:
  *
- * - `POST /v1/chat/completions` for completions
+ * - `POST /v1/chat/completions` for text completions
+ * - `POST /v1/responses` for agent turns (no tool execution here)
  * - `GET /v1/models` for auth validation
  *
  * ## When this provider is selected
@@ -25,7 +27,10 @@
  * @see {@link createCodexCliClient} in `codex-cli-provider.ts` for the CLI alternative
  */
 
+import { setTimeout as delay } from "node:timers/promises";
+import { createOpenAiTurns, responseError, supportsOpenAiTurns } from "./openai-responses.js";
 import { resolveOpenAiEffort, usesOpenAiCompletionTokenLimit } from "./codex-effort.js";
+import { parseRetryAfterHeader, DEFAULT_AUTO_RETRY_THRESHOLD_MS } from "./rate-limit.js";
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
@@ -33,7 +38,7 @@ import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } fro
 import type { CodexConfig } from "./llm-types.js";
 import { requireVendorApiKey, resolveVendorKey } from "./vendor-auth.js";
 import { NEWEST_MODELS, resolveApiEndpoint } from "./config.js";
-import { postJsonWithRetries, throwHttpStatusError } from "./http-retry.js";
+import { throwHttpStatusError } from "./http-retry.js";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
@@ -203,11 +208,12 @@ export function createOpenAiApiProvider(
     vendor: LLM_VENDOR.CODEX,
     mode: "api",
     ...(defaultModel ? { model: defaultModel } : {}),
-    capabilities: ["streaming", "function-calling"],
+    capabilities: supportsOpenAiTurns(defaultModel) ? ["streaming", "function-calling"] : ["streaming"],
   };
 
   return {
     info,
+    ...createOpenAiTurns({ baseUrl, headers, maxTokens, maxRetries, baseDelayMs, parseUsage }),
 
     async validateAuth(): Promise<boolean> {
       try {
@@ -239,22 +245,66 @@ export function createOpenAiApiProvider(
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       const model = request.model || defaultModel;
       const effort = resolveOpenAiEffort(model, request.effort, request.taskClass);
+      const signal = AbortSignal.any([
+        ...(request.signal ? [request.signal] : []),
+        ...(request.timeoutMs === undefined ? [] : [AbortSignal.timeout(request.timeoutMs)]),
+      ]);
+      const abortError = (): Error => request.signal?.aborted
+        ? new DOMException("OpenAI request cancelled", "AbortError")
+        : new ClaudeClientError("OpenAI request timed out", "timeout", true);
 
-      return postJsonWithRetries({
-        url: () => `${baseUrl}/chat/completions`,
-        body: () => JSON.stringify({
-          model,
-          ...(usesOpenAiCompletionTokenLimit(model)
-            ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
-          ...(effort !== undefined ? { reasoning_effort: effort } : {}),
-          messages: [{ role: "user", content: request.prompt }],
-        }),
-        headers,
-        maxRetries,
-        baseDelayMs,
-        throwForStatus: (status, body) => throwHttpStatusError(status, `OpenAI API error ${status}: ${body}`),
-        read: readChatCompletion,
-      });
+      for (let attempt = 0; ; attempt++) {
+        if (signal.aborted) throw abortError();
+        let failure: ClaudeClientError;
+        try {
+          const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: "POST",
+            headers,
+            signal,
+            redirect: "error",
+            body: JSON.stringify({
+              model,
+              ...(usesOpenAiCompletionTokenLimit(model)
+                ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+              ...(effort !== undefined ? { reasoning_effort: effort } : {}),
+              messages: [{ role: "user", content: request.prompt }],
+            }),
+          });
+
+          if (!response.ok) {
+            const error = responseError(response.status, parseRetryAfterHeader(response.headers.get("retry-after")));
+            await response.body?.cancel();
+            throw error;
+          }
+
+          const data = await response.json() as Record<string, unknown>;
+          if (signal.aborted) throw abortError();
+          const choices = data.choices as Array<Record<string, unknown>> | undefined;
+          let text = "";
+
+          if (choices && choices.length > 0) {
+            const choice = choices[0];
+            const message = choice.message as Record<string, unknown> | undefined;
+            // A truncated or filtered fragment cannot stand in for the dropped history.
+            const incompleteSummary = request.taskClass === "context.summarize" &&
+              (choice.finish_reason === "length" || choice.finish_reason === "content_filter");
+            if (!incompleteSummary && message && typeof message.content === "string") {
+              text = message.content;
+            }
+          }
+
+          return { text, ...parseUsage(data.usage) };
+        } catch (err) {
+          if (signal.aborted) throw abortError();
+          failure = err instanceof ClaudeClientError ? err
+            : err instanceof SyntaxError ? new ClaudeClientError("Invalid OpenAI text completion payload", "unknown", false)
+            : new ClaudeClientError("OpenAI connection failed", "network", true);
+        }
+        if (!failure.retryable || attempt >= maxRetries ||
+            (failure.retryAfterMs ?? 0) > DEFAULT_AUTO_RETRY_THRESHOLD_MS) throw failure;
+        try { await delay(failure.retryAfterMs ?? baseDelayMs * 2 ** attempt, undefined, { signal }); }
+        catch { throw abortError(); }
+      }
     },
 
     async *stream(request: CompletionRequest): AsyncIterable<StreamChunk> {

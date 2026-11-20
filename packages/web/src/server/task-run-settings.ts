@@ -156,7 +156,7 @@ export async function checkSavedRun(
     const model = vendor ? (models as Record<string, string> | undefined)?.[vendor] : undefined;
     if (model === undefined) continue;
     if (defaults[key] !== undefined && model === defaults[key]) continue;
-    const error = await validateCatalogModel(projectDir, vendor, model);
+    const error = await validateCatalogModel(projectDir, vendor, model, key === "reviewModels" ? "cli" : value.provider);
     if (error) return { ok: false, key, error: `Run setting "${key}.${vendor}": ${error}` };
   }
   if (value.provider !== undefined && vendor) {

@@ -20,7 +20,7 @@
 import { dirname } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
 import type { PRDItem, RunSettings, V2Tree } from "../../prd/rex-gateway.js";
-import { LLM_VENDOR, getGitCommonDir } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, getGitCommonDir, supportsOpenAiTurns } from "../../prd/llm-gateway.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { PERMISSION_MODES } from "../../schema/index.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
@@ -39,6 +39,7 @@ import { CLIError, requireLLMCLI } from "../errors.js";
 import { result as output, warn } from "../output.js";
 import { VENDOR_PROVIDERS } from "./provider-support.js";
 import { collectResettableTasks, readTreeConformanceRefusal } from "./run.js";
+import { decideGateOnlyRetry, gateOnlyProbeCommits, readGateOnlyGitFacts, taskRunsNewestFirst } from "../../agent/lifecycle/gate-only-retry.js";
 import { listRuns } from "../../store/runs.js";
 import { decideEscalation } from "../../agent/analysis/escalation.js";
 import {
@@ -368,8 +369,9 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   // Whether this task's next attempt would be escalated (hench.escalation),
   // decided from the run history exactly as a run decides it. When it would,
   // everything below resolves for the escalation vendor, as the run does.
+  const history = entry ? await listRuns(henchDir) : [];
   const decision = entry
-    ? decideEscalation(entry.item.id, await listRuns(henchDir), config.escalation, config.maxFailedAttempts)
+    ? decideEscalation(entry.item.id, history, config.escalation, config.maxFailedAttempts)
     : undefined;
   const { plan, skipped } = decision
     ? planEscalation({ decision, flags, vendor: baseVendor, llmConfig: baseLlmConfig })
@@ -452,6 +454,15 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   // ── Provider ──────────────────────────────────────────
   const provider = settings.provider;
   if (provider.error) refuse("provider-unsupported", provider.error);
+  if (!provider.error && !settings.model.mismatch && provider.value === "api" &&
+      vendor === LLM_VENDOR.CODEX && !supportsOpenAiTurns(settings.model.value)) {
+    const runs = taskRunsNewestFirst(entry?.item.id ?? taskId, history);
+    const gateOnly = runs[0]?.completionHold?.outcome === "not-applied" &&
+      decideGateOnlyRetry(runs, await readGateOnlyGitFacts(dir, gateOnlyProbeCommits(runs))).eligible;
+    if (!gateOnly) {
+      refuse("provider-unsupported", new CLIError(`OpenAI model "${settings.model.value}" has no verified agent-turn support.`));
+    }
+  }
   const reviewError = settings.review.value ? reviewProviderError(vendor, provider.value) : undefined;
   if (reviewError) refuse("provider-unsupported", reviewError);
   if (settings.reviewPairError) refuse("provider-unsupported", settings.reviewPairError);

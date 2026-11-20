@@ -47,6 +47,7 @@
  * ```
  */
 
+import type { ToolDefinition } from "./tool-schema.js";
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 
 /**
@@ -170,6 +171,47 @@ export interface StreamChunk {
   done?: boolean;
 }
 
+/** A validated call. Only completed turns expose executable tool calls. */
+export interface ProviderToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+/** Conversation history, including tool failures as data rather than transport errors. */
+export interface ProviderMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  toolCalls?: readonly ProviderToolCall[];
+  toolCallId?: string;
+  isError?: boolean;
+  /** Opaque assistant output: replay only to the originating vendor/model. Never log it. */
+  continuation?: { vendor: LLMVendor; model: string; items: readonly unknown[] };
+}
+
+export interface ProviderTurnRequest {
+  model: string;
+  messages: readonly ProviderMessage[];
+  tools: readonly ToolDefinition[];
+  effort?: string;
+  taskClass?: string;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+export interface ProviderTurnResult extends CompletionResult {
+  message: ProviderMessage;
+  model: string;
+  effort?: string;
+  /** max_tokens is nonterminal; its message contains no executable calls. */
+  stopReason: "end_turn" | "tool_use" | "refusal" | "max_tokens";
+}
+
+/** Text is provisional; tools and continuation are available only on completed. */
+export type ProviderTurnEvent =
+  | { type: "text_delta"; text: string }
+  | { type: "completed"; result: ProviderTurnResult };
+
 // ── Core provider interface ────────────────────────────────────────────────
 
 /**
@@ -209,6 +251,10 @@ export interface LLMProvider {
    * @throws {ClaudeClientError} on classified failures (auth, timeout, rate-limit, etc.)
    */
   complete(request: CompletionRequest): Promise<CompletionResult>;
+
+  /** Optional agent protocol. Check method availability; text APIs cannot substitute. */
+  completeTurn?(request: ProviderTurnRequest): Promise<ProviderTurnResult>;
+  streamTurn?(request: ProviderTurnRequest): AsyncIterable<ProviderTurnEvent>;
 
   /**
    * Stream a completion as an async iterable of incremental chunks.
