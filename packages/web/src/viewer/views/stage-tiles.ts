@@ -59,6 +59,11 @@ export type RenderPanel = (panel: StagePanelId, opened: boolean, grid: TileGridA
 /** A tile's summary, or null to show its panel or its view cut to the tile. */
 export type RenderSummary = (tile: StageTile) => ComponentChild | null;
 
+/** Whether the tile's title differs between a v1 and a v2 project (it names its view, whose label does). */
+export function titleVariesByLayout(tile: StageTile): boolean {
+  return !tile.title && viewLabelFor(tile.view, "v1") !== viewLabelFor(tile.view, "v2");
+}
+
 /** Key of a tile: its panel, else its view. */
 export function tileKey(tile: StageTile): string {
   return tile.panel ?? tile.view;
@@ -316,8 +321,9 @@ export function useOverflowing(ref: { current: HTMLElement | null }): boolean {
  */
 function PendingTile({ tile, stage }: { tile: StageTile; stage: StageId }) {
   const key = tileKey(tile);
-  const layout = useStatusLayout();
-  const title = tileTitle(tile, layout);
+  // A title that depends on the layout (Describe a change / Add Items) is not
+  // known yet: the head says "Loading..." rather than guess the v1 one.
+  const title = tile.title ?? (titleVariesByLayout(tile) ? "Loading..." : viewLabelFor(tile.view, "v2"));
   if (tile.band) return h("section", { class: "stage-band", "data-tile": key, "data-pending": "true", "aria-label": title });
   const idBase = `stage-tile-${stage}-${key}`;
   return h("section", {

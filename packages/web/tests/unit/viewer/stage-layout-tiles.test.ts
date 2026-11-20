@@ -86,6 +86,21 @@ describe("Plan tiles before the first status", () => {
     expect(root.querySelector("[data-pending]")).toBeNull();
   });
 
+  it("names the capture tile neither Add Items nor Describe a change until the layout is known", () => {
+    status = null;
+    mount();
+    const capture = root.querySelector('[data-tile="capture"]')!;
+    expect(capture.hasAttribute("data-pending")).toBe(true);
+    expect(capture.querySelector(".stage-tile-title")?.textContent).toBe("Loading...");
+    expect(root.textContent).not.toMatch(/Add Items|Generate/);
+
+    // The real tile takes over once status lands. (Its title reads the status cache,
+    // which this harness's mocked useProjectStatus does not fill.)
+    status = withLayout("v2");
+    mount();
+    expect(root.querySelector('[data-tile="capture"]')?.hasAttribute("data-pending")).toBe(false);
+  });
+
   it("draws the tiles in their v2 order while the layout loads, so nothing moves when it lands", () => {
     status = null;
     mount();

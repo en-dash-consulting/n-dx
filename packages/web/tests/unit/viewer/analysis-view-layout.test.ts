@@ -88,6 +88,29 @@ describe("AnalysisView as Plan's capture row", () => {
     expect(onMore.mock.results[0]!.value).toBe(more);
   });
 
+  it("shows a neutral loading line, not v1's Generate, until the layout is read; then v2's Preview first", async () => {
+    let answer: (layout: "v1" | "v2") => void = () => {};
+    globalThis.fetch = vi.fn((url: string) => (url === "/api/rex/changes"
+      ? new Promise((resolve) => { answer = (layout) => resolve({ ok: true, json: async () => ({ layout }) }); })
+      : Promise.resolve({ ok: true, json: async () => ({ items: [] }) }))) as unknown as typeof fetch;
+    root = renderToDiv(h(AnalysisView, { onMore: () => {} }));
+    await settle();
+    expect(root.querySelector("[role=status]")?.textContent).toBe("Loading...");
+    expect(root.querySelector(".smart-add-panel-bar")).toBeNull();
+    expect(root.textContent).not.toMatch(/Generate|Add Items/);
+
+    answer("v2");
+    await settle();
+    expect(root.querySelector(".smart-add-btn-generate")?.textContent).toBe("Preview");
+  });
+
+  it("shows v1's Generate once the layout reads v1", async () => {
+    mockLayout("v1");
+    root = renderToDiv(h(AnalysisView, { onMore: () => {} }));
+    await settle();
+    expect(root.querySelector(".smart-add-btn-generate")?.textContent).toBe("Generate");
+  });
+
   it("shares one draft with the full form under a CaptureDraftProvider", async () => {
     mockLayout("v2");
     root = renderToDiv(h(CaptureDraftProvider, null,

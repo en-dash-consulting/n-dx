@@ -34,7 +34,7 @@ import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from
 import { useFeatureToggle, useCliName, useStatusLayout, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
-import { TileGrid, tileKey, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
+import { TileGrid, tileKey, titleVariesByLayout, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -271,8 +271,9 @@ function LayoutTileGrid({ v1Tiles, deployed, tiles, ...grid }: LayoutTileGridPro
   const shown = deployed || known.current === "v1" ? v1Tiles
     : known.current === "none" ? v1Tiles.filter((t) => !t.requiresPrd)
     : tiles;
+  // A tile titled by its view's layout-specific label waits too, so no v1 name shows first on a v2 project.
   const pending = !deployed && known.current === undefined
-    ? new Set(tiles.filter((t) => t.v2Only).map(tileKey))
+    ? new Set(tiles.filter((t) => t.v2Only || titleVariesByLayout(t)).map(tileKey))
     : undefined;
   return h(TileGrid, { ...grid, tiles: shown, pending });
 }

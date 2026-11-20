@@ -114,18 +114,21 @@ export function AnalysisView({ navigateTo, onMore }: AnalysisViewProps = {}) {
 
   // A v2 add captures a change into the Inbox rather than generating
   // proposals, so the panel's words depend on the layout. /api/rex/changes
-  // answers `{ layout }` on both; a failed read keeps the v1 wording.
-  const [layout, setLayout] = useState<"v1" | "v2">("v1");
+  // answers `{ layout }` on both; a failed read takes the v1 wording. Until it
+  // answers the layout is unknown (null): the capture row waits rather than
+  // show v1's Generate first on a v2 project.
+  const [read, setLayout] = useState<"v1" | "v2" | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetch("/api/rex/changes")
       .then((res) => (res.ok ? res.json() : null))
       .then((body: { layout?: string } | null) => {
-        if (!cancelled && body?.layout === "v2") setLayout("v2");
+        if (!cancelled) setLayout(body?.layout === "v2" ? "v2" : "v1");
       })
       .catch(() => { if (!cancelled) setLayout("v1"); });
     return () => { cancelled = true; };
   }, []);
+  const layout = read ?? "v1";
 
   const handlePrdChanged = useCallback(() => {
     // Refresh log after proposals are accepted
@@ -144,7 +147,8 @@ export function AnalysisView({ navigateTo, onMore }: AnalysisViewProps = {}) {
   });
 
   if (row) {
-    return h("div", { class: "rex-analysis-view rex-analysis-view--row" }, smartAdd(true));
+    return h("div", { class: "rex-analysis-view rex-analysis-view--row" },
+      read === null ? h("p", { class: "stage-tile-empty", role: "status" }, "Loading...") : smartAdd(true));
   }
 
   return h(
