@@ -14,10 +14,10 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
+import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";
 import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import { planSidecarSettings, readSidecarSettings, saveSidecarSettings } from "./sidecar/settings.js";
 import { PROJECT_LANGUAGES, isProjectLanguage } from "../shared/index.js";
@@ -72,21 +72,6 @@ const MAX_PORT = 65535;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function readNdxConfig(projectDir: string): Record<string, unknown> {
-  const configPath = resolveLayout(projectDir).configFile;
-  if (!existsSync(configPath)) return {};
-  try {
-    return JSON.parse(readFileSync(configPath, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = resolveLayout(projectDir).configFile;
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-}
-
 function extractProjectSettings(projectDir: string): ProjectSettingsResponse {
   const config = readNdxConfig(projectDir);
   const web = (config["web"] ?? {}) as Record<string, unknown>;
@@ -132,6 +117,117 @@ function readGithubReads(projectDir: string): Pick<ProjectSettingsResponse, "git
   }
 }
 
+/**
+ * The first problem with a PUT body's project-config fields, or null. GitHub
+ * reads is not checked here: the Sidecar settings planner owns that rule.
+ */
+function projectSettingsProblem(parsed: ProjectSettingsPutBody): string | null {
+  if ("port" in parsed) {
+    const v = parsed.port;
+    if (v !== null && v !== undefined) {
+      if (!Number.isInteger(v) || v < MIN_PORT || v > MAX_PORT) {
+        return `port must be an integer between ${MIN_PORT} and ${MAX_PORT}`;
+      }
+    }
+  }
+
+  if ("language" in parsed) {
+    const v = parsed.language;
+    if (v !== null && v !== undefined && (typeof v !== "string" || !isProjectLanguage(v))) {
+      return `language must be one of: ${PROJECT_LANGUAGES.map((l) => l.id).join(", ")}`;
+    }
+  }
+
+  // mergeThreshold is the minimum zone size in files — a count, not a ratio.
+  if ("sourcevisionMergeThreshold" in parsed) {
+    const v = parsed.sourcevisionMergeThreshold;
+    if (v !== null && v !== undefined) {
+      if (typeof v !== "number" || !Number.isInteger(v) || v < 0) {
+        return "sourcevisionMergeThreshold must be a non-negative integer (minimum zone size in files)";
+      }
+    }
+  }
+
+  if (parsed.sourcevisionPins !== null && parsed.sourcevisionPins !== undefined) {
+    if (typeof parsed.sourcevisionPins !== "object" || Array.isArray(parsed.sourcevisionPins)) {
+      return "sourcevisionPins must be an object";
+    }
+    for (const [k, v] of Object.entries(parsed.sourcevisionPins)) {
+      if (v !== null && typeof v !== "string") {
+        return `sourcevisionPins["${k}"] must be a string or null`;
+      }
+    }
+  }
+
+  return null;
+}
+
+/** `parent[key]` as an object, set to a fresh one first when it is not one. */
+function childObject(parent: Record<string, unknown>, key: string): Record<string, unknown> {
+  if (!parent[key] || typeof parent[key] !== "object") parent[key] = {};
+  return parent[key] as Record<string, unknown>;
+}
+
+/**
+ * Write a validated PUT body's project-config fields into `config`. Returns
+ * the config keys it set or removed, in the order the response lists them.
+ */
+function applyProjectSettings(config: Record<string, unknown>, parsed: ProjectSettingsPutBody): string[] {
+  const applied: string[] = [];
+
+  if ("port" in parsed) {
+    const web = childObject(config, "web");
+    if (parsed.port === null || parsed.port === undefined) {
+      delete web["port"];
+    } else {
+      web["port"] = parsed.port;
+    }
+    applied.push("web.port");
+  }
+
+  if ("language" in parsed) {
+    if (parsed.language === null || parsed.language === undefined) {
+      delete config["language"];
+    } else {
+      config["language"] = parsed.language;
+    }
+    applied.push("language");
+  }
+
+  if ("sourcevisionMergeThreshold" in parsed) {
+    const sv = childObject(config, "sourcevision");
+    const zones = childObject(sv, "zones");
+    if (
+      parsed.sourcevisionMergeThreshold === null ||
+      parsed.sourcevisionMergeThreshold === undefined
+    ) {
+      delete zones["mergeThreshold"];
+    } else {
+      zones["mergeThreshold"] = parsed.sourcevisionMergeThreshold;
+    }
+    // Remove empty zones object
+    if (Object.keys(zones).length === 0) delete sv["zones"];
+    applied.push("sourcevision.zones.mergeThreshold");
+  }
+
+  if (parsed.sourcevisionPins) {
+    const zones = childObject(childObject(config, "sourcevision"), "zones");
+    const pins = childObject(zones, "pins");
+    for (const [k, v] of Object.entries(parsed.sourcevisionPins)) {
+      if (v === null) {
+        delete pins[k];
+      } else {
+        pins[k] = v;
+      }
+    }
+    // Remove empty pins object
+    if (Object.keys(pins).length === 0) delete zones["pins"];
+    applied.push("sourcevision.zones.pins");
+  }
+
+  return applied;
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -161,53 +257,10 @@ export async function handleProjectSettingsRoute(
       const body = await readBody(req, res);
       const parsed = JSON.parse(body) as ProjectSettingsPutBody;
 
-      // Validate port
-      if ("port" in parsed) {
-        const v = parsed.port;
-        if (v !== null && v !== undefined) {
-          if (!Number.isInteger(v) || v < MIN_PORT || v > MAX_PORT) {
-            errorResponse(res, 400, `port must be an integer between ${MIN_PORT} and ${MAX_PORT}`);
-            return true;
-          }
-        }
-      }
-
-      // Validate language
-      if ("language" in parsed) {
-        const v = parsed.language;
-        if (v !== null && v !== undefined && (typeof v !== "string" || !isProjectLanguage(v))) {
-          errorResponse(
-            res,
-            400,
-            `language must be one of: ${PROJECT_LANGUAGES.map((l) => l.id).join(", ")}`,
-          );
-          return true;
-        }
-      }
-
-      // Validate mergeThreshold (minimum zone size in files — a count, not a ratio)
-      if ("sourcevisionMergeThreshold" in parsed) {
-        const v = parsed.sourcevisionMergeThreshold;
-        if (v !== null && v !== undefined) {
-          if (typeof v !== "number" || !Number.isInteger(v) || v < 0) {
-            errorResponse(res, 400, "sourcevisionMergeThreshold must be a non-negative integer (minimum zone size in files)");
-            return true;
-          }
-        }
-      }
-
-      // Validate pins
-      if (parsed.sourcevisionPins !== null && parsed.sourcevisionPins !== undefined) {
-        if (typeof parsed.sourcevisionPins !== "object" || Array.isArray(parsed.sourcevisionPins)) {
-          errorResponse(res, 400, "sourcevisionPins must be an object");
-          return true;
-        }
-        for (const [k, v] of Object.entries(parsed.sourcevisionPins)) {
-          if (v !== null && typeof v !== "string") {
-            errorResponse(res, 400, `sourcevisionPins["${k}"] must be a string or null`);
-            return true;
-          }
-        }
+      const problem = projectSettingsProblem(parsed);
+      if (problem) {
+        errorResponse(res, 400, problem);
+        return true;
       }
 
       // Validate GitHub reads (the Sidecar settings planner owns the rule).
@@ -217,70 +270,8 @@ export async function handleProjectSettingsRoute(
         return true;
       }
 
-      // Apply changes
       const config = readNdxConfig(ctx.projectDir);
-      const applied: string[] = [];
-
-      if ("port" in parsed) {
-        if (!config["web"] || typeof config["web"] !== "object") config["web"] = {};
-        const web = config["web"] as Record<string, unknown>;
-        if (parsed.port === null || parsed.port === undefined) {
-          delete web["port"];
-        } else {
-          web["port"] = parsed.port;
-        }
-        applied.push("web.port");
-      }
-
-      if ("language" in parsed) {
-        if (parsed.language === null || parsed.language === undefined) {
-          delete config["language"];
-        } else {
-          config["language"] = parsed.language;
-        }
-        applied.push("language");
-      }
-
-      if ("sourcevisionMergeThreshold" in parsed) {
-        if (!config["sourcevision"] || typeof config["sourcevision"] !== "object") {
-          config["sourcevision"] = {};
-        }
-        const sv = config["sourcevision"] as Record<string, unknown>;
-        if (!sv["zones"] || typeof sv["zones"] !== "object") sv["zones"] = {};
-        const zones = sv["zones"] as Record<string, unknown>;
-        if (
-          parsed.sourcevisionMergeThreshold === null ||
-          parsed.sourcevisionMergeThreshold === undefined
-        ) {
-          delete zones["mergeThreshold"];
-        } else {
-          zones["mergeThreshold"] = parsed.sourcevisionMergeThreshold;
-        }
-        // Remove empty zones object
-        if (Object.keys(zones).length === 0) delete sv["zones"];
-        applied.push("sourcevision.zones.mergeThreshold");
-      }
-
-      if (parsed.sourcevisionPins) {
-        if (!config["sourcevision"] || typeof config["sourcevision"] !== "object") {
-          config["sourcevision"] = {};
-        }
-        const sv = config["sourcevision"] as Record<string, unknown>;
-        if (!sv["zones"] || typeof sv["zones"] !== "object") sv["zones"] = {};
-        const zones = sv["zones"] as Record<string, unknown>;
-        if (!zones["pins"] || typeof zones["pins"] !== "object") zones["pins"] = {};
-        const pins = zones["pins"] as Record<string, unknown>;
-        for (const [k, v] of Object.entries(parsed.sourcevisionPins)) {
-          if (v === null) {
-            delete pins[k];
-          } else {
-            pins[k] = v;
-          }
-        }
-        // Remove empty pins object
-        if (Object.keys(pins).length === 0) delete zones["pins"];
-        applied.push("sourcevision.zones.pins");
-      }
+      const applied = applyProjectSettings(config, parsed);
 
       // Only rewrite (and commit) the project config when one of its own keys changed.
       if (applied.length > 0) {

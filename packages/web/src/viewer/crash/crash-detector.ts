@@ -80,10 +80,37 @@ function storageAvailable(): boolean {
   }
 }
 
-function getJSON<T>(key: string): T | null {
+/** Read a key; null when it is unset or storage is unavailable. */
+function readKey(key: string): string | null {
   try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** Write a key. Storage full or unavailable — silently ignore. */
+function writeKey(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Storage full or unavailable — silently ignore.
+  }
+}
+
+/** Remove a key. Storage unavailable — nothing to remove. */
+function removeKey(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // noop
+  }
+}
+
+function getJSON<T>(key: string): T | null {
+  const raw = readKey(key);
+  if (!raw) return null;
+  try {
     return JSON.parse(raw) as T;
   } catch {
     return null;
@@ -91,11 +118,7 @@ function getJSON<T>(key: string): T | null {
 }
 
 function setJSON(key: string, value: unknown): void {
-  try {
-    sessionStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Storage full or unavailable — silently ignore.
-  }
+  writeKey(key, JSON.stringify(value));
 }
 
 // ─── Crash history management ────────────────────────────────────────────────
@@ -123,34 +146,21 @@ function getRecentCrashCount(history: CrashRecord[]): number {
 
 /** Set the heartbeat flag — call once at page startup. */
 function setHeartbeat(): void {
-  try {
-    sessionStorage.setItem(HEARTBEAT_KEY, new Date().toISOString());
-  } catch {
-    // noop
-  }
+  writeKey(HEARTBEAT_KEY, new Date().toISOString());
 }
 
 /** Clear the heartbeat flag — called on clean page unload. */
 function clearHeartbeat(): void {
-  try {
-    sessionStorage.removeItem(HEARTBEAT_KEY);
-  } catch {
-    // noop
-  }
+  removeKey(HEARTBEAT_KEY);
 }
 
 /** Check whether the heartbeat was left set from a previous load. */
 function heartbeatPresent(): boolean {
-  try {
-    return sessionStorage.getItem(HEARTBEAT_KEY) !== null;
-  } catch {
-    return false;
-  }
+  return readKey(HEARTBEAT_KEY) !== null;
 }
 
 // ─── Module state ────────────────────────────────────────────────────────────
 
-let initialized = false;
 let detectionResult: CrashDetectionResult | null = null;
 let unloadHandler: (() => void) | null = null;
 
@@ -203,13 +213,8 @@ export function detectCrash(): CrashDetectionResult {
   window.addEventListener("beforeunload", unloadHandler);
 
   // Mark recovery as not yet shown for this session.
-  try {
-    sessionStorage.removeItem(RECOVERY_SHOWN_KEY);
-  } catch {
-    // noop
-  }
+  removeKey(RECOVERY_SHOWN_KEY);
 
-  initialized = true;
   return detectionResult;
 }
 
@@ -231,33 +236,21 @@ export function saveNavigationState(state: Omit<SavedNavigationState, "timestamp
  * Clear the saved navigation state (e.g. after successful recovery).
  */
 export function clearSavedNavigationState(): void {
-  try {
-    sessionStorage.removeItem(NAV_STATE_KEY);
-  } catch {
-    // noop
-  }
+  removeKey(NAV_STATE_KEY);
 }
 
 /**
  * Mark that the recovery banner has been shown/dismissed in this session.
  */
 export function markRecoveryShown(): void {
-  try {
-    sessionStorage.setItem(RECOVERY_SHOWN_KEY, "true");
-  } catch {
-    // noop
-  }
+  writeKey(RECOVERY_SHOWN_KEY, "true");
 }
 
 /**
  * Check if recovery was already shown in this session.
  */
 export function wasRecoveryShown(): boolean {
-  try {
-    return sessionStorage.getItem(RECOVERY_SHOWN_KEY) === "true";
-  } catch {
-    return false;
-  }
+  return readKey(RECOVERY_SHOWN_KEY) === "true";
 }
 
 /** Get the cached crash detection result (null if detectCrash hasn't been called). */
@@ -267,11 +260,7 @@ export function getDetectionResult(): CrashDetectionResult | null {
 
 /** Clear the crash history. */
 export function clearCrashHistory(): void {
-  try {
-    sessionStorage.removeItem(CRASH_HISTORY_KEY);
-  } catch {
-    // noop
-  }
+  removeKey(CRASH_HISTORY_KEY);
 }
 
 /** Reset all module state (for testing). */
@@ -280,7 +269,6 @@ export function resetCrashDetector(): void {
     window.removeEventListener("beforeunload", unloadHandler);
     unloadHandler = null;
   }
-  initialized = false;
   detectionResult = null;
 
   try {

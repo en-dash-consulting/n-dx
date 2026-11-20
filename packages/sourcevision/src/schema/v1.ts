@@ -1328,7 +1328,6 @@ export interface SdlcCoverage extends SdlcDetection {
   enforced: boolean;
 }
 
-/** A CI pipeline and the jobs it runs. */
 /**
  * What a CI step does, classified from the command it runs.
  *
@@ -1382,6 +1381,7 @@ export interface SdlcCiJob {
   environment?: string;
 }
 
+/** A CI pipeline and the jobs it runs. */
 export interface SdlcCiPipeline extends SdlcDetection {
   /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`, `jenkins`. */
   provider: string;

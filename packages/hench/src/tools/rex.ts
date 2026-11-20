@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
 import { repoCommandEnv, resolveLayout } from "../prd/llm-gateway.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";

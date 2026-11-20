@@ -12,6 +12,7 @@
  */
 
 import { exec } from "./exec-gateway.js";
+import { NDX_CLI_TIMEOUT_MS, ndxCliFailureDetail } from "./sidecars.js";
 import type { SidecarState, SidecarStatus } from "./sidecars.js";
 import { FRAME_KEY_SEGMENT } from "./frame-keys.js";
 
@@ -59,7 +60,7 @@ export type ListResult =
 export type ListExtensions = () => Promise<ListResult>;
 
 /** The list function for a hub that knows where n-dx's CLI is. */
-export function ndxCliLister(ndxCli: string, cwd: string, timeoutMs = 30_000): ListExtensions {
+export function ndxCliLister(ndxCli: string, cwd: string, timeoutMs = NDX_CLI_TIMEOUT_MS): ListExtensions {
   return async () => {
     const result = await exec(process.execPath, [ndxCli, "extensions", "list", "--json"], { cwd, timeout: timeoutMs });
     if (result.exitCode === 0) {
@@ -76,8 +77,7 @@ export function ndxCliLister(ndxCli: string, cwd: string, timeoutMs = 30_000): L
         // Not JSON: reported below with whatever stderr said.
       }
     }
-    const detail = result.stderr.trim() || result.error?.message || `exit code ${result.exitCode ?? "null"}`;
-    return { ok: false, error: `Could not ask n-dx for its extensions: ${detail}` };
+    return { ok: false, error: `Could not ask n-dx for its extensions: ${ndxCliFailureDetail(result)}` };
   };
 }
 

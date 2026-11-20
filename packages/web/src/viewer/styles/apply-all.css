@@ -3,9 +3,8 @@
   margin-bottom: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--green);
   border-radius: var(--radius-md);
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--green) 8%, var(--bg-surface));
   font-size: 13px;
 }
 .aa-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }

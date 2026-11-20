@@ -5,14 +5,6 @@
 
 import type { Imports, Inventory, Zones, ImportEdge, ImportType, ExternalImport } from "../../external.js";
 
-const ALL_IMPORT_TYPES: readonly ImportType[] = [
-  "static",
-  "dynamic",
-  "require",
-  "reexport",
-  "type",
-];
-
 /** Files that participate in at least one circular dependency cycle. */
 export function filesInCycles(imports: Imports): Set<string> {
   const set = new Set<string>();
@@ -149,10 +141,6 @@ export function partitionNeighbors(
 
 export function findExternal(imports: Imports, packageName: string): ExternalImport | undefined {
   return imports.external.find((x) => x.package === packageName);
-}
-
-export function allImportTypes(): readonly ImportType[] {
-  return ALL_IMPORT_TYPES;
 }
 
 /** Count internal import edges per file (outgoing from / incoming to). */

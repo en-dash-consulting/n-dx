@@ -204,6 +204,9 @@ export {
 } from "./claude-effort.js";
 export type { ClaudeEffort } from "./claude-effort.js";
 
+// Whether a vendor and model take image input (the dashboard's attach-image control)
+export { acceptsImageInput } from "./image-input.js";
+
 // Model-aware token pricing (the single price table for every cost surface)
 export {
   resolveModelPricing,

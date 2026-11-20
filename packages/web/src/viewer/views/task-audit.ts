@@ -1,5 +1,3 @@
-import { FloatingNotice } from "../components/index.js";
-import { useToast } from "../hooks/index.js";
 /**
  * Task Audit view — detailed execution information and administrative controls.
  *
@@ -14,10 +12,11 @@ import { useToast } from "../hooks/index.js";
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { BrandedHeader, RexTaskLink, ElapsedTime } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { BrandedHeader, RexTaskLink, ElapsedTime, FloatingNotice } from "../components/index.js";
+import { useCliName, useToast } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { openWebSocket } from "../session.js";
+import { formatElapsedSince, formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -84,18 +83,6 @@ function fmtBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
-function fmtElapsed(ms: number): string {
-  if (ms < 0) return "0s";
-  const totalSecs = Math.floor(ms / 1000);
-  if (totalSecs < 60) return `${totalSecs}s`;
-  const mins = Math.floor(totalSecs / 60);
-  const secs = totalSecs % 60;
-  if (mins < 60) return `${mins}m ${secs}s`;
-  const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hours}h ${remainMins}m`;
-}
-
 function fmtUptime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const mins = Math.floor(seconds / 60);
@@ -108,12 +95,6 @@ function fmtUptime(seconds: number): string {
   return `${days}d ${remainHours}h`;
 }
 
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 function fmtTimeSince(isoString: string): string {
   const elapsed = Date.now() - new Date(isoString).getTime();
   if (elapsed < 0) return "just now";
@@ -124,11 +105,6 @@ function fmtTimeSince(isoString: string): string {
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   return `${hours}h ago`;
-}
-
-/** Formatter for useTick: computes elapsed time from an ISO start timestamp. */
-function formatElapsedFromStart(startedAt: string): string {
-  return fmtElapsed(Date.now() - new Date(startedAt).getTime());
 }
 
 function heartbeatLabel(status?: HeartbeatStatus): string {
@@ -184,7 +160,6 @@ function AuditTaskCard({
   entry,
   navigateTo,
   onTerminate,
-  onViewLogs,
   terminating,
   expanded,
   onToggle,
@@ -192,7 +167,6 @@ function AuditTaskCard({
   entry: AuditEntry;
   navigateTo?: NavigateTo;
   onTerminate: (taskId: string) => void;
-  onViewLogs: (runId: string) => void;
   terminating: boolean;
   expanded: boolean;
   onToggle: () => void;
@@ -253,7 +227,7 @@ function AuditTaskCard({
               ),
           h("span", { class: "audit-chip", title: "Elapsed time" },
             h("span", { class: "audit-chip-icon" }, "⏱"),
-            h(ElapsedTime, { startedAt: entry.startedAt, formatter: formatElapsedFromStart }),
+            h(ElapsedTime, { startedAt: entry.startedAt, formatter: formatElapsedSince }),
           ),
           h("span", { class: "audit-chip", title: "Run ID" },
             h("span", { class: "audit-chip-icon" }, "▶"),
@@ -617,7 +591,6 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
                   entry,
                   navigateTo,
                   onTerminate: handleTerminate,
-                  onViewLogs: (runId) => toggleLogs(runId),
                   terminating: terminatingTasks.has(entry.taskId),
                   expanded: isExpanded,
                   onToggle: () => toggleLogs(entry.runId),

@@ -73,7 +73,6 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import { z } from "zod";
 import {
   ClaudeClientError,

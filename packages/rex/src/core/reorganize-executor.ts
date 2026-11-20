@@ -25,7 +25,6 @@ import type {
   MergeDetail,
   MoveDetail,
   DeleteDetail,
-  PruneDetail,
   CollapseDetail,
   SplitDetail,
 } from "./reorganize.js";

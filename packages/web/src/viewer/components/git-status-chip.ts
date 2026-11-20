@@ -17,6 +17,7 @@ import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { GitStatus, GitStatusFile } from "../hooks/index.js";
+import { errorMessage } from "../utils/format.js";
 
 export interface GitStatusChipProps {
   status: GitStatus | null;
@@ -40,6 +41,17 @@ const STATUS_LABEL: Record<GitStatusFile["status"], string> = {
   unmerged: "U",
   other: "•",
 };
+
+/** POST one of the panel's git actions; a refusal throws the server's error, else its status. */
+async function postGit(path: string, body: Record<string, unknown>): Promise<void> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+}
 
 /** Renders a unified diff with basic +/- coloring. */
 function DiffView({ diff }: { diff: string }) {
@@ -87,16 +99,10 @@ function FileRow({ file, onIgnored }: { file: GitStatusFile; onIgnored: () => vo
     setIgnoring(true);
     setIgnoreError(null);
     try {
-      const res = await fetch("/api/git/ignore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: file.path }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await postGit("/api/git/ignore", { file: file.path });
       onIgnored();
     } catch (err) {
-      setIgnoreError(err instanceof Error ? err.message : String(err));
+      setIgnoreError(errorMessage(err));
     } finally {
       setIgnoring(false);
     }
@@ -174,17 +180,11 @@ function GitStatusPanel({
     setCommitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/git/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: message.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await postGit("/api/git/commit", { message: message.trim() });
       setMessage("");
       onCommitted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setCommitting(false);
     }
@@ -203,16 +203,10 @@ function GitStatusPanel({
     setCommitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/git/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: status.scope }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await postGit("/api/git/commit", { scope: status.scope });
       onCommitted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setCommitting(false);
     }
@@ -222,16 +216,10 @@ function GitStatusPanel({
     setDiscarding(true);
     setDiscardError(null);
     try {
-      const res = await fetch("/api/git/discard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmCount: status.files.length }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await postGit("/api/git/discard", { confirmCount: status.files.length });
       onCommitted();
     } catch (err) {
-      setDiscardError(err instanceof Error ? err.message : String(err));
+      setDiscardError(errorMessage(err));
       setConfirmingDiscard(false);
     } finally {
       setDiscarding(false);

@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import type { PRDItem } from "../schema/index.js";
-import { spawnClaude, resolveConfiguredModel, extractJson } from "./reason.js";
+import { extractJson } from "./reason.js";
 import { withEscalation } from "./escalate.js";
 import type { PromptEnvelope } from "@n-dx/llm-client";
 import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";

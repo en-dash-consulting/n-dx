@@ -315,15 +315,15 @@ export function buildReviewSystemPrompt(): string {
   ].join("\n");
 }
 
-/**
- * v2 only: the dedupe listing of `changes/` does not reach `changes/inbox/`
- * (no `index.md`, no matching slug), yet unplaced captures wait there.
- */
 /** What a capture is called: a PRD task on v1, a change that lands in the Inbox on v2. */
 function captureNoun(ctx: { inboxDir?: string }): string {
   return ctx.inboxDir ? "a change (it lands in the Inbox)" : "a PRD task";
 }
 
+/**
+ * v2 only: the dedupe listing of `changes/` does not reach `changes/inbox/`
+ * (no `index.md`, no matching slug), yet unplaced captures wait there.
+ */
 function inboxClause(ctx: { inboxDir?: string }): string {
   return ctx.inboxDir ? ` and under \`${ctx.inboxDir}\`, where unplaced changes wait,` : "";
 }

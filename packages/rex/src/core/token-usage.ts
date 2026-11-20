@@ -350,6 +350,21 @@ interface HenchRunSummary {
   }>;
 }
 
+/** A hench run or turn record's counts in the four billed kinds; a missing count is 0. */
+function henchBillable(u: {
+  input: number;
+  output: number;
+  cacheCreationInput?: number;
+  cacheReadInput?: number;
+}): BillableTokens {
+  return {
+    inputTokens: u.input ?? 0,
+    outputTokens: u.output ?? 0,
+    cacheCreationTokens: u.cacheCreationInput ?? 0,
+    cacheReadTokens: u.cacheReadInput ?? 0,
+  };
+}
+
 /**
  * Read hench run files and aggregate token usage.
  *
@@ -403,22 +418,10 @@ export async function extractHenchTokenUsage(
       const buckets = modelBuckets(usage);
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
         for (const turn of run.turnTokenUsage) {
-          attributeToModel(buckets, turn.model ?? run.model, {
-            diagnosticStatus: turn.diagnosticStatus ?? run.diagnostics?.tokenDiagnosticStatus,
-            inputTokens: turn.input ?? 0,
-            outputTokens: turn.output ?? 0,
-            cacheCreationTokens: turn.cacheCreationInput ?? 0,
-            cacheReadTokens: turn.cacheReadInput ?? 0,
-          });
+          attributeToModel(buckets, turn.model ?? run.model, { ...henchBillable(turn), diagnosticStatus: turn.diagnosticStatus ?? run.diagnostics?.tokenDiagnosticStatus });
         }
       } else {
-        attributeToModel(buckets, run.model, {
-          diagnosticStatus: run.diagnostics?.tokenDiagnosticStatus,
-          inputTokens: run.tokenUsage.input ?? 0,
-          outputTokens: run.tokenUsage.output ?? 0,
-          cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
-          cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
-        });
+        attributeToModel(buckets, run.model, { ...henchBillable(run.tokenUsage), diagnosticStatus: run.diagnostics?.tokenDiagnosticStatus });
       }
     } catch {
       // Invalid run file — skip
@@ -597,10 +600,7 @@ export async function extractHenchTokenEvents(
             timestamp: run.startedAt,
             command: "run",
             package: "hench",
-            inputTokens: turn.input ?? 0,
-            outputTokens: turn.output ?? 0,
-            cacheCreationTokens: turn.cacheCreationInput ?? 0,
-            cacheReadTokens: turn.cacheReadInput ?? 0,
+            ...henchBillable(turn),
             calls: 1,
             vendor: turn.vendor,
             model: turn.model ?? run.model,
@@ -625,10 +625,7 @@ export async function extractHenchTokenEvents(
         timestamp: run.startedAt,
         command: "run",
         package: "hench",
-        inputTokens: run.tokenUsage.input ?? 0,
-        outputTokens: run.tokenUsage.output ?? 0,
-        cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
-        cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
+        ...henchBillable(run.tokenUsage),
         calls: 1,
         model: run.model,
         runId,
@@ -947,11 +944,6 @@ export interface CostEstimate {
   fullyAttributed: boolean;
 }
 
-/** Sum the four billed kinds in a counts record. */
-function billableTotal(t: BillableTokens): number {
-  return t.inputTokens + t.outputTokens + t.cacheCreationTokens + t.cacheReadTokens;
-}
-
 /**
  * Estimate cost from aggregate token usage.
  *
@@ -1043,7 +1035,7 @@ export function estimateCostFromTotals(
       pricedAs: resolved.modelId,
       known: resolved.known,
       unattributed: false,
-      tokens: billableTotal(tokens),
+      tokens: totalTokens(tokens),
       totalRaw: cost.totalRaw,
       ...(tokens.diagnosticStatus ? measurementCost(cost.totalRaw, tokens.diagnosticStatus) : {}),
     });
@@ -1061,7 +1053,7 @@ export function estimateCostFromTotals(
     cacheReadTokens: Math.max(0, totals.cacheReadTokens - attributed.cacheReadTokens),
   };
 
-  const residualTokens = billableTotal(residual);
+  const residualTokens = totalTokens(residual);
   if (residualTokens > 0) {
     const cost = priceTokens(residual, DEFAULT_PRICING);
     inputCost += cost.inputCost;

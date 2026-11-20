@@ -383,7 +383,7 @@
 }
 
 .hench-run-card.failed {
-  border-left: 3px solid var(--red);
+  background: color-mix(in srgb, var(--red) 7%, var(--bg-surface));
 }
 
 /* Run card header row */
@@ -1062,7 +1062,7 @@
 
 /* Stale run indicator */
 .hench-run-card.stale {
-  border-left: 3px solid var(--yellow, #f59e0b);
+  background: color-mix(in srgb, var(--yellow, #f59e0b) 7%, var(--bg-surface));
 }
 
 /* Worktree chip: a directory name, so set in mono like every other path in the UI. */

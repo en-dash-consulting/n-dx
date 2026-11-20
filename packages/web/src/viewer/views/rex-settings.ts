@@ -21,6 +21,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { responseError } from "../utils/response-error.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -184,8 +185,7 @@ export function useRexSettingsForm(): RexSettingsForm {
     try {
       const res = await fetch("/api/rex/settings");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setLoadError((body as { error?: string }).error ?? "Failed to load rex settings");
+        setLoadError(await responseError(res, "Failed to load", "Failed to load rex settings"));
         return;
       }
       const body = await res.json() as RexSettingsResponse;
@@ -231,8 +231,7 @@ export function useRexSettingsForm(): RexSettingsForm {
         body: JSON.stringify(pendingBody),
       });
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Save failed" }));
-        setSaveError((errBody as { error?: string }).error ?? "Save failed");
+        setSaveError(await responseError(res, "Save failed"));
         return false;
       }
     } catch (err) {

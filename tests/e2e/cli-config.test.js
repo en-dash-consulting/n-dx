@@ -1171,6 +1171,16 @@ describe("n-dx config", () => {
   // ── Help — Claude settings ───────────────────────────────────────────────
 
   describe("help — claude settings", () => {
+    it("describes capability-gated Codex forks and their cold fallback", () => {
+      const start = helpOutput.indexOf("hench.sessionStrategy");
+      const block = helpOutput.slice(start, helpOutput.indexOf("hench.tasksPerSession    ", start));
+      expect(block).toContain("Claude CLI");
+      expect(block).toContain("Codex CLI");
+      expect(block).toContain("capability and identity checks pass");
+      expect(block).toContain('fall back to "cold"');
+      expect(block).not.toContain("Claude today");
+    });
+
     it("documents claude.cli_path", () => {
       const output = helpOutput;
       expect(output).toContain("claude.cli_path");

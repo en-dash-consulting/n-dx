@@ -14,6 +14,7 @@
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { detectBasePath } from "../external.js";
 import { getWorkspaceKey } from "../base-path.js";
+import { getJson, sendJson } from "../utils/json-requests.js";
 import type { SidecarCard, SidecarSessionEntry } from "./use-sidecar.js";
 
 export type SidecarSessionFilter = "this" | "all";
@@ -31,6 +32,15 @@ export interface SidecarSessionRow {
   waiting: number;
 }
 
+/**
+ * Cards still waiting on the operator. Here rather than beside `SidecarCard`
+ * in use-sidecar.ts, which imports this module: the sessions list counts them
+ * for every row, and the drawer for its badges.
+ */
+export function waitingCards(cards: readonly SidecarCard[]): number {
+  return cards.filter((c) => c.status === "pending").length;
+}
+
 interface Workspaces {
   anchor: string;
   workspaces: Array<{ key: string; branch: string | null }>;
@@ -46,27 +56,6 @@ export interface SidecarSessionsState {
   rename: (id: string, name: string) => Promise<boolean>;
   /** Call the end route. The caller has asked the operator to confirm. */
   end: (id: string) => Promise<boolean>;
-}
-
-async function getJson<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url);
-    return res.ok ? (await res.json()) as T : null;
-  } catch {
-    return null;
-  }
-}
-
-async function send(method: "PATCH" | "POST", url: string, body: unknown): Promise<
-  { ok: true; data: SidecarSessionEntry } | { ok: false; error: string }
-> {
-  try {
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const data = await res.json().catch(() => ({})) as SidecarSessionEntry & { error?: string };
-    return res.ok ? { ok: true, data } : { ok: false, error: data.error ?? `Request failed (${res.status})` };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
 }
 
 /**
@@ -113,7 +102,7 @@ export function useSidecarSessions(opts: {
         const cards = entry.session.endedAt
           ? null
           : await getJson<{ cards: SidecarCard[] }>(worktreeApiUrl(w.key, `${SESSIONS}/${encodeURIComponent(entry.session.id)}/cards`));
-        const waiting = cards?.cards.filter((c) => c.status === "pending").length ?? 0;
+        const waiting = cards ? waitingCards(cards.cards) : 0;
         return { entry, worktree: w.key, own: false, waiting };
       }));
     }));
@@ -127,7 +116,7 @@ export function useSidecarSessions(opts: {
   }, []);
 
   const change = useCallback(async (method: "PATCH" | "POST", url: string, body: unknown): Promise<boolean> => {
-    const res = await send(method, url, body);
+    const res = await sendJson<SidecarSessionEntry>(method, url, body);
     if (!mountedRef.current) return res.ok;
     setError(res.ok ? null : res.error);
     if (res.ok) {

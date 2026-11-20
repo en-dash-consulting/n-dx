@@ -41,6 +41,27 @@ export function parseRetryAfterHeader(
   return undefined;
 }
 
+// ── Vendor CLI failure text ─────────────────────────────────────────────
+// Shared by the Claude and Codex CLI providers, which classify a failed
+// spawn from its stderr rather than from an HTTP status.
+
+/** Stderr text that means a vendor CLI was rate limited. */
+export const CLI_RATE_LIMIT_PATTERN = /rate.limit|429|too many requests|overloaded/i;
+
+/** Error text that marks a vendor CLI failure as transient, so worth retrying. */
+export const CLI_TRANSIENT_PATTERNS: readonly RegExp[] = [
+  /\b500\b/,
+  /\b502\b/,
+  /\b503\b/,
+  /\b529\b/,
+  /\b429\b/,
+  /overloaded/i,
+  /ETIMEDOUT/,
+  /ECONNRESET/,
+  /ECONNREFUSED/,
+  /socket hang up/i,
+];
+
 // ── Countdown formatting ────────────────────────────────────────────────
 
 /**

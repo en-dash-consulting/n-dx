@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, realpathSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,18 +44,57 @@ const commonJsOptions = {
   },
 };
 
+/**
+ * A page template with its stylesheet link and module script replaced by the
+ * bundled CSS and JS, inline. Function replacements, so a `$` in either bundle
+ * is copied as it is rather than read as a replacement pattern.
+ */
+function inlineTemplate(templatePath, { cssLink, scriptTag, cssCode, jsCode }) {
+  return readFileSync(templatePath, "utf-8")
+    .replace(cssLink, () => `<style>${cssCode}</style>`)
+    .replace(scriptTag, () => `<script type="module">${jsCode}</script>`);
+}
+
+/** Bundle one CSS entry point to a string, minified outside watch mode. */
+async function bundleCssEntry(entryPoint) {
+  const result = await esbuild.build({
+    entryPoints: [entryPoint],
+    bundle: true,
+    write: false,
+    minify: !watchMode,
+  });
+  return result.outputFiles[0].text;
+}
+
+/**
+ * An esbuild plugin that rewrites a page after every successful rebuild of its
+ * JS, for watch mode. `rebuild` receives the new JS; `done` and `failed` are
+ * the log lines for each outcome.
+ */
+function rebuildPagePlugin(name, rebuild, done, failed) {
+  return {
+    name,
+    setup(build) {
+      build.onEnd(async (result) => {
+        if (result.errors.length > 0) return;
+        try {
+          await rebuild(result.outputFiles?.[0]?.text ?? "");
+          console.log(done);
+        } catch (err) {
+          console.error(failed, err.message);
+        }
+      });
+    },
+  };
+}
+
 function buildHtml(jsCode, cssCode) {
-  const htmlTemplate = readFileSync(htmlTemplatePath, "utf-8");
-
-  let inlinedHtml = htmlTemplate.replace(
-    '<link rel="stylesheet" href="./styles.css">',
-    () => `<style>${cssCode}</style>`
-  );
-
-  inlinedHtml = inlinedHtml.replace(
-    '<script type="module" src="./main.ts"></script>',
-    () => `<script type="module">${jsCode}</script>`
-  );
+  const inlinedHtml = inlineTemplate(htmlTemplatePath, {
+    cssLink: '<link rel="stylesheet" href="./styles.css">',
+    scriptTag: '<script type="module" src="./main.ts"></script>',
+    cssCode,
+    jsCode,
+  });
 
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "index.html"), inlinedHtml);
@@ -77,37 +116,24 @@ function buildHtml(jsCode, cssCode) {
   }
 }
 
-async function bundleCss() {
-  const result = await esbuild.build({
-    entryPoints: [cssEntryPoint],
-    bundle: true,
-    write: false,
-    minify: !watchMode,
-  });
-  return result.outputFiles[0].text;
-}
+const bundleCss = () => bundleCssEntry(cssEntryPoint);
 
 // ── Hub session drawer build helpers ──
 
 export const hubSessionJsOptions = { ...commonJsOptions, entryPoints: [hubSessionJsEntryPoint] };
 
 function buildHubSessionHtml(jsCode, cssCode) {
-  const inlinedHtml = readFileSync(hubSessionHtmlTemplatePath, "utf-8")
-    .replace('<link rel="stylesheet" href="./hub-session.css">', () => `<style>${cssCode}</style>`)
-    .replace('<script type="module" src="./hub-session.ts"></script>', () => `<script type="module">${jsCode}</script>`);
+  const inlinedHtml = inlineTemplate(hubSessionHtmlTemplatePath, {
+    cssLink: '<link rel="stylesheet" href="./hub-session.css">',
+    scriptTag: '<script type="module" src="./hub-session.ts"></script>',
+    cssCode,
+    jsCode,
+  });
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "hub-session.html"), inlinedHtml);
 }
 
-async function bundleHubSessionCss() {
-  const result = await esbuild.build({
-    entryPoints: [hubSessionCssEntryPoint],
-    bundle: true,
-    write: false,
-    minify: !watchMode,
-  });
-  return result.outputFiles[0].text;
-}
+const bundleHubSessionCss = () => bundleCssEntry(hubSessionCssEntryPoint);
 
 async function buildHubSession() {
   const jsResult = await esbuild.build({ ...hubSessionJsOptions, write: false, minify: true });
@@ -118,31 +144,18 @@ async function buildHubSession() {
 // ── Landing page build helpers ──
 
 function buildLandingHtml(jsCode, cssCode) {
-  const htmlTemplate = readFileSync(landingHtmlTemplatePath, "utf-8");
-
-  let inlinedHtml = htmlTemplate.replace(
-    '<link rel="stylesheet" href="./landing.css">',
-    () => `<style>${cssCode}</style>`
-  );
-
-  inlinedHtml = inlinedHtml.replace(
-    '<script type="module" src="./landing.ts"></script>',
-    () => `<script type="module">${jsCode}</script>`
-  );
+  const inlinedHtml = inlineTemplate(landingHtmlTemplatePath, {
+    cssLink: '<link rel="stylesheet" href="./landing.css">',
+    scriptTag: '<script type="module" src="./landing.ts"></script>',
+    cssCode,
+    jsCode,
+  });
 
   mkdirSync(landingOutDir, { recursive: true });
   writeFileSync(resolve(landingOutDir, "index.html"), inlinedHtml);
 }
 
-async function bundleLandingCss() {
-  const result = await esbuild.build({
-    entryPoints: [landingCssEntryPoint],
-    bundle: true,
-    write: false,
-    minify: !watchMode,
-  });
-  return result.outputFiles[0].text;
-}
+const bundleLandingCss = () => bundleCssEntry(landingCssEntryPoint);
 
 const landingJsOptions = {
   entryPoints: [landingJsEntryPoint],
@@ -179,32 +192,7 @@ async function buildLanding() {
   console.log("Built landing: dist/landing/index.html");
 }
 
-/**
- * Copy the UI layout preview document into dist.
- *
- * No bundling: the whole point of that file is that it is hand-edited HTML with
- * no build step. The copy exists so `ndx start --preview` also works from a
- * published install, where src/ is not shipped. In a monorepo checkout the
- * preview server prefers src/preview/index.html so edits are live.
- */
-function copyPreview() {
-  const previewSrcDir = resolve(__dirname, "src/preview");
-  if (!existsSync(resolve(previewSrcDir, "index.html"))) return;
-  const previewOutDir = resolve(__dirname, "dist/preview");
-  mkdirSync(previewOutDir, { recursive: true });
-  // Every page and data file in the folder ships: index.layout.json carries the
-  // structure the editor renders (without it a published install opens to an
-  // empty shell), and sibling pages such as option1-demo.html are reachable
-  // from the editor's header.
-  for (const file of readdirSync(previewSrcDir)) {
-    if (!/\.(html|json)$/.test(file)) continue;
-    copyFileSync(resolve(previewSrcDir, file), resolve(previewOutDir, file));
-  }
-  console.log("Copied preview: dist/preview/");
-}
-
 async function buildProduction() {
-  copyPreview();
   if (landingOnly) {
     await buildLanding();
   } else if (viewerOnly) {
@@ -230,66 +218,36 @@ async function buildWatch() {
   const jsCtx = await esbuild.context({
     ...commonJsOptions,
     write: false,
-    plugins: [{
-      name: "rebuild-html",
-      setup(build) {
-        build.onEnd(async (result) => {
-          if (result.errors.length > 0) return;
-
-          try {
-            const jsCode = result.outputFiles?.[0]?.text ?? "";
-            const cssCode = await bundleCss();
-            buildHtml(jsCode, cssCode);
-            console.log(`[esbuild] Rebuilt viewer: dist/viewer/index.html`);
-          } catch (err) {
-            console.error("[esbuild] HTML rebuild failed:", err.message);
-          }
-        });
-      },
-    }],
+    plugins: [rebuildPagePlugin(
+      "rebuild-html",
+      async (jsCode) => buildHtml(jsCode, await bundleCss()),
+      "[esbuild] Rebuilt viewer: dist/viewer/index.html",
+      "[esbuild] HTML rebuild failed:",
+    )],
   });
 
   // Landing page JS context for watching
   const landingJsCtx = await esbuild.context({
     ...landingJsOptions,
     write: false,
-    plugins: [{
-      name: "rebuild-landing-html",
-      setup(build) {
-        build.onEnd(async (result) => {
-          if (result.errors.length > 0) return;
-
-          try {
-            const jsCode = result.outputFiles?.[0]?.text ?? "";
-            const cssCode = await bundleLandingCss();
-            buildLandingHtml(jsCode, cssCode);
-            console.log(`[esbuild] Rebuilt landing: dist/landing/index.html`);
-          } catch (err) {
-            console.error("[esbuild] Landing rebuild failed:", err.message);
-          }
-        });
-      },
-    }],
+    plugins: [rebuildPagePlugin(
+      "rebuild-landing-html",
+      async (jsCode) => buildLandingHtml(jsCode, await bundleLandingCss()),
+      "[esbuild] Rebuilt landing: dist/landing/index.html",
+      "[esbuild] Landing rebuild failed:",
+    )],
   });
 
   // Hub session drawer JS context for watching
   const hubSessionJsCtx = await esbuild.context({
     ...hubSessionJsOptions,
     write: false,
-    plugins: [{
-      name: "rebuild-hub-session-html",
-      setup(build) {
-        build.onEnd(async (result) => {
-          if (result.errors.length > 0) return;
-          try {
-            buildHubSessionHtml(result.outputFiles?.[0]?.text ?? "", await bundleHubSessionCss());
-            console.log("[esbuild] Rebuilt hub session drawer: dist/viewer/hub-session.html");
-          } catch (err) {
-            console.error("[esbuild] Hub session drawer rebuild failed:", err.message);
-          }
-        });
-      },
-    }],
+    plugins: [rebuildPagePlugin(
+      "rebuild-hub-session-html",
+      async (jsCode) => buildHubSessionHtml(jsCode, await bundleHubSessionCss()),
+      "[esbuild] Rebuilt hub session drawer: dist/viewer/hub-session.html",
+      "[esbuild] Hub session drawer rebuild failed:",
+    )],
   });
 
   // Initial build — viewer

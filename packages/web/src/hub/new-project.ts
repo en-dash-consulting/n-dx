@@ -25,6 +25,7 @@
 
 import { createHash } from "node:crypto";
 import { readdirSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 
@@ -91,7 +92,8 @@ export function validateProjectName(raw: string): string | null {
   return null;
 }
 
-function isDirectory(path: string): boolean {
+/** Whether `path` is a directory; false for anything that cannot be stat'ed. */
+export function isDirectory(path: string): boolean {
   try {
     return statSync(path).isDirectory();
   } catch {
@@ -237,6 +239,11 @@ export function defaultParentDir(repoRoots: readonly string[], home: string): st
     }
   }
   return best ?? resolve(home);
+}
+
+/** {@link defaultParentDir} over the hub's registered projects, falling back to this user's home. */
+export function suggestedParentDir(projects: readonly { repoRoot: string }[]): string {
+  return defaultParentDir(projects.map((p) => p.repoRoot), homedir());
 }
 
 /**

@@ -30,11 +30,7 @@
  * The Preact integration lives in the consumer (views/prd.ts etc.).
  */
 
-import {
-  onVisibilityChange,
-  isTabVisible,
-  type TabVisibilitySnapshot,
-} from "../polling/index.js";
+import { onDebouncedVisibilityChange, isTabVisible } from "../polling/index.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -99,10 +95,6 @@ export interface ResponseBufferGate {
   dispose(): void;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const DEFAULT_RESUME_DEBOUNCE_MS = 100;
-
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -134,22 +126,13 @@ export function createResponseBufferGate(
 ): ResponseBufferGate {
   const flushDownstream = config.flushDownstream;
   const onResume = config.onResume;
-  const resumeDebounceMs = config.resumeDebounceMs ?? DEFAULT_RESUME_DEBOUNCE_MS;
 
   // Start as visible; the initial-state check below may immediately suspend.
   let open = true;
   let droppedCount = 0;
   let totalDropped = 0;
   let suspensionCount = 0;
-  let resumeTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
-
-  function clearResumeTimer(): void {
-    if (resumeTimer !== null) {
-      clearTimeout(resumeTimer);
-      resumeTimer = null;
-    }
-  }
 
   /** Flush all downstream buffers to release buffered data from memory. */
   function flushAllDownstream(): void {
@@ -195,25 +178,12 @@ export function createResponseBufferGate(
     }
   }
 
-  function handleVisibilityChange(snapshot: TabVisibilitySnapshot): void {
-    if (disposed) return;
-
-    if (snapshot.isVisible) {
-      // Tab became visible — resume with debounce to prevent thrash.
-      clearResumeTimer();
-      resumeTimer = setTimeout(() => {
-        resumeTimer = null;
-        resume();
-      }, resumeDebounceMs);
-    } else {
-      // Tab became hidden — suspend immediately.
-      clearResumeTimer();
-      suspend();
-    }
-  }
-
-  // Subscribe to tab visibility changes.
-  const unsubVisibility = onVisibilityChange(handleVisibilityChange);
+  // Subscribe to tab visibility changes: suspend immediately when hidden,
+  // resume after the debounce when visible again.
+  const stopVisibility = onDebouncedVisibilityChange(
+    { onHidden: suspend, onVisible: resume },
+    config.resumeDebounceMs,
+  );
 
   // If the tab is currently hidden, suspend immediately. This runs the
   // full suspend path (flush + mark closed) even on initial creation.
@@ -250,8 +220,7 @@ export function createResponseBufferGate(
 
   function dispose(): void {
     disposed = true;
-    clearResumeTimer();
-    unsubVisibility();
+    stopVisibility();
   }
 
   return { accept, isOpen: isOpenFn, getSnapshot, dispose };

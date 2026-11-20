@@ -130,8 +130,6 @@ function runDurationMs(run: RunRecord): number {
   return new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
 }
 
-const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded"]);
-
 // ── Metrics computation ─────────────────────────────────────────────
 
 /**

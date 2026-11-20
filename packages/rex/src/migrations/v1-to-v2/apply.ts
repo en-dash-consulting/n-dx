@@ -156,8 +156,6 @@ export interface BuiltV2Tree {
   stateKeys: Map<string, Set<string>>;
 }
 
-type WorkType = "change" | "task" | "subtask";
-
 interface Placed {
   item: PRDItem;
   entry?: V1ToV2Entry;
@@ -490,7 +488,6 @@ function inboxOf(p: Placed): Placed {
   return { item: p.item, ...(p.entry ? { entry: p.entry } : {}), type: "change", held: true };
 }
 
-/** The v1 item's fields as a v2 node of `p.type`: intent and state together, as the reader loads them. */
 /**
  * A v1 item's `links[]` as v2 `issues`: each link is its URL when that is a
  * work ref, else its `workItemId` when that is one (a tracker key); repeats
@@ -511,6 +508,7 @@ function moveLinksToIssues(node: Record<string, unknown>, item: PRDItem): void {
   else delete node.links;
 }
 
+/** The v1 item's fields as a v2 node of `p.type`: intent and state together, as the reader loads them. */
 function toNode(p: Placed, slug: string, cutAt: string): RuleNode {
   const { item, entry, type } = p;
   const {

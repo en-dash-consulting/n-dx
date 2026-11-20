@@ -5,6 +5,8 @@
  * route answers one.
  */
 
+import { fetchWithJsonBody } from "../utils/json-requests.js";
+
 export interface ConnectionProfile {
   name: string;
   state: "ok" | "unchecked" | "invalid";
@@ -52,19 +54,10 @@ export async function readError(res: Response): Promise<string> {
   return `HTTP ${res.status}`;
 }
 
-export function send(method: "POST" | "PUT" | "DELETE", path: string, body?: Record<string, unknown>): Promise<Response> {
-  return fetch(path, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
-}
+export const send: (method: "POST" | "PUT" | "DELETE", path: string, body?: Record<string, unknown>) => Promise<Response> =
+  fetchWithJsonBody;
 
 export const connectionPath = (id: string): string => `/api/connections/${encodeURIComponent(id)}`;
-
-export function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 /** The state as Settings words it. */
 export function connectionStateLabel(row: Pick<ConnectionRow, "state" | "reason" | "signIn">): string {

@@ -17,14 +17,14 @@
  */
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { relativeToRoot, repoCommandEnv, spawnCli } from "../llm-gateway.js";
+import { fileURLToPath } from "node:url";
+import { relativeToRoot, repoCommandEnv, resolveLayout, spawnCli, type Layout } from "../llm-gateway.js";
 import { emitProjection, type EmitResult } from "../emit.js";
 import { prepareCommandCwd, readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
 import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
-import { fileURLToPath } from "node:url";
 import { describeMisfits } from "../fit.js";
-import { resolveLayout } from "../llm-gateway.js";
+import { errorMessage } from "../error-message.js";
 import { FACE_EXTENSION, faceEnvironment, findInstalledFace, planProductFace, type FacePlan, type InstalledFace } from "../face.js";
 
 const SUBCOMMANDS = ["emit", "check", "describe", "serve", "mcp", "info"] as const;
@@ -50,6 +50,13 @@ The graview binary comes from graview.bin in the project config, $NDX_GRAVIEW_BI
 PATH or a product face checkout's own graview, in that order; npx -y graview@<pinned>
 only when graview.allowNpx is true or $NDX_GRAVIEW_NPX=1. Nothing is downloaded unasked.
 `;
+
+/**
+ * Flags that take the next token as their value, when it is not a flag: the
+ * value flags of the graview subcommands this CLI passes on — check,
+ * describe, serve and mcp (graview 0.1.67).
+ */
+const VALUE_FLAGS = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite", "--allow-origin", "--remote-url", "--views", "--face", "--previous", "--width", "--id", "--seed"];
 
 interface ParsedArgs {
   sub: Subcommand | "help";
@@ -83,10 +90,7 @@ function parse(argv: string[]): ParsedArgs {
     else if (arg === "--quiet" || arg === "-q") quiet = true;
     else if (arg.startsWith("-")) {
       passthrough.push(arg);
-      // A flag's value: the next token when it is not a flag and the flag takes one.
-      // The value flags of the graview subcommands this CLI passes on: check, describe, serve and mcp (graview 0.1.67).
-      const takesValue = ["--place", "--as", "--port", "--host", "--roles", "--header", "--data", "--sqlite", "--allow-origin", "--remote-url", "--views", "--face", "--previous", "--width", "--id", "--seed"].includes(arg);
-      if (takesValue && i + 1 < rest.length) passthrough.push(rest[++i]!);
+      if (VALUE_FLAGS.includes(arg) && i + 1 < rest.length) passthrough.push(rest[++i]!);
     } else if (dir === undefined) dir = arg;
     else passthrough.push(arg);
   }
@@ -134,8 +138,7 @@ function run(cmd: string, args: string[], options: { cwd: string; env: NodeJS.Pr
   });
 }
 
-/** graview's flags whose value is a path. */
-// Flags whose value is a path: resolved against the project, since npx runs graview elsewhere.
+/** graview's flags whose value is a path: resolved against the project, since npx runs graview elsewhere. */
 const PATH_FLAGS = ["--data", "--sqlite", "--seed", "--previous", "--views", "--face"];
 
 /**
@@ -200,6 +203,11 @@ function enabledFaceDir(face: InstalledFace | undefined): string | undefined {
   return face?.state === "enabled" ? face.dir : undefined;
 }
 
+/** The graview binary for `layout`, the installed face's own taken when the face is enabled. */
+async function graviewCommandFor(layout: Layout): Promise<GraviewCommand> {
+  return resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(layout.root)) });
+}
+
 /** `graview sync-seed --apply --prune` when a store exists, so it mirrors the fresh snapshot. */
 async function refreshStore(command: GraviewCommand, emitted: EmitResult, options: { stdoutToStderr?: boolean } = {}): Promise<number> {
   mkdirSync(emitted.dataDir, { recursive: true });
@@ -212,7 +220,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   try {
     parsed = parse(argv);
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(errorMessage(error));
     return 2;
   }
   if (parsed.sub === "help") {
@@ -263,7 +271,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // A command that needs graview and has none stops before it writes anything; serve asks for
   // a product face first, which needs no binary, so it is judged after the face plan below.
   const needsBinary = parsed.sub !== "emit" && !(parsed.sub === "serve" && parsed.face);
-  const early = needsBinary ? resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(layout.root)) }) : undefined;
+  const early = needsBinary ? await graviewCommandFor(layout) : undefined;
   if (early?.source === "none") {
     console.error(`ndx graview ${parsed.sub}: ${early.detail}`);
     return 1;
@@ -292,7 +300,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     say(`product face: ${face.detail}`);
   }
 
-  const command = early ?? resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(root)) });
+  const command = early ?? (await graviewCommandFor(layout));
   // Everything past a product face needs a graview binary, and none is downloaded unasked.
   if (command.source === "none") {
     console.error(`ndx graview ${parsed.sub}: ${command.detail}`);

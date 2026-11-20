@@ -21,8 +21,6 @@ import { callSites, contains, innermostEach, type Capture, type FrameworkContext
 
 const spanKey = (c: Capture): string => `${c.start.line}:${c.start.column}-${c.end.line}:${c.end.column}`;
 
-const sameSpan = (a: Capture, b: Capture): boolean => spanKey(a) === spanKey(b);
-
 /** A dotted name as written, without the whitespace Python allows inside it. */
 export const dotted = (text: string): string => text.replace(/\s+/g, "");
 

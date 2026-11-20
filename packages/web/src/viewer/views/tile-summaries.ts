@@ -17,6 +17,7 @@ import type { Finding } from "../external.js";
 import type { StageTile } from "./stages.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { effectiveEnrichmentPass } from "../enrichment-pass.js";
+import { zoneNeedsAttention } from "../visualization/metrics.js";
 
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 
@@ -65,7 +66,7 @@ function findingsSummary(data: LoadedData, type: Finding["type"], noun: string, 
 function zonesSummary(data: LoadedData): ComponentChild {
   const zones = data.zones?.zones ?? [];
   if (zones.length === 0) return empty("No zones loaded.");
-  const attention = zones.filter((z) => z.cohesion < 0.4 || z.coupling > 0.5).length;
+  const attention = zones.filter(zoneNeedsAttention).length;
   const files = zones.reduce((n, z) => n + z.files.length, 0);
   const largest = [...zones].sort((a, b) => b.files.length - a.files.length).slice(0, 4);
   const circular = data.imports?.summary.circularCount ?? 0;
