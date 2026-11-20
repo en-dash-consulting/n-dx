@@ -144,6 +144,10 @@ export interface ReadyTask {
   resume: boolean;
   /** A run of this task is live (or cannot be confirmed dead) in some worktree. */
   liveRun: boolean;
+  /** Who it is assigned to: the task's own assignee, else its nearest assigned ancestor's. Null when nobody is. */
+  assignee: string | null;
+  /** The task's saved run tier, when it carries one; null runs on the project default. */
+  tier: string | null;
   /** The task carries its own run settings, which `ndx work` applies. */
   saved: boolean;
 }
@@ -658,6 +662,8 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
       tags: item.tags ?? [],
       resume: item.status === "in_progress" && !liveRun,
       liveRun,
+      assignee: [item, ...[...parents].reverse()].find((i) => typeof i.assignee === "string" && i.assignee.trim() !== "")?.assignee ?? null,
+      tier: typeof (item.run as RunSettings | undefined)?.tier === "string" ? (item.run as RunSettings).tier as string : null,
       saved: savedRunVersion(item.run as RunSettings | undefined) !== "none",
     };
   });

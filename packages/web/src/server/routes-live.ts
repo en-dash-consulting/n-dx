@@ -155,6 +155,11 @@ export interface LiveRun {
    * recorded while the run is going, so it is not reported.
    */
   criteriaTotal: number | null;
+  /**
+   * Who the task is assigned to in its worktree's PRD (its own assignee, else
+   * its nearest assigned ancestor's); null when nobody is.
+   */
+  assignee: string | null;
   /** Newest progress event summary, else the dashboard's last stdout line. */
   lastProgress: string | null;
   /**
@@ -347,6 +352,8 @@ interface PrdIndex {
   titles: Map<string, string>;
   /** Acceptance criteria per item, for items that list any. */
   criteria: Map<string, number>;
+  /** Who the item is assigned to: its own assignee, else its nearest assigned ancestor's. */
+  assignees: Map<string, string>;
   doc: CachedPRDDocument | null;
   completedIds: Set<string>;
   /**
@@ -410,7 +417,7 @@ function prdIndexFor(rexDir: string): PrdIndex {
   const cached = prdIndexes.get(rexDir);
   if (cached && cached.signature === signature) return cached;
   const doc = signature === "absent" ? null : loadPRDSync(rexDir);
-  const index: PrdIndex = { signature, v2: isV2Tree(rexDir), chains: new Map(), units: new Set(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set(), nextByExcluded: new Map() };
+  const index: PrdIndex = { signature, v2: isV2Tree(rexDir), chains: new Map(), units: new Set(), titles: new Map(), criteria: new Map(), assignees: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set(), nextByExcluded: new Map() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
       index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })));
@@ -418,6 +425,8 @@ function prdIndexFor(rexDir: string): PrdIndex {
       if (runsAsOneTask(item)) index.units.add(item.id);
       const criteria = item.acceptanceCriteria?.length ?? 0;
       if (criteria > 0) index.criteria.set(item.id, criteria);
+      const assignee = [item, ...[...parents].reverse()].find((i) => typeof i.assignee === "string" && i.assignee.trim() !== "")?.assignee;
+      if (assignee) index.assignees.set(item.id, assignee);
     }
   }
   prdIndexes.set(rexDir, index);
@@ -640,6 +649,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         livenessReason: verdict?.reason ?? null,
         canEnd: verdict?.canEnd ?? null,
         criteriaTotal: digest.taskId ? prdIndexFor(layout.rexDir).criteria.get(digest.taskId) ?? null : null,
+        assignee: digest.taskId ? prdIndexFor(layout.rexDir).assignees.get(digest.taskId) ?? null : null,
         lastProgress: running ? lastProgressOf(digest, ws.path, roots, execution) : null,
         loop: digest.loop,
       };
