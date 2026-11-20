@@ -12,10 +12,11 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync, rmSync, symlinkSync } from "fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtemp, rm, writeFile, chmod } from "node:fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { setupAssistantIntegrations, formatInitReport } from "../../packages/core/assistant-integration.js";
 import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 import {
   getMcpServers,
@@ -353,6 +354,46 @@ describe("setupCodexIntegration", () => {
     expect(firstAgents).toBe(secondAgents);
   });
 
+  it("refreshes owned commands without losing operator extras or adjacent comments", () => {
+    mkdirSync(join(tmpDir, ".codex"));
+    const file = join(tmpDir, ".codex/config.toml");
+    const extras = 'enabled = false # deliberately disabled\nstartup_timeout_sec = 45\ntool_timeout_sec = 90\nexperimental_setting = ["keep"]\n';
+    const adjacent = '# operator server documentation\n[mcp_servers.operator]\ncommand = "operator"\n';
+    writeFileSync(file, '[mcp_servers.rex]\ncommand = "stale" # launcher\nargs = ["old"]\n' + extras + adjacent);
+    setupCodexIntegration(tmpDir);
+    const first = readFileSync(file, "utf8");
+    expect(first).toContain(extras);
+    expect(first).toContain(adjacent);
+    expect(first).toContain('command = "n-dx" # launcher');
+    expect(first).toContain('args = ["rex", "mcp", "."]');
+    expect(first).not.toContain('"stale"');
+    setupCodexIntegration(tmpDir);
+    expect(readFileSync(file, "utf8")).toBe(first);
+  });
+
+  it("reports only config refusal and refreshes stale instructions and skills on every init", () => {
+    setupCodexIntegration(tmpDir);
+    const file = join(tmpDir, ".codex/config.toml");
+    const content = '[mcp_servers.operator]\ncommand = "operator"\nenv = { FOO = "bar" }\n';
+    writeFileSync(file, content);
+    for (let n = 0; n < 2; n++) {
+      writeFileSync(join(tmpDir, "AGENTS.md"), "stale instructions");
+      writeFileSync(join(tmpDir, ".agents/skills/ndx-work/SKILL.md"), "stale skill");
+      const results = setupAssistantIntegrations(tmpDir, { claude: false });
+      expect(results.codex.skipped).toBe(false);
+      expect(results.codex.detail.config.written).toBe(false);
+      expect(readFileSync(file, "utf8")).toBe(content);
+      expect(readFileSync(join(tmpDir, "AGENTS.md"), "utf8")).toContain("# n-dx");
+      expect(readFileSync(join(tmpDir, ".agents/skills/ndx-work/SKILL.md"), "utf8")).not.toBe("stale skill");
+      for (const opts of [{}, { verbose: false }, { activeVendor: "claude" }]) {
+        const report = formatInitReport(results, opts).join("\n");
+        expect(report).toContain("config.toml");
+        expect(report).toContain("cannot safely merge");
+        expect(report).not.toMatch(/\d+ MCP servers/);
+      }
+    }
+  });
+
   it("preserves operator settings verbatim while refreshing only manifest MCP tables", () => {
     mkdirSync(join(tmpDir, ".codex"));
     const file = join(tmpDir, ".codex/config.toml");
@@ -361,8 +402,9 @@ describe("setupCodexIntegration", () => {
     setupCodexIntegration(tmpDir);
     const first = readFileSync(file, "utf8");
     expect(first.startsWith(operator)).toBe(true);
-    expect(first).toContain(renderCodexConfigToml("n-dx").slice(renderCodexConfigToml("n-dx").indexOf("[mcp_servers.")));
-    expect(first).not.toMatch(/stale|OLD|old.invalid/);
+    expect(first).toContain('command = "n-dx"');
+    expect(first).toContain('[mcp_servers.rex.env]\nOLD = "yes"');
+    expect(first).not.toMatch(/stale|old.invalid/);
     setupCodexIntegration(tmpDir);
     expect(readFileSync(file, "utf8")).toBe(first);
   });
@@ -378,23 +420,25 @@ describe("setupCodexIntegration", () => {
     '[[mcp_servers.rex]]\ncommand = "operator"\n',
     'mcp_servers = false\n',
     '[mcp_servers.rex]\ncommand = nonsense\n',
+    '[mcp_servers.rex]\nenabled = false\nenv = { FOO = "bar" }\n',
+    '[mcp_servers.rex.command]\nvalue = "operator"\n',
     '[mcp_servers.rex]\ncommand = "one"\ncommand = "two"\n',
     '[mcp_servers.rex.env]\nA = "one"\n[mcp_servers]\nrex = "conflict"\n',
     'model = """\n[mcp_servers.rex]\nnot a table\n"""\n',
     '[mcp_servers.operator]\nargs = ["unterminated"\n',
-  ])("refuses ambiguous or unsupported TOML without modifying artifacts: %s", (content) => {
+  ])("refuses ambiguous or unsupported TOML without modifying config bytes: %s", (content) => {
     mkdirSync(join(tmpDir, ".codex"));
     const file = join(tmpDir, ".codex/config.toml");
     writeFileSync(file, content);
-    expect(() => setupCodexIntegration(tmpDir)).toThrow(/config.toml/);
+    expect(setupCodexIntegration(tmpDir).config.error).toMatch(/config.toml/);
     expect(readFileSync(file, "utf8")).toBe(content);
-    expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(false);
-    expect(existsSync(join(tmpDir, ".agents"))).toBe(false);
+    expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".agents"))).toBe(true);
   });
 
   it("refuses an unreadable config path instead of treating it as missing", () => {
     mkdirSync(join(tmpDir, ".codex/config.toml"), { recursive: true });
-    expect(() => setupCodexIntegration(tmpDir)).toThrow(/config.toml/);
+    expect(setupCodexIntegration(tmpDir).config.error).toMatch(/config.toml/);
     expect(existsSync(join(tmpDir, ".codex/config.toml"))).toBe(true);
   });
 
@@ -403,7 +447,7 @@ describe("setupCodexIntegration", () => {
     const file = join(tmpDir, ".codex/config.toml");
     const bytes = Buffer.from([0xff, 0xfe]);
     writeFileSync(file, bytes);
-    expect(() => setupCodexIntegration(tmpDir)).toThrow(/config.toml/);
+    expect(setupCodexIntegration(tmpDir).config.error).toMatch(/config.toml/);
     expect(readFileSync(file)).toEqual(bytes);
   });
 
@@ -412,7 +456,7 @@ describe("setupCodexIntegration", () => {
     const target = join(tmpDir, "operator.toml");
     writeFileSync(target, 'model = "gpt-6.1-sol"\n');
     symlinkSync(target, join(tmpDir, ".codex/config.toml"));
-    expect(() => setupCodexIntegration(tmpDir)).toThrow(/config.toml/);
+    expect(setupCodexIntegration(tmpDir).config.error).toMatch(/config.toml/);
     expect(readFileSync(target, "utf8")).toBe('model = "gpt-6.1-sol"\n');
   });
 });
@@ -528,21 +572,66 @@ describe("ndx init --no-codex", () => {
     }
   });
 
-  it("retains a disposable operator config through repeated CLI init", async () => {
+  it("preserves both vendor pins through config and init switch-backs and reports real mismatches", async () => {
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-switch-pins-"));
+    try {
+      await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+      await writeFakeBinary(join(binDir, "claude"), { stdout: "ok" });
+      const options = { env: { ...process.env, CODEX_HOME: binDir, CLAUDE_CONFIG_DIR: binDir,
+        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}` } };
+      const file = join(tmpDir, ".n-dx.json");
+      const pins = { claude: { model: "claude-opus-4-20250514" }, codex: { model: "gpt-5.2" } };
+      writeFileSync(file, JSON.stringify({ llm: { vendor: "codex", ...pins } }));
+      for (const command of ["config", "init"]) {
+        for (const vendor of ["claude", "codex", "claude", "codex"]) {
+          run(command === "config" ? ["config", "llm.vendor", vendor, "--soft-preflight", tmpDir]
+            : ["init", `--provider=${vendor}`, "--no-claude", "--no-codex", "--no-commit", tmpDir], options);
+          const config = JSON.parse(readFileSync(file, "utf8"));
+          expect(config.llm.vendor).toBe(vendor);
+          expect(config.llm.claude).toEqual(pins.claude);
+          expect(config.llm.codex).toEqual(pins.codex);
+        }
+      }
+      for (const command of ["config", "init"]) {
+        writeFileSync(file, JSON.stringify({ llm: { vendor: "codex", claude: { model: "gpt-5.2" }, codex: pins.codex } }));
+        const args = command === "config" ? ["config", "llm.vendor", "claude", "--soft-preflight", tmpDir]
+          : ["init", "--provider=claude", "--no-claude", "--no-codex", "--no-commit", tmpDir];
+        const result = spawnSync(process.execPath, [CLI_PATH, ...args], { ...options, encoding: "utf8", timeout: DEFAULT_TIMEOUT });
+        expect(result.status, result.stderr).toBe(0);
+        const config = JSON.parse(readFileSync(file, "utf8"));
+        expect(config.llm.claude.model).toBeUndefined();
+        expect(config.llm.codex.model).toBe(pins.codex.model);
+        expect(result.stderr).toContain("llm.claude.model");
+        expect(result.stderr).toContain("not compatible with claude");
+        if (command === "init") expect(result.stdout).toMatch(/Model +not set/);
+      }
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+    }
+  });
+
+  it.each([false, true])("retains a disposable operator config through repeated CLI init (inline=%s)", async (inline) => {
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-preserve-bin-"));
     try {
       await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
       mkdirSync(join(tmpDir, ".codex"));
       const file = join(tmpDir, ".codex/config.toml");
       const operator = 'model = "gpt-6.1-sol"\n[features]\noperator_flag = true\n[mcp_servers.operator]\ncommand = "operator"\n';
-      writeFileSync(file, operator + '[mcp_servers.rex]\ncommand = "stale"\n');
-      const options = { env: { ...process.env, CODEX_HOME: binDir, PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}` } };
+      const original = operator + (inline ? 'env = { FOO = "bar" }\n' : '[mcp_servers.rex]\ncommand = "stale"\n');
+      writeFileSync(file, original);
+      const options = { env: { ...process.env, CODEX_HOME: binDir, CLAUDE_CONFIG_DIR: binDir, PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}` } };
       run(["init", "--provider=codex", "--no-claude", "--no-commit", tmpDir], options);
       const first = readFileSync(file, "utf8");
       expect(first.startsWith(operator)).toBe(true);
       expect(first).not.toContain("stale");
-      run(["init", "--provider=codex", "--no-claude", "--no-commit", tmpDir], options);
+      if (inline) expect(first).toBe(original);
+      writeFileSync(join(tmpDir, "AGENTS.md"), "stale instructions");
+      writeFileSync(join(tmpDir, ".agents/skills/ndx-work/SKILL.md"), "stale skill");
+      const output = run(["init", "--provider=codex", "--no-claude", "--no-commit", tmpDir], options);
       expect(readFileSync(file, "utf8")).toBe(first);
+      expect(readFileSync(join(tmpDir, "AGENTS.md"), "utf8")).toContain("# n-dx");
+      expect(readFileSync(join(tmpDir, ".agents/skills/ndx-work/SKILL.md"), "utf8")).not.toBe("stale skill");
+      if (inline) expect(output).toContain("cannot safely merge");
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }

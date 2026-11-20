@@ -25,6 +25,7 @@ import { dirname, join } from "node:path";
 import { FEATURE_DISABLED_HEADER, HUB_SESSION_ROUTES, HUB_SIDECAR_API_PREFIX, HUB_SIDECAR_HOST_LOCK_SEGMENTS } from "../shared/index.js";
 import type { ProjectView } from "./hub.js";
 import { isPidAlive } from "./registry.js";
+import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 export interface HubSessionHostLock {
   pid: number;
@@ -216,9 +217,9 @@ export async function probeHubLens(
     if (!host) return false;
     let res: Response;
     try {
-      res = await fetchImpl(`http://127.0.0.1:${host.port}${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.lens}`, {
+      res = await fetchImpl(loopbackUrl(host.port, `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.lens}`), {
         signal: AbortSignal.timeout(opts.timeoutMs ?? 2_000),
-        headers: opts.token ? { "X-Ndx-Token": opts.token } : {},
+        headers: tokenHeaders(opts.token),
       });
     } catch (err) {
       // Slow is not down: the proxy marks a host only when it cannot connect, and

@@ -1,5 +1,3 @@
-import { FloatingNotice } from "../components/index.js";
-import { useToast } from "../hooks/index.js";
 /**
  * Workflow Optimization view — displays analysis of run history with
  * actionable suggestions that users can preview, accept, reject, or defer.
@@ -12,8 +10,10 @@ import { useToast } from "../hooks/index.js";
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { BrandedHeader, FloatingNotice } from "../components/index.js";
+import { useCliName, useToast } from "../hooks/index.js";
+import { responseError } from "../utils/response-error.js";
+import { StatCard } from "./stat-card.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -117,31 +117,17 @@ function StatsOverview({ stats, totalRuns, timeRange }: {
 }) {
   return h("div", { class: "wf-stats" },
     h("div", { class: "stat-grid wf-stats-grid" },
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, String(totalRuns)),
-        h("div", { class: "label" }, "Total Runs"),
-      ),
-      h("div", { class: `stat-card${stats.successRate < 0.5 ? " wf-stat-warn" : ""}` },
-        h("div", { class: "value" }, formatPercent(stats.successRate)),
-        h("div", { class: "label" }, "Success Rate"),
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, stats.avgTurns.toFixed(1)),
-        h("div", { class: "label" }, "Avg Turns"),
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, formatNumber(stats.avgTokensPerRun)),
-        h("div", { class: "label" }, "Avg Tokens/Run"),
-      ),
-      h("div", { class: "stat-card" },
-        h("div", { class: "value" }, formatDuration(stats.avgDurationMs)),
-        h("div", { class: "label" }, "Avg Duration"),
-      ),
+      h(StatCard, { value: String(totalRuns), label: "Total Runs" }),
+      h(StatCard, {
+        value: formatPercent(stats.successRate),
+        label: "Success Rate",
+        cardClass: stats.successRate < 0.5 ? "wf-stat-warn" : undefined,
+      }),
+      h(StatCard, { value: stats.avgTurns.toFixed(1), label: "Avg Turns" }),
+      h(StatCard, { value: formatNumber(stats.avgTokensPerRun), label: "Avg Tokens/Run" }),
+      h(StatCard, { value: formatDuration(stats.avgDurationMs), label: "Avg Duration" }),
       stats.turnLimitHits > 0
-        ? h("div", { class: "stat-card wf-stat-warn" },
-            h("div", { class: "value" }, String(stats.turnLimitHits)),
-            h("div", { class: "label" }, "Turn Limit Hits"),
-          )
+        ? h(StatCard, { value: String(stats.turnLimitHits), label: "Turn Limit Hits", cardClass: "wf-stat-warn" })
         : null,
     ),
     timeRange
@@ -346,8 +332,7 @@ export function WorkflowOptimizationView() {
     try {
       const res = await fetch("/api/hench/workflow/analysis");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setError((body as { error?: string }).error ?? "Failed to load analysis");
+        setError(await responseError(res, "Failed to load", "Failed to load analysis"));
         return;
       }
       const json = await res.json() as AnalysisResponse;

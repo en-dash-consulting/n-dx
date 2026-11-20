@@ -9,6 +9,8 @@ import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { ItemStatus } from "./types.js";
+import { statusOptions } from "./status-display.js";
+import { errorOrHttpStatus } from "../../utils/response-error.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -25,14 +27,7 @@ export interface BulkActionsProps {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: Array<{ value: ItemStatus; label: string; icon: string }> = [
-  { value: "pending", label: "Pending", icon: "○" },
-  { value: "in_progress", label: "In Progress", icon: "◐" },
-  { value: "completed", label: "Completed", icon: "●" },
-  { value: "blocked", label: "Blocked", icon: "⊘" },
-  { value: "deferred", label: "Deferred", icon: "◌" },
-  { value: "deleted", label: "Deleted", icon: "✕" },
-];
+const STATUS_OPTIONS = statusOptions(["pending", "in_progress", "completed", "blocked", "deferred", "deleted"]);
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -58,8 +53,7 @@ export function BulkActions({ selectedIds, onClearSelection, onActionComplete, o
         });
 
         if (!res.ok) {
-          const errBody = await res.json().catch(() => ({ error: "Update failed" }));
-          throw new Error(errBody.error || `HTTP ${res.status}`);
+          throw new Error(await errorOrHttpStatus(res, "Update failed"));
         }
 
         const data = await res.json();

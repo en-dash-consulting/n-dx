@@ -12,3 +12,8 @@ export function meterClass(value: number, invert: boolean = false): string {
   if (v >= 0.4) return "mid";
   return "bad";
 }
+
+/** A zone the health views flag: cohesion under 0.4 or coupling over 0.5. */
+export function zoneNeedsAttention(zone: { cohesion: number; coupling: number }): boolean {
+  return zone.cohesion < 0.4 || zone.coupling > 0.5;
+}

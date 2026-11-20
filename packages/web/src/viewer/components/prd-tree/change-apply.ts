@@ -16,6 +16,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import type { AppliedAmendment, ChangeApply } from "../../views/product-model.js";
 import type { PRDItemData } from "./types.js";
+import { errorMessage } from "../../utils/format.js";
 
 type Answer = { ok: true; result: ChangeApply } | { ok: false; message: string; moved?: boolean };
 
@@ -30,7 +31,7 @@ async function post(changeId: string, action: "apply" | "apply/preview", hash?: 
     if (res.ok) return { ok: true, result: json as unknown as ChangeApply };
     return { ok: false, message: typeof json?.error === "string" ? json.error : `HTTP ${res.status}`, ...(json?.moved === true ? { moved: true } : {}) };
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    return { ok: false, message: errorMessage(err) };
   }
 }
 

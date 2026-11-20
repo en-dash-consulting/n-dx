@@ -591,60 +591,8 @@ export function buildReviewerArgs(reviewer, model, codexPolicyFlags = []) {
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
-  const resolved = await resolveReviewerEnv(dir, reviewer, trust);
-  if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError };
-  const { env, codexPolicyFlags } = resolved;
-  return new Promise((resolve) => {
-    let child;
-    try {
-      // Deliver the prompt via stdin to avoid newline injection on Windows cmd.exe.
-      // claude: `-p -` reads the full prompt from stdin.
-      // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
-      const args = buildReviewerArgs(reviewer, model, codexPolicyFlags);
-      child = registerChild(spawnCli(cliPath, args, {
-        cwd: dir,
-        env,
-        stdio: ["pipe", "inherit", "inherit"],
-        // POSIX: makes the CLI a process-group leader so the timeout can signal the
-        // group and reach its descendants. No-op on Windows, where taskkill walks
-        // the tree by pid. Paired with registerChild — see doNotTrack for why one
-        // without the other moves the orphan rather than removing it.
-        ...treeKillSpawnOptions(),
-      }));
-    } catch (err) {
-      resolve({ exitCode: 1, timedOut: false, spawnError: err.message });
-      return;
-    }
-
-    child.stdin.on("error", () => { /* EPIPE guard — child may close stdin early */ });
-    child.stdin.write(prompt);
-    child.stdin.end();
-
-    // Claimed by whichever path gets there first. Awaiting termination below means
-    // `close` now fires BEFORE the timeout path resolves, so without this flag a
-    // timeout would be reported as an ordinary exit with a signal code — the very
-    // outcome the caller checks `timedOut` to distinguish.
-    let timedOut = false;
-
-    const timer = setTimeout(async () => {
-      timedOut = true;
-      await terminateTimedOutTree(child);
-      resolve({ exitCode: 1, timedOut: true });
-    }, timeout);
-
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      if (timedOut) return;
-      resolve({ exitCode: code ?? 1, timedOut: false });
-    });
-
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      if (timedOut) return;
-      resolve({ exitCode: 1, timedOut: false, spawnError: err.message });
-    });
-  });
+export async function runReviewerLlm(options) {
+  return spawnReviewerLlm(options, false);
 }
 
 /**
@@ -662,60 +610,81 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, ti
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
+export async function runReviewerLlmCapturing(options) {
+  return spawnReviewerLlm(options, true);
+}
+
+/**
+ * The spawn behind {@link runReviewerLlm} and {@link runReviewerLlmCapturing}.
+ * With `capture`, stdout and stderr are piped, echoed to this process's own,
+ * and every result carries what they printed as `output`; without it the
+ * child inherits them and results have no `output`.
+ */
+async function spawnReviewerLlm({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }, capture) {
+  let output = "";
+  const settle = (result) => (capture ? { ...result, output } : result);
   const resolved = await resolveReviewerEnv(dir, reviewer, trust);
-  if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError, output: "" };
+  if ("spawnError" in resolved) return settle({ exitCode: 1, timedOut: false, spawnError: resolved.spawnError });
   const { env, codexPolicyFlags } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
-      // Deliver the prompt via stdin — same rationale as runReviewerLlm.
+      // Deliver the prompt via stdin to avoid newline injection on Windows cmd.exe.
+      // claude: `-p -` reads the full prompt from stdin.
+      // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
       const args = buildReviewerArgs(reviewer, model, codexPolicyFlags);
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
         env,
-        stdio: ["pipe", "pipe", "pipe"],
-        // Process-group leader on POSIX; see runReviewerLlm.
+        stdio: capture ? ["pipe", "pipe", "pipe"] : ["pipe", "inherit", "inherit"],
+        // POSIX: makes the CLI a process-group leader so the timeout can signal the
+        // group and reach its descendants. No-op on Windows, where taskkill walks
+        // the tree by pid. Paired with registerChild — see doNotTrack for why one
+        // without the other moves the orphan rather than removing it.
         ...treeKillSpawnOptions(),
       }));
     } catch (err) {
-      resolve({ exitCode: 1, timedOut: false, spawnError: err.message, output: "" });
+      resolve(settle({ exitCode: 1, timedOut: false, spawnError: err.message }));
       return;
     }
 
-    child.stdin.on("error", () => { /* EPIPE guard */ });
+    child.stdin.on("error", () => { /* EPIPE guard — child may close stdin early */ });
     child.stdin.write(prompt);
     child.stdin.end();
 
-    let output = "";
-    child.stdout.on("data", (chunk) => {
-      output += chunk;
-      process.stdout.write(chunk);
-    });
-    child.stderr.on("data", (chunk) => {
-      output += chunk;
-      process.stderr.write(chunk);
-    });
+    if (capture) {
+      child.stdout.on("data", (chunk) => {
+        output += chunk;
+        process.stdout.write(chunk);
+      });
+      child.stderr.on("data", (chunk) => {
+        output += chunk;
+        process.stderr.write(chunk);
+      });
+    }
 
-    // See runReviewerLlm for why the flag is required once termination is awaited.
+    // Claimed by whichever path gets there first. Awaiting termination below means
+    // `close` now fires BEFORE the timeout path resolves, so without this flag a
+    // timeout would be reported as an ordinary exit with a signal code — the very
+    // outcome the caller checks `timedOut` to distinguish.
     let timedOut = false;
 
     const timer = setTimeout(async () => {
       timedOut = true;
       await terminateTimedOutTree(child);
-      resolve({ exitCode: 1, timedOut: true, output });
+      resolve(settle({ exitCode: 1, timedOut: true }));
     }, timeout);
 
     child.on("close", (code) => {
       clearTimeout(timer);
       if (timedOut) return;
-      resolve({ exitCode: code ?? 1, timedOut: false, output });
+      resolve(settle({ exitCode: code ?? 1, timedOut: false }));
     });
 
     child.on("error", (err) => {
       clearTimeout(timer);
       if (timedOut) return;
-      resolve({ exitCode: 1, timedOut: false, spawnError: err.message, output });
+      resolve(settle({ exitCode: 1, timedOut: false, spawnError: err.message }));
     });
   });
 }
@@ -913,7 +882,7 @@ function spawnShellTestCommand(testCommand, dir, timeout, registerChild, env) {
     child.stdout.on("data", (chunk) => { output += chunk; });
     child.stderr.on("data", (chunk) => { output += chunk; });
 
-    // See runReviewerLlm for why the flag is required once termination is awaited.
+    // See spawnReviewerLlm for why the flag is required once termination is awaited.
     let timedOut = false;
 
     const timer = setTimeout(async () => {

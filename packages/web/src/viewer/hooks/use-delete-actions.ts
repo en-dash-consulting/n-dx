@@ -12,6 +12,7 @@ import type { VNode } from "preact";
 import { replaceAppHistory } from "../base-path.js";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById, collectSubtreeIds, removeItemById } from "../components/prd-tree/tree-utils.js";
+import { errorOrHttpStatus } from "../utils/response-error.js";
 
 export interface DeleteActionsDeps {
   /** Current PRD document data. */
@@ -109,8 +110,7 @@ export function useDeleteActions({
       try {
         const res = await fetch(`/api/rex/items/${id}`, { method: "DELETE" });
         if (!res.ok) {
-          const errBody = await res.json().catch(() => ({ error: "Delete failed" }));
-          throw new Error(errBody.error || `HTTP ${res.status}`);
+          throw new Error(await errorOrHttpStatus(res, "Delete failed"));
         }
         const result = await res.json();
         showToast(`Deleted ${result.type}: ${result.title}`);

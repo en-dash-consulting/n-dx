@@ -34,7 +34,7 @@ import { usePolling } from "../hooks/index.js";
 import { useHenchRunsLiveRefresh } from "../hooks/index.js";
 import type { HenchExecutionProgress } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { fmtDuration } from "../utils/format.js";
+import { errorMessage, fmtDuration, formatTokenCount as fmtTokens } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -220,10 +220,9 @@ export interface RunDetail extends RunSummary {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
+/** Every token a run spent: input, output and both cache figures. */
+function totalTokensOf(usage: RunSummary["tokenUsage"]): number {
+  return (usage.input ?? 0) + (usage.output ?? 0) + (usage.cacheCreationInput ?? 0) + (usage.cacheReadInput ?? 0);
 }
 
 function fmtTimestamp(iso: string): string {
@@ -296,7 +295,9 @@ const SESSION_REASON_PROSE: Record<string, string> = {
   cached: "reused the cached orientation",
   "chain-continued": "continued the running batch chain",
   "configured-cold": "cold spawns are configured",
-  "fork-unsupported": "this vendor cannot resume a session by id",
+  "fork-unsupported": "this CLI or provider cannot fork an orientation session",
+  "identity-unavailable": "the Codex account or execution identity could not be verified",
+  "identity-changed": "the checkout, policy or execution identity changed",
   "not-consulted": "no cache was consulted",
   "api-provider": "the API path holds no resumable session",
   "no-entry": "nothing was cached",
@@ -427,11 +428,6 @@ function getChangeClassification(changes: FileChangeEntry[]): { label: string; c
   if (changes.length === 0) return { label: "no changes", color: "var(--text-dim)" };
 
   const categories = new Set(changes.map((c) => c.category));
-  const hasCode = categories.has("code");
-  const hasDocs = categories.has("docs");
-  const hasConfig = categories.has("config");
-  const hasMetadata = categories.has("metadata");
-  const hasTest = categories.has("test");
 
   // If only one non-test category, use that
   const nonTestCategories = Array.from(categories).filter((c) => c !== "test");
@@ -479,10 +475,7 @@ function RunMetrics({ runs }: { runs: RunSummary[] }) {
   const completed = runs.filter((r) => r.status === "completed").length;
   const failed = runs.filter((r) => r.status === "failed" || r.status === "error").length;
 
-  const totalTokens = runs.reduce((sum, r) => {
-    const t = r.tokenUsage;
-    return sum + (t.input ?? 0) + (t.output ?? 0) + (t.cacheCreationInput ?? 0) + (t.cacheReadInput ?? 0);
-  }, 0);
+  const totalTokens = runs.reduce((sum, r) => sum + totalTokensOf(r.tokenUsage), 0);
 
   const totalTurns = runs.reduce((sum, r) => sum + (r.turns ?? 0), 0);
 
@@ -528,10 +521,7 @@ function RunCard({ run, isSelected, isHighlighted, isNewestOfTask, showWorktree,
 }) {
   const status = getStatusConfig(run.status);
   const stale = isStaleRun(run);
-  const totalTokens = (run.tokenUsage.input ?? 0)
-    + (run.tokenUsage.output ?? 0)
-    + (run.tokenUsage.cacheCreationInput ?? 0)
-    + (run.tokenUsage.cacheReadInput ?? 0);
+  const totalTokens = totalTokensOf(run.tokenUsage);
 
   const counts = run.structuredSummary?.counts;
 
@@ -656,10 +646,7 @@ export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onB
   const status = getStatusConfig(run.status);
   const cliName = useCliName();
   const errorDisplay = runErrorDisplay(run, cliName);
-  const totalTokens = (run.tokenUsage.input ?? 0)
-    + (run.tokenUsage.output ?? 0)
-    + (run.tokenUsage.cacheCreationInput ?? 0)
-    + (run.tokenUsage.cacheReadInput ?? 0);
+  const totalTokens = totalTokensOf(run.tokenUsage);
   const counts = run.structuredSummary?.counts;
 
   return h("div", { class: "hench-run-detail" },
@@ -1031,7 +1018,7 @@ function ValidateTokensTrigger() {
       setOutput(body.output ?? "Token reporting verified.");
       setState("done");
     } catch (err) {
-      setOutput(err instanceof Error ? err.message : String(err));
+      setOutput(errorMessage(err));
       setState("error");
     }
   }, []);
@@ -1059,6 +1046,20 @@ interface NextTaskInfo {
   status: string;
   itemType: string;
   priority?: string;
+}
+
+/** The dismissible banner for a run link that could not be opened; null when there is no error. */
+function deepLinkErrorBanner(message: string | null, onDismiss: () => void) {
+  return message
+    ? h("div", { class: "hench-deep-link-error", role: "alert" },
+        h("span", null, message),
+        h("button", {
+          class: "hench-deep-link-error-dismiss",
+          onClick: onDismiss,
+          "aria-label": "Dismiss",
+        }, h(ActionIcon, { name: "close" })),
+      )
+    : null;
 }
 
 export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps = {}) {
@@ -1392,16 +1393,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
         h("h2", null, "Execution History"),
         h(ValidateTokensTrigger, null),
       ),
-      deepLinkError
-        ? h("div", { class: "hench-deep-link-error", role: "alert" },
-            h("span", null, deepLinkError),
-            h("button", {
-              class: "hench-deep-link-error-dismiss",
-              onClick: () => setDeepLinkError(null),
-              "aria-label": "Dismiss",
-            }, h(ActionIcon, { name: "close" })),
-          )
-        : null,
+      deepLinkErrorBanner(deepLinkError, () => setDeepLinkError(null)),
       h("div", { class: "hench-empty" },
         h("div", { class: "hench-empty-icon" }, "▶"),
         h("p", null, "No runs yet."),
@@ -1476,16 +1468,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
     ),
 
     // Deep-link error banner
-    deepLinkError
-      ? h("div", { class: "hench-deep-link-error", role: "alert" },
-          h("span", null, deepLinkError),
-          h("button", {
-            class: "hench-deep-link-error-dismiss",
-            onClick: () => setDeepLinkError(null),
-            "aria-label": "Dismiss",
-          }, h(ActionIcon, { name: "close" })),
-        )
-      : null,
+    deepLinkErrorBanner(deepLinkError, () => setDeepLinkError(null)),
 
     // Active tasks panel — shown at top when there are running tasks
     h(ActiveTasksPanel, { runs: activeRuns, navigateTo }),

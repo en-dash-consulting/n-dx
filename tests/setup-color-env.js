@@ -1,8 +1,9 @@
 /**
  * Vitest setupFile — pin color detection to a known state before anything reads it.
  *
- * WHY: `supportsColor()` in packages/core/cli.js and packages/core/help.js checks
- * `FORCE_COLOR` FIRST, ahead of both `NO_COLOR` and `process.stdout.isTTY`. A
+ * WHY: `supportsColor()` in packages/core/cli-brand.js (which cli.js and help.js
+ * color through) checks `FORCE_COLOR` FIRST, ahead of both `NO_COLOR` and
+ * `process.stdout.isTTY`. A
  * developer whose shell exports `FORCE_COLOR=3` (it ships with many terminals and
  * tool wrappers, usually alongside `COLORTERM=truecolor`) therefore made the CLI
  * emit ANSI escapes into output that tests compare against plain strings:
@@ -15,7 +16,7 @@
  * and it looked like a real output-contract regression rather than a shell issue.
  *
  * WHY A setupFile RATHER THAN globalSetup: the color result is memoised
- * (`_colorEnabled` in help.js, `colorEnabled` in cli.js), so the environment has
+ * (`_colorEnabled` in cli-brand.js), so the environment has
  * to be correct before the FIRST read, not merely before an assertion. setupFiles
  * run inside each worker before that worker loads any test module, which is early
  * enough. They also mutate the worker's own `process.env`, so the CLI child
@@ -23,7 +24,8 @@
  * build `env: { ...process.env, … }`, and fixing the parent covers them.
  *
  * Tests that need color ON override it per-spawn; both `supportsColor()`
- * implementations check FORCE_COLOR before NO_COLOR precisely so that works. See
+ * implementations (cli-brand.js, and @n-dx/llm-client's help-format for the
+ * other CLIs) check FORCE_COLOR before NO_COLOR precisely so that works. See
  * tests/e2e/cli-tty-color.test.js, which asserts ANSI IS emitted under
  * FORCE_COLOR=1 and suppressed under NO_COLOR=1.
  *

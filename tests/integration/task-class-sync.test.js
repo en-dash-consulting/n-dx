@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { TASK_CLASSES, nearestTaskClass, describeUnknownTaskClass } from "../../packages/core/config.js";
+import { TASK_CLASSES, EFFORT_ONLY_TASK_CLASSES, nearestTaskClass, describeUnknownTaskClass } from "../../packages/core/config.js";
 import { DEFAULT_ROUTES } from "../../packages/llm-client/dist/public.js";
 
 describe("core TASK_CLASSES mirrors llm-client DEFAULT_ROUTES", () => {
@@ -28,6 +28,16 @@ describe("core TASK_CLASSES mirrors llm-client DEFAULT_ROUTES", () => {
   it("agrees on every default tier", () => {
     for (const [taskClass, tier] of Object.entries(DEFAULT_ROUTES)) {
       expect(TASK_CLASSES[taskClass], taskClass).toBe(tier);
+    }
+  });
+
+  it("keeps effort-only classes out of routing and explains review model selection", () => {
+    expect([...EFFORT_ONLY_TASK_CLASSES]).toEqual(["agent.review"]);
+    for (const taskClass of EFFORT_ONLY_TASK_CLASSES) {
+      expect(Object.hasOwn(DEFAULT_ROUTES, taskClass)).toBe(false);
+      expect(describeUnknownTaskClass(`effort.${taskClass}`)).toBeNull();
+      expect(describeUnknownTaskClass(`routes.${taskClass}`)).toMatch(/effort-only.*no effect/);
+      expect(describeUnknownTaskClass(`routes.${taskClass}`)).toContain("reviewModel");
     }
   });
 

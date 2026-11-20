@@ -18,7 +18,6 @@ import {
   onSnapshot,
   getLatestSnapshot,
   getSnapshotHistory,
-  resetMemoryMonitor,
 } from "../performance/memory-monitor.js";
 
 export interface UseMemoryMonitorOptions {
@@ -56,7 +55,8 @@ export interface UseMemoryMonitorResult {
 export function useMemoryMonitor(
   options: UseMemoryMonitorOptions = {}
 ): UseMemoryMonitorResult {
-  const { intervalMs = 5000, thresholds, enabled = true } = options;
+  // An omitted interval falls through to the monitor's own default.
+  const { intervalMs, thresholds, enabled = true } = options;
 
   const [snapshot, setSnapshot] = useState<MemorySnapshot | null>(
     getLatestSnapshot
@@ -70,7 +70,7 @@ export function useMemoryMonitor(
     startMemoryMonitor({
       intervalMs,
       thresholds: thresholds as MemoryThresholds | undefined,
-      onLevelChange: (snap, prevLevel) => {
+      onLevelChange: (snap) => {
         // If the level escalates beyond what was dismissed, re-show the warning.
         if (
           dismissedLevelRef.current &&

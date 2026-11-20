@@ -55,6 +55,7 @@ import {
 } from "@n-dx/llm-client";
 import type { LLMConfig, LLMVendor, ModelSource } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS } from "./hench-config-fields.js";
+import { isRecord } from "../shared/index.js";
 
 /** The two ways hench can drive a vendor. Mirrors hench's `HenchProvider`. */
 export type HenchProvider = "cli" | "api";
@@ -221,9 +222,7 @@ export function readConfigSnapshot(
  */
 function henchOverrides(snapshot: ConfigSnapshot): Record<string, unknown> {
   const section = snapshot.ndx["hench"];
-  return section && typeof section === "object" && !Array.isArray(section)
-    ? (section as Record<string, unknown>)
-    : {};
+  return isRecord(section) ? section : {};
 }
 
 /**
@@ -376,9 +375,7 @@ const REVIEWERS: readonly string[] = ["claude", "codex"];
 
 function reviewSection(config: Record<string, unknown>): Record<string, unknown> {
   const review = config["review"];
-  return review && typeof review === "object" && !Array.isArray(review)
-    ? (review as Record<string, unknown>)
-    : {};
+  return isRecord(review) ? review : {};
 }
 
 /**

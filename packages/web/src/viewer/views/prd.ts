@@ -1,4 +1,3 @@
-import { FloatingNotice } from "../components/index.js";
 /**
  * PRD view — displays Rex PRD hierarchy with interactive tree.
  *
@@ -16,7 +15,7 @@ import { FloatingNotice } from "../components/index.js";
  * @see ../hooks/use-toast.ts — toast notification state
  */
 
-import {h} from "preact";
+import { h } from "preact";
 import type { VNode } from "preact";
 import { ActionIcon, GhostCardsContext } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo, useRef, useContext } from "preact/hooks";
@@ -26,7 +25,7 @@ import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
-import { BrandedHeader, WorkspaceWriteStrip, InfoTip } from "../components/index.js";
+import { BrandedHeader, WorkspaceWriteStrip, InfoTip, FloatingNotice } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
 import type { PRDDocumentData, ItemStatus } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
@@ -78,7 +77,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Data fetching & polling ────────────────────────────────────
   const {
-    data, setData, loading, error, setError,
+    data, setData, loading, error,
     taskUsageById, rollupById, weeklyBudget,
     fetchPRDData, fetchTaskUsage,
   } = usePRDData(prdData);
@@ -152,9 +151,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Facet filters (tags + status + branch + Inbox, URL-persisted) ────
   const {
-    activeTags, activeSearchStatuses, searchFacets,
+    activeTags, searchFacets,
     activeBranch, setActiveBranch,
-    setActiveTags, setActiveSearchStatuses,
+    setActiveTags,
     clearFacets, hasFacets,
     inboxOnly, setInboxOnly,
   } = useFacetState(inboxIds);

@@ -8,7 +8,6 @@ import { isV2Dir } from "./v2-cli.js";
 import { addChanges, report } from "./add-change.js";
 import { changeInputsFromRecommendations } from "../../recommend/changes-from-proposals.js";
 
-import { parseIntList } from "../parse-utils.js";
 import { info, result, withCommandProgressReporter } from "../output.js";
 import type { ItemLevel } from "../../schema/index.js";
 import {
@@ -488,7 +487,6 @@ async function handleAcknowledge(
   }
 
   const tokens = flag.split(",").map((s) => s.trim()).filter(Boolean);
-  const indices = parseIntList(flag);
   let updated = ackStore;
   const acked: string[] = [];
   for (const token of tokens) {

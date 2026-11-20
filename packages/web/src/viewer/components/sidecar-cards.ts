@@ -562,6 +562,8 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
   const [open, setOpen] = useState(false);
   const folded = foldable(card) && !open;
   const input = h("pre", { class: "sidecar-card-input" }, JSON.stringify(card.input, null, 2));
+  // The raw input, behind a disclosure under a body that shows it its own way.
+  const inputDetails = h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input);
   const editable = first && state === "pending";
   // A change-set card's body is its items; the raw input stays behind a disclosure.
   const body = card.externalCall
@@ -571,22 +573,22 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
           args: (card.input.arguments && typeof card.input.arguments === "object" ? card.input.arguments : {}) as Record<string, unknown>,
         }),
         h(ProblemList, { problems: card.carriedOut?.problems }),
-        h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        inputDetails,
       ]
     : card.changeSet
     ? [
         h(ChangeSetBody, { card, editable, drafts: editable ? drafts : {}, onDraft }),
-        h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        inputDetails,
       ]
     : card.placement
       ? [
           h(PlacementBody, { card, editable, onEdit: onPlacementEdit, edit: placementEdit }),
-          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+          inputDetails,
         ]
     : card.itemEdit
       ? [
           h(ItemEditBody, { card, editable, draft: editable ? itemEditDraft : {}, onDraft: onItemEditDraft }),
-          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+          inputDetails,
         ]
     : card.choice
       ? h(ChoiceBody, {
@@ -596,12 +598,12 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
     : card.statusChange
       ? [
           h(StatusBody, { card }),
-          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+          inputDetails,
         ]
     : card.link
       ? [
           h(LinkBody, { link: card.link, written: card.carriedOut }),
-          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+          inputDetails,
         ]
     : card.runPlan
       ? h(RunPlanBody, { card, cards, decidable: editable, deciding, onStartLane: (lane) => onDecide({ approve: true, lane }), onRestartLane })
@@ -612,11 +614,11 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
             : card.kind === "draft-file"
               ? h(DraftFileBody, { card, editable, path, onPath })
               : h(NetworkReadBody, { card }),
-          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+          inputDetails,
         ]
       : state === "pending"
       ? input
-      : h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input);
+      : inputDetails;
   const draft = card.kind === "draft-post";
   return h("li", { class: `sidecar-card sidecar-card--${state}`, "data-card": card.id, "data-kind": card.kind },
     h("div", { class: "sidecar-card-head" },

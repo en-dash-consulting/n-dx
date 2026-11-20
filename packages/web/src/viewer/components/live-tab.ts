@@ -36,13 +36,9 @@ import {
   type LiveSummary,
   type LiveWorktreeRef,
 } from "../hooks/index.js";
-import { fmtDuration } from "../utils/format.js";
+import { elapsedUntilNow } from "./elapsed-time.js";
 
 const PEEK_ID = "live-peek";
-
-function elapsedFormatter(startedAt: string): string {
-  return fmtDuration(startedAt, new Date().toISOString());
-}
 
 // ── Links ────────────────────────────────────────────────────────────
 
@@ -112,7 +108,7 @@ export function PeekLink({ target, navigateTo, onNavigated, class: className, cu
 }
 
 function Elapsed({ startedAt }: { startedAt: string }) {
-  return h("span", { class: "live-peek-elapsed" }, useTick(startedAt, elapsedFormatter));
+  return h("span", { class: "live-peek-elapsed" }, useTick(startedAt, elapsedUntilNow));
 }
 
 function RunRow({ run, navigateTo, onNavigated }: { run: LiveRunSummary; navigateTo?: NavigateTo; onNavigated: () => void }) {

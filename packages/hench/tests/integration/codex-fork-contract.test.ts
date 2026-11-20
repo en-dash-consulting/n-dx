@@ -7,6 +7,7 @@ import { serializeDocument } from "@n-dx/rex";
 import { cleanupProjectDir } from "../helpers/index.js";
 import { createScriptedClaudeCli, setupScriptedProject, type ScriptedClaudeCli, type ScriptedTurn } from "../helpers/scripted-claude-cli.js";
 import { loadConfig, saveConfig } from "../../src/store/config.js";
+import { ensureRunLogsIgnored } from "../../src/store/run-log.js";
 
 const result = (id: string) => ({ lines: [
   { type: "thread.started", thread_id: id },
@@ -32,7 +33,7 @@ describe("Codex warm-parent loop contract", () => {
     ] } as never));
     await saveConfig(henchDir, { ...await loadConfig(henchDir), sessionStrategy: "fork" });
     writeFileSync(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
-    execFileSync("git", ["add", ".n-dx.json"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["add", ".n-dx.json", ".hench/config.json", ".rex/prd.md"], { cwd: projectDir, stdio: "ignore" });
     execFileSync("git", ["commit", "-m", "fixture vendor"], { cwd: projectDir, stdio: "ignore" });
     for (const method of ["log", "warn", "error"] as const) vi.spyOn(console, method).mockImplementation(() => {});
     const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
@@ -50,6 +51,7 @@ describe("Codex warm-parent loop contract", () => {
 
   afterEach(async () => {
     vi.doUnmock("node:child_process");
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     await cleanupProjectDir(projectDir);
   });
@@ -96,6 +98,25 @@ describe("Codex warm-parent loop contract", () => {
     expect(cli.invocations).toHaveLength(2);
     expect(cli.invocations[1].args).not.toContain("fork");
     expect(cli.invocations[1].args).not.toContain("parent");
+  });
+
+  it("reorients Codex when the sanitized child environment changes", async () => {
+    await ensureRunLogsIgnored(projectDir);
+    execFileSync("git", ["add", ".gitignore"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-am", "fixture run logs"], { cwd: projectDir, stdio: "ignore" });
+    vi.stubEnv("NDX_FORK_FIXTURE", "before");
+    cli.script(() => result("parent-one"), works("one.ts", "child-one"),
+      () => result("parent-two"), works("two.ts", "child-two"));
+    const first = await run("task-1");
+    vi.stubEnv("NDX_FORK_FIXTURE", "after");
+    const second = await run("task-2");
+
+    expect(first.run.error).toBeUndefined();
+    expect(second.run.error).toBeUndefined();
+    expect(second.run.session).toMatchObject({ strategy: "fork", outcome: "miss", reason: "identity-changed" });
+    expect(second.run.parentSessionId).toBe("parent-two");
+    expect(cli.invocations).toHaveLength(4);
+    expect(cli.invocations[3].args.slice(0, 3)).toEqual(["exec", "fork", "parent-two"]);
   });
 
   it("uses cold sessions when the supported binary has an opaque account identity", async () => {

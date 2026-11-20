@@ -17,10 +17,11 @@
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { appUrl } from "../base-path.js";
-import { ProblemList, TrackerCardForm, trackerErrorOf as errorOf } from "../components/index.js";
+import { ProblemList, TrackerCardForm } from "../components/index.js";
 import { useFeatureToggle } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { formatSince } from "../utils/format.js";
+import { stringErrorOf } from "../utils/response-error.js";
 import {
   activityRows,
   asTrackerActivity,
@@ -49,7 +50,7 @@ function ActivityRow({ entry, waiting, onChanged }: { entry: TrackerActivityRow;
         body: JSON.stringify({ requestId: entry.requestId, action: "dismiss" }),
       });
       if (res.ok) onChanged();
-      else setError(await errorOf(res, "Could not dismiss"));
+      else setError(await stringErrorOf(res, "Could not dismiss"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not dismiss");
     } finally {

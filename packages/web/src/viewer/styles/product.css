@@ -67,8 +67,7 @@
 
 /* The two rows a reader is looking for: spec ahead of build, or broken now. */
 .pm-row-attention {
-  background: var(--bg-hover);
-  box-shadow: inset 3px 0 0 var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
 }
 
 .pm-metric-revised .metric-value { color: var(--orange); }
@@ -657,8 +656,7 @@
 .inbox-qitem:hover { background: var(--bg-hover); }
 
 .inbox-qitem.is-selected {
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface));
 }
 
 .inbox-qitem-meta {
@@ -764,7 +762,6 @@
   position: relative;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-left-width: 4px;
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   color: var(--text);
@@ -911,11 +908,10 @@
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--text-muted);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
-.asm-band-defective { border-left-color: var(--red); }
+.asm-band-defective { background: color-mix(in srgb, var(--red) 8%, var(--bg-surface)); }
 .asm-band-title { font-weight: 600; overflow-wrap: anywhere; }
 /* Items a waiting Sidecar card proposes for the constraint: dashed, in the band's flow. */
 .asm-band-ghost { border: 1px dashed var(--text-muted); background: transparent; color: var(--text-muted); font-weight: 600; }

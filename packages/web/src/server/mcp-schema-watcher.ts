@@ -21,20 +21,9 @@ import { dirname, join } from "node:path";
 import { reloadMcpFactories, type McpRouteFactories } from "./routes-mcp.js";
 import { createSubprocessMcpProxy } from "./mcp-subprocess-proxy.js";
 import type { ServerContext } from "./types.js";
-import { guardWatcher } from "./watcher-guard.js";
+import { debounce, guardWatcher } from "./watcher-guard.js";
 
 const DEBOUNCE_MS = 500;
-
-function debounce<T extends (...args: unknown[]) => void>(fn: T, delayMs: number): T {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  return ((...args: unknown[]) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = null;
-      fn(...args);
-    }, delayMs);
-  }) as T;
-}
 
 /**
  * Resolve the root directory of a package from its main entry point path.

@@ -29,6 +29,7 @@ import { AreaView } from "./area.js";
 import { PlacementMode } from "./placement-mode.js";
 import { RequirementsView } from "./requirements.js";
 import type { CapabilityDetail, ChangeRow, ProductEdit, ProductMap } from "./product-model.js";
+import { errorMessage } from "../utils/format.js";
 
 /** The v1 empty state: the product layer exists only after migrating. */
 export function NoProductLayer({ title }: { title: string }) {
@@ -78,7 +79,7 @@ function CapabilityFromRoute({ id, onBack, onOpenChange }: { id: string; onBack:
   const onEdit = useCallback((edit: ProductEdit) => {
     postProductEdit(edit).then(
       () => { setEditError(null); refetch(); },
-      (err: unknown) => setEditError(err instanceof Error ? err.message : String(err)),
+      (err: unknown) => setEditError(errorMessage(err)),
     );
   }, [refetch]);
   if (load.state === "v1") return h(NoProductLayer, { title: "Product" });

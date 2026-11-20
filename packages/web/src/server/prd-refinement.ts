@@ -60,7 +60,7 @@ import {
   walkTree,
 } from "./rex-gateway.js";
 import type { PRDDocument, PRDItem } from "./rex-gateway.js";
-import { isValidParentType, itemTypeOf, parentTypesOf } from "../shared/index.js";
+import { isValidParentType, itemTypeOf } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Caps

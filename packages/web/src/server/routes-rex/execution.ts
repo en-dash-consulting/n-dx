@@ -20,7 +20,7 @@ import { refuseWhileRestricted } from "../trust-gate.js";
 import { WorkspaceScoped } from "../workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, appendLog } from "./rex-route-helpers.js";
+import { findItemById, appendLog, loadPRDOr404 } from "./rex-route-helpers.js";
 import { loadPRDSync } from "../prd-io.js";
 
 import {
@@ -293,11 +293,8 @@ async function handleStartEpicByEpic(
     return true;
   }
 
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
+  const doc = loadPRDOr404(ctx, res);
+  if (!doc) return true;
 
   try {
     const body = await readBody(req, res);

@@ -45,6 +45,7 @@ import type {
   StackLayer,
   WorktreeRef,
 } from "./types.js";
+import { isRecord } from "../../shared/index.js";
 
 export interface CollectOptions {
   /** Whether `gh` may be asked (the project's `web.sidecarGithubReads`). */
@@ -354,7 +355,7 @@ async function viewPr(git: Runner, branch: string | null, fields: string): Promi
   } catch (err) {
     return { reason: `gh pr view returned output that is not JSON: ${errorMessage(err)}`, noPr: false };
   }
-  if (pr && typeof pr === "object" && !Array.isArray(pr)) return { pr: pr as Record<string, unknown> };
+  if (isRecord(pr)) return { pr };
   return { reason: "gh pr view returned JSON that is not an object.", noPr: false };
 }
 

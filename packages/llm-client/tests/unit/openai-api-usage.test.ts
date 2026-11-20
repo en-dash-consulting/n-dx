@@ -121,3 +121,38 @@ describe("OpenAI API usage accounting", () => {
   });
 
 });
+
+
+describe("OpenAI token limit dialect", () => {
+  it.each([
+    "o1", "o3", "o3-mini", "o4-mini", "o3-2025-04-16",
+    "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5.1", "gpt-5.2", "gpt-5.4",
+    "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.5", "gpt-6-astra", "gpt-6-sol",
+    "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra",
+    "fixture-model", "custom-model", "gpt-4o", "gpt-6-unverified", "constructor",
+  ])("uses the supported limit for %s with or without effort", async model => {
+    const legacy = ["fixture-model", "custom-model", "gpt-4o", "gpt-6-unverified", "constructor"].includes(model);
+    const warning = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      for (const effort of [undefined, "high"]) {
+        const fetchMock = vi.fn()
+          .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [] })))
+          .mockResolvedValueOnce(streamResponse(["data: [DONE]\n\n"]));
+        vi.stubGlobal("fetch", fetchMock);
+        const req = { prompt: "fixture", model, effort };
+        const client = createOpenAiApiProvider({ codexConfig: { api_key: "fixture-key" }, maxRetries: 0, maxTokens: 1234 });
+        await client.complete(req);
+        await Array.fromAsync(client.stream!(req));
+        for (const [, init] of fetchMock.mock.calls) {
+          const body = JSON.parse(init.body);
+          expect(body[legacy ? "max_tokens" : "max_completion_tokens"]).toBe(1234);
+          expect(body).not.toHaveProperty(legacy ? "max_completion_tokens" : "max_tokens");
+          if (!legacy && effort) expect(body.reasoning_effort).toBe(effort);
+          else expect(body).not.toHaveProperty("reasoning_effort");
+        }
+      }
+    } finally {
+      warning.mockRestore();
+    }
+  });
+});

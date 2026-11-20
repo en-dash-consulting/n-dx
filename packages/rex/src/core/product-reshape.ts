@@ -42,7 +42,7 @@ import { randomUUID } from "node:crypto";
 import type { Amendment, CriteriaDelta, Criterion } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import type { ReshapeProposal } from "./reshape.js";
-import { bodyNotes, nodeSpecHash, resolve, upsertCriteriaDelta } from "./apply-amendments.js";
+import { bodyNotes, liveDescendants, nodeSpecHash, resolve, upsertCriteriaDelta } from "./apply-amendments.js";
 import { addChangeNode, AddChangeNodeError } from "./change-add.js";
 
 export const PRODUCT_RESHAPE_TITLE = "Reshape the product layer";
@@ -353,10 +353,6 @@ function renumber(criteria: readonly Criterion[], taken: readonly Criterion[]): 
     used.add(id);
     return { id, text: c.text };
   });
-}
-
-function liveDescendants(node: RuleNode): RuleNode[] {
-  return (node.children ?? []).flatMap((child) => (child.status === "deleted" ? [] : [child, ...liveDescendants(child)]));
 }
 
 function parentOf(nodes: readonly RuleNode[], id: string, parent?: RuleNode): RuleNode | undefined {

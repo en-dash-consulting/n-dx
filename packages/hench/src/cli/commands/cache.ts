@@ -14,7 +14,6 @@
  * @module hench/cli/commands/cache
  */
 
-import { join } from "node:path";
 import {
   CACHE_SCOPES,
   clearCacheScopes,

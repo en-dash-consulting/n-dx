@@ -32,6 +32,7 @@ import {
 } from "./route-detection.js";
 import { detectServerRoutes } from "./server-route-detection.js";
 import { withPackRouteGroups, type PackFrameworkFacts } from "./pack-framework-facts.js";
+import { parseJsTsSource } from "./ts-source.js";
 import { isVerbose, verbose } from "@n-dx/llm-client";
 import { debugTimed, debugTimedAsync, checkpoint } from "../util/debug-timing.js";
 
@@ -40,18 +41,11 @@ const ALL_PARSEABLE = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function getScriptKind(filePath: string): ts.ScriptKind {
-  const ext = extname(filePath);
-  if (ext === ".tsx" || ext === ".jsx") return ts.ScriptKind.TSX;
-  if (ext === ".ts") return ts.ScriptKind.TS;
-  return ts.ScriptKind.JS;
-}
-
 function isPascalCase(name: string): boolean {
   return /^[A-Z][a-zA-Z0-9]*$/.test(name);
 }
 
-function returnsJsx(node: ts.Node, sf: ts.SourceFile): boolean {
+function returnsJsx(node: ts.Node): boolean {
   let found = false;
   function walk(n: ts.Node) {
     if (found) return;
@@ -75,41 +69,22 @@ export function extractComponentDefinitions(
   sourceText: string,
   filePath: string
 ): ComponentDefinition[] {
-  const sf = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    getScriptKind(filePath)
-  );
+  const sf = parseJsTsSource(filePath, sourceText);
 
   const components: ComponentDefinition[] = [];
 
   // Track which declarations are default-exported
   let defaultExportedName: string | null = null;
-  let hasDefaultExportDeclaration = false;
 
   // First pass: find default export identifier
   for (const stmt of sf.statements) {
-    // export default function Foo() {}
+    // export default function Foo() {} / export default class Foo {}
     if (
-      ts.isFunctionDeclaration(stmt) &&
-      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
+      (ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) &&
+      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) &&
+      stmt.name
     ) {
-      hasDefaultExportDeclaration = true;
-      if (stmt.name) {
-        defaultExportedName = stmt.name.text;
-      }
-    }
-    // export default class Foo {}
-    if (
-      ts.isClassDeclaration(stmt) &&
-      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
-    ) {
-      hasDefaultExportDeclaration = true;
-      if (stmt.name) {
-        defaultExportedName = stmt.name.text;
-      }
+      defaultExportedName = stmt.name.text;
     }
     // export default Foo;
     if (ts.isExportAssignment(stmt) && !stmt.isExportEquals) {
@@ -168,7 +143,7 @@ export function extractComponentDefinitions(
     // function Foo() { return <div/> }
     if (ts.isFunctionDeclaration(stmt) && stmt.name && stmt.body) {
       const name = stmt.name.text;
-      if (isPascalCase(name) && returnsJsx(stmt.body, sf)) {
+      if (isPascalCase(name) && returnsJsx(stmt.body)) {
         const line = sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
         addComponent(name, "function", line, stmt);
       }
@@ -209,7 +184,7 @@ export function extractComponentDefinitions(
             }
           }
 
-          if (kind && bodyNode && returnsJsx(bodyNode, sf)) {
+          if (kind && bodyNode && returnsJsx(bodyNode)) {
             const line =
               sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
             addComponent(name, kind, line, stmt);
@@ -246,7 +221,7 @@ export function extractComponentDefinitions(
                     ts.isIdentifier(member.name) &&
                     member.name.text === "render" &&
                     member.body &&
-                    returnsJsx(member.body, sf)
+                    returnsJsx(member.body)
                   ) {
                     const line =
                       sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
@@ -273,13 +248,7 @@ export function extractJsxUsages(
   sourceText: string,
   filePath: string
 ): Array<{ componentName: string; count: number }> {
-  const sf = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    getScriptKind(filePath)
-  );
+  const sf = parseJsTsSource(filePath, sourceText);
 
   const counts = new Map<string, number>();
 
@@ -318,13 +287,7 @@ export function extractConventionExports(
   sourceText: string,
   filePath: string
 ): RouteExportKind[] {
-  const sf = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    getScriptKind(filePath)
-  );
+  const sf = parseJsTsSource(filePath, sourceText);
 
   const exports: RouteExportKind[] = [];
 
@@ -427,6 +390,14 @@ function resolveUsageEdges(
   return Array.from(edgeMap.values());
 }
 
+/** Record a route module's convention exports, `default` aside, on the components it defines. */
+function tagConventionExports(components: ComponentDefinition[], file: string, exports: RouteExportKind[]): void {
+  const conventionNames = exports.filter((e) => e !== "default");
+  for (const def of components) {
+    if (def.file === file) def.conventionExports = conventionNames;
+  }
+}
+
 interface RouteDetectionResult {
   routeModules: RouteModule[];
   routeTree: RouteTreeNode[];
@@ -476,11 +447,7 @@ async function detectRoutes(
           if (canIncremental && changedFiles && !changedFiles.has(mod.file) && prevRouteMap.has(mod.file)) {
             const prevMod = prevRouteMap.get(mod.file)!;
             routeModules.push(prevMod);
-            const conventionNames = prevMod.exports.filter((e) => e !== "default");
-            const compDefs = allComponents.filter((c) => c.file === mod.file);
-            for (const def of compDefs) {
-              def.conventionExports = conventionNames;
-            }
+            tagConventionExports(allComponents, mod.file, prevMod.exports);
             continue;
           }
 
@@ -500,11 +467,7 @@ async function detectRoutes(
             exports: conventionExports,
           });
 
-          const compDefs = allComponents.filter((c) => c.file === mod.file);
-          const conventionNames = conventionExports.filter((e) => e !== "default");
-          for (const def of compDefs) {
-            def.conventionExports = conventionNames;
-          }
+          tagConventionExports(allComponents, mod.file, conventionExports);
         }
       }
     }
@@ -531,12 +494,7 @@ async function detectRoutes(
         if (canIncremental && changedFiles && !changedFiles.has(file.path) && prevRouteMap.has(file.path)) {
           const prevMod = prevRouteMap.get(file.path)!;
           routeModules.push(prevMod);
-
-          const conventionNames = prevMod.exports.filter((e) => e !== "default");
-          const compDefs = allComponents.filter((c) => c.file === file.path);
-          for (const def of compDefs) {
-            def.conventionExports = conventionNames;
-          }
+          tagConventionExports(allComponents, file.path, prevMod.exports);
           continue;
         }
 
@@ -577,11 +535,7 @@ async function detectRoutes(
           isLayout = true;
         }
 
-        const compDefs = allComponents.filter((c) => c.file === file.path);
-        const conventionNames = conventionExports.filter((e) => e !== "default");
-        for (const def of compDefs) {
-          def.conventionExports = conventionNames;
-        }
+        tagConventionExports(allComponents, file.path, conventionExports);
 
         routeModules.push({
           file: file.path,
@@ -787,9 +741,6 @@ export async function analyzeComponents(
         });
       }
     }
-
-    // Also check .ts files for components (rare but possible with createElement)
-    // and .tsx convention exports
   }
 
   if (verboseScan) {

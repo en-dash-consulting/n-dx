@@ -696,6 +696,8 @@ export interface TokenUsage {
 
 /** Aggregated token usage across one or more LLM calls. */
 export interface AnalyzeTokenUsage {
+  /** Measurement completeness, separate from model price attribution. Absent on legacy manifests. */
+  diagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Number of LLM calls made. */
   calls: number;
   /** Total input tokens across all calls. */
@@ -1326,7 +1328,6 @@ export interface SdlcCoverage extends SdlcDetection {
   enforced: boolean;
 }
 
-/** A CI pipeline and the jobs it runs. */
 /**
  * What a CI step does, classified from the command it runs.
  *
@@ -1380,6 +1381,7 @@ export interface SdlcCiJob {
   environment?: string;
 }
 
+/** A CI pipeline and the jobs it runs. */
 export interface SdlcCiPipeline extends SdlcDetection {
   /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`, `jenkins`. */
   provider: string;

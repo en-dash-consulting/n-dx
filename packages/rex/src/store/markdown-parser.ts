@@ -21,6 +21,7 @@
  */
 
 import type { PRDDocument, PRDItem, ItemLevel, ItemStatus } from "../schema/index.js";
+import { countIndent, parseBlockScalar, splitMappingLine } from "./yaml-block.js";
 
 // ── Error type ────────────────────────────────────────────────────────────────
 
@@ -247,12 +248,8 @@ function parseFrontMatter(lines: string[], start: number): FrontMatterResult {
 //
 // Hand-rolled to avoid an external dependency. Covers the subset emitted by
 // markdown-serializer.ts. See file header for the supported feature list.
-
-function countIndent(line: string): number {
-  let i = 0;
-  while (i < line.length && line[i] === " ") i++;
-  return i;
-}
+// Line splitting and block scalars come from yaml-block.ts, shared with the
+// folder-tree parser; scalar typing below is this reader's own.
 
 function parseYamlBlock(
   lines: string[],
@@ -403,165 +400,6 @@ function parseYamlSequence(
   }
 
   return [items, i];
-}
-
-// ── Mapping line split ─────────────────────────────────────────────────────────
-
-type MappingLineSplit =
-  | { key: string; kind: "scalar"; valueStr: string }
-  | { key: string; kind: "block"; valueStr: "" }
-  | { key: string; kind: "block-scalar"; indicator: BlockScalarIndicator; valueStr: "" }
-  | { key: null; kind: "plain"; valueStr: string };
-
-interface BlockScalarIndicator {
-  style: "literal" | "folded";
-  chomping: "clip" | "strip" | "keep";
-}
-
-function splitMappingLine(trimmed: string): MappingLineSplit {
-  const colonSpaceIdx = findColonSeparator(trimmed);
-  const endsWithColon = trimmed.endsWith(":") && !trimmed.endsWith("\\:");
-
-  if (colonSpaceIdx === -1 && !endsWithColon) {
-    return { key: null, kind: "plain", valueStr: trimmed };
-  }
-
-  if (colonSpaceIdx !== -1) {
-    const key = trimmed.slice(0, colonSpaceIdx);
-    const valueStr = trimmed.slice(colonSpaceIdx + 2).trim();
-
-    const blockScalar = parseBlockScalarHeader(valueStr);
-    if (blockScalar) {
-      return { key, kind: "block-scalar", indicator: blockScalar, valueStr: "" };
-    }
-    return { key, kind: "scalar", valueStr };
-  }
-
-  const key = trimmed.slice(0, -1);
-  return { key, kind: "block", valueStr: "" };
-}
-
-function parseBlockScalarHeader(valueStr: string): BlockScalarIndicator | null {
-  if (valueStr.length === 0) return null;
-  const head = valueStr[0];
-  if (head !== "|" && head !== ">") return null;
-  const style: "literal" | "folded" = head === "|" ? "literal" : "folded";
-  const rest = valueStr.slice(1).trim();
-  if (rest === "") return { style, chomping: "clip" };
-  if (rest === "-") return { style, chomping: "strip" };
-  if (rest === "+") return { style, chomping: "keep" };
-  return null;
-}
-
-function findColonSeparator(s: string): number {
-  let inQuote = false;
-  for (let i = 0; i < s.length - 1; i++) {
-    if (s[i] === '"' && (i === 0 || s[i - 1] !== "\\")) {
-      inQuote = !inQuote;
-    }
-    if (!inQuote && s[i] === ":" && s[i + 1] === " ") {
-      return i;
-    }
-  }
-  return -1;
-}
-
-// ── Block scalar parsing ───────────────────────────────────────────────────────
-
-/**
- * Parse a block scalar starting at `start`. The block scalar indent is
- * determined by the first non-empty content line — it must be deeper than
- * `parentIndent`. Lines with less indent end the scalar.
- */
-function parseBlockScalar(
-  lines: string[],
-  start: number,
-  parentIndent: number,
-  indicator: BlockScalarIndicator,
-): [string, number] {
-  let i = start;
-
-  // Find first non-empty line to determine block indent.
-  let blockIndent = -1;
-  let scanI = i;
-  while (scanI < lines.length) {
-    if (lines[scanI].trim() === "") { scanI++; continue; }
-    blockIndent = countIndent(lines[scanI]);
-    break;
-  }
-
-  if (blockIndent <= parentIndent) {
-    // Empty scalar — no content lines.
-    return [applyChomping("", indicator.chomping), i];
-  }
-
-  const collected: string[] = [];
-  while (i < lines.length) {
-    if (lines[i].trim() === "") {
-      collected.push("");
-      i++;
-      continue;
-    }
-    const ind = countIndent(lines[i]);
-    if (ind < blockIndent) break;
-    collected.push(lines[i].slice(blockIndent));
-    i++;
-  }
-
-  // Trim purely-empty trailing lines that belong to following content.
-  while (collected.length > 0 && collected[collected.length - 1] === "") {
-    collected.pop();
-    // Keep one trailing empty for clip/keep — re-added after chomping.
-  }
-
-  let content: string;
-  if (indicator.style === "literal") {
-    content = collected.join("\n");
-  } else {
-    // Folded — join non-empty runs with single space, blank lines preserved as \n.
-    content = foldFoldedScalar(collected);
-  }
-
-  return [applyChomping(content, indicator.chomping), i];
-}
-
-function foldFoldedScalar(lines: string[]): string {
-  const out: string[] = [];
-  let buffer: string[] = [];
-  for (const line of lines) {
-    if (line === "") {
-      if (buffer.length > 0) {
-        out.push(buffer.join(" "));
-        buffer = [];
-      }
-      out.push("");
-    } else {
-      buffer.push(line);
-    }
-  }
-  if (buffer.length > 0) out.push(buffer.join(" "));
-  // Collapse "" markers into newlines.
-  return out.join("\n").replace(/\n\n/g, "\n");
-}
-
-function applyChomping(content: string, chomping: "clip" | "strip" | "keep"): string {
-  if (chomping === "strip") return stripTrailingNewlines(content);
-  if (chomping === "keep") return content + (content.endsWith("\n") ? "" : "\n");
-  // clip: single trailing newline (or none if content is empty)
-  if (content === "") return "";
-  return stripTrailingNewlines(content) + "\n";
-}
-
-/**
- * `content` without its trailing newlines. A loop, not `/\n*$/`: that regex
- * tries every newline in the body as a start, runs to the end of each run and
- * backtracks when `$` fails, so a block scalar with a long run of blank lines in
- * its middle costs quadratic time (6 s at 100k) when a legacy `prd.md` is read.
- */
-function stripTrailingNewlines(content: string): string {
-  let end = content.length;
-  while (end > 0 && content.charCodeAt(end - 1) === 10) end--;
-  return content.slice(0, end);
 }
 
 // ── Scalar parsing ─────────────────────────────────────────────────────────────

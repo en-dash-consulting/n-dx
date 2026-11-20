@@ -8,7 +8,6 @@
  * - Selective refresh: only reload files whose mtime changed
  */
 
-import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../external.js";
 import { DATA_FILES } from "../external.js";
 import {
   validate,
@@ -77,20 +76,33 @@ function notifyChange(): void {
   if (onChange) onChange(currentData);
 }
 
+/** The module definitions for `keys`, in order; unknown keys are skipped. */
+function moduleDefsFor(keys: Array<keyof LoadedData>): ModuleDef[] {
+  return keys
+    .map((key) => MODULE_DEFS.find((m) => m.key === key))
+    .filter((mod): mod is ModuleDef => mod !== undefined);
+}
+
+/**
+ * Migrate and validate one module's raw JSON, and store it when it passes.
+ * Returns true on success; a validation failure is logged.
+ */
+function acceptModule(mod: ModuleDef, raw: unknown): boolean {
+  const result = mod.validate(migrateData(mod.key, raw));
+  if (result.ok) {
+    (currentData as unknown as Record<string, unknown>)[mod.key] = result.data;
+    return true;
+  }
+  console.warn(`Validation failed for ${mod.file}:`, result);
+  return false;
+}
+
 /** Fetch, validate, and store a single module. Returns true on success. */
 async function fetchModule(mod: ModuleDef): Promise<boolean> {
   try {
     const res = await fetch(`/data/${mod.file}`);
     if (!res.ok) return false;
-    const raw = await res.json();
-    const migrated = migrateData(mod.key, raw);
-    const result = mod.validate(migrated);
-    if (result.ok) {
-      (currentData as unknown as Record<string, unknown>)[mod.key] = result.data;
-      return true;
-    }
-    console.warn(`Validation failed for ${mod.file}:`, result);
-    return false;
+    return acceptModule(mod, await res.json());
   } catch {
     return false;
   }
@@ -101,10 +113,7 @@ async function fetchModule(mod: ModuleDef): Promise<boolean> {
  * are not already loaded. Returns the current data state.
  */
 export async function loadModules(keys: Array<keyof LoadedData>): Promise<LoadedData> {
-  const toLoad = keys
-    .filter((key) => currentData[key] === null)
-    .map((key) => MODULE_DEFS.find((m) => m.key === key))
-    .filter((mod): mod is ModuleDef => mod !== undefined);
+  const toLoad = moduleDefsFor(keys.filter((key) => currentData[key] === null));
 
   if (toLoad.length > 0) {
     await Promise.allSettled(toLoad.map((mod) => fetchModule(mod)));
@@ -125,15 +134,7 @@ export async function loadFromFiles(files: FileList): Promise<LoadedData> {
     if (!file) continue;
 
     try {
-      const text = await file.text();
-      const raw = JSON.parse(text);
-      const migrated = migrateData(mod.key, raw);
-      const result = mod.validate(migrated);
-      if (result.ok) {
-        (currentData as unknown as Record<string, unknown>)[mod.key] = result.data;
-      } else {
-        console.warn(`Validation failed for ${mod.file}:`, result);
-      }
+      acceptModule(mod, JSON.parse(await file.text()));
     } catch (err) {
       console.warn(`Failed to parse ${mod.file}:`, err);
     }
@@ -187,8 +188,9 @@ export function classifyProbeStatus(status: number): { result: ServerProbe; retr
   if (status >= 200 && status < 300) return { result: { mode: "server" }, retry: false };
   if (status === 404) return { result: { mode: "static" }, retry: false };
   const result: ServerProbe = { mode: "unavailable", status, detail: null };
-  // Gateway answers: the hub is up, the project server is not (yet).
-  const retry = status === 502 || status === 503 || status === 504 || (status >= 500 && status < 600);
+  // Any 5xx may clear: gateway answers (502–504) mean the hub is up and the
+  // project server is not (yet).
+  const retry = status >= 500 && status < 600;
   return { result, retry };
 }
 
@@ -240,11 +242,6 @@ export async function probeServer(options: ServerProbeOptions = {}): Promise<Ser
   }
 }
 
-/** Check if we're running in server mode. Prefer {@link probeServer}, which says why not. */
-export async function detectMode(): Promise<"server" | "static"> {
-  return (await probeServer()).mode === "server" ? "server" : "static";
-}
-
 /**
  * Selectively reload only the data files whose mtime has changed.
  * More memory-efficient than reloading all files on every change.
@@ -266,9 +263,7 @@ async function refreshChangedModules(newMtimes: Record<string, number>): Promise
   lastMtimes = newMtimes;
 
   // Only fetch the modules that actually changed
-  const toLoad = changedKeys
-    .map((key) => MODULE_DEFS.find((m) => m.key === key))
-    .filter((mod): mod is ModuleDef => mod !== undefined);
+  const toLoad = moduleDefsFor(changedKeys);
 
   if (toLoad.length > 0) {
     await Promise.allSettled(toLoad.map((mod) => fetchModule(mod)));
@@ -300,12 +295,15 @@ async function pollForChanges(): Promise<void> {
   }
 }
 
+/** How often the data files' mtimes are checked, unless the caller says otherwise. */
+const DATA_POLL_INTERVAL_MS = 5000;
+
 /**
  * Start polling for data changes (selective refresh — only changed files).
  * Registers with the centralized polling manager for automatic
  * suspend/resume based on tab visibility.
  */
-export function startPolling(intervalMs: number = 5000): void {
+export function startPolling(intervalMs: number = DATA_POLL_INTERVAL_MS): void {
   if (pollingActive) return;
   pollingActive = true;
   registerPoller("loader:data-status", pollForChanges, intervalMs);

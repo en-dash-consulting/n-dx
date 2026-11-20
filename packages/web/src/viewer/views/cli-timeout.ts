@@ -13,6 +13,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { responseError } from "../utils/response-error.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -150,42 +151,50 @@ function isDirty(savedMs: number | null, raw: string, defaultMs: number): boolea
   return n !== effective;
 }
 
-// ── Field component ───────────────────────────────────────────────────
+// ── Field components ──────────────────────────────────────────────────
 
-function TimeoutField({ fieldKey, label, description, savedMs, defaultMs, editValue, error, noDefaultTimeout, onchange, onReset }: {
-  fieldKey: string;
-  label: string;
+/**
+ * The layout both timeout fields share: name with modified/unsaved badges, the
+ * config key and Revert, the description, the millisecond input, then a
+ * preview of an unsaved value or the value in force, and any error.
+ */
+function TimeoutFieldFrame({ name, configKey, description, savedMs, defaultMs, editValue, error, placeholder, ariaLabel, previewFor, defaultText, onInput, onReset }: {
+  name: string;
+  configKey: string;
   description: string;
   savedMs: number | null;
   defaultMs: number;
   editValue: string;
   error: string | null;
-  noDefaultTimeout: boolean;
-  onchange: (key: string, raw: string) => void;
-  onReset: (key: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+  /** What saving `ms` would do, shown while the edit is unsaved. */
+  previewFor: (ms: number) => string;
+  /** The line shown when nothing is saved and nothing is being edited. */
+  defaultText: string;
+  onInput: (raw: string) => void;
+  onReset: () => void;
 }) {
   const dirty = isDirty(savedMs, editValue, defaultMs);
   const isModified = savedMs !== null;
 
   const parsedMs = parseMs(editValue);
-  const preview = dirty && parsedMs !== null
-    ? (parsedMs === 0 ? "Command will run without any time limit" : `Command will timeout after ${formatMs(parsedMs)}`)
-    : null;
+  const preview = dirty && parsedMs !== null ? previewFor(parsedMs) : null;
 
   return h("div", { class: `ct-field${isModified ? " ct-field-modified" : ""}${dirty ? " ct-field-dirty" : ""}` },
     h("div", { class: "ct-field-header" },
       h("div", { class: "ct-field-label-row" },
-        h("span", { class: "ct-field-name" }, label),
+        h("span", { class: "ct-field-name" }, name),
         isModified ? h("span", { class: "ct-badge-modified" }, "modified") : null,
         dirty ? h("span", { class: "ct-badge-unsaved" }, "unsaved") : null,
       ),
       h("div", { class: "ct-field-actions" },
-        h("span", { class: "ct-field-key" }, `cli.timeouts.${fieldKey}`),
+        h("span", { class: "ct-field-key" }, configKey),
         dirty
           ? h("button", {
               type: "button",
               class: "ct-reset-btn",
-              onClick: () => onReset(fieldKey),
+              onClick: onReset,
               title: "Revert to current saved value",
             }, "Revert")
           : null,
@@ -199,9 +208,9 @@ function TimeoutField({ fieldKey, label, description, savedMs, defaultMs, editVa
         value: editValue,
         min: "0",
         step: "1",
-        placeholder: noDefaultTimeout ? "0 (no timeout)" : String(defaultMs),
-        onInput: (e: Event) => onchange(fieldKey, (e.target as HTMLInputElement).value),
-        "aria-label": `Timeout for ${label} in milliseconds`,
+        placeholder,
+        onInput: (e: Event) => onInput((e.target as HTMLInputElement).value),
+        "aria-label": ariaLabel,
       }),
       h("span", { class: "ct-input-unit" }, "ms"),
     ),
@@ -210,14 +219,39 @@ function TimeoutField({ fieldKey, label, description, savedMs, defaultMs, editVa
           h("span", { class: "ct-field-preview-label" }, "Preview: "),
           preview,
         )
-      : (savedMs !== null
-          ? h("div", { class: "ct-field-impact" }, `Currently: ${formatMs(savedMs)}`)
-          : h("div", { class: "ct-field-impact" }, noDefaultTimeout ? "No timeout by default" : `Default: ${formatMs(defaultMs)}`)),
+      : h("div", { class: "ct-field-impact" }, savedMs !== null ? `Currently: ${formatMs(savedMs)}` : defaultText),
     error ? h("div", { class: "ct-field-error" }, error) : null,
   );
 }
 
-// ── Global timeout field ──────────────────────────────────────────────
+function TimeoutField({ fieldKey, label, description, savedMs, defaultMs, editValue, error, noDefaultTimeout, onchange, onReset }: {
+  fieldKey: string;
+  label: string;
+  description: string;
+  savedMs: number | null;
+  defaultMs: number;
+  editValue: string;
+  error: string | null;
+  noDefaultTimeout: boolean;
+  onchange: (key: string, raw: string) => void;
+  onReset: (key: string) => void;
+}) {
+  return h(TimeoutFieldFrame, {
+    name: label,
+    configKey: `cli.timeouts.${fieldKey}`,
+    description,
+    savedMs,
+    defaultMs,
+    editValue,
+    error,
+    placeholder: noDefaultTimeout ? "0 (no timeout)" : String(defaultMs),
+    ariaLabel: `Timeout for ${label} in milliseconds`,
+    previewFor: (ms) => (ms === 0 ? "Command will run without any time limit" : `Command will timeout after ${formatMs(ms)}`),
+    defaultText: noDefaultTimeout ? "No timeout by default" : `Default: ${formatMs(defaultMs)}`,
+    onInput: (raw) => onchange(fieldKey, raw),
+    onReset: () => onReset(fieldKey),
+  });
+}
 
 function GlobalTimeoutField({ savedMs, defaultMs, editValue, error, onchange, onReset }: {
   savedMs: number | null;
@@ -227,58 +261,25 @@ function GlobalTimeoutField({ savedMs, defaultMs, editValue, error, onchange, on
   onchange: (raw: string) => void;
   onReset: () => void;
 }) {
-  const dirty = isDirty(savedMs, editValue, defaultMs);
-  const isModified = savedMs !== null;
-
-  const parsedMs = parseMs(editValue);
-  const preview = dirty && parsedMs !== null
-    ? (parsedMs === 0 ? "All bounded commands will run without any time limit" : `All bounded commands will timeout after ${formatMs(parsedMs)} (unless overridden)`)
-    : null;
-
-  return h("div", { class: `ct-field${isModified ? " ct-field-modified" : ""}${dirty ? " ct-field-dirty" : ""}` },
-    h("div", { class: "ct-field-header" },
-      h("div", { class: "ct-field-label-row" },
-        h("span", { class: "ct-field-name" }, "Global Default Timeout"),
-        isModified ? h("span", { class: "ct-badge-modified" }, "modified") : null,
-        dirty ? h("span", { class: "ct-badge-unsaved" }, "unsaved") : null,
-      ),
-      h("div", { class: "ct-field-actions" },
-        h("span", { class: "ct-field-key" }, "cli.timeoutMs"),
-        dirty
-          ? h("button", {
-              type: "button",
-              class: "ct-reset-btn",
-              onClick: onReset,
-              title: "Revert to current saved value",
-            }, "Revert")
-          : null,
-      ),
-    ),
-    h("p", { class: "ct-field-desc" },
+  return h(TimeoutFieldFrame, {
+    name: "Global Default Timeout",
+    configKey: "cli.timeoutMs",
+    description:
       "Global timeout applied to all bounded CLI commands when no per-command override is set. " +
       "Set to 0 for no timeout. Leave unset to use the built-in default (30 minutes).",
-    ),
-    h("div", { class: "ct-control-row" },
-      h("input", {
-        type: "number",
-        class: `ct-input${error ? " ct-input-error" : ""}`,
-        value: editValue,
-        min: "0",
-        step: "1",
-        placeholder: String(defaultMs),
-        onInput: (e: Event) => onchange((e.target as HTMLInputElement).value),
-        "aria-label": "Global CLI timeout in milliseconds",
-      }),
-      h("span", { class: "ct-input-unit" }, "ms"),
-    ),
-    preview
-      ? h("div", { class: "ct-field-preview" },
-          h("span", { class: "ct-field-preview-label" }, "Preview: "),
-          preview,
-        )
-      : h("div", { class: "ct-field-impact" }, isModified ? `Currently: ${formatMs(savedMs!)}` : `Default: ${formatMs(defaultMs)}`),
-    error ? h("div", { class: "ct-field-error" }, error) : null,
-  );
+    savedMs,
+    defaultMs,
+    editValue,
+    error,
+    placeholder: String(defaultMs),
+    ariaLabel: "Global CLI timeout in milliseconds",
+    previewFor: (ms) => (ms === 0
+      ? "All bounded commands will run without any time limit"
+      : `All bounded commands will timeout after ${formatMs(ms)} (unless overridden)`),
+    defaultText: `Default: ${formatMs(defaultMs)}`,
+    onInput: onchange,
+    onReset,
+  });
 }
 
 // ── Form state ────────────────────────────────────────────────────────
@@ -330,8 +331,7 @@ export function useCliTimeoutsForm(): CliTimeoutsForm {
     try {
       const res = await fetch("/api/cli/timeouts");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setLoadError((body as { error?: string }).error ?? "Failed to load timeout configuration");
+        setLoadError(await responseError(res, "Failed to load", "Failed to load timeout configuration"));
         return;
       }
       setData(await res.json() as CliTimeoutsResponse);
@@ -414,8 +414,7 @@ export function useCliTimeoutsForm(): CliTimeoutsForm {
         body: JSON.stringify(pendingBody),
       });
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Save failed" }));
-        setSaveError((errBody as { error?: string }).error ?? "Save failed");
+        setSaveError(await responseError(res, "Save failed"));
         return false;
       }
     } catch (err) {

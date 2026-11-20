@@ -19,10 +19,10 @@
 
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { DEFAULT_CLI_NAME, latestContextTokens, lensLabel, sidecarSetupNeed } from "../hooks/sidecar.js";
 import type { HubSessionInfo, HubSnapshotWorktree, SidecarState } from "../hooks/sidecar.js";
-import { SidecarFrameRow, pairToolResults } from "./sidecar-drawer.js";
+import { SidecarFrameRow, SidecarTurnNotices, pairToolResults, useFollowNewestFrame } from "./sidecar-drawer.js";
 import { SidecarCardList, cardTurnSender } from "./sidecar-cards.js";
 
 /** `40000` → `40k`, `12345` → `12k`, `1234` → `1.2k`, `950` → `950`: one decimal only below 10k. */
@@ -41,7 +41,7 @@ export function snapshotChipLabel(snapshot: HubSessionInfo["snapshot"]): string 
 }
 
 /** The composer's meter: the context the next turn resumes with, against the hub ceiling. */
-export function HubCeilingMeter({ used, ceiling }: { used: number; ceiling: number | null }) {
+function HubCeilingMeter({ used, ceiling }: { used: number; ceiling: number | null }) {
   const max = ceiling ?? 0;
   const ratio = max > 0 ? Math.min(1, used / max) : 0;
   const level = ratio >= 0.9 ? "high" : ratio >= 0.7 ? "mid" : "low";
@@ -117,12 +117,7 @@ export interface HubSessionDrawerProps {
 
 export function HubSessionDrawer({ sidecar, info, onClose, onHandoff }: HubSessionDrawerProps) {
   const [draft, setDraft] = useState("");
-  const transcriptRef = useRef<HTMLOListElement>(null);
-
-  useEffect(() => {
-    const el = transcriptRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [sidecar.frames.length]);
+  const transcriptRef = useFollowNewestFrame(sidecar.frames.length);
 
   const setupNeed = sidecarSetupNeed(sidecar.agent, sidecar.catalog, sidecar.lastTurn);
   const busy = sidecar.running || sidecar.sending;
@@ -134,8 +129,6 @@ export function HubSessionDrawer({ sidecar, info, onClose, onHandoff }: HubSessi
   const results = pairToolResults(sidecar.frames);
   const rows: ComponentChildren[] = sidecar.frames.map((frame) =>
     h(SidecarFrameRow, { key: frame.seq, frame, result: results.get(frame.seq) }));
-  const paused = sidecar.running && sidecar.sessionWaiting > 0;
-  const turnFailed = sidecar.lastTurn && sidecar.lastTurn.status !== "completed" ? sidecar.lastTurn : null;
   const lens = info.lens?.lens ?? null;
   const lensNeeds = lens && !lens.available ? lens.needs ?? "a host that can run it" : null;
   const snapshotTitle = info.snapshot && info.snapshot !== "loading" && info.snapshot.error
@@ -173,23 +166,7 @@ export function HubSessionDrawer({ sidecar, info, onClose, onHandoff }: HubSessi
     h(SidecarCardList, {
       cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide, send: cardTurnSender(sidecar), cliName: DEFAULT_CLI_NAME,
     }),
-    setupNeed
-      ? h("div", { class: "sidecar-setup", role: "alert", "data-reason": setupNeed.reason },
-          h("p", { class: "sidecar-setup-title" },
-            `The ${setupNeed.cli} CLI is ${setupNeed.reason === "missing-cli" ? "not installed" : "not signed in"}`),
-          h("p", { class: "sidecar-setup-hint" },
-            setupNeed.reason === "missing-cli" ? "Install it on the host, then send again:" : "Sign in, then send your message again:"),
-          h("code", { class: "sidecar-setup-command" }, setupNeed.command))
-      : null,
-    turnFailed && !setupNeed
-      ? h("p", { class: "sidecar-turn-end", role: "status" },
-          `Turn ${turnFailed.status}${turnFailed.error ? `: ${turnFailed.error}` : ""}`)
-      : null,
-    sidecar.error ? h("p", { class: "sidecar-error", role: "alert" }, sidecar.error) : null,
-    paused
-      ? h("div", { class: "sidecar-paused", role: "status" },
-          `Agent paused · waiting on ${sidecar.sessionWaiting === 1 ? "your decision" : `${sidecar.sessionWaiting} decisions`}`)
-      : null,
+    h(SidecarTurnNotices, { sidecar, setupNeed, installHint: "Install it on the host, then send again:" }),
     sidecar.readOnly
       ? h("p", { class: "sidecar-readonly", role: "status" }, "This session has ended. Its transcript is read-only.")
       : h("form", {

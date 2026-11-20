@@ -9,6 +9,7 @@ import { SCHEMA_VERSION } from "../../schema/index.js";
 import { walkTree } from "../../core/tree.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { CLIError } from "../errors.js";
+import { promptAnswer } from "../prompt.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 import { refuseOnV2, MIGRATE_ON_V2_HINT } from "./v2-cli.js";
 import type { PRDDocument, PRDItem } from "../../schema/index.js";
@@ -245,7 +246,7 @@ async function offerDeletePrdFiles(rexDir: string, prompt?: PromptFn): Promise<v
   const prdFiles = await findPrdMarkdownFiles(rexDir);
   if (prdFiles.length === 0) return;
 
-  const effectivePrompt = prompt ?? defaultPrompt;
+  const effectivePrompt = prompt ?? promptAnswer;
   const count = prdFiles.length;
   const label =
     count === 1
@@ -263,12 +264,4 @@ async function offerDeletePrdFiles(rexDir: string, prompt?: PromptFn): Promise<v
       warn(`  Could not delete .rex/${file}`);
     }
   }
-}
-
-async function defaultPrompt(question: string): Promise<string> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise<string>((resolve) => rl.question(question, resolve));
-  rl.close();
-  return answer;
 }

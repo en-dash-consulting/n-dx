@@ -15,7 +15,7 @@
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWorkspaceKey } from "../base-path.js";
 import { createWSPipeline } from "./use-gateway.js";
-import { openWebSocket } from "../session.js";
+import { openFrameSocket } from "../live-feed-socket.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-live-analyze.ts and sourcevision's analyze-progress.ts
@@ -168,7 +168,6 @@ export function useLiveAnalyze(): LiveAnalyzeData {
     mountedRef.current = true;
     void fetchSnapshot();
 
-    let ws: WebSocket | null = null;
     const pipeline = createWSPipeline({
       workspace: getWorkspaceKey(),
       onFlush: (batch) => {
@@ -178,23 +177,13 @@ export function useLiveAnalyze(): LiveAnalyzeData {
       // Progress frames go straight to the coalescer: a short window is the only delay.
       coalescerWindowMs: 100,
     });
-    try {
-      ws = openWebSocket();
-      ws.onmessage = (event) => {
-        try {
-          pipeline.push(JSON.parse(event.data));
-        } catch {
-          // Malformed frame — the poll still catches up.
-        }
-      };
-    } catch {
-      // No WebSocket — polling still works.
-    }
+    // No WebSocket — polling still works.
+    const closeSocket = openFrameSocket((frame) => pipeline.push(frame));
 
     return () => {
       mountedRef.current = false;
       pipeline.dispose();
-      ws?.close();
+      closeSocket();
     };
   }, [fetchSnapshot]);
 

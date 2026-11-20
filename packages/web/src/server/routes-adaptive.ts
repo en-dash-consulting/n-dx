@@ -16,12 +16,12 @@
  * GET    /api/hench/adaptive/history        — adjustment history + stats
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
+import { jsonResponse, errorResponse, readJsonBody, errorMessage } from "./response-utils.js";
 import { safeDecodeSegment } from "../shared/index.js";
 import {
   validateConfigKeyValue,
@@ -29,9 +29,12 @@ import {
   completeConfigGroups,
   getConfigValue as getNestedValue,
   setConfigValue as setNestedValue,
+  henchConfigPath,
+  loadHenchConfig,
 } from "./hench-config-fields.js";
 import { resolveActiveVendor } from "./routes-llm.js";
 import { contextWriteFloor, runBudgetedTokens } from "./token-cost.js";
+import { loadRuns, type RunData } from "./tuner-runs.js";
 
 const ADAPTIVE_PREFIX = "/api/hench/adaptive/";
 
@@ -115,21 +118,6 @@ interface AdaptiveState {
   overrides: Record<string, unknown>;
 }
 
-interface RunData {
-  id: string;
-  taskId: string;
-  taskTitle: string;
-  startedAt: string;
-  finishedAt?: string;
-  status: string;
-  turns: number;
-  error?: string;
-  tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
-  toolCalls: unknown[];
-  model: string;
-  retryAttempts?: number;
-}
-
 interface HenchConfigData {
   maxTurns?: number;
   maxTokens?: number;
@@ -141,40 +129,6 @@ interface HenchConfigData {
 }
 
 // ── Data loading helpers ─────────────────────────────────────────────
-
-function loadRuns(projectDir: string): RunData[] {
-  const runsDir = join(henchDirIn(projectDir), "runs");
-  let files: string[];
-  try {
-    files = readdirSync(runsDir);
-  } catch {
-    return [];
-  }
-
-  const runs: RunData[] = [];
-  for (const file of files.filter((f) => f.endsWith(".json"))) {
-    try {
-      const raw = readFileSync(join(runsDir, file), "utf-8");
-      const data = JSON.parse(raw) as RunData;
-      if (data.id && data.startedAt) {
-        runs.push(data);
-      }
-    } catch {
-      // skip invalid files
-    }
-  }
-
-  return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-}
-
-function loadConfig(projectDir: string): HenchConfigData | null {
-  try {
-    const raw = readFileSync(join(henchDirIn(projectDir), "config.json"), "utf-8");
-    return JSON.parse(raw) as HenchConfigData;
-  } catch {
-    return null;
-  }
-}
 
 function defaultSettings(): AdaptiveSettings {
   return {
@@ -220,8 +174,6 @@ function saveAdaptiveState(projectDir: string, state: AdaptiveState): void {
 // engine used to count `input + output`, which on a prompt-cached run is
 // roughly a twelfth of what `checkTokenBudget` enforces, so every proposal
 // below was in different units from the budget it was proposing.
-
-const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded"]);
 
 const totalTokens = runBudgetedTokens;
 
@@ -528,7 +480,7 @@ export function handleAdaptiveRoute(
   // GET /api/hench/adaptive/analysis — full adaptive analysis
   if (path === "analysis" && method === "GET") {
     const runs = loadRuns(ctx.projectDir);
-    const config = loadConfig(ctx.projectDir);
+    const config = loadHenchConfig(ctx.projectDir) as HenchConfigData | null;
     const state = loadAdaptiveState(ctx.projectDir);
 
     if (!config) {
@@ -675,14 +627,8 @@ async function handleUpdateSettings(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const state = loadAdaptiveState(ctx.projectDir);
 
@@ -715,14 +661,8 @@ async function handleApplyAdjustment(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const adjustmentId = body.adjustmentId as string;
   const configKey = body.configKey as string;
@@ -745,7 +685,7 @@ async function handleApplyAdjustment(
   }
 
   // Read and modify config
-  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
   let config: Record<string, unknown>;
   try {
     config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
@@ -808,14 +748,8 @@ async function handleDismissAdjustment(
   ctx: ServerContext,
   adjustmentId: string,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const title = (body.title as string) || adjustmentId;
   const category = (body.category as string) || "unknown";
@@ -848,14 +782,8 @@ async function handleSetOverride(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  let body: Record<string, unknown>;
-  try {
-    const raw = await readBody(req, res);
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    errorResponse(res, 400, "Invalid JSON in request body");
-    return true;
-  }
+  const body = await readJsonBody(req, res);
+  if (body === undefined) return true;
 
   const key = body.key as string;
   const value = body.value;
@@ -880,7 +808,7 @@ async function handleSetOverride(
   }
 
   // Also apply the override to the actual config
-  const configPath = join(henchDirIn(ctx.projectDir), "config.json");
+  const configPath = henchConfigPath(ctx.projectDir);
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const previousValue = getNestedValue(config, key);
