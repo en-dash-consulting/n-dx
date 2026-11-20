@@ -2,10 +2,14 @@
  * Per-vendor live model list and installed-CLI probe behind GET /api/llm/catalog.
  *
  * Codex uses the selected CLI's model/list client catalog, which is not proof
- * of inference access. Claude uses its vendor API. Codex probes are not cached:
- * account, CLI config and PATH changes must apply on the next request.
+ * of inference access. Claude uses its vendor API. Codex probes share a short
+ * cache keyed by effective config, environment, binary and auth-file metadata.
  */
 
+import { createHash } from "node:crypto";
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { delimiter, dirname, join, resolve } from "node:path";
 import {
   ClaudeClientError,
   LLM_VENDOR,
@@ -14,6 +18,7 @@ import {
   listCodexModels,
   loadLLMConfig,
   repoEnvPolicy,
+  repoTrustRecordPath,
   resolveGoogleApiKey,
   resolveVendorAuth,
   resolveVendorCliEnv,
@@ -21,8 +26,12 @@ import {
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
 import { isProjectRestricted } from "./trust-gate.js";
 
-/** How long a live list and CLI probe are served before they are fetched again. */
+/** Claude's live-list/CLI TTL; Codex uses the shorter account-sensitive TTL below. */
 export const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
+/** CLI/keychain account changes without file signals become visible within a minute. */
+export const CODEX_CATALOG_CACHE_TTL_MS = 60_000;
+export const CATALOG_FAILURE_TTL_MS = 10_000;
+const MAX_CACHE_ENTRIES = 128;
 
 const CLI_PROBE_TIMEOUT_MS = 5000;
 
@@ -42,18 +51,22 @@ export interface LiveVendorProbe {
 }
 
 interface CacheEntry {
+  requested: number;
+  prepared: number;
+  identity?: string;
   expiresAt: number;
-  probe: LiveVendorProbe;
+  probe?: LiveVendorProbe;
+  pending?: Promise<LiveVendorProbe>;
 }
 
 const cache = new Map<string, CacheEntry>();
 
-const cacheKey = (projectDir: string, vendor: ListableVendor): string => `${projectDir}\0${vendor}`;
+const cacheKey = (projectDir: string, vendor: ListableVendor): string => `${resolve(projectDir)}\0${vendor}`;
 
-/** Drop every cached probe for `projectDir` (after a config save). */
+/** Retire every cached or pending probe for `projectDir` (after a config save). */
 export function clearLlmCatalogCache(projectDir: string): void {
   for (const key of cache.keys()) {
-    if (key.startsWith(`${projectDir}\0`)) cache.delete(key);
+    if (key.startsWith(`${resolve(projectDir)}\0`)) cache.delete(key);
   }
 }
 
@@ -82,15 +95,68 @@ function parseVersion(output: string): string | null {
  * usable key — the one case `resolveVendorCliEnv` refuses — the probe runs as
  * `cli` instead of failing.
  */
-function probeEnv(vendor: ListableVendor, projectDir: string, config: LLMConfig): NodeJS.ProcessEnv {
+function probeEnv(vendor: ListableVendor, projectDir: string, config: LLMConfig): { env: NodeJS.ProcessEnv; missingKey: boolean } {
   const policy = repoEnvPolicy(projectDir);
   const vendorConfig: LLMConfig = { ...config, vendor };
   try {
-    return resolveVendorCliEnv(vendorConfig, policy);
+    return { env: resolveVendorCliEnv(vendorConfig, policy), missingKey: false };
   } catch (err) {
     if (!(err instanceof ClaudeClientError) || err.reason !== "auth") throw err;
-    return resolveVendorCliEnv({ ...vendorConfig, [vendor]: { ...config[vendor], auth: "cli" } }, policy);
+    return { env: resolveVendorCliEnv({ ...vendorConfig, [vendor]: { ...config[vendor], auth: "cli" } }, policy), missingKey: true };
   }
+}
+
+interface ProbeContext {
+  binary: string;
+  env: NodeJS.ProcessEnv;
+  missingKey: boolean;
+  restricted: boolean;
+}
+
+/** Metadata only: credential contents are never read or retained by the cache. */
+function fileRevision(path: string): unknown {
+  try {
+    const stat = statSync(path, { throwIfNoEntry: false });
+    return [path, stat ? [realpathSync(path), stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs, stat.mode] : null];
+  } catch (err) {
+    // Inaccessible and absent inputs are distinct; the live probe reports usability.
+    return [path, (err as NodeJS.ErrnoException).code ?? "unreadable"];
+  }
+}
+
+function codexIdentity(projectDir: string, config: LLMConfig, context: ProbeContext): string {
+  const { binary, env, restricted, missingKey } = context;
+  const windows = process.platform === "win32";
+  // resolveVendorCliEnv returns a plain object, without process.env's Windows
+  // case folding. Match the first sorted spelling Node passes to the child.
+  const envValue = (name: string): string | undefined => {
+    if (!windows) return env[name];
+    const key = Object.keys(env).sort().find((key) => key.toUpperCase() === name);
+    return key === undefined ? undefined : env[key];
+  };
+  const home = resolve(projectDir, envValue("CODEX_HOME") || join(envValue("HOME") || envValue("USERPROFILE") || homedir(), ".codex"));
+  const files = [join(home, "auth.json"), join(home, "config.toml"), repoTrustRecordPath(projectDir)];
+  // Include every project config Codex can inherit, even one created later.
+  for (let dir = resolve(projectDir); ; dir = dirname(dir)) {
+    files.push(join(dir, ".codex", "config.toml"));
+    if (existsSync(join(dir, ".git")) || dirname(dir) === dir) break;
+  }
+  // Observe PATH candidates as well as the configured path: installation,
+  // replacement, permission changes and symlink retargeting all invalidate.
+  const path = envValue("PATH") ?? (windows ? "" : "/usr/bin:/bin");
+  const dirs = /[/\\]/.test(binary) ? [projectDir] : [
+    ...(windows ? [projectDir] : []), ...path.split(delimiter),
+  ];
+  const extensions = windows ? ["", ...(envValue("PATHEXT") || ".COM;.EXE;.BAT;.CMD").split(";")] : [""];
+  for (const dir of dirs) {
+    for (const extension of extensions) files.push(resolve(projectDir, dir, binary + extension));
+  }
+  // Only this digest survives the lookup. Never log secret-bearing config/env.
+  return createHash("sha256").update(JSON.stringify([
+    config, binary, restricted, missingKey,
+    Object.keys(env).sort().map((name) => [name, env[name]]),
+    files.map(fileRevision),
+  ])).digest("hex");
 }
 
 /**
@@ -100,56 +166,50 @@ function probeEnv(vendor: ListableVendor, projectDir: string, config: LLMConfig)
  * repository's allow only while trusted), so no credential outside the
  * vendor's mode, and none the user denied, reaches the binary or anything it runs.
  */
-async function probeCli(vendor: ListableVendor, projectDir: string, config: LLMConfig): Promise<CliInfo> {
-  const binary = resolveBinary(vendor, config);
-  const env = probeEnv(vendor, projectDir, config);
+async function probeCli(projectDir: string, { binary, env }: ProbeContext): Promise<CliInfo> {
   const result = await exec(binary, ["--version"], { cwd: projectDir, timeout: CLI_PROBE_TIMEOUT_MS, env });
   if (!result.launched || result.exitCode !== 0) return { found: false, version: null, path: null };
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };
 }
 
 /**
- * The live list and the CLI probe, from `config` as `loadLLMConfig` returns
- * it. Neither needs a trust check of its own: the loader drops the `cli_path`
- * the shared project config sets until the repository is accepted (and clamps
- * a committed `.n-dx.local.json` the same way), so the probe runs only a
- * binary the operator chose; and the listing always goes to the vendor's own
- * models URL, never a configured `api_endpoint`, so the repository cannot
- * redirect the operator's key.
+ * Probe the binary and filtered environment captured for this lookup. The
+ * loader clamps untrusted binary settings. Codex model/list also requires
+ * repository trust because app-server loads project config; Claude's listing
+ * uses the vendor's own models URL, never a configured api_endpoint.
  */
 async function probeVendor(
   vendor: ListableVendor,
   projectDir: string,
   config: LLMConfig,
+  context: ProbeContext,
 ): Promise<LiveVendorProbe> {
   if (vendor === LLM_VENDOR.CODEX) {
-    const cli = await probeCli(vendor, projectDir, config);
+    const cli = await probeCli(projectDir, context);
     let listing: LiveVendorProbe["listing"];
-    if (isProjectRestricted(projectDir)) {
+    if (context.restricted || isProjectRestricted(projectDir)) {
       listing = { ok: false, reason: "Codex catalog not probed: accept this checkout with n-dx trust accept . before refreshing." };
     } else if (!cli.found) {
       listing = { ok: false, reason: "Codex CLI unavailable; check llm.codex.cli_path, install or update Codex, then refresh." };
+    } else if (context.missingKey) {
+      listing = { ok: false, reason: "Codex API authentication is configured without a key; configure the key or select CLI login, then refresh." };
     } else {
-      try {
-        const env = resolveVendorCliEnv({ ...config, vendor }, repoEnvPolicy(projectDir));
-        listing = await listCodexModels({ binary: resolveBinary(vendor, config), cwd: projectDir, env });
-      } catch (err) {
-        if (!(err instanceof ClaudeClientError) || err.reason !== "auth") throw err;
-        listing = { ok: false, reason: "Codex API authentication is configured without a key; configure the key or select CLI login, then refresh." };
-      }
+      listing = await listCodexModels({ binary: context.binary, cwd: projectDir, env: context.env });
     }
     return { listing, checkedAt: new Date().toISOString(), cli };
   }
   const [listing, cli] = await Promise.all([
     listVendorModels(vendor, config),
-    probeCli(vendor, projectDir, config),
+    probeCli(projectDir, context),
   ]);
   return { listing, checkedAt: new Date().toISOString(), cli };
 }
 
 /**
  * The live list and CLI probe for `vendor`, from cache while fresh.
- * `refresh` bypasses the cache and refills it.
+ * Concurrent lookups of one identity share both CLI and catalog probes.
+ * `refresh` retires the cached/pending entry before any asynchronous work;
+ * clearing, eviction and refresh cannot be undone by an older completion.
  */
 export async function getLiveVendorProbe(
   vendor: ListableVendor,
@@ -157,15 +217,42 @@ export async function getLiveVendorProbe(
   options: { refresh?: boolean } = {},
 ): Promise<LiveVendorProbe> {
   const key = cacheKey(projectDir, vendor);
-  const hit = cache.get(key);
-  if (vendor !== LLM_VENDOR.CODEX && !options.refresh && hit && hit.expiresAt > Date.now()) return hit.probe;
+  let entry = options.refresh ? undefined : cache.get(key);
+  if (!entry) entry = { requested: 0, prepared: 0, expiresAt: 0 };
+  cache.delete(key);
+  cache.set(key, entry);
+  if (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value!);
 
-  const restricted = isProjectRestricted(projectDir);
-  const probe = await probeVendor(vendor, projectDir, await loadLLMConfig(projectDir));
-  // A restricted answer is not cached: accepting the config must show the
-  // probed result on the next request, not ten minutes later.
-  if (!restricted && vendor !== LLM_VENDOR.CODEX) cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
-  return probe;
+  const request = ++entry.requested;
+  const config = await loadLLMConfig(projectDir);
+  // A slow config read must not restore an identity a newer lookup retired.
+  if (cache.get(key) === entry && request < entry.prepared) return getLiveVendorProbe(vendor, projectDir);
+  entry.prepared = request;
+  const context = { binary: resolveBinary(vendor, config), ...probeEnv(vendor, projectDir, config), restricted: isProjectRestricted(projectDir) };
+  const identity = vendor === LLM_VENDOR.CODEX ? codexIdentity(projectDir, config, context) : String(context.restricted);
+  if (entry.identity !== identity) {
+    entry.identity = identity;
+    entry.probe = undefined;
+    entry.pending = undefined;
+  }
+  if (entry.probe && entry.expiresAt > Date.now()) return entry.probe;
+  if (entry.pending) return entry.pending;
+
+  const pending = probeVendor(vendor, projectDir, config, context);
+  entry.pending = pending;
+  try {
+    const probe = await pending;
+    if (cache.get(key) === entry && entry.pending === pending) {
+      const ttl = vendor === LLM_VENDOR.CODEX
+        ? (probe.listing.ok ? CODEX_CATALOG_CACHE_TTL_MS : CATALOG_FAILURE_TTL_MS)
+        : CATALOG_CACHE_TTL_MS;
+      entry.probe = probe;
+      entry.expiresAt = Date.now() + ttl;
+    }
+    return probe;
+  } finally {
+    if (entry.pending === pending) entry.pending = undefined;
+  }
 }
 
 /** Whether a vendor can run as configured, with the line its card shows as-is. */

@@ -1040,8 +1040,9 @@ export interface LlmCatalogResponse {
 
 /**
  * Codex's built-in selection catalog, independent of pricing coverage.
- * Keep the pre-pricing-refresh set; additional ids require a successful live
- * listing. Pricing metadata alone does not establish model availability.
+ * Retain the pre-pricing-refresh set and explicitly include the new defaults
+ * introduced by this catalog change. Other ids require a successful live
+ * listing; pricing metadata alone does not establish model availability.
  */
 const BUILT_IN_CODEX_MODELS = [
   "gpt-5.4-mini",
@@ -1049,6 +1050,9 @@ const BUILT_IN_CODEX_MODELS = [
   "gpt-5.6-luna",
   "gpt-5.6-sol",
   "gpt-5.6-terra",
+  "gpt-6-astra",
+  "gpt-6-luna",
+  "gpt-6.1-sol",
 ] as const;
 
 /** Built-in selection ids, sorted; Claude and Google retain their tier/cost union. */
@@ -1084,6 +1088,7 @@ export async function validateCatalogModel(
   if (vendor !== LLM_VENDOR.GOOGLE) {
     const live = await getLiveVendorProbe(vendor, projectDir);
     if (live.listing.ok && live.listing.models.includes(model)) return null;
+    if (!live.listing.ok) return `Cannot check model "${model}" in the ${vendor} catalog: ${live.listing.reason}`;
   }
   return `Model "${model}" is not in the ${vendor} catalog.`;
 }
