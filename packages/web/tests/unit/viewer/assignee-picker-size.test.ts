@@ -13,6 +13,7 @@ const read = (file: string) =>
   readFileSync(join(import.meta.dirname, "../../../src/viewer/styles", file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 const assignee = read("assignee.css");
 const prdTree = read("prd-tree.css");
+const buttons = read("token-usage.css");
 
 /** Declarations of every rule whose selector list contains `selector` exactly. */
 function declarations(css: string, selector: string): string {
@@ -43,11 +44,10 @@ describe("detail panel assignee field", () => {
     expect(value(declarations(assignee, ".assignee-input"), "max-width")).toBe("100%");
   });
 
-  it("sizes Save, Unassign and Cancel like the panel's other edit buttons", () => {
+  it("sizes Save, Unassign and Cancel like the panel's other edit buttons, through .btn-sm", () => {
     const small = declarations(prdTree, ".task-edit-save");
-    const buttons = declarations(assignee, ".assignee-form .btn");
-    for (const prop of ["padding", "font-size", "border-radius"]) {
-      expect(value(buttons, prop), prop).toBe(value(small, prop));
-    }
+    const sm = declarations(buttons, ".btn-sm");
+    for (const prop of ["padding", "font-size"]) expect(value(sm, prop), prop).toBe(value(small, prop));
+    expect(value(declarations(assignee, ".assignee-form .btn"), "border-radius")).toBe(value(small, "border-radius"));
   });
 });

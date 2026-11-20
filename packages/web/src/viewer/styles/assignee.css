@@ -47,13 +47,12 @@
   color: var(--text);
 }
 
-/* Save, Unassign and Cancel take the small size of the detail panel's other
-   edit buttons (.task-edit-save, .task-edit-cancel), not .btn's full size. */
+/* Save, Unassign and Cancel are .btn-sm (token-usage.css), the size of the
+   detail panel's other edit buttons (.task-edit-save, .task-edit-cancel);
+   here they take those buttons' border and corners too. */
 .assignee-form .btn {
-  padding: var(--space-1) var(--space-2-5);
   border: 1px solid var(--accent);
   border-radius: 4px;
-  font-size: var(--font-sm);
   line-height: var(--leading-normal);
 }
 
