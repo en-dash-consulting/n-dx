@@ -21,10 +21,10 @@ On re-init, if the vendor and model are already configured the LLM prompts are s
 | `claude` | `claude-opus-5-5` | Claude Opus 5.5 | |
 | `claude` | `claude-fable-5-1` | Claude Fable 5.1 | |
 | `claude` | `claude-haiku-4-5` | Claude Haiku 4.5 | |
-| `codex` | `gpt-5.6-terra` | GPT-5.6 Terra | yes |
-| `codex` | `gpt-5.6-sol` | GPT-5.6 Sol | |
-| `codex` | `gpt-5.6-luna` | GPT-5.6 Luna | |
-| `codex` | `gpt-5.5` | GPT-5.5 | |
+| `codex` | `gpt-6.1-sol` | GPT-6.1 Sol | yes |
+| `codex` | `gpt-6-astra` | GPT-6 Astra | |
+| `codex` | `gpt-6-luna` | GPT-6 Luna | |
+| `codex` | `gpt-5.5` | GPT-5.5 (API key only; retired from ChatGPT sign-in) | |
 | `google` | `gemini-2.5-pro` | Gemini 2.5 Pro | yes |
 | `google` | `gemini-3.7-flash` | Gemini 3.7 Flash | |
 | `google` | `gemini-3.5-flash-lite` | Gemini 3.5 Flash Lite | |
@@ -59,7 +59,7 @@ Examples:
 ndx init --provider=claude --model=claude-sonnet-5-5 .
 
 # Configure both vendors in a single call
-ndx init --provider=claude --claude-model=claude-sonnet-5-5 --codex-model=gpt-5.6-terra .
+ndx init --provider=claude --claude-model=claude-sonnet-5-5 --codex-model=gpt-6.1-sol .
 
 # A lone vendor-specific flag implies the provider
 ndx init --claude-model=claude-opus-5-5 .   # implies --provider=claude
@@ -201,7 +201,7 @@ Writing `llm.<vendor>.api_key` still works as an alias for `credentials.<vendor>
 
 ```sh
 ndx config llm.codex.cli_path /path/to/codex .
-ndx config rex.model gpt-5.6-terra .
+ndx config rex.model gpt-6.1-sol .
 ```
 
 ## TypeSafe Jev for Judgment Calls
@@ -438,3 +438,36 @@ See [Getting Started — Assistant Surfaces](./getting-started#assistant-surface
 | `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](./skills#ndx-config) | Interactive view, explanation, and validation of n-dx configuration settings |
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
+
+### Codex defaults and upgrades
+
+Unpinned Codex execution uses `gpt-6-luna` for light work, `gpt-6.1-sol` for
+standard work, and `gpt-6-astra` for heavy work. Routine review uses Sol;
+a saved `run.reviewTier: heavy` selects Astra. Explicit execution, tier,
+Hench, task and reviewer model pins remain literal; upgrading or re-running
+`n-dx init` does not migrate saved settings.
+
+To retain previous defaults, pin each tier you use. `llm.codex.model` pins
+standard execution only; it does not pin light or heavy work. Replace
+`<model-id>` with the previous model for that slot:
+
+```sh
+n-dx config llm.codex.model <model-id> .
+n-dx config llm.tiers.codex.light <model-id> .
+n-dx config llm.tiers.codex.heavy <model-id> .
+n-dx config llm.codex.reviewModel <model-id> .
+```
+
+`n-dx config llm.codex.lightModel <model-id> .` is also a light-work pin;
+an explicit `llm.tiers.codex.light` takes precedence over it. Saved task and
+Hench model overrides still apply according to the normal precedence rules.
+The heavy tier pin also applies to saved `run.reviewTier: heavy` reviews,
+which take precedence over `llm.codex.reviewModel`. Explicit task reviewer
+models and CLI reviewer overrides still win.
+
+These are workload recommendations, not n-dx benchmark results or proof of
+account access. [Official model guidance](https://learn.chatgpt.com/docs/models?surface=cli)
+was checked on 2026-11-16. GPT-5.5's retirement from ChatGPT-authenticated Codex
+does not retire it from the API or API-key sessions. Retained API pins remain
+usable subject to provider availability. Codex effort recommendations are not
+applied here: client defaults remain in effect pending Codex effort support.

@@ -39,6 +39,9 @@ const SUPPORTED_PROVIDERS = Object.values(LLM_PROVIDER);
  */
 const LEGACY_CATALOG_MODEL_ALIASES = {
   [LLM_PROVIDER.CODEX]: [
+    "gpt-5.6-terra",
+    "gpt-5.6-sol",
+    "gpt-5.6-luna",
     "gpt-5-codex",
     "gpt-5.1-codex-max",
     "gpt-5.1-codex-mini",
@@ -241,16 +244,20 @@ async function defaultPromptProvider(existingProvider) {
  * "★ recommended" hint and pre-selected.
  *
  * In non-TTY environments (piped input, CI, test harnesses), auto-selects the
- * recommended model without prompting. Explicit model selection in scripted
- * flows requires the --model= flag.
+ * saved model when present, otherwise the recommended model without prompting.
  *
  * @param {string} provider      The resolved provider (e.g. "codex", "claude").
  * @param {string} [existingModel]  Current model from config — pre-selected as default.
  * @returns {Promise<string|undefined>}  Selected model ID or undefined on cancel.
  */
 async function defaultPromptModel(provider, existingModel) {
-  const models = getModelsForVendor(provider);
-  if (!models || models.length === 0) return undefined;
+  const catalog = getModelsForVendor(provider);
+  if (!catalog || catalog.length === 0) return undefined;
+  // A saved pin may no longer be in the recommended catalog. Keep it as the
+  // selected choice on re-init; Enter must not silently migrate user intent.
+  const models = existingModel && !catalog.some((entry) => entry.id === existingModel)
+    ? [{ id: existingModel, label: `${existingModel} (saved pin; availability depends on provider)`, recommended: false }, ...catalog]
+    : catalog;
 
   // Single-model vendor: return the only option without prompting
   if (models.length === 1) return models[0].id;
@@ -260,12 +267,12 @@ async function defaultPromptModel(provider, existingModel) {
   }
 
   // Non-interactive environment (piped input, CI, test harnesses):
-  // auto-select the recommended model without prompting. Readline-based
+  // retain a saved pin, or select the recommended model. Readline-based
   // model selection is unreliable in non-TTY environments because stdin
   // may be at EOF or closed. The recommended model is the sensible default
-  // for scripted flows; explicit model selection requires --model= flag.
+  // for new scripted setups without a saved pin or --model= flag.
   const recommended = getRecommendedModel(provider);
-  return recommended ? recommended.id : models[0].id;
+  return existingModel ?? (recommended ? recommended.id : models[0].id);
 }
 
 /**

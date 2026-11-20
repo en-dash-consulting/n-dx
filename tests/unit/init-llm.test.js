@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   resolveInitLLMSelection,
@@ -872,9 +873,9 @@ describe("LLM_MODEL_CATALOG", () => {
     ]);
   });
 
-  it("recommended Codex model is gpt-5.6-terra", () => {
+  it("recommended Codex model is gpt-6.1-sol", () => {
     const recommended = LLM_MODEL_CATALOG.codex.find((m) => m.recommended);
-    expect(recommended.id).toBe("gpt-5.6-terra");
+    expect(recommended.id).toBe("gpt-6.1-sol");
   });
 });
 
@@ -906,7 +907,7 @@ describe("getRecommendedModel", () => {
     const recommended = getRecommendedModel("codex");
     expect(recommended).toBeDefined();
     expect(recommended.recommended).toBe(true);
-    expect(recommended.id).toBe("gpt-5.6-terra");
+    expect(recommended.id).toBe("gpt-6.1-sol");
   });
 
   it("returns undefined for unknown vendor", () => {
@@ -928,7 +929,7 @@ describe("promptLLMSelection model prompt integration", () => {
         needsModelPrompt: true,
       };
       const result = await promptLLMSelection(resolution);
-      expect(result.model).toBe("gpt-5.6-terra");
+      expect(result.model).toBe("gpt-6.1-sol");
       expect(result.modelSource).toBe("prompt");
     });
   });
@@ -949,7 +950,7 @@ describe("promptLLMSelection model prompt integration", () => {
         // No promptModel override — uses default, which selects the recommended catalog model
       });
       expect(result.provider).toBe("codex");
-      expect(result.model).toBe("gpt-5.6-terra");
+      expect(result.model).toBe("gpt-6.1-sol");
       expect(result.modelSource).toBe("prompt");
     });
   });
@@ -1410,4 +1411,40 @@ describe("local provider model prompt", () => {
       expect(result.modelSource).toBeUndefined();
     });
   });
+});
+
+
+describe("Codex re-init preserves historical pins", () => {
+  it.each(["gpt-5.5", "gpt-5.4", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.6-luna"])("keeps %s without prompting for a replacement", async (model) => {
+    const existingConfig = { vendor: "codex", model };
+    const resolution = resolveInitLLMSelection({ flags: {}, existingConfig, isTTY: false });
+    expect(resolution.needsModelPrompt).toBe(false);
+    expect((await promptLLMSelection(resolution)).model).toBe(model);
+    expect(existingConfig).toEqual({ vendor: "codex", model });
+  });
+});
+
+
+it("preselects an out-of-catalog saved pin on interactive re-init", async () => {
+  const originalTTY = process.stdin.isTTY;
+  const originalCI = process.env.CI;
+  const prompt = vi.fn(async (options) => ({ model: options.choices[options.initial].name }));
+  const Enquirer = createRequire(new URL("../../packages/core/init-llm.js", import.meta.url))("enquirer");
+  const promptSpy = vi.spyOn(Enquirer.prototype, "prompt").mockImplementation(prompt);
+  try {
+    process.stdin.isTTY = true;
+    delete process.env.CI;
+    const resolution = resolveInitLLMSelection({
+      flags: { provider: "codex" }, existingConfig: { vendor: "codex", model: "gpt-5.6-terra" }, isTTY: true,
+    });
+    expect((await promptLLMSelection(resolution)).model).toBe("gpt-5.6-terra");
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(LLM_MODEL_CATALOG.codex.some((m) => m.id === "gpt-5.6-terra")).toBe(false);
+  } finally {
+    if (originalTTY === undefined) delete process.stdin.isTTY;
+    else process.stdin.isTTY = originalTTY;
+    if (originalCI === undefined) delete process.env.CI;
+    else process.env.CI = originalCI;
+    promptSpy.mockRestore();
+  }
 });

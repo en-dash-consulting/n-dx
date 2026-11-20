@@ -804,3 +804,46 @@ describe("literal Codex execution and review precedence", () => {
     expect(resolveFor({ ...base, item: task({ tier: "light" }), llm: { ...llm, tiers: { codex: { light: "gpt-5.4-mini" } } } }).model.value).toBe("gpt-5.4-mini");
   });
 });
+
+
+describe("Codex default upgrade preserves saved intent", () => {
+  const base = { vendor: "codex" as const, llm: { vendor: "codex" as const } };
+  it.each([
+    ["light", "gpt-6-luna"], ["standard", "gpt-6.1-sol"], ["heavy", "gpt-6-astra"],
+  ])("resolves saved %s execution and review tiers", (tier, model) => {
+    const r = resolveFor({ ...base, item: task({ tier, review: true, reviewTier: tier }) });
+    expect(r.model.value).toBe(model);
+    expect(r.reviewModel.value).toBe(model);
+  });
+
+  it("uses Sol for ordinary execution and review", () => {
+    const r = resolveFor(base);
+    expect(r.model.value).toBe("gpt-6.1-sol");
+    expect(r.reviewModel.value).toBe("gpt-6.1-sol");
+  });
+
+  it("retains each explicit execution pin across an upgrade", () => {
+    for (const options of [
+      { llm: { vendor: "codex" as const, model: "gpt-5.5" } },
+      { llm: { vendor: "codex" as const, codex: { model: "gpt-5.5" } } },
+      { llm: { vendor: "codex" as const, tiers: { codex: { standard: "gpt-5.5" } } } },
+      { config: { models: { codex: "gpt-5.5" } } },
+      { item: task({ models: { codex: "gpt-5.5" } }) },
+      { flags: { model: "gpt-5.5" } },
+    ]) {
+      const input = { ...base, ...options };
+      const before = JSON.stringify(input);
+      expect(resolveFor(input).model.value).toBe("gpt-5.5");
+      expect(JSON.stringify(input)).toBe(before);
+    }
+  });
+
+  it("retains reviewer pins and CLI > task > vendor > shared precedence", () => {
+    const llm: LLMConfig = { vendor: "codex", reviewModel: "gpt-5.4", codex: { reviewModel: "gpt-5.5" } };
+    expect(resolveFor({ ...base, llm }).reviewModel.value).toBe("gpt-5.5");
+    const item = task({ review: true, reviewModels: { codex: "gpt-5.6-sol" } });
+    expect(resolveFor({ ...base, llm, item }).reviewModel.value).toBe("gpt-5.6-sol");
+    expect(resolveFor({ ...base, llm, item, flags: { review: "true", "review-model": "gpt-5.2" } }).reviewModel.value).toBe("gpt-5.2");
+    expect(resolveFor({ ...base, llm: { vendor: "codex", reviewModel: "gpt-5.4" } }).reviewModel.value).toBe("gpt-5.4");
+  });
+});

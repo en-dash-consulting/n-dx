@@ -30,14 +30,14 @@ import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { CodexConfig } from "./llm-types.js";
 import { requireVendorApiKey, resolveVendorKey } from "./vendor-auth.js";
-import { resolveApiEndpoint } from "./config.js";
+import { NEWEST_MODELS, resolveApiEndpoint } from "./config.js";
 import { postJsonWithRetries, throwHttpStatusError } from "./http-retry.js";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_MODEL = "gpt-5.6-terra";
+const DEFAULT_MODEL = NEWEST_MODELS.codex;
 
 // ── Options ───────────────────────────────────────────────────────────────
 

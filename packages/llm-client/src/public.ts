@@ -668,6 +668,10 @@ export {
 } from "./vendor-model-reset.js";
 export type { VendorModelResetResult } from "./vendor-model-reset.js";
 
+// Codex CLI client catalog (not an inference entitlement check)
+export { listCodexModels } from "./codex-model-list.js";
+export type { CodexModelListOptions } from "./codex-model-list.js";
+
 // Live model listing from the vendor APIs
 export { listVendorModels } from "./vendor-model-list.js";
 export type {

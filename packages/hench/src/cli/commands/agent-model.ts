@@ -99,7 +99,7 @@ function modelVendorMismatch(vendor: LLMVendor, model: string): CLIError | undef
   if (vendor === LLM_VENDOR.CODEX && !isModelCompatibleWithVendor(LLM_VENDOR.CODEX, model)) {
     return new CLIError(
       `Configured model "${model}" is not compatible with vendor="codex".`,
-      `Either use a Codex/GPT model (e.g., gpt-5.6-terra, gpt-5.6-luna) or switch vendor: 'n-dx config llm.vendor claude'`,
+      `Either use a Codex/GPT model (e.g., gpt-6.1-sol, gpt-6-luna) or switch vendor: 'n-dx config llm.vendor claude'`,
     );
   }
   if (vendor === LLM_VENDOR.GOOGLE && !isModelCompatibleWithVendor(LLM_VENDOR.GOOGLE, model)) {

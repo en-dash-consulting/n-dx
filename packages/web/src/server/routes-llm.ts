@@ -998,9 +998,11 @@ export interface VendorCatalogEntry {
    * vendor default.
    */
   defaultModel: string;
-  /** `"live"` when `models` came from the vendor's Models API, else the built-in list. */
+  /** Live CLI client catalog or vendor API; see provenance. */
   source: "live" | "built-in";
-  /** ISO time of the live fetch; null when `source` is `"built-in"`. */
+  /** Catalog provenance is not inference entitlement. */
+  provenance?: "codex-client-catalog" | "vendor-api" | "built-in";
+  /** ISO time of the probe, including failed probes; null when not probed. */
   checkedAt: string | null;
   /** Why the built-in list is shown. Present only when `source` is `"built-in"`. */
   reason?: string;
@@ -1038,8 +1040,9 @@ export interface LlmCatalogResponse {
 
 /**
  * Codex's built-in selection catalog, independent of pricing coverage.
- * Keep the pre-pricing-refresh set; additional ids require a successful live
- * listing. Pricing metadata alone does not establish model availability.
+ * Retain the pre-pricing-refresh set and explicitly include the new defaults
+ * introduced by this catalog change. Other ids require a successful live
+ * listing; pricing metadata alone does not establish model availability.
  */
 const BUILT_IN_CODEX_MODELS = [
   "gpt-5.4-mini",
@@ -1047,6 +1050,9 @@ const BUILT_IN_CODEX_MODELS = [
   "gpt-5.6-luna",
   "gpt-5.6-sol",
   "gpt-5.6-terra",
+  "gpt-6-astra",
+  "gpt-6-luna",
+  "gpt-6.1-sol",
 ] as const;
 
 /** Built-in selection ids, sorted; Claude and Google retain their tier/cost union. */
@@ -1082,6 +1088,7 @@ export async function validateCatalogModel(
   if (vendor !== LLM_VENDOR.GOOGLE) {
     const live = await getLiveVendorProbe(vendor, projectDir);
     if (live.listing.ok && live.listing.models.includes(model)) return null;
+    if (!live.listing.ok) return `Cannot check model "${model}" in the ${vendor} catalog: ${live.listing.reason}`;
   }
   return `Model "${model}" is not in the ${vendor} catalog.`;
 }
@@ -1118,7 +1125,8 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       providers: [...VENDOR_PROVIDERS[vendor]],
       defaultModel: defaultModel(vendor),
       source: live ? "live" : "built-in",
-      checkedAt: live ? probe.checkedAt : null,
+      provenance: live ? (vendor === LLM_VENDOR.CODEX ? "codex-client-catalog" : "vendor-api") : "built-in",
+      checkedAt: probe.checkedAt,
       ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
       readiness,
       cli: probe.cli,

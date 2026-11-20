@@ -152,6 +152,7 @@ interface CatalogEntry {
   defaultModel: string;
   /** Cloud vendors: where `models` came from. Local reports `reachable` instead. */
   source?: "live" | "built-in";
+  provenance?: "codex-client-catalog" | "vendor-api" | "built-in";
   checkedAt?: string | null;
   reachable?: boolean;
   reason?: string;
@@ -1126,9 +1127,12 @@ function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): { label: s
       ? { label: "Local server not configured", detail: entry.reason ?? null }
       : { label: "Local server unreachable", detail: entry.reason ?? null };
   }
+  if (entry.provenance === "codex-client-catalog") {
+    return { label: "Codex client catalog", detail: `CLI ${entry.cli?.version ?? "unknown"} · Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}. Inference access is not verified.` };
+  }
   return entry.source === "live"
     ? { label: "Live model list", detail: `Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}` }
-    : { label: "Built-in model list", detail: entry.reason ?? null };
+    : { label: "Built-in model list", detail: [entry.reason, entry.checkedAt ? `Checked ${new Date(entry.checkedAt).toLocaleString()}` : null].filter(Boolean).join(" · ") || null };
 }
 
 type AuthState = "checking" | "ok" | "bad";

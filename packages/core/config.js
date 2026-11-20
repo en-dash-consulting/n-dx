@@ -1083,7 +1083,7 @@ function validateModel(value) {
  * Validate llm.google.model: must be a non-empty string starting with "gemini-".
  *
  * Gemini model IDs all start with "gemini-" (e.g. "gemini-2.5-pro",
- * "gemini-3.7-flash"). IDs from other vendors (e.g. "gpt-5.6-terra", "claude-sonnet-*")
+ * "gemini-3.7-flash"). IDs from other vendors (e.g. "gpt-6.1-sol", "claude-sonnet-*")
  * are rejected immediately.
  *
  * Canonical known models (from @n-dx/llm-client GOOGLE_MODELS):
@@ -2544,7 +2544,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
                                     light tier use this model.
-                                    Falls back to gpt-5.6-luna if not set.
+                                    Falls back to gpt-6-luna if not set.
   llm.google.api_key       string    Google Gemini API key (optional; validated format)
                                     Stored in .n-dx.local.json.
                                     Preflight validates the key against the Gemini API.
@@ -2561,7 +2561,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     Must be a valid Gemini model ID starting with "gemini-".
                                     Known models: gemini-3.5-flash-lite (light),
                                     gemini-3.7-flash (standard), gemini-2.5-pro (heavy)
-                                    Validation: rejects non-Gemini model IDs (e.g. "gpt-5.6-terra")
+                                    Validation: rejects non-Gemini model IDs (e.g. "gpt-6.1-sol")
   llm.local.host           string    Hostname of the local LM Studio server (default: localhost)
   llm.local.port           number    Port of the local LM Studio server (default: 1234)
   llm.local.model          string    Model ID to request from the local server (optional)

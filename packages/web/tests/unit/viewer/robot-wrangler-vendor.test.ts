@@ -275,6 +275,20 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     expect(api.calls.some((c) => c.url.includes("/api/llm/catalog?refresh=true"))).toBe(true);
   });
 
+  it("labels the Codex client catalog without claiming inference access", async () => {
+    stubApi({ config: config("codex"), catalog: catalog({ codex: {
+      models: ["gpt-client-only"], providers: ["cli"], defaultModel: "gpt-client-only",
+      source: "live", provenance: "codex-client-catalog", checkedAt: "2026-11-16T12:00:00Z",
+      cli: { found: true, version: "0.167.0", path: "codex" },
+    } }) });
+    await mount();
+    const checks = root.querySelector(".llm-runcard-checks")!;
+    expect(checks.textContent).toContain("Codex client catalog");
+    expect(checks.textContent).toContain("0.167.0");
+    expect(checks.textContent).toContain("Checked");
+    expect(checks.textContent).toContain("Inference access is not verified");
+  });
+
   it("names the reason for a built-in list", async () => {
     stubApi({ config: config("codex") });
     await mount();

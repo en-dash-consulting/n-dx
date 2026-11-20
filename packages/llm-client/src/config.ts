@@ -50,7 +50,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5";
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   [LLM_VENDOR.CLAUDE]: DEFAULT_CLAUDE_MODEL,
-  [LLM_VENDOR.CODEX]: "gpt-5.6-terra",
+  [LLM_VENDOR.CODEX]: "gpt-6.1-sol",
   // Google: newest *stable* Pro model. `gemini-3.1-pro-preview` is newer but
   // is a preview release — preview IDs can be renamed or withdrawn, so it is
   // not shipped as a default. Users can still select it via llm.google.model.
@@ -94,9 +94,9 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
     heavy: "claude-opus-5-5",
   },
   [LLM_VENDOR.CODEX]: {
-    light: "gpt-5.6-luna",
-    standard: NEWEST_MODELS.codex, // gpt-5.6-terra
-    heavy: "gpt-5.6-sol",
+    light: "gpt-6-luna",
+    standard: NEWEST_MODELS.codex, // gpt-6.1-sol
+    heavy: "gpt-6-astra",
   },
   [LLM_VENDOR.GOOGLE]: GOOGLE_MODELS,
   // Local: no catalog — model is whatever LM Studio has loaded.
@@ -314,9 +314,9 @@ export function normalizeCodexModel(model: string): string {
  * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
- * - `'light'` — cheaper/faster models (haiku, gemini-flash-lite, gpt-5.6-luna)
- * - `'standard'` or omitted — full-capability balanced models (sonnet, gemini-3.7-flash, gpt-5.6-terra)
- * - `'heavy'` — most capable models (opus, gemini-2.5-pro, gpt-5.6-sol); always uses TIER_MODELS.heavy
+ * - `'light'` — cheaper/faster models (haiku, gemini-flash-lite, gpt-6-luna)
+ * - `'standard'` or omitted — full-capability balanced models (sonnet, gemini-3.7-flash, gpt-6.1-sol)
+ * - `'heavy'` — most capable models (opus, gemini-2.5-pro, gpt-6-astra); always uses TIER_MODELS.heavy
  *
  * For the 'light' weight, if `lightModel` is configured, it takes precedence
  * over both `model` and `TIER_MODELS`. This allows users to customize which
@@ -752,10 +752,11 @@ export function routesToTier(taskClass: string, config?: LLMConfig): boolean {
  *   and below Opus 5 ($5/$25). `claude-fable-5-1` is stronger still but costs
  *   2.5x Opus 5.5 ($10/$50) — available via override, not worth it as the
  *   default for a single-pass review.
- * - **codex → `gpt-5.6-terra`** (`NEWEST_MODELS.codex`). The review model
- *   equals the execution model. `gpt-5.6-sol` is the heavy tier ($4/$20 vs
- *   terra's $2/$12) — available via override or `reviewModel` config, but not
- *   the default pending evidence its review quality justifies 2x the price.
+ * - **codex → `gpt-6.1-sol`** for routine review; select the heavy review
+ *   tier for `gpt-6-astra`. Workload recommendations verified against
+ *   https://learn.chatgpt.com/docs/models?surface=cli on 2026-11-16,
+ *   not n-dx benchmarks or evidence of account access. Effort stays at the
+ *   client's default until Codex effort plumbing is supported.
  * - **google → `gemini-2.5-pro`.** The heavy tier; `gemini-3.7-flash` is the
  *   balanced execution default.
  * - **local → `""`.** LM Studio serves whichever model is loaded; there is no

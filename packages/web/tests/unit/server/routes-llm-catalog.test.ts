@@ -23,9 +23,11 @@ import { CATALOG_CACHE_TTL_MS } from "../../../src/server/llm-catalog.js";
 // The CLI probe spawns `<binary> --version`; stub it so no test depends on a
 // CLI being installed.
 const execMock = vi.hoisted(() => vi.fn());
+const codexListMock = vi.hoisted(() => vi.fn());
 vi.mock("@n-dx/llm-client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@n-dx/llm-client")>()),
   exec: execMock,
+  listCodexModels: codexListMock,
 }));
 
 const realFetch = globalThis.fetch;
@@ -42,6 +44,7 @@ beforeEach(async () => {
   vi.stubEnv("ANTHROPIC_API_KEY", "");
   vi.stubEnv("OPENAI_API_KEY", "");
   vi.stubEnv("CLAUDE_CLI_PATH", "");
+  codexListMock.mockReset().mockResolvedValue({ ok: false, reason: "Codex model/list unsupported; update CLI" });
   execMock.mockReset().mockResolvedValue(MISSING_CLI);
   vendorFetch.mockReset().mockRejectedValue(new Error("unexpected vendor fetch"));
   vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
@@ -192,17 +195,29 @@ describe("GET /api/llm/catalog — live model list", () => {
     expect((init?.headers as Record<string, string>)["x-api-key"]).toBe(SECRET);
   });
 
-  it("lists codex from OpenAI /v1/models and drops non-chat models", async () => {
-    await writeConfig({ llm: { codex: { api_key: SECRET } } });
-    vendorFetch.mockResolvedValue(
-      jsonOk({ data: [{ id: "gpt-live-5" }, { id: "text-embedding-3-small" }, { id: "whisper-1" }, { id: "claude-x" }] }),
-    );
-
+  it("lists Codex client models without an API key or API catalog request", async () => {
+    execMock.mockResolvedValue({ stdout: "codex-cli 0.167.0", stderr: "", exitCode: 0, launched: true });
+    codexListMock.mockResolvedValue({ ok: true, models: ["gpt-client-new"] });
     const body = await getCatalog();
+    expect(body.codex.provenance).toBe("codex-client-catalog");
+    expect(body.codex.models).toEqual(["gpt-client-new"]);
+    expect(vendorFetch).not.toHaveBeenCalled();
+    expect(await validateCatalogModel(projectDir, "codex", "gpt-client-new")).toBeNull();
+  });
 
-    expect(body.codex.source).toBe("live");
-    expect(body.codex.models).toEqual(["gpt-live-5"]);
-    expect(vendorFetch.mock.calls[0][0]).toContain("api.openai.com/v1/models");
+  it("shares Codex probes across HTTP reads and validation, until an explicit refresh", async () => {
+    execMock.mockResolvedValue({ stdout: "codex-cli 0.167.0", stderr: "", exitCode: 0, launched: true });
+    codexListMock.mockResolvedValue({ ok: true, models: ["gpt-client-new"] });
+    const catalogs = await Promise.all([getCatalog(), getCatalog(), getCatalog()]);
+    expect(catalogs.every((catalog) => catalog.codex.models.includes("gpt-client-new"))).toBe(true);
+    const reason = "Codex model/list timed out; check CLI login and connectivity, then refresh.";
+    codexListMock.mockResolvedValue({ ok: false, reason });
+    expect(await validateCatalogModel(projectDir, "codex", "gpt-client-new")).toBeNull();
+    expect(codexListMock).toHaveBeenCalledTimes(1);
+    expect(execMock.mock.calls.filter(([binary]) => binary === "codex")).toHaveLength(1);
+    expect((await getCatalog("?refresh=true")).codex).toMatchObject({ source: "built-in", reason });
+    expect(await validateCatalogModel(projectDir, "codex", "gpt-client-new")).toContain(reason);
+    expect(codexListMock).toHaveBeenCalledTimes(2);
   });
 
   it("falls back to the built-in list with a reason when no key resolves", async () => {
@@ -210,8 +225,8 @@ describe("GET /api/llm/catalog — live model list", () => {
 
     for (const vendor of ["claude", "codex"]) {
       expect(body[vendor].source, vendor).toBe("built-in");
-      expect(body[vendor].checkedAt, vendor).toBeNull();
-      expect(body[vendor].reason, vendor).toMatch(/API key/);
+      expect(Number.isNaN(Date.parse(body[vendor].checkedAt)), vendor).toBe(false);
+      expect(body[vendor].reason, vendor).toMatch(vendor === "codex" ? /CLI unavailable/ : /API key/);
     }
     expect(body.claude.models).toEqual(expect.arrayContaining(Object.values(TIER_MODELS.claude)));
     expect(vendorFetch).not.toHaveBeenCalled();
@@ -247,7 +262,7 @@ describe("GET /api/llm/catalog — live model list", () => {
     vi.advanceTimersByTime(CATALOG_CACHE_TTL_MS - 1000);
     await getCatalog();
     expect(vendorCalls("anthropic")).toBe(1);
-    expect(execMock).toHaveBeenCalledTimes(2); // one claude + one codex probe, not repeated
+    expect(execMock).toHaveBeenCalledTimes(3); // Claude cached; Codex's shorter TTL expired.
 
     vi.advanceTimersByTime(2000);
     await getCatalog();
