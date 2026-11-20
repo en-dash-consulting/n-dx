@@ -3,20 +3,34 @@
  * text (no web server is run, LS16): access denials and front-controller
  * rewrites. Used by the docroot routes (`php-docroot.ts`).
  *
- * - **Directory access**: `Deny from all` (Apache 2.2's mod_access_compat)
- *   or `Require all denied` (2.4's mod_authz_core) outside a `<Files>`
- *   block denies the directory and everything below it; `Allow from all` or
- *   `Require all granted` with no denial grants it again below a denied
- *   parent. A rule inside `<Limit>`/`<LimitExcept>` counts only when the
- *   block covers GET or POST (`<LimitExcept GET POST>` covers neither);
- *   other containers (`<IfModule>`) are read through.
+ * - **Directory access**, outside a `<Files>` block, read as two models and
+ *   joined as Apache's default `Satisfy All` does (the stricter wins: denied,
+ *   then restricted, then granted; a tie goes to the earlier line):
+ *   - 2.4's mod_authz_core: sibling `Require` lines are `<RequireAny>`, so
+ *     `Require all granted` grants, else `Require ip|host|local`
+ *     (mod_authz_host) restricts, else `Require all denied` denies.
+ *   - 2.2's mod_access_compat: under `Order deny,allow` (the default) an
+ *     `Allow` overrides a `Deny`, so `Allow from all` grants, `Deny from all`
+ *     with `Allow from <clients>` restricts, and `Deny from all` alone
+ *     denies; under `Order allow,deny` (or `mutual-failure`) `Deny from all`
+ *     denies, else `Allow from all` grants, else `Allow from <clients>`
+ *     restricts. `Deny from <clients>` is not read: the rest are served.
+ *   A denial covers the directory and everything below it; a grant opens it
+ *   again below a denied parent. A restricted directory's files are still
+ *   served, to the clients named, so they stay routes. A rule inside
+ *   `<Limit>`/`<LimitExcept>` counts only when the block covers GET or POST
+ *   (`<LimitExcept GET POST>` covers neither); other containers
+ *   (`<IfModule>`) are read through, so both halves of the dual-version
+ *   idiom are read and joined.
  * - **File access**: the same denials inside `<Files name>`,
  *   `<Files ~ "regex">` or `<FilesMatch "regex">` deny the files whose name
- *   matches, in the directory and below.
+ *   matches, in the directory and below. A restriction inside them is not read.
  * - **`RedirectMatch 403 regex`**: denies every URL path the regex matches.
  * - **Front controllers**: `RewriteRule pattern target [flags]` whose target,
- *   less its query string, is a literal `.php` path (`index.php?q=$1`), not
- *   a redirect, proxy, forbidden or gone rule; `FallbackResource /index.php`.
+ *   less its query string and any path info after `.php`, is a literal `.php`
+ *   path (`index.php?q=$1`, `index.php/$1`), not a redirect, proxy, forbidden
+ *   or gone rule; `FallbackResource /index.php`. A `.php` file chosen by a
+ *   back-reference or variable (`$1.php`) is a notice.
  *   A relative target is under `RewriteBase`, else the directory.
  *
  * A line ending in `\` continues on the next; a line starting with `#` is a
@@ -27,6 +41,13 @@
  */
 
 import { isOverlongLine, overlongLinesNotice } from "./php-line-cap.js";
+
+/** A directory's access in one `.htaccess` file. */
+export interface HtaccessAccess {
+  readonly denied: boolean;
+  readonly line: number;
+  readonly restriction?: string;
+}
 
 /** A `<Files>`/`<FilesMatch>` block's denial. */
 export interface HtaccessFileDenial {
@@ -46,7 +67,7 @@ export interface HtaccessFrontController {
   readonly directive: "RewriteRule" | "FallbackResource";
   /** The rule's pattern as written; absent for `FallbackResource`. */
   readonly pattern?: string;
-  /** The target as written, query string removed. */
+  /** The target's file as written: query string, fragment and path info after `.php` removed. */
   readonly target: string;
   readonly line: number;
 }
@@ -54,8 +75,13 @@ export interface HtaccessFrontController {
 export interface Htaccess {
   /** Project-relative path of the file. */
   readonly file: string;
-  /** Directory-wide access: `denied` wins over `granted` in one file; absent when it sets none. */
-  readonly access?: { readonly denied: boolean; readonly line: number };
+  /**
+   * Directory-wide access, absent when the file sets none (rules in the
+   * module comment). `restriction` is the restricting directive as written
+   * (`Require ip 10.0.0.0/8`, `Allow from 10.0.0.0/8`), set when the
+   * directory is served only to the clients it names.
+   */
+  readonly access?: HtaccessAccess;
   readonly fileDenials: readonly HtaccessFileDenial[];
   readonly urlDenials: readonly HtaccessUrlDenial[];
   /** `RewriteBase` as written. */
@@ -143,6 +169,65 @@ const isDenial = (w: readonly string[]): boolean =>
 const isGrant = (w: readonly string[]): boolean =>
   (w[0] === "allow" && w[1] === "from" && w[2] === "all") || (w[0] === "require" && w[1] === "all" && w[2] === "granted");
 
+/**
+ * `Require ip|host|local` (mod_authz_host) or `Allow from <clients>`
+ * (mod_access_compat): only the clients it names are served.
+ */
+const isRestriction = (w: readonly string[]): boolean =>
+  (w[0] === "require" && (((w[1] === "ip" || w[1] === "host") && w[2] !== undefined) || w[1] === "local")) ||
+  (w[0] === "allow" && w[1] === "from" && w[2] !== undefined && w[2] !== "all");
+
+/** A directive that bears on who is served the pages, `Order` included. */
+const isAccessRule = (w: readonly string[]): boolean => isDenial(w) || isGrant(w) || isRestriction(w) || w[0] === "order";
+
+/** One access model's directives in a file, the first line of each kind. */
+interface AccessLines {
+  denied?: number;
+  granted?: number;
+  restricted?: { readonly line: number; readonly directive: string };
+}
+
+const denial = (line: number): HtaccessAccess => ({ denied: true, line });
+const grant = (line: number): HtaccessAccess => ({ denied: false, line });
+const restriction = (r: { readonly line: number; readonly directive: string }): HtaccessAccess => ({
+  denied: false,
+  line: r.line,
+  restriction: r.directive,
+});
+
+/** mod_authz_core: sibling `Require` lines are `<RequireAny>`, so any one that succeeds serves. */
+function requireAccess(r: AccessLines): HtaccessAccess | undefined {
+  if (r.granted !== undefined) return grant(r.granted);
+  if (r.restricted !== undefined) return restriction(r.restricted);
+  return r.denied === undefined ? undefined : denial(r.denied);
+}
+
+/**
+ * mod_access_compat: `Order deny,allow` (the default) serves by default and
+ * lets an `Allow` override a `Deny`; `Order allow,deny` and `mutual-failure`
+ * deny by default and let a `Deny` override an `Allow`. An `Order` with no
+ * `Allow`/`Deny` beside it is not read.
+ */
+function compatAccess(c: AccessLines, allowFirst: boolean): HtaccessAccess | undefined {
+  if (allowFirst) {
+    if (c.denied !== undefined) return denial(c.denied);
+    if (c.granted !== undefined) return grant(c.granted);
+    return c.restricted === undefined ? undefined : restriction(c.restricted);
+  }
+  if (c.granted !== undefined) return grant(c.granted);
+  if (c.denied === undefined) return undefined;
+  return c.restricted === undefined ? denial(c.denied) : restriction(c.restricted);
+}
+
+const strictness = (a: HtaccessAccess): number => (a.denied ? 2 : a.restriction !== undefined ? 1 : 0);
+
+/** `Satisfy All`, the default: a client must pass both models, so the stricter wins. */
+function joinAccess(a: HtaccessAccess | undefined, b: HtaccessAccess | undefined): HtaccessAccess | undefined {
+  if (a === undefined || b === undefined) return a ?? b;
+  if (strictness(a) !== strictness(b)) return strictness(a) > strictness(b) ? a : b;
+  return a.line <= b.line ? a : b;
+}
+
 /** Flags that make a rule something other than an internal rewrite: redirect, forbidden, gone, proxy. */
 const NOT_INTERNAL = /^(r|redirect|f|forbidden|g|gone|p|proxy)(=|$)/i;
 
@@ -166,8 +251,9 @@ function filesMatcher(args: readonly string[], regex: boolean): ((name: string) 
 
 /** Read one `.htaccess` file's text. */
 export function parseHtaccess(file: string, text: string): Htaccess {
-  let denied: number | undefined;
-  let granted: number | undefined;
+  const required: AccessLines = {};
+  const compat: AccessLines = {};
+  let allowFirst = false;
   const fileDenials: HtaccessFileDenial[] = [];
   const urlDenials: HtaccessUrlDenial[] = [];
   const frontControllers: HtaccessFrontController[] = [];
@@ -211,15 +297,19 @@ export function parseHtaccess(file: string, text: string): Htaccess {
     const raw = htaccessWords(trimmed);
     const w = raw.map((x) => x.toLowerCase());
     // Access rules for methods other than GET and POST say nothing about the pages.
-    if (containers.includes("other-methods") && (isDenial(w) || isGrant(w))) continue;
+    if (containers.includes("other-methods") && isAccessRule(w)) continue;
     const files = containers.find((c) => c !== null && c !== "other-methods");
-    if (isDenial(w)) {
-      if (files === undefined) denied ??= line;
-      else if (files !== "unreadable") fileDenials.push({ matches: files, line });
-      continue;
-    }
-    if (isGrant(w)) {
-      if (files === undefined) granted ??= line;
+    if (isAccessRule(w)) {
+      if (files !== undefined) {
+        if (isDenial(w) && files !== "unreadable") fileDenials.push({ matches: files, line });
+      } else if (w[0] === "order") {
+        allowFirst = /^(allow,deny|mutual-failure)$/.test(w.slice(1).join(""));
+      } else {
+        const lines = w[0] === "require" ? required : compat;
+        if (isDenial(w)) lines.denied ??= line;
+        else if (isGrant(w)) lines.granted ??= line;
+        else lines.restricted ??= { line, directive: raw.join(" ") };
+      }
       continue;
     }
     if (files !== undefined) continue;
@@ -240,25 +330,48 @@ export function parseHtaccess(file: string, text: string): Htaccess {
         const [, pattern, target, flags] = raw;
         if (pattern === undefined || target === undefined) break;
         if (flags !== undefined && flags.replace(/^\[|\]$/g, "").split(",").some((f) => NOT_INTERNAL.test(f.trim()))) break;
-        const path = phpTarget(target);
-        if (path !== undefined) frontControllers.push({ directive: "RewriteRule", pattern, target: path, line });
+        addFrontController(frontControllers, notices, file, { directive: "RewriteRule", pattern, target, line });
         break;
       }
-      case "fallbackresource": {
-        const path = raw[1] === undefined ? undefined : phpTarget(raw[1]);
-        if (path !== undefined) frontControllers.push({ directive: "FallbackResource", target: path, line });
+      case "fallbackresource":
+        if (raw[1] !== undefined) addFrontController(frontControllers, notices, file, { directive: "FallbackResource", target: raw[1], line });
         break;
-      }
     }
   }
   if (overlong > 0) notices.push(overlongLinesNotice(file, overlong, "access and rewrite rules"));
-  const access = denied !== undefined ?{ denied: true, line: denied } : granted !== undefined ? { denied: false, line: granted } : undefined;
+  const access = joinAccess(requireAccess(required), compatAccess(compat, allowFirst));
   return { file, ...(access && { access }), fileDenials, urlDenials, ...(rewriteBase !== undefined && { rewriteBase }), frontControllers, notices };
 }
 
-/** A rewrite target's path when it is a literal local `.php` file: query string dropped, no back-reference or variable. */
-function phpTarget(target: string): string | undefined {
-  const path = target.split("?")[0]!;
-  if (/[$%]/.test(path) || /^[a-z][a-z0-9+.-]*:/i.test(path)) return undefined;
-  return path.toLowerCase().endsWith(".php") ? path : undefined;
+/**
+ * A rewrite target's file part: the text before its query string or fragment,
+ * cut after a `.php` followed by `/` (path info, `index.php/$1`).
+ */
+function targetFile(target: string): string {
+  const file = target.split(/[?#]/)[0]!;
+  const pathInfo = /\.php(?=\/)/i.exec(file);
+  return pathInfo === null ? file : file.slice(0, pathInfo.index + 4);
+}
+
+/**
+ * A rewrite target's local `.php` file: `{ path }` when literal, `"dynamic"`
+ * when a back-reference or variable chooses it (`$1.php`), else undefined.
+ */
+function phpTarget(target: string): { readonly path: string } | "dynamic" | undefined {
+  const file = targetFile(target);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(file) || !file.toLowerCase().endsWith(".php")) return undefined;
+  return /[$%]/.test(file) ? "dynamic" : { path: file };
+}
+
+/** Records `target`'s front controller, or a notice when the request chooses its file. */
+function addFrontController(
+  frontControllers: HtaccessFrontController[],
+  notices: string[],
+  file: string,
+  rule: HtaccessFrontController,
+): void {
+  const target = phpTarget(rule.target);
+  if (target === undefined) return;
+  if (target === "dynamic") notices.push(`${file}:${rule.line} ${rule.directive} target ${rule.target} takes its PHP file from the request; no route recorded.`);
+  else frontControllers.push({ ...rule, target: target.path });
 }

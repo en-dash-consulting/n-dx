@@ -6,6 +6,7 @@ import { runPhpGuardsIfNeeded } from "../../../src/agent/lifecycle/shared.js";
 import { detectProjectLanguage } from "../../../src/cli/commands/init.js";
 import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
 import type { RunRecord } from "../../../src/schema/index.js";
+import { setActiveRunEvents, type RunEvent, type RunEventWriter } from "../../../src/store/run-events.js";
 import type { ExecResult } from "../../../src/process/exec.js";
 import { initGitFixtureRepo } from "../../helpers/index.js";
 
@@ -42,7 +43,47 @@ describe("runPhpGuardsIfNeeded", () => {
     const run = completedRun(["bad.php"]);
     await runPhpGuardsIfNeeded(run, projectDir, php, deps(255));
     expect(run.status).toBe("failed");
-    expect(run.error).toContain("php -l bad.php");
+    expect(run.error).toContain("php -l ./bad.php");
+  });
+
+  it("reports skipped, not passed, when every check was skipped, and keeps the run completed", async () => {
+    await writeFile(join(projectDir, "ok.php"), "<?php echo 1;");
+    await writeFile(join(projectDir, "composer.json"), "{}");
+    const events: RunEvent[] = [];
+    setActiveRunEvents({ append: (e: RunEvent) => events.push(e) } as unknown as RunEventWriter);
+    try {
+      const run = completedRun(["ok.php", "composer.json"]);
+      await runPhpGuardsIfNeeded(run, projectDir, php, { ...deps(0), onPath: () => false });
+      expect(run.status).toBe("completed");
+    } finally {
+      setActiveRunEvents(null);
+    }
+    const gate = events.find((e) => e.kind === "gate");
+    expect(gate).toMatchObject({ summary: "PHP guards skipped", ok: true, counts: { checks: 0, failed: 0, skipped: 2 } });
+    expect(gate?.detail).toContain("php is not on PATH");
+    expect(gate?.detail).toContain("composer is not on PATH");
+  });
+
+  it("says a check was skipped, with its reason, when one check passed and another was skipped", async () => {
+    await writeFile(join(projectDir, "ok.php"), "<?php echo 1;");
+    await writeFile(join(projectDir, "composer.json"), "{}");
+    const events: RunEvent[] = [];
+    setActiveRunEvents({ append: (e: RunEvent) => events.push(e) } as unknown as RunEventWriter);
+    try {
+      const run = completedRun(["ok.php", "composer.json"]);
+      await runPhpGuardsIfNeeded(run, projectDir, php, { ...deps(0), onPath: (bin: string) => bin === "php" });
+      expect(run.status).toBe("completed");
+    } finally {
+      setActiveRunEvents(null);
+    }
+    const gate = events.find((e) => e.kind === "gate");
+    expect(gate).toMatchObject({
+      summary: "PHP guards passed — 1 check(s) skipped",
+      ok: true,
+      counts: { checks: 1, failed: 0, skipped: 1 },
+    });
+    expect(gate?.detail).toContain("composer is not on PATH");
+    expect(gate?.detail).not.toContain("php is not on PATH");
   });
 
   it("leaves a passing PHP run completed", async () => {
@@ -52,7 +93,7 @@ describe("runPhpGuardsIfNeeded", () => {
     const run = completedRun(["ok.php", "composer.json"]);
     await runPhpGuardsIfNeeded(run, projectDir, php, deps(0, calls));
     expect(run.status).toBe("completed");
-    expect(calls).toEqual(["php -l ok.php", "composer validate --no-check-publish"]);
+    expect(calls).toEqual(["php -l ./ok.php", "composer validate --no-check-publish"]);
   });
 
   // Git reports changed paths from the repository root. A project in a
@@ -67,7 +108,7 @@ describe("runPhpGuardsIfNeeded", () => {
     const calls: string[] = [];
     const run = completedRun(["app/bad.php", "outside.php"]);
     await runPhpGuardsIfNeeded(run, app, php, deps(255, calls));
-    expect(calls).toEqual(["php -l bad.php"]);
+    expect(calls).toEqual(["php -l ./bad.php"]);
     expect(run.status).toBe("failed");
   });
 

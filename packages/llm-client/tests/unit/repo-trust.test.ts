@@ -402,6 +402,14 @@ describe("assessRepoExecutionConfig", () => {
     expect(codes).toContain("commands-added");
   });
 
+  it("keeps and reviews a tracked php language rather than discarding it", () => {
+    writeJson(".n-dx.json", { hench: { language: "php" } });
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.language).toBe("php");
+    expect(config.detectedLanguage).toBe("typescript");
+    expect(assessRepoExecutionConfig(config).find((f) => f.code === "language-mismatch")?.message).toContain("php");
+  });
+
   it.each([
     ["go", "go.mod", false],
     ["swift", "Package.swift", false],

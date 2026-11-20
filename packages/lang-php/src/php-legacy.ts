@@ -52,9 +52,9 @@
 
 import { join } from "node:path";
 import type { FactKind, FileFacts, LanguageBoundary, LegacyConstructFact, LegacyStatus, SourcePosition } from "@n-dx/lang-kit";
-import { atOrBefore, contains, innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
+import { atOrBefore, contains, innermostEach, type Capture, type FrameworkContext, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
-import { builtinCallResolver, declaredFunctions } from "./php-namespaces.js";
+import { builtinReached, callCandidates, declaredFunctions } from "./php-namespaces.js";
 import { phpVersionSource, phpVersionSourceName } from "./php-version-sources.js";
 
 /** One removed, deprecated or changed construct, with the php.net page of every version it names. */
@@ -351,9 +351,25 @@ function inlineHtmlHits(segments: readonly Capture[]): LegacyHit[] {
   return hits;
 }
 
-/** Every rule a file's captures match. `declared` holds the functions the repository declares ({@link declaredFunctions}). */
-export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> = new Set()): LegacyHit[] {
-  const builtin = builtinCallResolver(file, declared);
+/** A call that reaches a legacy built-in unless the repository declares one of its candidates ({@link callCandidates}). */
+interface LegacyCall {
+  readonly candidates: readonly string[];
+  readonly position: SourcePosition;
+}
+
+/**
+ * What {@link legacyHits} needs from one file's `legacy` captures, read as
+ * the file is parsed (`FrameworkPack.digest`), so those captures need not
+ * outlive it: the calls that may reach a legacy built-in, which only the
+ * repository's declared functions settle, and every other hit.
+ */
+export interface LegacyDigest {
+  readonly calls: readonly LegacyCall[];
+  readonly hits: readonly LegacyHit[];
+}
+
+/** One file's {@link LegacyDigest}, from its captures alone. */
+export function digestLegacy(file: PackSourceFile): LegacyDigest {
   const by = new Map<string, Capture[]>();
   for (const capture of file.captures[QUERY] ?? []) {
     const name = capture.name.slice(PREFIX.length);
@@ -361,12 +377,18 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
     if (list === undefined) by.set(name, (list = []));
     list.push(capture);
   }
-  const hits: LegacyHit[] = [];
-  for (const call of by.get("call") ?? []) {
-    const name = builtin(call);
-    const rule = name === undefined ? undefined : functionRule(name.toLowerCase());
-    if (rule !== undefined) hits.push({ rule, position: call.start, construct: `${name}()` });
+  const calls: LegacyCall[] = [];
+  const called = by.get("call") ?? [];
+  if (called.length > 0) {
+    const candidatesOf = callCandidates(file);
+    for (const call of called) {
+      const candidates = candidatesOf(call);
+      // The built-in a call reaches is its last candidate (builtinReached): one no rule names is no hit, declared or not.
+      const reached = candidates?.[candidates.length - 1];
+      if (reached !== undefined && !reached.includes("\\") && functionRule(reached.toLowerCase()) !== undefined) calls.push({ candidates: candidates!, position: call.start });
+    }
   }
+  const hits: LegacyHit[] = [];
   for (const fn of by.get("function") ?? []) {
     if (fn.text.toLowerCase() === "__autoload") hits.push({ rule: "autoload-function", position: fn.start });
   }
@@ -389,7 +411,20 @@ export function legacyHits(file: PackSourceFile, declared: ReadonlySet<string> =
 
   hits.push(...inlineHtmlHits(by.get("inline-html") ?? []));
   hits.push(...classHits(by), ...curlyOffsetHits(by, file.rewrites));
-  return hits.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
+  return { calls, hits };
+}
+
+/** Every rule a file matches, from its digest. `declared` holds the functions the repository declares ({@link declaredFunctions}). */
+export function legacyHits(file: PackSourceFile | LegacyDigest, declared: ReadonlySet<string> = new Set()): LegacyHit[] {
+  const digest = "captures" in file ? digestLegacy(file) : file;
+  const hits: LegacyHit[] = [];
+  for (const { candidates, position } of digest.calls) {
+    const name = builtinReached(candidates, declared);
+    const rule = name === undefined ? undefined : functionRule(name.toLowerCase());
+    if (rule !== undefined) hits.push({ rule, position, construct: `${name}()` });
+  }
+  // Stable: calls first, then the rest, each in capture order, as one pass read them.
+  return [...hits, ...digest.hits].sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
 }
 
 /** The page behind a rule's status: the notice's page, else the removal's, else the deprecation's. */
@@ -440,7 +475,7 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
   ),
 };
 
-export const phpLegacy: FrameworkPack = {
+export const phpLegacy: FrameworkPack<LegacyDigest> = {
   id: "php-legacy",
   produces: ["legacyConstructs"],
   // A getter, so the path is computed on first use rather than at import.
@@ -448,12 +483,15 @@ export const phpLegacy: FrameworkPack = {
     return [{ name: QUERY, path: join(PHP_PACKAGE.queryDir("php-legacy"), `${QUERY}.scm`) }];
   },
   provenance: PROVENANCE,
-  read(files: readonly PackSourceFile[], kinds: readonly FactKind[]): FrameworkFacts {
+  digest: digestLegacy,
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], _context?: FrameworkContext, digests?: ReadonlyMap<string, LegacyDigest>): FrameworkFacts {
     const facts = new Map<string, Omit<FileFacts, "path">>();
     if (!kinds.includes("legacyConstructs")) return { facts, notices: [] };
     const declared = declaredFunctions(files);
     for (const file of files) {
-      const hits = legacyHits(file, declared);
+      const digest = digests === undefined ? file : digests.get(file.path);
+      if (digest === undefined) continue;
+      const hits = legacyHits(digest, declared);
       if (hits.length > 0) facts.set(file.path, { legacyConstructs: hits.map(legacyFact) });
     }
     return { facts, notices: [] };

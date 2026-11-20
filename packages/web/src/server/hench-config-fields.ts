@@ -191,7 +191,7 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   // ── General ──
   { path: "apiKeyEnv", label: "API Key Env Var", description: "Environment variable name for Anthropic API key", type: "string", category: "general", defaultValue: "ANTHROPIC_API_KEY" },
   { path: "claudePath", label: "Claude CLI Path", description: "Path to the Claude Code binary. Falls back to 'claude' on PATH", type: "string", category: "general" },
-  { path: "language", label: "Project Language", description: "Project toolchain, which selects the guard defaults", type: "enum", enumValues: ["typescript", "javascript", "go", "swift"], category: "general" },
+  { path: "language", label: "Project Language", description: "Project toolchain, which selects the guard defaults", type: "enum", enumValues: ["typescript", "javascript", "go", "swift", "php"], category: "general" },
 ];
 
 /** Path segments that would poison the prototype chain if used as an object key. */

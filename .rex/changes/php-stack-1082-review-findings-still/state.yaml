@@ -1,0 +1,224 @@
+schema: "rex/v2"
+items:
+  "009f879d-64a5-4bbc-8c67-dd2f8dafa7da":
+    status: "completed"
+    startedAt: "2026-11-19T03:47:44.568Z"
+    completedAt: "2026-11-19T03:49:12.718Z"
+    endedAt: "2026-11-19T03:49:12.718Z"
+    activeIntervals: [{"end":"2026-11-19T03:49:12.718Z","start":"2026-11-19T03:47:44.568Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ec5d959c9: partial skip now emits \"PHP guards passed — N check(s) skipped\" with skip reasons as detail, ok true. Test added in php-guards-finalize.test.ts. Tests not run in session (vitest/tsc refused); hench gate must run them."
+    lastModified: "2026-11-19T03:49:12.718Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "03468932-0d88-42ed-a764-c25c654a20f5":
+    status: "completed"
+    startedAt: "2026-11-19T03:12:36.763Z"
+    completedAt: "2026-11-19T03:17:53.883Z"
+    endedAt: "2026-11-19T03:17:53.883Z"
+    activeIntervals: [{"end":"2026-11-19T03:17:53.883Z","start":"2026-11-19T03:12:36.763Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "FlowCompiler.variableIn unwraps parenthesised expressions; readPathOf, the copy source (target.from) and method receiver names use it."
+    lastModified: "2026-11-19T03:17:53.883Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "132dbb84-f95a-4c01-98e7-bb0fdfd395d6":
+    status: "completed"
+    startedAt: "2026-11-19T03:06:18.933Z"
+    completedAt: "2026-11-19T03:12:26.858Z"
+    endedAt: "2026-11-19T03:12:26.858Z"
+    activeIntervals: [{"end":"2026-11-19T03:12:26.858Z","start":"2026-11-19T03:06:18.933Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ff1bd7601: endsInsideHost/openHostValue in php-outbound.ts make partial scheme/host prefixes and open DSN host values unknown, as written."
+    lastModified: "2026-11-19T03:12:26.858Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "135ce8f7-f173-4382-8d6b-71308fec7f75":
+    status: "completed"
+    startedAt: "2026-11-19T02:33:29.998Z"
+    completedAt: "2026-11-19T02:52:53.951Z"
+    endedAt: "2026-11-19T02:52:53.951Z"
+    activeIntervals: [{"end":"2026-11-19T02:52:53.951Z","start":"2026-11-19T02:33:29.998Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "readWrittenImports pairs use clauses/names/aliases/types/prefixes and include paths/guards with owners via innermostEach (n log n); fixture imports byte-identical; counted-work test at 2,000 uses."
+    lastModified: "2026-11-19T02:52:53.951Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2116a61e-04a6-4ad9-a5f3-09eb29f47dff":
+    status: "completed"
+    startedAt: "2026-11-19T01:35:58.527Z"
+    completedAt: "2026-11-19T01:41:22.849Z"
+    endedAt: "2026-11-19T01:41:22.849Z"
+    activeIntervals: [{"end":"2026-11-19T01:41:22.849Z","start":"2026-11-19T01:35:58.527Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "A PHP marker one folder down adds PHP beside the TypeScript fallback (ordered by source count) when a direct child holds package.json or the repo has source of a config-less language; otherwise PHP alone."
+    lastModified: "2026-11-19T01:41:22.849Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "30758b33-8939-42e9-bbce-5730d622e190":
+    status: "completed"
+    startedAt: "2026-11-19T16:07:50.759Z"
+    completedAt: "2026-11-19T16:11:31.140Z"
+    endedAt: "2026-11-19T16:11:31.140Z"
+    activeIntervals: [{"end":"2026-11-19T16:11:31.140Z","start":"2026-11-19T16:07:50.759Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "phpOneDownLanguages weighs source outside the PHP marker folders against PHP (commit 6ac9f1e40); tests not run in-session, gate must run them."
+    lastModified: "2026-11-19T16:11:31.140Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5ebf7eba-b5c3-4c21-b09b-80eed9399acb":
+    status: "completed"
+    startedAt: "2026-11-19T01:45:58.980Z"
+    completedAt: "2026-11-19T02:15:14.055Z"
+    endedAt: "2026-11-19T02:15:14.055Z"
+    activeIntervals: [{"end":"2026-11-19T02:15:14.055Z","start":"2026-11-19T01:45:58.980Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Reproduced at this head on generated PHP (~900 KB class files, every method with a query, a fetch and call_user_func on a fetched row). Before: dynamicCode alone on 20 MB sampled 2.4 GB peak heap; every kind 2.3 GB; one 900 KB file holds 72 MB of captures, 42 MB of them dynamic. Fix 1 (release): lang-runtime FrameworkPack gains optional digest(file, kinds), called as each file is parsed, after which that framework's query captures are dropped from the file; read gets digests by path; a throwing digest fails only that framework (notice names the file). php-dynamic digests each file: sites (builtin resolution deferred via new callCandidates/builtinReached in php-namespaces, filtered against repo declarations at read), scope names (batched), include scopes, and the database flow compiled (compileFlow) into a capture-free expression IR, keeping only scopes with a site or a return; MAX_EXPRESSION_DEPTH enforced at compile with identical semantics. Digest per 900 KB file: ~5 MB vs 42 MB of dynamic captures. After: 20 MB dynamicCode fits a 768 MB heap (fails at 512; imports alone fit 512); every kind fits 1 GB (before 2.3 GB). 10 MB dynamicCode fits 448 MB (was ~1.1 GB). Facts identical: dynamic-code facts and notices over all 29 lang-php fixture dirs byte-identical before/after; generated 5 MB input hash identical. Fix 3 (contain): file with more than MAX_DYNAMIC_CAPTURES (500,000, ~2x a dense 1 MiB file) is skipped with [php-dynamic-skipped] naming it; other files still read. Fix 2 (narrow dynamic.scm) not done: after the release, dynamic captures live for one file at a time (bounded by the runner's 1 MiB limit, ~45 MB), so narrowing could only shave that transient while risking fact identity; the remaining peak is the language queries' captures held for all files (imports/calls/config), which is separate work. Test: php-dynamic-memory.test.ts runs 10 MB generated PHP in a child Node capped at 640 MB (verified it OOMs at 640 with digest disabled), plus cap notice, digest wiring and digest-failure containment. lang-php 211 tests, lang-runtime, sourcevision PHP integration, root-policy, changeset-body-policy pass. Patch changeset for lang-php and lang-runtime."
+    lastModified: "2026-11-19T02:15:14.055Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "70795381-c8f5-49f5-bdd4-c90bb9b7dca9":
+    status: "completed"
+    startedAt: "2026-11-19T16:12:29.769Z"
+    completedAt: "2026-11-19T16:13:00.895Z"
+    endedAt: "2026-11-19T16:13:00.895Z"
+    activeIntervals: [{"end":"2026-11-19T16:13:00.895Z","start":"2026-11-19T16:12:29.769Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Lead cut to 27 words; Python example moved to paragraph 2 (e2a0bbacb). Policy test not run in session."
+    lastModified: "2026-11-19T16:13:00.895Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7969bba2-eb02-4f21-a637-6c0cb4f1f4bb":
+    status: "completed"
+    startedAt: "2026-11-19T02:15:25.328Z"
+    completedAt: "2026-11-19T02:25:17.612Z"
+    endedAt: "2026-11-19T02:25:17.612Z"
+    activeIntervals: [{"end":"2026-11-19T02:25:17.612Z","start":"2026-11-19T02:15:25.328Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "evaluatePath caps nesting at MAX_PATH_NESTING (32); repositoryConstants caps chains at MAX_CONSTANT_CHAIN (32), chain length memoized so order-independent; both counted in [php-too-deep]. scopeNames iterative, cut at MAX_SCOPE_CLOSURES (32) with [php-deep-scope]. createPackEntry contains a throwing prepare as a notice (no imports, frameworks resolve nothing), not degraded."
+    lastModified: "2026-11-19T02:25:17.612Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8cdfc6e9-6a56-46ce-a44b-9e461dc45892":
+    status: "completed"
+    startedAt: "2026-11-19T02:58:05.946Z"
+    completedAt: "2026-11-19T03:02:01.578Z"
+    endedAt: "2026-11-19T03:02:01.578Z"
+    activeIntervals: [{"end":"2026-11-19T03:00:32.697Z","start":"2026-11-19T02:58:05.946Z"},{"end":"2026-11-19T03:02:01.578Z","start":"2026-11-19T03:02:01.578Z"}]
+    failureReason: "The completion was refused: the run left work uncommitted."
+    resolutionType: "code-change"
+    resolutionDetail: "prefixCovers matches PSR-0 and composer.lock prefixes only on a \\ or _ boundary; file lookup unchanged (664909b2b, from run 16ed9d71, committed by the operator after the lang-php suite with grammar, 222 tests, typecheck and changeset-body-policy passed). Review: 2 fixed, 1 dropped."
+    lastModified: "2026-11-19T03:02:01.578Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94add228-871f-4544-bcb3-6c25ff72ef4d":
+    status: "completed"
+    startedAt: "2026-11-19T17:27:43.232Z"
+    completedAt: "2026-11-19T17:27:43.232Z"
+    endedAt: "2026-11-19T17:27:43.232Z"
+    activeIntervals: [{"end":"2026-11-19T17:27:43.232Z","start":"2026-11-19T17:27:43.232Z"}]
+    appliedAt: "2026-11-19T17:27:43.232Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-18T22:33:39.769Z"
+    lastModified: "2026-11-19T17:27:43.232Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "96c36dff-2ec0-445a-9319-91d3f350c83c":
+    status: "completed"
+    startedAt: "2026-11-19T03:02:24.421Z"
+    completedAt: "2026-11-19T03:06:10.342Z"
+    endedAt: "2026-11-19T03:06:10.342Z"
+    activeIntervals: [{"end":"2026-11-19T03:06:10.342Z","start":"2026-11-19T03:02:24.421Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "215f7c2fd: rewrite target file part (before ?, #, or / after .php) checked for $/%; index.php/$1 is a catch-all on index.php; $1.php is noticed."
+    lastModified: "2026-11-19T03:06:10.342Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a739a401-b0e9-4203-9156-16e8431a584f":
+    status: "completed"
+    startedAt: "2026-11-19T03:40:48.562Z"
+    completedAt: "2026-11-19T03:44:07.844Z"
+    endedAt: "2026-11-19T03:44:07.844Z"
+    activeIntervals: [{"end":"2026-11-19T03:44:07.844Z","start":"2026-11-19T03:40:48.562Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "All-skipped PHP guards emit \"PHP guards skipped\" with reasons (ok: true). Relative paths reach php -l as ./<path>. Tests added; not run locally (commands refused), so the gate runs them."
+    lastModified: "2026-11-19T03:44:07.844Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bd91778d-ccce-4732-a205-581368648413":
+    status: "completed"
+    startedAt: "2026-11-19T16:13:33.424Z"
+    completedAt: "2026-11-19T16:15:46.154Z"
+    endedAt: "2026-11-19T16:15:46.154Z"
+    activeIntervals: [{"end":"2026-11-19T16:15:46.154Z","start":"2026-11-19T16:13:33.424Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "isFragment accepts any run of declarations before the direct-access guard; fixtures CartView.php, router.php, checkout.php and test expectation added (bc9aee947)."
+    lastModified: "2026-11-19T16:15:46.154Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c2d2a6aa-f957-4cd5-9395-d278659e514b":
+    status: "completed"
+    startedAt: "2026-11-19T03:18:03.748Z"
+    completedAt: "2026-11-19T03:44:50.686Z"
+    endedAt: "2026-11-19T03:44:50.686Z"
+    activeIntervals: [{"end":"2026-11-19T03:22:22.031Z","start":"2026-11-19T03:18:03.748Z"},{"end":"2026-11-19T03:40:38.285Z","start":"2026-11-19T03:39:09.147Z"},{"end":"2026-11-19T03:44:50.686Z","start":"2026-11-19T03:44:50.686Z"}]
+    failureReason: "The agent's completion is held: the run did not finish its gates."
+    lastModified: "2026-11-19T03:44:50.686Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cd616ada-a02b-450d-986d-3bad122ec522":
+    status: "completed"
+    startedAt: "2026-11-19T02:25:26.791Z"
+    completedAt: "2026-11-19T02:33:20.765Z"
+    endedAt: "2026-11-19T02:33:20.765Z"
+    activeIntervals: [{"end":"2026-11-19T02:33:20.765Z","start":"2026-11-19T02:25:26.791Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "docroot.scm captures direct-access guards (defined() or exit/die; if (!defined()) exit/die or a block that exits) and include/require statements; isFragment treats guard-first files with only declarations/includes after as fragments. php-htaccess reads Require ip|host|local (no grant) as a restriction: routes kept, source unchanged, one notice per .htaccess. Fixture php-docroot-guarded."
+    lastModified: "2026-11-19T02:33:20.765Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d4da1efe-89b4-4d06-ad10-382baa25d3a2":
+    status: "completed"
+    startedAt: "2026-11-19T16:24:07.413Z"
+    completedAt: "2026-11-19T16:26:35.536Z"
+    endedAt: "2026-11-19T16:26:35.536Z"
+    activeIntervals: [{"end":"2026-11-19T16:26:35.536Z","start":"2026-11-19T16:24:07.413Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixture cases and expectations pin parenthesised subscript base, write target and $this receiver (commit 17cf77e3c); test run pending the hench gate."
+    lastModified: "2026-11-19T16:26:35.536Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dcd473b7-2b77-42f1-8720-e1cd223a4562":
+    status: "completed"
+    startedAt: "2026-11-19T02:53:03.813Z"
+    completedAt: "2026-11-19T02:57:36.624Z"
+    endedAt: "2026-11-19T02:57:36.624Z"
+    activeIntervals: [{"end":"2026-11-19T02:55:36.678Z","start":"2026-11-19T02:53:03.813Z"},{"end":"2026-11-19T02:57:36.624Z","start":"2026-11-19T02:57:36.624Z"}]
+    failureReason: "The completion was refused: the run left work uncommitted."
+    resolutionType: "code-change"
+    resolutionDetail: "phpConfig reuses TYPESCRIPT_SKIP_DIRECTORIES and TYPESCRIPT_GENERATED_FILE_PATTERNS (9ddab919a, from run ba81723e, committed by the operator after lang-kit 355 tests, typecheck, sourcevision language/inventory tests and changeset-body-policy passed). Review: changeset added; merged-config build/dist override captured as b392e0e8."
+    lastModified: "2026-11-19T02:57:36.624Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ec36a246-db57-4541-a4d4-28895bc10caf":
+    status: "completed"
+    startedAt: "2026-11-19T16:32:16.353Z"
+    completedAt: "2026-11-19T17:27:43.232Z"
+    endedAt: "2026-11-19T17:27:43.232Z"
+    activeIntervals: [{"end":"2026-11-19T17:27:43.232Z","start":"2026-11-19T16:32:16.353Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-config, php-outbound and php-legacy digest per file (digestConfig/digestOutbound/digestLegacy). Peak heap, all kinds on 20 MB generated PHP: 992 MB → 704 MB minimum --max-old-space-size. Facts byte-identical on all 219 lang-php fixture projects."
+    lastModified: "2026-11-19T17:27:43.232Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ec5c180b-a937-4585-afe2-b61c8ad83564":
+    status: "completed"
+    startedAt: "2026-11-19T16:28:15.724Z"
+    completedAt: "2026-11-19T16:30:59.965Z"
+    endedAt: "2026-11-19T16:30:59.965Z"
+    activeIntervals: [{"end":"2026-11-19T16:30:59.965Z","start":"2026-11-19T16:28:15.724Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixture php-include-path-ini-order and a test pinning in-place get_include_path() expansion against php.ini roots (commit 5cf874c57)."
+    lastModified: "2026-11-19T16:30:59.965Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f2a302a2-bb06-40b9-831a-3916923e0ee7":
+    status: "completed"
+    startedAt: "2026-11-19T16:17:14.756Z"
+    completedAt: "2026-11-19T16:22:42.718Z"
+    endedAt: "2026-11-19T16:22:42.718Z"
+    activeIntervals: [{"end":"2026-11-19T16:22:42.718Z","start":"2026-11-19T16:17:14.756Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Order-aware mod_access_compat and RequireAny reading in parseHtaccess, joined as Satisfy All; unit tests for each case; commit 7d32b4646."
+    lastModified: "2026-11-19T16:22:42.718Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "faa0c3c8-a8aa-4762-8e96-227138e9e179":
+    status: "completed"
+    startedAt: "2026-11-19T01:41:32.244Z"
+    completedAt: "2026-11-19T01:45:49.333Z"
+    endedAt: "2026-11-19T01:45:49.333Z"
+    activeIntervals: [{"end":"2026-11-19T01:45:49.333Z","start":"2026-11-19T01:41:32.244Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-includes.ts: setter get_include_path() parts expand to the configured path in force for the file (else default .); replacing setters unchanged; php.ini fixture outcomes unchanged."
+    lastModified: "2026-11-19T01:45:49.333Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

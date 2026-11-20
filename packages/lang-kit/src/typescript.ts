@@ -12,6 +12,33 @@
 import type { LanguageConfig } from "./registry.js";
 
 /**
+ * Dependency, build-output and cache directories JS tooling writes. A PHP
+ * site ships the same (a theme's `node_modules/`, `dist/`), so `phpConfig`
+ * reuses this set.
+ */
+export const TYPESCRIPT_SKIP_DIRECTORIES: ReadonlySet<string> = new Set([
+  "node_modules",
+  "dist",
+  "build",
+  "__pycache__",
+  ".react-router",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".turbo",
+  ".cache",
+  "coverage",
+  ".output",
+]);
+
+/** Compiled and minified output; shared with `phpConfig` for the same reason. */
+export const TYPESCRIPT_GENERATED_FILE_PATTERNS: readonly RegExp[] = [
+  /\.d\.ts$/,
+  /\.min\.js$/,
+  /\.bundle\.js$/,
+];
+
+/**
  * Language config for TypeScript / JavaScript projects.
  *
  * `skipDirectories` and `configFilenames` match the current hardcoded values
@@ -132,26 +159,9 @@ export const typescriptConfig: LanguageConfig = {
     "Justfile",
   ]),
 
-  skipDirectories: new Set([
-    "node_modules",
-    "dist",
-    "build",
-    "__pycache__",
-    ".react-router",
-    ".next",
-    ".nuxt",
-    ".svelte-kit",
-    ".turbo",
-    ".cache",
-    "coverage",
-    ".output",
-  ]),
+  skipDirectories: TYPESCRIPT_SKIP_DIRECTORIES,
 
-  generatedFilePatterns: [
-    /\.d\.ts$/,
-    /\.min\.js$/,
-    /\.bundle\.js$/,
-  ],
+  generatedFilePatterns: TYPESCRIPT_GENERATED_FILE_PATTERNS,
 
   entryPointPatterns: [
     /(?:^|\/)index\.[tj]sx?$/,

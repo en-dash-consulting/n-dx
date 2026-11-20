@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { connectionTarget, envKey, isRequestKey, PHP_OUTBOUND_FUNCTIONS, PHP_OUTBOUND_METHODS, withoutCredentials } from "../../src/index.js";
+import { connectionTarget, endsInsideHost, envKey, isRequestKey, openHostValue, PHP_OUTBOUND_FUNCTIONS, PHP_OUTBOUND_METHODS, withoutCredentials } from "../../src/index.js";
 
 const query = readFileSync(join(import.meta.dirname, "..", "..", "queries", "php-outbound", "outbound.scm"), "utf8");
 
@@ -34,6 +34,18 @@ describe("php outbound query", () => {
   });
 });
 
+describe("endsInsideHost", () => {
+  it("is true for text that ends inside a scheme or a host", () => {
+    for (const prefix of ["http", "https:/", "https://api.", "db-", "tcp://cache"]) expect(endsInsideHost(prefix), prefix).toBe(true);
+  });
+
+  it("is false once the host ends, and for a scheme alone", () => {
+    for (const prefix of ["https://", "https://api.example.test/", "https://db:", "/users/", "?id=", "smtp.example.test:"]) {
+      expect(endsInsideHost(prefix), prefix).toBe(false);
+    }
+  });
+});
+
 describe("connectionTarget", () => {
   it("reads a DSN's driver and host", () => {
     expect(connectionTarget("mysql:host=db;port=3307;dbname=shop", "dsn")).toEqual({ target: { target: "db:3307", targetSource: "literal" }, driver: "mysql" });
@@ -46,6 +58,16 @@ describe("connectionTarget", () => {
   it("is unknown for a DSN with no host value or no driver", () => {
     expect(connectionTarget("mysql:host=", "dsn").target.targetSource).toBe("unknown");
     expect(connectionTarget("no-driver", "dsn").target.targetSource).toBe("unknown");
+  });
+
+  it("finds the host value a computable part ends inside", () => {
+    expect(openHostValue("mysql:host=db-")).toBe("db-");
+    expect(openHostValue("host='pg-")).toBe("pg-");
+    expect(openHostValue("mysql:host=")).toBe("");
+    expect(openHostValue("mysql:host='")).toBe("");
+    expect(openHostValue("mysql:host=db;dbname=")).toBeUndefined();
+    expect(openHostValue("host='pg' ")).toBeUndefined();
+    expect(openHostValue("host='pg'")).toBeUndefined();
   });
 
   it("reads a pg_connect string's host, quoted or not, and never its password", () => {

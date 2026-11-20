@@ -21,6 +21,7 @@ const dir = join(import.meta.dirname, "..", "fixtures", "php-composer");
 const sharedRoot = join(import.meta.dirname, "..", "fixtures", "php-shared-root");
 const apps = join(import.meta.dirname, "..", "fixtures", "php-composer-apps");
 const monorepo = join(import.meta.dirname, "..", "fixtures", "php-composer-monorepo");
+const psr0Boundary = join(import.meta.dirname, "..", "fixtures", "php-psr0-boundary");
 const required = join(import.meta.dirname, "..", "fixtures", "php-composer-required");
 const files = (): string[] => listFixtureFiles(dir, [...phpPack.config.extensions]);
 
@@ -104,6 +105,16 @@ describe("php namespace resolver", () => {
     const regions = (await facts()).get("regions.php");
     expect(edges(regions)).toEqual(["src/Money.php Acme\\Shop\\Money"]);
     expect(regions?.imports?.external).toEqual([]);
+  });
+
+  it("matches a PSR-0 prefix without a separator only on a namespace or underscore boundary", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const outcomes = (await outcomesIn(psr0Boundary))("app.php");
+    expect(outcomes).toEqual(
+      expect.arrayContaining(["use Acme\\Foo psr-0", "new Acme_Bar psr-0", "use AcmeCorp\\Sdk\\Client external"]),
+    );
+    // A file at the PSR-0 path is what Composer loads, boundary or not: two declarations are not ambiguous.
+    expect(outcomes).toContain("use AcmeTools\\Hammer psr-0");
   });
 
   it("says why a reference is not an edge", async (ctx) => {

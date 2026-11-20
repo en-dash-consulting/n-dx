@@ -8,7 +8,7 @@ import {
   CONFIG_FIELDS,
   CATEGORY_ORDER,
 } from "../../../../src/cli/commands/config.js";
-import { DEFAULT_HENCH_CONFIG } from "../../../../src/schema/v1.js";
+import { DEFAULT_HENCH_CONFIG, PROJECT_LANGUAGES } from "../../../../src/schema/v1.js";
 import type { HenchConfig } from "../../../../src/schema/v1.js";
 import { CLIError } from "../../../../src/cli/errors.js";
 
@@ -102,6 +102,11 @@ describe("coerceValue", () => {
 
   it("throws on invalid enum values", () => {
     expect(() => coerceValue("invalid", findField("provider"))).toThrow();
+  });
+
+  // The language field offers every language the schema accepts.
+  it.each([...PROJECT_LANGUAGES])("accepts language %s", (language) => {
+    expect(coerceValue(language, findField("language"))).toBe(language);
   });
 
   it("coerces comma-separated arrays", () => {

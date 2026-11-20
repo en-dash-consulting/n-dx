@@ -8,6 +8,7 @@
  */
 
 import type { LanguageConfig } from "./registry.js";
+import { TYPESCRIPT_GENERATED_FILE_PATTERNS, TYPESCRIPT_SKIP_DIRECTORIES } from "./typescript.js";
 
 /**
  * PHP extensions that other ecosystems use too: `.inc` (Pascal, assembly,
@@ -33,6 +34,8 @@ export const PHP_DOCROOT_DIRECTORIES: readonly string[] = ["public", "web", "htd
  * Key PHP-specific behaviors:
  * - `.inc`, `.module` and `.install` count as PHP only in a repository
  *   detected as PHP (see {@link PHP_REPOSITORY_ONLY_EXTENSIONS}).
+ * - Skip directories and generated-file patterns are the TypeScript config's
+ *   (`node_modules/`, `dist/`, `*.min.js`): a PHP site's themes ship them.
  * - `vendor/` is skipped only beside a `composer.json` (`skipOnlyBeside`):
  *   legacy repositories commit hand-copied libraries under `vendor/` without
  *   Composer, and those are source to inventory.
@@ -72,13 +75,13 @@ export const phpConfig: LanguageConfig = {
     "phpunit.xml.dist",
   ]),
 
-  skipDirectories: new Set(),
+  skipDirectories: TYPESCRIPT_SKIP_DIRECTORIES,
 
   skipUnlessContains: new Map([".phpunit.cache", "cache", "tmp"].map((name) => [name, ["*.php"]])),
 
   skipOnlyBeside: new Map([["vendor", ["composer.json"]]]),
 
-  generatedFilePatterns: [],
+  generatedFilePatterns: TYPESCRIPT_GENERATED_FILE_PATTERNS,
 
   entryPointPatterns: [
     /^index\.php$/,
