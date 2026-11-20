@@ -459,6 +459,24 @@ a saved `run.reviewTier: heavy` selects Astra. Explicit execution, tier,
 Hench, task and reviewer model pins remain literal; upgrading or re-running
 `n-dx init` does not migrate saved settings.
 
+To retain previous defaults, pin each tier you use. `llm.codex.model` pins
+standard execution only; it does not pin light or heavy work. Replace
+`<model-id>` with the previous model for that slot:
+
+```sh
+n-dx config llm.codex.model <model-id> .
+n-dx config llm.tiers.codex.light <model-id> .
+n-dx config llm.tiers.codex.heavy <model-id> .
+n-dx config llm.codex.reviewModel <model-id> .
+```
+
+`n-dx config llm.codex.lightModel <model-id> .` is also a light-work pin;
+an explicit `llm.tiers.codex.light` takes precedence over it. Saved task and
+Hench model overrides still apply according to the normal precedence rules.
+The heavy tier pin also applies to saved `run.reviewTier: heavy` reviews,
+which take precedence over `llm.codex.reviewModel`. Explicit task reviewer
+models and CLI reviewer overrides still win.
+
 These are workload recommendations, not n-dx benchmark results or proof of
 account access. [Official model guidance](https://learn.chatgpt.com/docs/models?surface=cli)
 was checked on 2026-11-16. GPT-5.5's retirement from ChatGPT-authenticated Codex
