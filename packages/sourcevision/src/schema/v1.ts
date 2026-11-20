@@ -1690,6 +1690,57 @@ export interface SdlcLanguageEcosystem {
   thirdParty?: { legacyConstructs?: SdlcLegacyConstructs; dynamicCode?: SdlcDynamicCode };
 }
 
+// ── Legacy constructs per file ──────────────────────────────────────────────
+// The per-file facts behind `SdlcLanguageEcosystem`'s `versionFloors` and
+// `legacyConstructs`, written to `legacy.json` only when a pack produced a
+// floor or a construct use. Versions and positions only: each rule's pages
+// live once in sdlc-profile.json, and no code is copied.
+
+/** One legacy-construct use in a file (lang-kit's `LegacyConstructFact`, versions without pages). */
+export interface LegacyConstructUse {
+  rule: string;
+  construct: string;
+  status: "removed" | "deprecated" | "notice";
+  /** 1-indexed. */
+  line: number;
+  /** 0-indexed, in UTF-16 code units. */
+  column: number;
+  deprecated?: string;
+  removed?: string;
+  changed?: string;
+  likely?: true;
+}
+
+/** One file's version floor and legacy-construct uses. */
+export interface LegacyFileEntry {
+  path: string;
+  /** The oldest version whose syntax covers the file, the rule that dated it and the line of its first use. */
+  floor?: { version: string; rule: string; line: number };
+  /** Uses of removed or deprecated constructs. */
+  uses: number;
+  /** Review notices, never in `uses`. */
+  notices: number;
+  /** `major.minor` → this file's uses of constructs that version removed, oldest first. */
+  removedIn: Record<string, number>;
+  /** `major.minor` → this file's uses of constructs deprecated there and not yet removed, oldest first. */
+  deprecatedIn: Record<string, number>;
+  /** Sorted by line, then column. */
+  constructs: LegacyConstructUse[];
+}
+
+/** One language's files; the split is `SdlcLanguageEcosystem`'s, mirror copies left out. */
+export interface LegacyLanguageFiles {
+  /** The application's own files with a floor or a construct use, sorted by path. */
+  files: LegacyFileEntry[];
+  /** Third-party files likewise; absent when there are none. */
+  thirdParty?: LegacyFileEntry[];
+}
+
+/** `legacy.json` — per language (the inventory's, lower-cased), each file's floor and legacy-construct uses. */
+export interface LegacyData {
+  languages: Record<string, LegacyLanguageFiles>;
+}
+
 /**
  * Evidence-based CI/CD maturity for one repository.
  *

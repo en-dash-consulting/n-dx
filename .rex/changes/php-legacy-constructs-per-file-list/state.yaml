@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "901e0556-9673-4eb8-bd46-1cd4789422ab":
+    status: "completed"
+    startedAt: "2026-11-20T17:08:43.375Z"
+    completedAt: "2026-11-20T17:08:43.375Z"
+    endedAt: "2026-11-20T17:08:43.375Z"
+    activeIntervals: [{"end":"2026-11-20T17:08:43.375Z","start":"2026-11-20T17:08:43.375Z"}]
+    appliedAt: "2026-11-20T17:08:43.375Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-18T03:58:51.364Z"
-    lastModified: "2026-11-18T03:59:15.598Z"
+    lastModified: "2026-11-20T17:08:43.375Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a3e64e4f-6124-4508-a4ba-27121a719148":
-    lastModified: "2026-11-18T03:59:15.598Z"
+    status: "completed"
+    startedAt: "2026-11-20T16:50:39.201Z"
+    completedAt: "2026-11-20T17:08:43.375Z"
+    endedAt: "2026-11-20T17:08:43.375Z"
+    activeIntervals: [{"end":"2026-11-20T17:08:43.375Z","start":"2026-11-20T16:50:39.201Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "legacy.json (DATA_FILES.legacy in sv + web mirror, LegacySchema, pack-legacy-files.ts reusing pack-ecosystem's byLanguage) written beside sdlc-profile.json from one packFrameworkFacts read; removed when empty. Unit + integration tests, docs, changeset."
+    lastModified: "2026-11-20T17:08:43.375Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

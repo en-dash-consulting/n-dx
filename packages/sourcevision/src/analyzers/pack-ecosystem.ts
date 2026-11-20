@@ -41,9 +41,11 @@ type Fact = PackFrameworkFacts[number];
 /**
  * Facts for files the inventory lists, grouped by language: the application's
  * own, and apart from them those of third-party files. A mirror copy's facts
- * are its source file's, already counted, so they are dropped.
+ * are its source file's, already counted, so they are dropped. legacy.json
+ * (`pack-legacy-files.ts`) lists files by the same split, so it and the
+ * profile never disagree.
  */
-function byLanguage(facts: PackFrameworkFacts | undefined, inventory: Inventory): Map<string, { own: Fact[]; outside: Fact[] }> {
+export function byLanguage(facts: PackFrameworkFacts | undefined, inventory: Inventory): Map<string, { own: Fact[]; outside: Fact[] }> {
   const files = new Map(inventory.files.map((f) => [f.path, f]));
   const grouped = new Map<string, { own: Fact[]; outside: Fact[] }>();
   for (const fact of facts ?? []) {
@@ -59,7 +61,7 @@ function byLanguage(facts: PackFrameworkFacts | undefined, inventory: Inventory)
 }
 
 /** `counts` as an object keyed oldest version first. */
-const byVersion = (counts: ReadonlyMap<string, number>): Record<string, number> =>
+export const byVersion = (counts: ReadonlyMap<string, number>): Record<string, number> =>
   Object.fromEntries([...counts.keys()].sort(compareLanguageVersions).map((v) => [v, counts.get(v)!]));
 
 const add = (counts: Map<string, number>, key: string, n = 1) => counts.set(key, (counts.get(key) ?? 0) + n);

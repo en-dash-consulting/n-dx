@@ -220,6 +220,7 @@ All output is written to `.sourcevision/`:
 | `sdlc-profile.json` | SDLC practices detected, each claim tied to the file proving it. With the PHP pack, an optional `ecosystem.php`: `versionFloors`, written whenever the pack read PHP files, the files it read (`files`) counted by the oldest PHP version whose syntax covers them (`floors`), files no rule dates (`none`) and the `highest` floor, absent when no file has one (a PHP 5.2-era repository gets `floors` `{}` and `none` equal to `files`); and `legacyConstructs`, written when a file has a use, uses of constructs later PHP versions removed or deprecated, by rule (`rules`, each with its php.net pages), by the version that removed them (`removedIn`) or deprecated them (`deprecatedIn`), with review `notices` counted apart; and `dynamicCode`, written when a file has a site, the repository's dynamic-code sites (`sites`, in `files` files) by kind (`kinds`: `exec`, `dispatch`, `include`), by construct (`constructs`), with `literal` counting `exec` sites whose code is literals alone, and `database`, written when a site is fed by a database query result, those sites (`sites`) by kind (`kinds`: `exec`, `dispatch`), by table (`tables`) and by `table.column` (`columns`) (see [PHP pack rules](#php-pack-rules)). Field names are under review |
 | `readiness.json` | Readiness score computed from that profile, with the profile's `ecosystem` carried through unscored |
 | `config.json` | **New.** Where code reads configuration and checks feature flags, per file, with indexes of flags (by normalized name, with the lines each gates) and config keys (with their consumer files). Names, keys and positions only, never values. Written only when a language pack produces config reads or flag checks (the PHP pack does); otherwise absent. Field names are under review. |
+| `legacy.json` | **New.** The files behind `ecosystem`'s `versionFloors` and `legacyConstructs`, per language: each file's floor and every legacy-construct use (see [Legacy constructs per file](#legacy-constructs-per-file)). Written only when a language pack finds a floor or a use (the PHP pack does); otherwise absent. |
 | `llms.txt` | AI-readable codebase summary |
 | `CONTEXT.md` | Detailed AI context document |
 | `zones/{zone-id}/` | Per-zone context and summary files |
@@ -385,6 +386,20 @@ A third-party file stays in the inventory, and imports to it still resolve. It i
 A folder that is a near-copy of another (a legacy `edit/` kept beside `app/`) would double every count. Inventory finds such pairs from content hashes: identical files with the same name give candidate root pairs, and a pair counts when at least 10 files of one root, and at least half of its files, are identical to the file at the same relative path in the other. That root is the copy (for an exact copy, the smaller, then the later in path order). Each identical file of the copy gets `mirrorOf`, its counterpart's path, and `summary.mirrored` counts them; analyze prints one `[mirror]` line per pair. Files where the copy diverged stay first-party.
 
 A mirror copy is left out of the same phases as third-party code, and its pack totals and outbound calls are dropped, since its source's are already counted. `sourcevision.mirrors` sets a pair (`{ "edit/": "app/" }`) or denies one (`{ "edit/": false }`).
+
+## Legacy constructs per file
+
+`legacy.json` lists, per language (the inventory's, lower-cased), each file with a version floor or a legacy-construct use, so an upgrade can be planned and split file by file. It is built from the same pack facts as `sdlc-profile.json`'s `ecosystem` in the same run (`src/analyzers/pack-legacy-files.ts`), with the same split: the application's own files under `files`, third-party files under `thirdParty` (absent when none), mirror copies left out.
+
+```json
+{ "languages": { "php": { "files": [
+  { "path": "lib/db.php", "floor": { "version": "5.3", "rule": "closures", "line": 4 },
+    "uses": 2, "notices": 0, "removedIn": { "7.0": 2 }, "deprecatedIn": {},
+    "constructs": [ { "rule": "mysql-functions", "construct": "mysql_query()", "status": "removed",
+                      "line": 7, "column": 2, "deprecated": "5.5", "removed": "7.0" } ] } ] } } }
+```
+
+Files are sorted by path, uses by line then column. `uses` counts removed and deprecated uses and `notices` the review notices; `removedIn` and `deprecatedIn` count a file's uses as `legacyConstructs` does. Summed over `files`, they equal the profile's `legacyConstructs` (files with a use, uses, notices, per-rule uses and files, `removedIn`, `deprecatedIn`) and the floors equal `versionFloors.floors`; summed over `thirdParty`, they equal `thirdParty.legacyConstructs`. Versions and positions only: each rule's php.net pages are in the profile, and no code is copied. Without a floor or a use no file is written, and one an earlier run left is removed.
 
 ## Jev request size
 
