@@ -57,7 +57,7 @@ interface LocalVendorConfig {
 interface FailoverInfo {
   /** Whether automatic failover is enabled in the config. */
   enabled: boolean;
-  /** Whether failover can fire for this config (true only for Claude + API). */
+  /** Whether the provider supports failover: Claude API or a supported Codex API config. Independent of enabled. */
   applies: boolean;
   /** Why applies is false (empty when applies is true). */
   reason?: string;
@@ -1128,7 +1128,7 @@ function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): { label: s
       : { label: "Local server unreachable", detail: entry.reason ?? null };
   }
   if (entry.provenance === "codex-client-catalog") {
-    return { label: "Codex client catalog", detail: `CLI ${entry.cli?.version ?? "unknown"} · Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}. Inference access is not verified.` };
+    return { label: "Codex client catalog", detail: [`CLI ${entry.cli?.version ?? "unknown"} · Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}. Inference access is not verified.`, entry.reason].filter(Boolean).join(" ") };
   }
   return entry.source === "live"
     ? { label: "Live model list", detail: `Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}` }

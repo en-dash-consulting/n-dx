@@ -76,7 +76,7 @@ function config(vendor: Vendor, overrides: Json = {}): Json {
     failover: {
       enabled: false,
       applies: false,
-      reason: "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.",
+      reason: "Failover is not available for Claude CLI. Use the API connection for failover.",
       chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5", "claude-haiku-4-5"],
     },
     ...overrides,
@@ -295,6 +295,18 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     const checks = root.querySelector(".llm-runcard-checks")!;
     expect(checks.textContent).toContain("Built-in model list");
     expect(checks.textContent).toContain("No OPENAI_API_KEY");
+  });
+
+  it("explains an empty Codex client catalog after unsupported provider models are excluded", async () => {
+    const reason = "Custom-provider model IDs are excluded. Configure supported Codex model IDs, then refresh.";
+    stubApi({ config: config("codex"), catalog: catalog({ codex: {
+      models: [], providers: ["cli"], defaultModel: "gpt-5.5",
+      source: "live", provenance: "codex-client-catalog", checkedAt: "2026-11-16T12:00:00Z",
+      reason, cli: { found: true, version: "0.167.0", path: "codex" },
+    } }) });
+    await mount();
+    expect(root.querySelector(".llm-runcard-checks")?.textContent).toContain(reason);
+    expect(Array.from(select("agent.codex")!.options).map((option) => option.value)).not.toContain("deployment-prod");
   });
 
   it("reports the installed CLI and its version for claude, and a missing one for codex", async () => {

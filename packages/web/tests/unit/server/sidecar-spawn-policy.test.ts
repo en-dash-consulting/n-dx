@@ -8,7 +8,7 @@
 import { execFileSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -108,7 +108,7 @@ describe("Claude spawn", () => {
   });
 });
 
-describe("hub-scope Claude spawn", () => {
+describe("hub-scope spawn policy", () => {
   const hubRecord = (vendor = "claude"): SidecarSessionRecord => ({ ...record(vendor), scope: "hub" });
   const endpoint = (id: string) => ({ url: `http://127.0.0.1:4000/api/sidecar/hub/sessions/${id}/mcp`, headers: { "x-ndx-sidecar-key": "key" } });
 
@@ -158,9 +158,17 @@ describe("hub-scope Claude spawn", () => {
     }
   });
 
-  it("refuses to open a hub session on Codex, naming that its sandbox can still read repositories", async () => {
-    const connect = sidecarSessionConnect(join(root, "hub", "sidecar"), undefined, root);
-    await expect(connect(hubRecord("codex"))).rejects.toThrow(/read-only sandbox can still read repositories/);
+  it.each(["host", "broker", "dedicated workspace"] as const)("refuses a Codex hub session without its %s before spawning or writing broker config", async (missing) => {
+    const dir = join(root, "hub", "sidecar");
+    const connect = sidecarSessionConnect(dir, missing === "broker" ? undefined : endpoint, missing === "host" ? undefined : root);
+    const attempt = async () => {
+      const current = { ...hubRecord("codex"), worktree: missing === "dedicated workspace" ? root : dir };
+      const session = startVendorSession({ ...await connect(current), vendor: "codex", cwd: dir, spawn: recordingSpawn });
+      await session.sendTurn("one");
+    };
+    await expect(attempt()).rejects.toThrow("Codex hub requires its host, broker and dedicated workspace");
+    expect(spawned).toEqual([]);
+    expect(existsSync(join(dir, "sess-1.mcp.json"))).toBe(false);
   });
 });
 

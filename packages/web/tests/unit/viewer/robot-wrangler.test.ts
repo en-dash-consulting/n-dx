@@ -34,7 +34,7 @@ function config(overrides: Json = {}): Json {
     failover: {
       enabled: false,
       applies: false,
-      reason: "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.",
+      reason: "Failover is not available for Claude CLI. Use the API connection for failover.",
       chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5", "claude-haiku-4-5"],
     },
     ...overrides,
@@ -200,7 +200,7 @@ describe("RobotWranglerView", () => {
       failover: {
         enabled: false,
         applies: false,
-        reason: "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.",
+        reason: "Failover is not available for Claude CLI. Use the API connection for failover.",
         chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"],
       },
     }));
@@ -220,7 +220,7 @@ describe("RobotWranglerView", () => {
       failover: {
         enabled: false,
         applies: false,
-        reason: "Failover is not available for local models. Only Claude on the API connection supports failover.",
+        reason: "Failover is not available for local models. Use Claude or supported Codex models on the API connection for failover.",
         chain: ["llama-2"],
       },
     }));

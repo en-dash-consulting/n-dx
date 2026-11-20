@@ -61,25 +61,26 @@
  * - a backstop in the session registry: a turn whose events show a tool use
  *   on any MCP server but the broker is stopped
  *   ({@link strayMcpServer}).
- * - `--ignore-user-config` drops the user's `model_provider` too, so a user
- *   config selecting any provider but `openai` refuses the session at create
- *   and before every turn ({@link codexUserProviderRefusal}).
+ * - `--ignore-user-config` drops the user's `model_provider` too. The selected
+ *   provider alone is carried by `codex-provider.ts`; unsupported settings or
+ *   missing credentials refuse before a turn, without selecting a fallback.
  *
  * **Hub scope.** The hub session works from the hub snapshot and must not
  * read any repository, so its Claude spawn gets no built-in tool at all
- * (`--tools ""`): the broker is all it has. Codex cannot be confined that
- * far — its read-only sandbox still reads every file — so a hub session is
- * Claude-only ({@link hubVendorRefusal}).
+ * (`--tools ""`): the broker is all it has. Codex uses the exact host-audited
+ * macOS permission profile below, never the ordinary read-only sandbox.
+ * Admission checks the selected executable and paths again on each turn.
  */
 
-import { chmodSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { CodexProjectConfigError, codexProjectMcpDisableFlags, codexUserConfigPath, codexUserModelProvider, compileCodexPolicyFlags } from "@n-dx/llm-client";
+import { chmodSync, lstatSync, realpathSync, writeFileSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
+import { CodexProjectConfigError, codexProjectMcpDisableFlags, compileCodexPolicyFlags } from "@n-dx/llm-client";
 import type { ClaudeTurnFlags, CodexTurnFlags, ExecutionPolicy, RuntimeEvent } from "@n-dx/llm-client";
 import { errorMessage } from "../response-utils.js";
 import { SIDECAR_BROKER_NAME } from "./broker-policy.js";
 import type { SidecarScope } from "./context-refresh.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
+import { readSidecarCodexProvider } from "./codex-provider.js";
 
 /** The built-in Claude tools a Sidecar session keeps: reads only. */
 export const SIDECAR_READ_TOOLS = ["Read", "Grep", "Glob"] as const;
@@ -88,32 +89,31 @@ export const SIDECAR_READ_TOOLS = ["Read", "Grep", "Glob"] as const;
 export const HUB_SIDECAR_TOOLS: readonly string[] = [];
 
 /** Why a hub-scope session cannot run on `vendor`, or null when it can. */
-export function hubVendorRefusal(vendor: string): string | null {
+export const CODEX_HUB_VERSION = "0.167.0-alpha.3.2";
+export const CODEX_HUB_BINARY = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex";
+export const CODEX_HUB_SHA256 = "a636331ed87605efc4cf84028ac2884a75363f9d10ead63cffb57ea0016d486e";
+export const CODEX_HUB_REQUIREMENT = `Codex hub sessions require macOS and codex-cli ${CODEX_HUB_VERSION}; other platforms and versions are unverified. Configure llm.codex.cli_path to the audited executable, or use Claude.`;
+
+export function hubVendorRefusal(vendor: string, audited?: { platform: NodeJS.Platform; version: string }): string | null {
   if (vendor === "claude") return null;
   if (vendor === "codex") {
-    return "A hub session cannot run on Codex: its read-only sandbox can still read repositories, and the hub session works from the hub snapshot alone";
+    if (audited?.platform === "darwin" && audited.version === CODEX_HUB_VERSION) return null;
+    return `A hub session cannot run on Codex without verified confinement. ${CODEX_HUB_REQUIREMENT}`;
   }
   return `A hub session runs on Claude only, not "${vendor}"`;
 }
 
 /**
- * Why a Codex Sidecar session cannot run under the user's Codex config, or
- * null when it can. A turn runs with `--ignore-user-config`, so a
- * `model_provider` the config selects (top level or through the selected
- * profile) would not apply: Codex would fall back to `openai` and never read
- * that provider's key. Checked at create and before every turn; the config
- * may change between them.
+ * Preflight selected settings/auth, without copying integrations or running a
+ * helper. The connection rechecks with its effective environment policy.
  */
 export function codexUserProviderRefusal(env: NodeJS.ProcessEnv = process.env): string | null {
-  const file = codexUserConfigPath(env);
-  let provider: string | undefined;
   try {
-    provider = codexUserModelProvider(env);
+    readSidecarCodexProvider(env);
+    return null;
   } catch (error) {
-    return `A Codex Sidecar session cannot start: ${file} could not be read (${errorMessage(error)}), so its model provider is unknown. Fix the file, or use Claude for the Sidecar.`;
+    return errorMessage(error);
   }
-  if (provider === undefined || provider === "openai") return null;
-  return `A Codex Sidecar session cannot start: ${file} selects model provider ${JSON.stringify(provider)}, but Codex Sidecar sessions skip the user's Codex config, so that provider would not apply. Use Claude for the Sidecar, or the default OpenAI provider.`;
 }
 
 /** Codex: read-only, never asks, no network, no writable root, no command or file tool beyond reads. */
@@ -235,6 +235,89 @@ export function sidecarCodexSpawn(endpoint: SidecarBrokerEndpoint | undefined, i
       hiddenEnv: Object.keys(env),
     },
     env,
+  };
+}
+
+/** Inputs for the host-audited hub profile. Never read from project config. */
+export interface CodexHubCandidateOptions {
+  cwd: string;
+  /** A dedicated, broker-produced snapshot file, never the session/credential directory. */
+  snapshot: string;
+  /** Explicit denials supplement root denial, whose native semantics need host verification. */
+  repositories: readonly string[];
+  /** Version observed from the selected executable, not a configured version hint. */
+  version: string;
+  platform: NodeJS.Platform;
+}
+
+/**
+ * The host-audited profile, shared by production admission and the host fixture.
+ * Reuses the production broker transport and secret masking. The permission
+ * profile replaces (never combines with) legacy read-only flags on fresh and
+ * resumed turns. Every turn rechecks path identity before invoking the CLI.
+ * Only the supplied macOS version has native filesystem, network and broker
+ * lifecycle evidence. Browser validation remains a separate host acceptance.
+ */
+export function candidateCodexHubSpawn(
+  endpoint: SidecarBrokerEndpoint,
+  idleMs: number,
+  options: CodexHubCandidateOptions,
+): SidecarCodexSpawn {
+  if (hubVendorRefusal("codex", options)) {
+    throw new Error("Codex hub candidate requires macOS codex-cli 0.167.0-alpha.3.2; other versions/platforms are unverified");
+  }
+  if (!options.repositories.length) throw new Error("Codex hub candidate requires explicit repository denials");
+  const paths = [options.cwd, options.snapshot, ...options.repositories];
+  if (paths.some((path) => !isAbsolute(path) || /[\x00-\x1f\x7f]/.test(path))) {
+    throw new Error("Codex hub candidate paths must be absolute and contain no control characters");
+  }
+  const canonical = paths.map((path) => realpathSync(path));
+  const [cwd, snapshot] = canonical as [string, string, ...string[]];
+  const inside = (parent: string, child: string): boolean => {
+    const tail = relative(parent, child);
+    return tail === "" || (!isAbsolute(tail) && tail !== ".." && !tail.startsWith(`..${sep}`));
+  };
+  if (canonical.slice(2).some((repo) => inside(repo, cwd) || inside(repo, snapshot))) {
+    throw new Error("Codex hub candidate workspace and snapshot must be outside every denied repository");
+  }
+  const checkPaths = (): void => {
+    if (paths.some((path, index) => realpathSync(path) !== canonical[index])) {
+      throw new Error("Codex hub candidate path identity changed; refusing the turn");
+    }
+    const file = lstatSync(options.snapshot);
+    if (!file.isFile() || file.nlink !== 1 || !lstatSync(cwd).isDirectory()
+        || canonical.slice(2).some((repo) => !lstatSync(repo).isDirectory())) {
+      throw new Error("Codex hub candidate requires a regular unlinked snapshot and repository directories");
+    }
+  };
+  checkPaths();
+  const filesystem: Record<string, string> = {
+    ":root": "deny", ":minimal": "read", ":tmpdir": "deny", ":slash_tmp": "deny",
+  };
+  for (const path of [...paths.slice(2), ...canonical.slice(2)]) filesystem[path] = "deny";
+  // Grant just one file. A hub directory also contains transcripts, cards and
+  // broker credentials; granting it would disclose more than the snapshot.
+  filesystem[snapshot] = "read";
+  const table = `{${Object.entries(filesystem).map(([key, value]) => `${tomlString(key)}=${tomlString(value)}`).join(",")}}`;
+  const flags = [
+    "--strict-config", "-c", 'approval_policy="never"',
+    "-c", 'default_permissions="ndx-hub-candidate"',
+    "-c", `permissions.ndx-hub-candidate.filesystem=${table}`,
+    "-c", "permissions.ndx-hub-candidate.network.enabled=false",
+  ];
+  const spawn = sidecarCodexSpawn(endpoint, idleMs, cwd);
+  return {
+    ...spawn,
+    codex: {
+      ...spawn.codex,
+      policyFlags: [...flags],
+      resumePolicyFlags: [...flags],
+      configFlags: [...(spawn.codex.configFlags ?? []), "-c", 'web_search="disabled"'],
+      turnConfigFlags: () => {
+        checkPaths();
+        return sidecarCodexProjectFlags(cwd);
+      },
+    },
   };
 }
 
