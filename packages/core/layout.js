@@ -53,6 +53,7 @@ export const NDX_CONTAINER_DIRNAME = ".ndx";
  * @property {string} webPidFile        Dashboard PID marker.
  * @property {string} webPortFile       Dashboard port marker.
  * @property {string} webUsageFile      Dashboard LLM spend ledger.
+ * @property {string} agentPromptFile   Operator instructions appended to every agent's system prompt.
  */
 
 /** Entry names inside `.ndx/`. Mirrors `NDX_ENTRIES` in the llm-client twin. */
@@ -66,6 +67,7 @@ const NDX_ENTRIES = {
   WEB_PID: "web.pid",
   WEB_PORT: "web.port",
   WEB_USAGE: "web-usage.jsonl",
+  AGENT_PROMPT: "agent-prompt.md",
 };
 
 /** Root-relative names in the legacy layout. Mirrors `LEGACY_ENTRIES` in the twin. */
@@ -79,6 +81,7 @@ const LEGACY_ENTRIES = {
   WEB_PID: ".n-dx-web.pid",
   WEB_PORT: ".n-dx-web.port",
   WEB_USAGE: ".n-dx-web-usage.jsonl",
+  AGENT_PROMPT: ".n-dx-agent-prompt.md",
 };
 
 /**
@@ -120,6 +123,7 @@ export function resolveLayout(root, options = {}) {
       webPidFile: join(container, NDX_ENTRIES.WEB_PID),
       webPortFile: join(container, NDX_ENTRIES.WEB_PORT),
       webUsageFile: join(container, NDX_ENTRIES.WEB_USAGE),
+      agentPromptFile: join(container, NDX_ENTRIES.AGENT_PROMPT),
     };
   }
 
@@ -136,6 +140,7 @@ export function resolveLayout(root, options = {}) {
     webPidFile: join(root, LEGACY_ENTRIES.WEB_PID),
     webPortFile: join(root, LEGACY_ENTRIES.WEB_PORT),
     webUsageFile: join(root, LEGACY_ENTRIES.WEB_USAGE),
+    agentPromptFile: join(root, LEGACY_ENTRIES.AGENT_PROMPT),
   };
 }
 

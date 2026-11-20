@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 import { trustSummaryForRun } from "../../store/trust.js";
-import { evaluateRepoTrust, redactSecrets } from "../../prd/llm-gateway.js";
+import { agentPromptSection, evaluateRepoTrust, redactSecrets } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -407,6 +407,13 @@ export async function prepareBrief(
     if (missing.length) {
       warn(`hench.projectSkills: no SKILL.md for ${missing.join(", ")} under ${PROJECT_SKILL_DIRS.join(" or ")}; skipped.`);
     }
+  }
+  if (options?.projectDir) {
+    // The operator's agent prompt file. Both loops read it off brief.project:
+    // the API loop through systemPrompt below, the CLI loop through the envelope.
+    const { text, warnings } = agentPromptSection(options.projectDir);
+    for (const message of warnings) warn(`Agent prompt: ${message}`);
+    if (text) brief.project = { ...brief.project, agentPrompt: text };
   }
   const briefText = formatTaskBrief(brief);
   const systemPrompt = buildSystemPrompt(brief.project, config);

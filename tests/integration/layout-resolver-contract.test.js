@@ -50,6 +50,7 @@ const LAYOUT_FIELDS = [
   "webPidFile",
   "webPortFile",
   "webUsageFile",
+  "agentPromptFile",
 ];
 
 beforeAll(async () => {
@@ -105,6 +106,7 @@ describe("layout resolver: lookup order", () => {
     expect(layout.webPidFile).toBe(join(ndxRoot, ".ndx", "web.pid"));
     expect(layout.webPortFile).toBe(join(ndxRoot, ".ndx", "web.port"));
     expect(layout.webUsageFile).toBe(join(ndxRoot, ".ndx", "web-usage.jsonl"));
+    expect(layout.agentPromptFile).toBe(join(ndxRoot, ".ndx", "agent-prompt.md"));
   });
 
   it("falls back to the legacy layout when the container is absent", () => {
@@ -119,6 +121,7 @@ describe("layout resolver: lookup order", () => {
     expect(layout.webPidFile).toBe(join(legacyRoot, ".n-dx-web.pid"));
     expect(layout.webPortFile).toBe(join(legacyRoot, ".n-dx-web.port"));
     expect(layout.webUsageFile).toBe(join(legacyRoot, ".n-dx-web-usage.jsonl"));
+    expect(layout.agentPromptFile).toBe(join(legacyRoot, ".n-dx-agent-prompt.md"));
   });
 
   it("falls back to legacy for a root that does not exist at all", () => {

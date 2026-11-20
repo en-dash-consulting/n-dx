@@ -54,6 +54,7 @@ import { handleTrustRoute } from "./routes-trust.js";
 import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
 import { enforceRouteFeatureGate, featureDisabledUpgradeResponse } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
+import { handleAgentPromptRoute } from "./routes-agent-prompt.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
@@ -888,6 +889,7 @@ async function handleApiRoutes(
   if (await handleTrustRoute(req, res, ctx)) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
+  if (await handleAgentPromptRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
   // Before the generic /api/rex/ router below, which would answer its own 404

@@ -117,7 +117,8 @@ import {
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout, agentPromptSection } from "../../prd/llm-gateway.js";
+import { appendAgentPrompt } from "../planning/prompt.js";
 import { prdLayout } from "../../prd/rex-gateway.js";
 import { reviewDedupeDir, reviewInboxDir } from "./uncommitted-work-gate.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
@@ -1872,7 +1873,12 @@ export async function runAdversarialReviewPass(
   const prdLayoutKind = await prdLayout(layout.rexDir);
   const prdTreeDir = reviewDedupeDir(rexRel, prdLayoutKind);
   const inboxDir = reviewInboxDir(rexRel, prdLayoutKind);
-  const systemPrompt = pair ? buildPairReviewSystemPrompt() : buildReviewSystemPrompt();
+  // The reviewer is an n-dx agent too, so it reads the operator's agent prompt
+  // file as the executor did (warnings were already printed for the executor).
+  const systemPrompt = appendAgentPrompt(
+    pair ? buildPairReviewSystemPrompt() : buildReviewSystemPrompt(),
+    agentPromptSection(inv.projectDir).text,
+  );
 
   let brief: string;
   if (pair) {
