@@ -30,7 +30,7 @@ export interface ProcessStep {
 
 /** The planning process, in order. */
 export const PROCESS_STEPS: readonly ProcessStep[] = [
-  { id: "capture", label: "Capture", does: "Describe an idea in the capture bar; it lands in the Inbox" },
+  { id: "capture", label: "Capture", does: "Describe an idea in the Describe a change tile; it lands in the Inbox" },
   { id: "place", label: "Place", does: "Put each Inbox change on the capability it touches" },
   { id: "ready", label: "Ready", does: "Mark a placed change ready: give it an automated requirement, then run rex ready" },
   { id: "work", label: "Work", does: "Run the next pick in Work" },
@@ -97,10 +97,10 @@ export function processFocus(summary: ChangeSummary): ProcessFocus {
   if (awaiting > 0) {
     return { step: "apply", cue: `${changes(awaiting)} done: ${awaiting === 1 ? "it applies" : "they apply"} to the product map at the next rex release` };
   }
-  return { step: "capture", cue: "Nothing open: describe the next idea in the capture bar" };
+  return { step: "capture", cue: "Nothing open: describe the next idea in the Describe a change tile" };
 }
 
-/** Where each step is done. Capture is the Smart Add row at the top of Plan. */
+/** Where each step is done. Capture is the Describe a change tile's input on Plan. */
 export function openStep(step: ProcessStepId, navigateTo: NavigateTo, summary: ChangeSummary): void {
   switch (step) {
     case "capture": {

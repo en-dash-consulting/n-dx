@@ -63,11 +63,17 @@ describe("PROCESS_STEPS", () => {
       expect(s.does).not.toContain("\n");
     }
   });
+
+  it("names the Describe a change tile at Capture, not the old capture bar", () => {
+    const capture = PROCESS_STEPS.find((s) => s.id === "capture")!;
+    expect(capture.does).toBe("Describe an idea in the Describe a change tile; it lands in the Inbox");
+    expect(capture.does).not.toMatch(/capture bar/i);
+  });
 });
 
 describe("processFocus", () => {
   it("asks for a capture when nothing is open", () => {
-    expect(processFocus(EMPTY)).toEqual({ step: "capture", cue: "Nothing open: describe the next idea in the capture bar" });
+    expect(processFocus(EMPTY)).toEqual({ step: "capture", cue: "Nothing open: describe the next idea in the Describe a change tile" });
   });
 
   it("asks for placing while Inbox changes wait for a place", () => {
@@ -245,7 +251,7 @@ describe("PlanProcess", () => {
     expect(root.childNodes).toHaveLength(0);
   });
 
-  it("links Capture to the capture bar on the page, focusing it", async () => {
+  it("links Capture to the Describe a change input on the page, focusing it", async () => {
     const bar = document.createElement("textarea");
     bar.className = "smart-add-textarea";
     document.body.appendChild(bar);
@@ -259,7 +265,7 @@ describe("PlanProcess", () => {
     }
   });
 
-  it("opens Add Items when the capture bar is not on the page", async () => {
+  it("opens Add Items when the Describe a change input is not on the page", async () => {
     await mount(EMPTY);
     click("capture");
     expect(navigateTo).toHaveBeenCalledWith("analysis");
