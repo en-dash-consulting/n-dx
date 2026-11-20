@@ -28,6 +28,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { exec } from "@n-dx/llm-client";
+import { errorMessage } from "./response-utils.js";
 
 /** One placement the commit records. */
 export interface CommittedPlacement {
@@ -125,7 +126,7 @@ export async function commitPlacements(
     const head = await git(projectDir, ["rev-parse", "--short", "HEAD"]);
     return head.ok ? { sha: head.stdout.trim() } : { skipped: "committed, but HEAD could not be read" };
   } catch (err) {
-    return { skipped: err instanceof Error ? err.message : String(err) };
+    return { skipped: errorMessage(err) };
   } finally {
     if (tmp) rmSync(tmp, { recursive: true, force: true });
   }
