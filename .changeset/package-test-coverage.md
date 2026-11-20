@@ -5,6 +5,7 @@
 "@n-dx/lang-go": patch
 "@n-dx/lang-java": patch
 "@n-dx/lang-kit": patch
+"@n-dx/lang-php": patch
 "@n-dx/lang-python": patch
 "@n-dx/lang-runtime": patch
 "@n-dx/lang-sql": patch
