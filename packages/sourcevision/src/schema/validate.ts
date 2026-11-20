@@ -744,6 +744,39 @@ const SdlcLanguageEcosystemSchema = z.object({
     .optional(),
 });
 
+// ── Legacy constructs per file ──────────────────────────────────────────────
+
+const VersionCountsSchema = z.record(z.string().regex(LANGUAGE_VERSION), z.number().int().positive());
+
+const LegacyFileEntrySchema = z.object({
+  path: z.string().min(1),
+  floor: z
+    .object({ version: z.string().regex(LANGUAGE_VERSION), rule: z.string().min(1), line: z.number().int().positive() })
+    .optional(),
+  uses: COUNT,
+  notices: COUNT,
+  removedIn: VersionCountsSchema,
+  deprecatedIn: VersionCountsSchema,
+  constructs: z.array(z.object({
+    rule: z.string().min(1),
+    construct: z.string().min(1),
+    status: z.enum(["removed", "deprecated", "notice"]),
+    line: z.number().int().positive(),
+    column: COUNT,
+    deprecated: z.string().regex(LANGUAGE_VERSION).optional(),
+    removed: z.string().regex(LANGUAGE_VERSION).optional(),
+    changed: z.string().regex(LANGUAGE_VERSION).optional(),
+    likely: z.literal(true).optional(),
+  })),
+}).refine((f) => f.floor !== undefined || f.constructs.length > 0, { message: "a file needs a floor or a construct use" });
+
+export const LegacySchema = z.object({
+  languages: z.record(z.string().min(1), z.object({
+    files: z.array(LegacyFileEntrySchema),
+    thirdParty: z.array(LegacyFileEntrySchema).min(1).optional(),
+  })),
+});
+
 export const SdlcProfileSchema = z.object({
   schemaVersion: z.string(),
   projectDir: z.string().optional(),
@@ -884,6 +917,8 @@ export function validateModule(
       return validate(OutboundSchema, data);
     case "config":
       return validate(ConfigSchema, data);
+    case "legacy":
+      return validate(LegacySchema, data);
     default:
       return {
         ok: false,

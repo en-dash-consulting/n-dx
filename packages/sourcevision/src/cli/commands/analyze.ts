@@ -57,6 +57,7 @@ import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
 import { packConfigData, writeConfigData } from "../../analyzers/pack-config-facts.js";
+import { packLegacyData, writeLegacyData } from "../../analyzers/pack-legacy-files.js";
 import { packEcosystem, withEcosystem } from "../../analyzers/pack-ecosystem.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
@@ -862,14 +863,18 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // Dockerfiles this reads. Deterministic: no LLM call and no network.
     // Language packs' version floors and legacy constructs join it as
     // `ecosystem`, only when a pack that produces them ran over files of its language.
+    const packFacts = await packFrameworkFacts(ctx, inventory);
     const sdlcProfile = withEcosystem(
       await buildSdlcProfile(ctx.absDir, { exclude: outsideStructurePredicate(inventory.files) }),
-      packEcosystem(await packFrameworkFacts(ctx, inventory), inventory),
+      packEcosystem(packFacts, inventory),
     );
     writeFileSync(
       join(ctx.svDir, DATA_FILES.sdlcProfile),
       toCanonicalJSON(stripSdlcProfileForDisk(sdlcProfile)),
     );
+    // The same facts per file: each file's floor and legacy-construct uses,
+    // only when a pack found any; otherwise a stale legacy.json is removed.
+    writeLegacyData(ctx.svDir, packLegacyData(packFacts, inventory));
 
     // The judgement computed from that profile, persisted so a reader that
     // only wants the headline — the dashboard's status poll, the hub card —
@@ -888,7 +893,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // Deterministic and LLM-free, so it runs on every analysis including
     // `--fast`, and is written canonically for the same reason as the file
     // above it. Language packs' outbound calls join the detectors' entries.
-    const outbound = applicationOutbound(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory)), inventory);
+    const outbound = applicationOutbound(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, packFacts), inventory);
     writeFileSync(join(ctx.svDir, DATA_FILES.outbound), toCanonicalJSON(outbound));
     const targetsLine = describeOutboundTargets(outbound.dependencies);
     if (targetsLine) info(targetsLine);
@@ -896,7 +901,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // Config reads and flag checks, only when a language pack produced them:
     // without one there is no config.json, and a stale one from a run that
     // had a producing pack is removed rather than left to mislead.
-    writeConfigData(ctx.svDir, packConfigData(await packFrameworkFacts(ctx, inventory), inventory));
+    writeConfigData(ctx.svDir, packConfigData(packFacts, inventory));
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
     writeFileSync(join(ctx.svDir, SUPPLEMENTARY_FILES[0]), llmsTxt);

@@ -248,6 +248,7 @@ All output is written to `.sourcevision/`:
 | `components.json` | React component catalog with props and usage edges |
 | `callgraph.json` | Function/method definitions and call edges, for JavaScript and TypeScript only: PHP call facts are not in it yet. Files with role `generated` or `asset` are left out, minified bundles included (`*.min.js`, `*-min.js`, `*.bundle.js`, or a line over 2,000 characters in the first 64 KiB); `--include-minified` maps minified ones |
 | `config.json` | **New.** Config reads and feature-flag checks from language packs, per file, with flag and config-key indexes; no values. Only written when a pack produces them |
+| `legacy.json` | **New.** Per language and file, the version floor and each legacy-construct use (rule, status, versions, position) behind `sdlc-profile.json`'s `ecosystem`; third-party files apart. Only written when a pack finds a floor or a use |
 | `llms.txt` | Structured Markdown summary for LLM consumption |
 | `CONTEXT.md` | Dense XML-tagged summary optimized for Claude |
 | `zones/{zone-id}/context.md` | Detailed per-zone context |
