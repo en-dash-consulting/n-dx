@@ -14,13 +14,14 @@
  */
 
 import { EventEmitter } from "node:events";
-import { PassThrough } from "node:stream";
+import { configReadChild, decodeWindowsCommandLine } from "./cli-process-fixtures.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { spawn as nodeSpawn } from "node:child_process";
 import { serializeDocument } from "@n-dx/rex";
 import { loadConfig, saveConfig } from "../../src/store/config.js";
 import { setupProjectDir, disableMemoryGuard, commitGitFixtureBaseline } from "./index.js";
+export { decodeWindowsCommandLine } from "./cli-process-fixtures.js";
 
 /** What one vendor-CLI spawn received. */
 export interface CliInvocation {
@@ -51,55 +52,6 @@ function commandBase(command: string): string {
 const VENDOR_CLIS = ["claude", "codex"];
 
 /**
- * Split a command line built by `buildWindowsCliCommandLine` back into its
- * tokens — the binary first, then the argv.
- *
- * The inverse of `quoteWindowsToken`: every argument is wrapped in `"…"`, an
- * embedded quote is written `""`, and backslashes are doubled only where they
- * precede a quote (or the closing quote). The binary may be bare.
- *
- * @internal Exported for testing.
- */
-export function decodeWindowsCommandLine(line: string): string[] {
-  const tokens: string[] = [];
-  let i = 0;
-  const n = line.length;
-  while (i < n) {
-    while (i < n && line[i] === " ") i++;
-    if (i >= n) break;
-    if (line[i] !== '"') {
-      const start = i;
-      while (i < n && line[i] !== " ") i++;
-      tokens.push(line.slice(start, i));
-      continue;
-    }
-    i++; // opening quote
-    let token = "";
-    while (i < n) {
-      let slashes = 0;
-      while (i < n && line[i] === "\\") {
-        slashes++;
-        i++;
-      }
-      if (i < n && line[i] === '"') {
-        token += "\\".repeat(slashes / 2);
-        if (line[i + 1] === '"') {
-          token += '"'; // `""` is an embedded quote
-          i += 2;
-          continue;
-        }
-        i++; // closing quote
-        break;
-      }
-      token += "\\".repeat(slashes);
-      if (i < n) token += line[i++];
-    }
-    tokens.push(token);
-  }
-  return tokens;
-}
-
-/**
  * The vendor binary and argv behind one spawn, or undefined when the spawn is
  * not a vendor CLI. On Windows `spawnCli` runs `cmd.exe /d /s /c "<line>"`,
  * where `<line>` is the quoted command line; it is decoded back to argv.
@@ -127,28 +79,6 @@ function emptyChild(): EventEmitter {
     kill: () => true,
   });
   queueMicrotask(() => proc.emit("close", 0, null));
-  return proc;
-}
-
-/** config/read never consumes a model turn. The native protocol is covered by
- * the dedicated scratch tests; loop fixtures retain the compiler's temp set.
- */
-function configReadChild(args: string[]): EventEmitter {
-  const proc = Object.assign(new EventEmitter(), {
-    pid: undefined, exitCode: null, signalCode: null,
-    stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), kill: () => true,
-  });
-  const set: Record<string, string> = {};
-  for (const arg of args) {
-    const match = /^shell_environment_policy\.set\.(TMPDIR|TMP|TEMP)=(.*)$/.exec(arg);
-    if (match) set[match[1]] = JSON.parse(match[2]);
-  }
-  proc.stdin.on("data", chunk => {
-    const message = JSON.parse(String(chunk));
-    if (message.id) queueMicrotask(() => proc.stdout.write(JSON.stringify({ id: message.id,
-      result: message.method === "initialize" ? {} : { config: { shell_environment_policy: { set } } },
-    }) + "\n"));
-  });
   return proc;
 }
 
