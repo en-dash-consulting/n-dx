@@ -329,6 +329,7 @@ describe("hench → llm-client gateway contract", () => {
 
   const GATEWAY_FUNCTIONS = [
     "createOpenAiApiProvider", "supportsOpenAiTurns",
+    "createCodexScratch", "assertCodexScratchEnvironment",
     "loadClaudeConfig",
     "loadLLMConfig",
     "compileEnvPolicy",

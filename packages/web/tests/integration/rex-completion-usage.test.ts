@@ -40,7 +40,7 @@ async function fixture() {
 }
 
 async function complete(ctx: ServerContext, stream: string, failed: boolean, ownerTime?: string) {
-  const cli = writeFakeCli(ctx.projectDir, { name: "codex", script: `
+  const cli = writeFakeCli(ctx.projectDir, { name: "codex", codexConfigRead: {}, script: `
     import fs from 'node:fs';
     for await (const chunk of process.stdin) { /* drain prompt */ }
     process.stdout.write(${JSON.stringify(stream)});
