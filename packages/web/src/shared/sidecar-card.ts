@@ -134,6 +134,28 @@ export interface SidecarStatusChange {
   rule: { allowed: true } | { allowed: false; message: string };
 }
 
+/**
+ * Active work that holds an item a PRD-writing card touches: a hench run, or a
+ * rex claim, on a task in some worktree of the repository. A change or feature
+ * above that task counts as held too, by the same holder. Approving the card
+ * still writes; the card warns first and the approval must acknowledge it.
+ */
+export interface SidecarHeldBy {
+  /** The item the card touches that the work holds: the task itself, or an item above it. */
+  itemId: string;
+  /** The task the run or claim is on. */
+  taskId: string;
+  taskTitle?: string;
+  /** The worktree's directory name, as the dashboard names worktrees. */
+  worktree: string;
+  /** The worktree's path. */
+  worktreePath: string;
+  /** The run, when the holder knows it. */
+  runId?: string;
+  /** A live run (hench lock or a dashboard execution), or a rex claim with no run seen. */
+  source: "run" | "claim";
+}
+
 /** One option of a choice card. */
 export interface SidecarChoiceOption {
   label: string;

@@ -27,6 +27,11 @@
  * sent with the approval; a validation error's problems list shows under it.
  * Rich edit bodies come later.
  *
+ * A PRD card whose item active work holds (`heldBy`: a run or a claim in
+ * some worktree, on the item or a task under it) says so above its actions,
+ * and Approve asks twice: the first press arms it, the second approves with
+ * `acknowledgeHeld`. ⌘↵ follows the same two steps.
+ *
  * A card withdrawn because its session ended draws as denied with the note
  * "session ended" (UX8); one withdrawn because the turn stopped draws as
  * withdrawn.
@@ -498,6 +503,37 @@ function settledNote(card: SidecarCard, state: SidecarCardState): string {
   }
 }
 
+/** The warning a card shows while active work holds its item. */
+export function heldWarningText(heldBy: NonNullable<SidecarCard["heldBy"]>): string {
+  return heldBy.source === "run"
+    ? `Being worked by an active run in ${heldBy.worktree} — approving changes it under that run.`
+    : `Claimed by ${heldBy.worktree} for a run — approving changes it under that claim.`;
+}
+
+/** Which item and task the hold is on, for the line under the warning. */
+function heldDetailText(heldBy: NonNullable<SidecarCard["heldBy"]>): string {
+  const task = `${heldBy.taskTitle ? `${heldBy.taskTitle} (${heldBy.taskId})` : heldBy.taskId}`;
+  const run = heldBy.runId ? `, run ${heldBy.runId}` : "";
+  return heldBy.itemId === heldBy.taskId ? `Task ${task}${run}` : `${heldBy.itemId} is above task ${task}${run}`;
+}
+
+/** The held warning: the sentence, then which task holds it. Decided cards keep a one-line record of it. */
+function HeldWarning({ card, armed }: { card: SidecarCard; armed: boolean }) {
+  const { heldBy } = card;
+  if (!heldBy) return null;
+  if (card.status !== "pending") {
+    return card.heldAcknowledged
+      ? h("p", { class: "sidecar-card-note sidecar-card-held-note" }, `Approved over active work in ${heldBy.worktree}`)
+      : null;
+  }
+  return h("div", { class: "sidecar-card-held", role: "status", title: heldBy.worktreePath },
+    h("span", { class: "sidecar-card-held-label" }, heldBy.source === "run" ? "IN PROGRESS" : "CLAIMED"),
+    h("p", { class: "sidecar-card-held-text" }, heldWarningText(heldBy)),
+    h("p", { class: "sidecar-card-held-detail" }, heldDetailText(heldBy)),
+    armed ? h("p", { class: "sidecar-card-held-detail" }, "Press Approve again to write anyway, or Deny.") : null,
+  );
+}
+
 /**
  * A decided card folds to one line. A decided run plan does not: its lanes
  * stay live after the decision (Started, Work card raised, Start lane again).
@@ -554,9 +590,11 @@ interface CardProps {
   choiceDraft: ChoiceDraft;
   onChoiceDraft: (draft: ChoiceDraft) => void;
   onRestartLane?: (lane: number) => void;
+  /** The held card's Approve was pressed once: the next press approves over the active work. */
+  heldArmed: boolean;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, itemEditDraft, onItemEditDraft, choiceDraft, onChoiceDraft, onRestartLane }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, placementEdit, onPlacementEdit, externalEdit, onExternalEdit, itemEditDraft, onItemEditDraft, choiceDraft, onChoiceDraft, onRestartLane, heldArmed }: CardProps) {
   const state = sidecarCardState(card);
   // A decided card is one line (head + note) until the operator opens its body.
   const [open, setOpen] = useState(false);
@@ -642,6 +680,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
     !folded && card.preview !== undefined
       ? h("pre", { class: "sidecar-card-preview", "aria-label": "What this would run" }, card.preview)
       : null,
+    folded && !card.heldAcknowledged ? null : h(HeldWarning, { card, armed: heldArmed }),
     folded ? null : body,
     state !== "pending"
       ? null
@@ -660,7 +699,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
               card.runPlan
                 ? null
                 : h("button", {
-                    type: "button", class: "sidecar-card-approve",
+                    type: "button", class: `sidecar-card-approve${heldArmed ? " is-confirming" : ""}`,
                     // Place waits for the dry-run line of the placement as edited; a call waits for every field to hold a value.
                     disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)) || externalEdit === null
                       || (!!card.choice && !choiceAnswerOf(choiceDraft)),
@@ -671,6 +710,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                     },
                   },
                     card.choice ? "Send"
+                    : heldArmed ? "Confirm: write under the active work"
                     : card.changeSet
                       ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}`
                       : card.placement ? "Place"
@@ -735,6 +775,8 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   const [itemEditDraft, setItemEditDraft] = useState<ItemEditDraft>({});
   const [choiceDraft, setChoiceDraft] = useState<ChoiceDraft>(EMPTY_CHOICE_DRAFT);
   const [decidedOpen, setDecidedOpen] = useState(false);
+  // The held card whose Approve was pressed once; its next approval acknowledges the active work.
+  const [heldArmed, setHeldArmed] = useState<string | null>(null);
   const firstId = first?.id ?? null;
   const firstPath = first?.kind === "draft-file" ? str(first.input.path) : "";
   const firstItemEdit = first?.itemEdit;
@@ -744,9 +786,11 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
     setNote(""); setDrafts({}); setPlacementEdit(null); setPath(firstPath); setExternalEdit(undefined);
     setItemEditDraft(firstItemEdit ? itemEditDraftOf(firstItemEdit) : {});
     setChoiceDraft(EMPTY_CHOICE_DRAFT);
+    setHeldArmed(null);
   }, [firstId]);
 
-  const answer = async (decision: SidecarCardDecision) => {
+  const answer = async (asked: SidecarCardDecision) => {
+    let decision = asked;
     if (!first || deciding) return;
     // ⌘↵ is no answer to a run plan: only a lane's Start lane approves it.
     if (first.runPlan && decision.approve && decision.lane === undefined) return;
@@ -754,6 +798,11 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
     if (first.placement && decision.approve && !placementDecidable(first, placementEdit)) return;
     // Nor of a call while a field's text is not a value of its type.
     if (first.kind === "external-call" && decision.approve && externalEdit === null) return;
+    // Active work holds the card's item: the first approval only arms Approve, the second acknowledges the work.
+    if (decision.approve && first.heldBy && !decision.acknowledgeHeld) {
+      if (heldArmed !== first.id) { setHeldArmed(first.id); return; }
+      decision = { ...decision, acknowledgeHeld: true };
+    }
     // Nor of a question until a row is picked (or Other holds text): ⌘↵ sends what the card shows.
     if (first.choice && decision.approve) {
       const picked = decision.answer ?? choiceAnswerOf(choiceDraft);
@@ -843,6 +892,7 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       path,
       onPath: setPath,
       onRestartLane: send ? (lane: number) => { void send(runPlanRestartPrompt(card, lane)); } : undefined,
+      heldArmed: card.id === firstId && heldArmed === card.id && !!card.heldBy,
   });
   // Pending cards (and run plans) stay first and open; several decided ones sit behind one toggle.
   const open = cards.filter((c) => !foldable(c));

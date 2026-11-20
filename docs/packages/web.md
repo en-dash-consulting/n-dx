@@ -218,6 +218,8 @@ On Tune, the run classifier's verdict chip on a failed run shows whether or not 
 
 **One placement surface.** One place decides a change's placement at a time. While the drawer holds that change's placement card, the placement panel shrinks to one line, "Placing with Sidecar · decide in the drawer", and the spec map follows the card's selected row, both ways. **Place by hand** reopens the panel with the card's selection. It also covers the card's withdrawal after 60 seconds.
 
+**Active work.** A card that would write to an item an agent run is executing, or that a worktree has claimed for a run, says so ("Being worked by an active run in <worktree>"), and its parents count too. Approve then takes a second press, and the server checks again on approval: an item that became held while the card waited answers 409 until the approval acknowledges it. The session's brief opens with the items active work holds, so the Sidecar avoids proposing writes to them.
+
 **Ghost items.** While a change-set card waits, its items show wherever a change appears: the PRD tree, Open changes rows, markers on the area map and the area view's spec map, and a "+N waiting on a card" note in the lifecycle strip. Real counts never include them.
 
 **Without the Sidecar.** Everything above is hidden. Plan keeps Preview, Draft with the model and the placement panel; Specs to tighten still links to the filtered list; the Tune tiles keep working.

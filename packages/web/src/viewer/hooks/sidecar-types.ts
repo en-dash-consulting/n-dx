@@ -147,6 +147,16 @@ export interface SidecarExternalCall {
 }
 /** One problem of a server's validation error; mirrors `SidecarCallProblem` in shared/sidecar-card.ts. */
 export interface SidecarCallProblem { field?: string; message: string }
+/** Active work holding an item a PRD card writes to; mirrors `SidecarHeldBy` in shared/sidecar-card.ts. */
+export interface SidecarHeldBy {
+  itemId: string;
+  taskId: string;
+  taskTitle?: string;
+  worktree: string;
+  worktreePath: string;
+  runId?: string;
+  source: "run" | "claim";
+}
 /** A permission card; mirrors `SidecarCard` in server/sidecar/broker.ts. */
 export interface SidecarCard {
   id: string;
@@ -180,6 +190,10 @@ export interface SidecarCard {
   externalCall?: SidecarExternalCall;
   /** The lane (0-based) the operator started from a run-plan card. */
   lane?: number;
+  /** Active work (a run or a claim in some worktree) holds an item the card writes to; Approve asks twice. */
+  heldBy?: SidecarHeldBy;
+  /** Approved over that warning. */
+  heldAcknowledged?: true;
   status: "pending" | "approved" | "denied" | "withdrawn";
   raisedAt: string;
   decidedAt?: string;
@@ -212,6 +226,8 @@ export interface SidecarCardDecision {
   arguments?: Record<string, unknown>;
   /** A choice card's answer: the option labels picked and the Other text; Send approves with it. */
   answer?: SidecarChoiceAnswer;
+  /** The operator confirmed approving although active work holds the card's item (`heldBy`). */
+  acknowledgeHeld?: boolean;
 }
 /**
  * The parts of a command's effects declaration a command card draws; core

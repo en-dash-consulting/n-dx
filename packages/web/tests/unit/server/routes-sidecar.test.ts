@@ -30,6 +30,7 @@ import {
 import { readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
 import type { SidecarActions } from "../../../src/server/sidecar/carry-out.js";
+import type { SidecarHeldBy, SidecarStatusChange } from "../../../src/shared/index.js";
 import { LENS_IDS } from "../../../src/server/sidecar/lens-packets.js";
 import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
@@ -44,6 +45,8 @@ let messages: SidecarFramesMessage[];
 let registry: SidecarSessionRegistry;
 let broker: SidecarBroker;
 let spawns: number;
+/** Per-test overrides of {@link noEffects}: a status read, or what active work holds. */
+let extraActions: Partial<SidecarActions>;
 
 /** Claude stand-in: resumes `--resume <id>`, else mints `vendor-<n>`. */
 const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) => {
@@ -157,10 +160,11 @@ beforeEach(async () => {
   messages = [];
   waiters = [];
   spawns = 0;
+  extraActions = {};
   registry = newRegistry();
   broker = createAnnouncingBroker(join(root, ".hench", "sidecar"), broadcast);
   server = await startRouteTestServer((req, res) =>
-    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry, brokerFor: () => broker, actionsFor: () => noEffects }));
+    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry, brokerFor: () => broker, actionsFor: () => ({ ...noEffects, ...extraActions }) }));
 });
 
 afterEach(async () => {
@@ -793,5 +797,97 @@ describe("broker", () => {
     expect(cards).toEqual([expect.objectContaining({ status: "withdrawn", reason: "session ended" })]);
     expect((await call).isError).toBe(true);
     await client.close();
+  });
+
+  describe("cards on items active work holds", () => {
+    const STATUS: SidecarStatusChange = { itemId: "t1", itemTitle: "Task one", from: "pending", to: "deferred", rule: { allowed: true } };
+    const HELD: SidecarHeldBy = { itemId: "t1", taskId: "t1", taskTitle: "Task one", worktree: "wt-a", worktreePath: "/repo/wt-a", source: "run" };
+    let held: SidecarHeldBy | null;
+    let asked: string[][];
+
+    beforeEach(() => {
+      held = null;
+      asked = [];
+      extraActions = {
+        checkStatus: async () => STATUS,
+        heldItem: async (ids) => { asked.push(ids); return held && ids.includes(held.itemId) ? held : null; },
+      };
+    });
+
+    it("raises the card with heldBy, refuses an approval that does not acknowledge it, and writes one that does", async () => {
+      held = HELD;
+      const id = await runningSession();
+      const client = await brokerClient(id);
+      const call = client.callTool({ name: "propose_status", arguments: { id: "t1", status: "deferred" } });
+      const { cardId } = await cardAnnounced(id, "pending");
+      expect(asked[0]).toEqual(["t1"]);
+      expect(broker.cards(id)[0]!.heldBy).toEqual(HELD);
+
+      const bare = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve" } });
+      expect(bare.status).toBe(409);
+      const conflict = await bare.json() as { code: string; heldBy: SidecarHeldBy; error: string };
+      expect(conflict.code).toBe("held");
+      expect(conflict.heldBy).toEqual(HELD);
+      expect(conflict.error).toMatch(/held by an active run on task t1 \(Task one\) in wt-a/);
+      expect(broker.cards(id)[0]!.status).toBe("pending");
+
+      const notBool = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", acknowledgeHeld: "yes" } });
+      expect(notBool.status).toBe(400);
+
+      const acked = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", acknowledgeHeld: true } });
+      expect(acked.status).toBe(200);
+      expect((await acked.json()).card).toEqual(expect.objectContaining({ status: "approved", heldAcknowledged: true, heldBy: HELD }));
+      const result = await call;
+      expect(result.isError).toBeFalsy();
+      expect(resultText(result)).toMatch(/confirmed it over the card's warning that t1 is held by an active run/);
+      expect(resultText(result)).toContain("Set it.");
+      await client.close();
+      await api(`/${id}/interrupt`, { method: "POST" });
+    });
+
+    it("warns at approval about work that started after the card was raised", async () => {
+      const id = await runningSession();
+      const client = await brokerClient(id);
+      const call = client.callTool({ name: "propose_status", arguments: { id: "t1", status: "deferred" } });
+      const { cardId } = await cardAnnounced(id, "pending");
+      expect(broker.cards(id)[0]!.heldBy).toBeUndefined();
+
+      held = { ...HELD, source: "claim" };
+      const bare = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve" } });
+      expect(bare.status).toBe(409);
+      // The waiting card now carries the warning, so the drawer can ask.
+      expect(broker.cards(id)[0]!.heldBy).toEqual(held);
+      const acked = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", acknowledgeHeld: true } });
+      expect(acked.status).toBe(200);
+      await call;
+      await client.close();
+      await api(`/${id}/interrupt`, { method: "POST" });
+    });
+
+    it("approves at once when nothing holds the item, and never asks on a deny", async () => {
+      const id = await runningSession();
+      const client = await brokerClient(id);
+      const call = client.callTool({ name: "propose_status", arguments: { id: "t1", status: "deferred" } });
+      const { cardId } = await cardAnnounced(id, "pending");
+      const approved = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve" } });
+      expect(approved.status).toBe(200);
+      expect((await approved.json()).card.heldAcknowledged).toBeUndefined();
+      await call;
+
+      held = HELD;
+      const second = client.callTool({ name: "propose_status", arguments: { id: "t1", status: "deferred" } });
+      const next = await new Promise<string>((resolve) => {
+        const poll = (): void => {
+          const pending = broker.cards(id).find((c) => c.status === "pending");
+          if (pending) resolve(pending.id); else setTimeout(poll, 5);
+        };
+        poll();
+      });
+      const denied = await api(`/${id}/cards/${next}`, { method: "POST", body: { decision: "deny" } });
+      expect(denied.status).toBe(200);
+      expect((await second).isError).toBe(true);
+      await client.close();
+      await api(`/${id}/interrupt`, { method: "POST" });
+    });
   });
 });
