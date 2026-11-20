@@ -1054,12 +1054,21 @@ export interface LlmCatalogResponse {
 }
 
 /**
- * Every model id llm-client's catalog knows for `vendor`: the union of its
- * `TIER_MODELS` (light/standard/heavy) and every `MODEL_COSTS` entry that
- * belongs to the vendor — the same cost table the dashboard's spend views and
- * `ndx usage` price a run against. Sorted for a stable response.
+ * Codex's built-in selection catalog, independent of pricing coverage.
+ * Keep the pre-pricing-refresh set; additional ids require a successful live
+ * listing. Pricing metadata alone does not establish model availability.
  */
+const BUILT_IN_CODEX_MODELS = [
+  "gpt-5.4-mini",
+  "gpt-5.5",
+  "gpt-5.6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+] as const;
+
+/** Built-in selection ids, sorted; Claude and Google retain their tier/cost union. */
 function cloudVendorModels(vendor: LLMVendor): string[] {
+  if (vendor === LLM_VENDOR.CODEX) return [...BUILT_IN_CODEX_MODELS];
   const tierModels = Object.values(TIER_MODELS[vendor]).filter((m): m is string => Boolean(m));
   const catalogModels = Object.keys(MODEL_COSTS).filter((id) => isModelCompatibleWithVendor(vendor, id));
   return [...new Set([...tierModels, ...catalogModels])].sort();

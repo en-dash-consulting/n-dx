@@ -83,22 +83,3 @@ Metadata snapshot normalization does not change the model passed to execution.
   (`known: false`, `pricedAs` on aggregate lines); it is not verified pricing.
   The strict `resolveOpenAICost` and preflight cost return undefined for unknowns.
   Dashboard estimates explain their assumptions and are not invoices.
-
-## Implementation validation (2026-11-16)
-
-- Scoped llm-client metadata, pricing, preflight, tier coverage, config and review
-  model tests: 171 passed. Dashboard DOM tests: 13 passed.
-- Both affected package builds and typechecks passed. Required root cli-dev and
-  scheduler-startup checks passed; root pricing-parity and changeset policy
-  checks passed. Shared-estimator parity verifies a 150K Sol prompt costs $0.30
-  on both paths; aggregate input does not trigger a per-request surcharge.
-- The broader llm-client run encountered 14 local-provider retry/streaming
-  failures with `listen EPERM` in this network-confined session. Those tests
-  were unchanged since the verified main baseline. An uppercase snapshot
-  regression exposed during that run was fixed and its final scoped run passed.
-- The web server parity test is added but was excluded by the existing
-  `CODEX_SANDBOX_NETWORK_DISABLED` configuration. It needs the mandatory outer
-  affected gate; no marker was cleared and no confinement was bypassed.
-- No live browser or model/account availability test was performed. DOM fixtures
-  and public metadata are not evidence of installed CLI model access. Mandatory
-  fresh Codex self-review and the affected gate remain Hench finalization steps.
