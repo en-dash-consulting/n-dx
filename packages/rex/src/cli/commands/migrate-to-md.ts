@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { CLIError } from "../errors.js";
 import { info } from "../output.js";
 import {

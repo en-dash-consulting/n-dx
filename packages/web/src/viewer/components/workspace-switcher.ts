@@ -20,10 +20,11 @@
  */
 
 import { h } from "preact";
-import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import type { ViewId } from "../types.js";
 import { detectBasePath } from "../external.js";
 import { getWorkspaceKey } from "../base-path.js";
+import { useBreadcrumbMenu } from "./breadcrumb-menu.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -134,10 +135,7 @@ function BranchIcon() {
 
 export function WorkspaceSwitcher({ view, branch, navigate, fetcher }: WorkspaceSwitcherProps) {
   const [options, setOptions] = useState<WorkspaceOption[]>([]);
-  const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const { open, setOpen, highlight, setHighlight, rootRef, buttonRef, onOpenMenuKey } = useBreadcrumbMenu(options);
   const currentKey = getWorkspaceKey();
   const doFetch = fetcher ?? ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
   const go = navigate ?? ((url: string) => { window.location.assign(url); });
@@ -156,16 +154,6 @@ export function WorkspaceSwitcher({ view, branch, navigate, fetcher }: Workspace
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (open) void load(); }, [open, load]);
-
-  // Close on outside click.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
 
   const current = useMemo(() => options.find((o) => o.isCurrent) ?? null, [options]);
   const label = current
@@ -188,16 +176,7 @@ export function WorkspaceSwitcher({ view, branch, navigate, fetcher }: Workspace
       }
       return;
     }
-    switch (e.key) {
-      case "ArrowDown": e.preventDefault(); setHighlight((i) => Math.min(options.length - 1, i + 1)); break;
-      case "ArrowUp": e.preventDefault(); setHighlight((i) => Math.max(0, i - 1)); break;
-      case "Home": e.preventDefault(); setHighlight(0); break;
-      case "End": e.preventDefault(); setHighlight(options.length - 1); break;
-      case "Enter":
-      case " ": e.preventDefault(); if (options[highlight]) select(options[highlight]); break;
-      case "Escape": e.preventDefault(); setOpen(false); buttonRef.current?.focus(); break;
-      case "Tab": setOpen(false); break;
-    }
+    onOpenMenuKey(e, select);
   };
 
   if (!label) return null;

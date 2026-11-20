@@ -57,10 +57,10 @@ export function deepMerge(
 }
 
 /**
- * Load and parse a JSON config file. Returns null if the file doesn't exist
- * or contains invalid JSON.
+ * Load and parse a JSON config file. Returns null if the file doesn't exist,
+ * contains invalid JSON, or does not hold a JSON object.
  */
-async function loadJSONFile(
+export async function loadJSONFile(
   filePath: string,
 ): Promise<Record<string, unknown> | null> {
   try {

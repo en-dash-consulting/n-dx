@@ -233,6 +233,67 @@ export function mergeChanges(
   return { valid: true, result: mergeItems(items, sourceIds, targetId, options) };
 }
 
+// ── Combined fields (shared by preview and apply) ───────────────────
+
+/**
+ * The items' descriptions in `orderedIds` order (target first), joined by a
+ * horizontal rule; undefined when none has one.
+ */
+function combineDescriptions(items: PRDItem[], orderedIds: string[]): string | undefined {
+  const descriptions: string[] = [];
+  for (const id of orderedIds) {
+    const entry = findItem(items, id)!;
+    if (entry.item.description) {
+      descriptions.push(entry.item.description);
+    }
+  }
+  return descriptions.length > 0
+    ? descriptions.join("\n\n---\n\n")
+    : undefined;
+}
+
+/** The items' acceptance criteria in `orderedIds` order (target first), deduplicated. */
+function unionCriteria(items: PRDItem[], orderedIds: string[]): string[] {
+  const allCriteria: string[] = [];
+  const seenCriteria = new Set<string>();
+  for (const id of orderedIds) {
+    const entry = findItem(items, id)!;
+    for (const ac of entry.item.acceptanceCriteria ?? []) {
+      if (!seenCriteria.has(ac)) {
+        seenCriteria.add(ac);
+        allCriteria.push(ac);
+      }
+    }
+  }
+  return allCriteria;
+}
+
+/** Every source item's tags, deduplicated and sorted. */
+function unionTags(items: PRDItem[], sourceIds: string[]): string[] {
+  const allTags = new Set<string>();
+  for (const id of sourceIds) {
+    const entry = findItem(items, id)!;
+    for (const tag of entry.item.tags ?? []) {
+      allTags.add(tag);
+    }
+  }
+  return [...allTags].sort();
+}
+
+/** Every source item's blockedBy, deduplicated, excluding the source items themselves. */
+function unionExternalBlockers(items: PRDItem[], sourceIds: string[]): string[] {
+  const allBlockedBy = new Set<string>();
+  for (const id of sourceIds) {
+    const entry = findItem(items, id)!;
+    for (const dep of entry.item.blockedBy ?? []) {
+      if (!sourceIds.includes(dep)) {
+        allBlockedBy.add(dep);
+      }
+    }
+  }
+  return [...allBlockedBy];
+}
+
 // ── Preview ─────────────────────────────────────────────────────────
 
 /**
@@ -249,39 +310,6 @@ export function previewMerge(
   const targetEntry = findItem(items, targetId)!;
   const target = targetEntry.item;
   const absorbedIds = sourceIds.filter((id) => id !== targetId);
-
-  // Combine acceptance criteria (deduplicated)
-  const allCriteria: string[] = [];
-  const seenCriteria = new Set<string>();
-  for (const id of [targetId, ...absorbedIds]) {
-    const entry = findItem(items, id)!;
-    for (const ac of entry.item.acceptanceCriteria ?? []) {
-      if (!seenCriteria.has(ac)) {
-        seenCriteria.add(ac);
-        allCriteria.push(ac);
-      }
-    }
-  }
-
-  // Combine tags (deduplicated)
-  const allTags = new Set<string>();
-  for (const id of sourceIds) {
-    const entry = findItem(items, id)!;
-    for (const tag of entry.item.tags ?? []) {
-      allTags.add(tag);
-    }
-  }
-
-  // Combine blockedBy (deduplicated, excluding source IDs)
-  const allBlockedBy = new Set<string>();
-  for (const id of sourceIds) {
-    const entry = findItem(items, id)!;
-    for (const dep of entry.item.blockedBy ?? []) {
-      if (!sourceIds.includes(dep)) {
-        allBlockedBy.add(dep);
-      }
-    }
-  }
 
   // Count children that will be reparented
   let reparentedChildCount = 0;
@@ -304,20 +332,9 @@ export function previewMerge(
     }
   }
 
-  // Build combined description
-  let combinedDescription = options?.description;
-  if (combinedDescription === undefined) {
-    const descriptions: string[] = [];
-    for (const id of [targetId, ...absorbedIds]) {
-      const entry = findItem(items, id)!;
-      if (entry.item.description) {
-        descriptions.push(entry.item.description);
-      }
-    }
-    combinedDescription = descriptions.length > 0
-      ? descriptions.join("\n\n---\n\n")
-      : undefined;
-  }
+  const combinedDescription = options?.description !== undefined
+    ? options.description
+    : combineDescriptions(items, [targetId, ...absorbedIds]);
 
   const absorbed = absorbedIds.map((id) => {
     const entry = findItem(items, id)!;
@@ -337,9 +354,9 @@ export function previewMerge(
       id: target.id,
       title: options?.title ?? target.title,
       description: combinedDescription,
-      acceptanceCriteria: allCriteria,
-      tags: [...allTags].sort(),
-      blockedBy: [...allBlockedBy],
+      acceptanceCriteria: unionCriteria(items, [targetId, ...absorbedIds]),
+      tags: unionTags(items, sourceIds),
+      blockedBy: unionExternalBlockers(items, sourceIds),
       childCount: existingTargetChildren + reparentedChildCount,
     },
     absorbed,
@@ -380,58 +397,28 @@ export function mergeItems(
   if (options?.description !== undefined) {
     target.description = options.description;
   } else {
-    const descriptions: string[] = [];
-    for (const id of [targetId, ...absorbedIds]) {
-      const entry = findItem(items, id)!;
-      if (entry.item.description) {
-        descriptions.push(entry.item.description);
-      }
-    }
-    if (descriptions.length > 0) {
-      target.description = descriptions.join("\n\n---\n\n");
+    const combined = combineDescriptions(items, [targetId, ...absorbedIds]);
+    if (combined !== undefined) {
+      target.description = combined;
     }
   }
 
   // Acceptance criteria — deduplicated union
-  const allCriteria: string[] = [];
-  const seenCriteria = new Set<string>();
-  for (const id of [targetId, ...absorbedIds]) {
-    const entry = findItem(items, id)!;
-    for (const ac of entry.item.acceptanceCriteria ?? []) {
-      if (!seenCriteria.has(ac)) {
-        seenCriteria.add(ac);
-        allCriteria.push(ac);
-      }
-    }
-  }
+  const allCriteria = unionCriteria(items, [targetId, ...absorbedIds]);
   if (allCriteria.length > 0) {
     target.acceptanceCriteria = allCriteria;
   }
 
   // Tags — deduplicated union
-  const allTags = new Set<string>();
-  for (const id of sourceIds) {
-    const entry = findItem(items, id)!;
-    for (const tag of entry.item.tags ?? []) {
-      allTags.add(tag);
-    }
-  }
-  if (allTags.size > 0) {
-    target.tags = [...allTags].sort();
+  const allTags = unionTags(items, sourceIds);
+  if (allTags.length > 0) {
+    target.tags = allTags;
   }
 
   // BlockedBy — union excluding self-references and source IDs
-  const allBlockedBy = new Set<string>();
-  for (const id of sourceIds) {
-    const entry = findItem(items, id)!;
-    for (const dep of entry.item.blockedBy ?? []) {
-      if (!sourceIds.includes(dep)) {
-        allBlockedBy.add(dep);
-      }
-    }
-  }
-  if (allBlockedBy.size > 0) {
-    target.blockedBy = [...allBlockedBy];
+  const allBlockedBy = unionExternalBlockers(items, sourceIds);
+  if (allBlockedBy.length > 0) {
+    target.blockedBy = allBlockedBy;
   } else {
     delete target.blockedBy;
   }

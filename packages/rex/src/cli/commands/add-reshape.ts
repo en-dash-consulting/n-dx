@@ -67,6 +67,32 @@ function normalizeForComparison(title: string): string {
 }
 
 /**
+ * Items keyed by their normalized, suffix-stripped title, in first-seen order.
+ * An item whose title normalizes to nothing is left out.
+ */
+function groupByNormalizedTitle(items: PRDItem[]): Map<string, PRDItem[]> {
+  const groups = new Map<string, PRDItem[]>();
+  for (const item of items) {
+    const key = normalizeForComparison(item.title);
+    if (!key) continue;
+    const group = groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key, group);
+  }
+  return groups;
+}
+
+/**
+ * A duplicate group's shared title: the canonical (suffix-free) member's, else
+ * the first member's with its suffix stripped. Keeps the original casing.
+ */
+function canonicalBaseTitle(group: PRDItem[]): string {
+  const canonicalMember =
+    group.find((g) => g.title.trim() === stripHashSuffix(g.title)) ?? group[0];
+  return stripHashSuffix(canonicalMember.title).trim();
+}
+
+/**
  * Return the container level one step above the given item level, or null
  * if there is no valid container level (e.g. epics can only live at root).
  */
@@ -108,14 +134,7 @@ export function detectHashSuffixDuplicates(
   if (siblings.length < 2) return [];
 
   // Group siblings by normalized stripped title
-  const groups = new Map<string, PRDItem[]>();
-  for (const sib of siblings) {
-    const key = normalizeForComparison(sib.title);
-    if (!key) continue;
-    const group = groups.get(key) ?? [];
-    group.push(sib);
-    groups.set(key, group);
-  }
+  const groups = groupByNormalizedTitle(siblings);
 
   const proposals: ReshapeProposal[] = [];
 
@@ -124,11 +143,7 @@ export function detectHashSuffixDuplicates(
 
     const containerLevel = group[0].level ? getContainerLevel(group[0].level) : null;
 
-    // Use the canonical (suffix-free) member's title when available; otherwise strip
-    // the first member's title. Preserves the original casing for the container title.
-    const canonicalMember =
-      group.find((g) => g.title.trim() === stripHashSuffix(g.title)) ?? group[0];
-    const containerTitle = stripHashSuffix(canonicalMember.title).trim();
+    const containerTitle = canonicalBaseTitle(group);
 
     // Determine strategy: group action when alwaysGroup or all items have children
     const allHaveChildren = group.every((g) => g.children && g.children.length > 0);
@@ -256,14 +271,7 @@ export function detectNonDuplicateTitleCollisions(
   if (siblings.length < 2) return [];
 
   // Group by normalized stripped title
-  const groups = new Map<string, PRDItem[]>();
-  for (const sib of siblings) {
-    const key = normalizeForComparison(sib.title);
-    if (!key) continue;
-    const grp = groups.get(key) ?? [];
-    grp.push(sib);
-    groups.set(key, grp);
-  }
+  const groups = groupByNormalizedTitle(siblings);
 
   const result: SiblingTitleCollisionPair[] = [];
 
@@ -349,14 +357,7 @@ export function detectHashSuffixDuplicatesInTree(
     if (cohort.length < 2) continue;
 
     // Sub-group members by normalized title
-    const byNormalized = new Map<string, PRDItem[]>();
-    for (const item of cohort) {
-      const key = normalizeForComparison(item.title);
-      if (!key) continue;
-      const grp = byNormalized.get(key) ?? [];
-      grp.push(item);
-      byNormalized.set(key, grp);
-    }
+    const byNormalized = groupByNormalizedTitle(cohort);
 
     for (const [normalizedTitle, members] of byNormalized) {
       if (members.length < 2) continue;
@@ -395,12 +396,11 @@ export function detectHashSuffixDuplicatesInTree(
  * return false.
  */
 function hasHashToken(title: string): boolean {
-  const UUID_HEX = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
   return (
     // bracketed UUID
-    new RegExp(`\\s*[\\(\\[]\\s*${UUID_HEX}\\s*[\\)\\]]\\s*$`, "i").test(title) ||
+    new RegExp(`\\s*[\\(\\[]\\s*${UUID_RE}\\s*[\\)\\]]\\s*$`, "i").test(title) ||
     // dash UUID tail
-    new RegExp(`\\s+-\\s+${UUID_HEX}$`, "i").test(title) ||
+    new RegExp(`\\s+-\\s+${UUID_RE}$`, "i").test(title) ||
     // bracketed purely hex token (4–12 chars)
     /\s*[\(\[]\s*[a-f0-9]{4,12}\s*[\)\]]\s*$/i.test(title) ||
     // dash purely hex token (6–12 chars)
@@ -456,14 +456,7 @@ export function detectConsolidationGroups(children: PRDItem[]): ConsolidationGro
   if (children.length < 2) return [];
 
   // Group by normalized stripped title
-  const groups = new Map<string, PRDItem[]>();
-  for (const child of children) {
-    const key = normalizeForComparison(child.title);
-    if (!key) continue;
-    const grp = groups.get(key) ?? [];
-    grp.push(child);
-    groups.set(key, grp);
-  }
+  const groups = groupByNormalizedTitle(children);
 
   const result: ConsolidationGroup[] = [];
 
@@ -475,11 +468,7 @@ export function detectConsolidationGroups(children: PRDItem[]): ConsolidationGro
     // clusters where the distinguishing suffix is a user-authored word.
     if (!group.some((item) => hasHashToken(item.title))) continue;
 
-    // Use the canonical (suffix-free) member's title for the base title;
-    // fall back to stripping the first member's title.
-    const canonicalMember =
-      group.find((g) => g.title.trim() === stripHashSuffix(g.title)) ?? group[0];
-    const baseTitle = stripHashSuffix(canonicalMember.title).trim();
+    const baseTitle = canonicalBaseTitle(group);
 
     result.push({
       baseTitle,
@@ -701,8 +690,6 @@ export async function runScopedConsolidationPass(
         timestamp,
       });
     }
-
-    // Persist renames and sync folder tree
 
     // Archive the rename audit trail
     await appendArchiveBatch(rexDir, {

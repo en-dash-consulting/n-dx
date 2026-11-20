@@ -9,11 +9,31 @@
 import type { Zones, CallEdge, ExternalImport } from "../external.js";
 import { getZoneColorByIndex } from "./colors.js";
 
+/** The zone a file belongs to, as the flow diagram names and colours it. */
+type FileZone = { id: string; name: string; color: string };
+
+/** A zone-to-zone edge weighted by how many crossings it stands for. */
+type WeightedEdge = { from: string; to: string; weight: number };
+
+/** Count one more `from → to` crossing in `pairCounts`. */
+function countPair(pairCounts: Map<string, number>, from: string, to: string): void {
+  const key = `${from}->${to}`;
+  pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+}
+
+/** The counted pairs as edges, in the order each pair was first counted. */
+function pairEdges(pairCounts: Map<string, number>): WeightedEdge[] {
+  return [...pairCounts.entries()].map(([key, weight]) => {
+    const [from, to] = key.split("->");
+    return { from, to, weight };
+  });
+}
+
 /** Build a map from file path to zone info (id, name, color). */
 export function buildFileToZoneMap(
   zones: Zones | null,
-): Map<string, { id: string; name: string; color: string }> {
-  const map = new Map<string, { id: string; name: string; color: string }>();
+): Map<string, FileZone> {
+  const map = new Map<string, FileZone>();
   if (zones) {
     zones.zones.forEach((z, i) => {
       const color = getZoneColorByIndex(i);
@@ -28,54 +48,38 @@ export function buildFileToZoneMap(
 /** Build aggregated flow edges from zone crossings for FlowDiagram. */
 export function buildFlowEdges(
   crossings: Zones["crossings"],
-): Array<{ from: string; to: string; weight: number }> {
+): WeightedEdge[] {
   const pairCounts = new Map<string, number>();
   for (const c of crossings) {
-    const key = `${c.fromZone}->${c.toZone}`;
-    pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
+    countPair(pairCounts, c.fromZone, c.toZone);
   }
-  return [...pairCounts.entries()].map(([key, weight]) => {
-    const [from, to] = key.split("->");
-    return { from, to, weight };
-  });
+  return pairEdges(pairCounts);
 }
 
 /** Build aggregated flow edges from call graph edges for FlowDiagram. */
 export function buildCallFlowEdges(
   edges: CallEdge[],
-  fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
-): Array<{ from: string; to: string; weight: number }> {
+  fileToZoneMap: Map<string, FileZone>,
+): WeightedEdge[] {
   const pairCounts = new Map<string, number>();
   for (const e of edges) {
     if (!e.calleeFile) continue;
     const fromZone = fileToZoneMap.get(e.callerFile);
     const toZone = fileToZoneMap.get(e.calleeFile);
     if (!fromZone || !toZone || fromZone.id === toZone.id) continue;
-    const key = `${fromZone.id}->${toZone.id}`;
-    pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
+    countPair(pairCounts, fromZone.id, toZone.id);
   }
-  return [...pairCounts.entries()].map(([key, weight]) => {
-    const [from, to] = key.split("->");
-    return { from, to, weight };
-  });
+  return pairEdges(pairCounts);
 }
 
 /**
- * Build cross-zone edges from external package imports.
- *
- * Static call analysis can't resolve cross-package function calls — they appear
- * as external imports (e.g. `import { ... } from "rex"`). This function maps
- * those external package names back to zones and creates weighted edges so the
- * call graph diagram shows inter-package traffic.
+ * Map the packages `external` imports to the zones that own them, by finding
+ * which zone owns files in each package's directory. E.g. "rex" →
+ * packages/rex/ → the zone whose files start with packages/rex/src/;
+ * "@n-dx/llm-client" → packages/llm-client/ → that package's zone. A package
+ * with no files in any zone is left out.
  */
-export function buildExternalImportEdges(
-  external: ExternalImport[],
-  fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
-  zones: Zones,
-): Array<{ from: string; to: string; weight: number }> {
-  // Map package names to zone IDs by finding which zone owns files in that package dir.
-  // E.g. "rex" → packages/rex/ → zone whose files start with packages/rex/src/
-  // "@n-dx/llm-client" → packages/claude-client/ → claude-client zone
+export function mapPackagesToZones(external: ExternalImport[], zones: Zones): Map<string, string> {
   const pkgToZone = new Map<string, string>();
 
   // Build directory prefix → zone mapping from zone file lists.
@@ -103,7 +107,7 @@ export function buildExternalImportEdges(
 
     // Try scoped packages: @n-dx/foo → packages/foo
     if (pkg.startsWith("@n-dx/")) {
-      const name = pkg.slice(6); // "claude-client", "web"
+      const name = pkg.slice(6); // "llm-client", "web"
       const entry = dirToZone.get(`packages/${name}`);
       if (entry) { pkgToZone.set(pkg, entry.zoneId); continue; }
     }
@@ -112,6 +116,24 @@ export function buildExternalImportEdges(
     const entry = dirToZone.get(`packages/${pkg}`);
     if (entry) { pkgToZone.set(pkg, entry.zoneId); continue; }
   }
+
+  return pkgToZone;
+}
+
+/**
+ * Build cross-zone edges from external package imports.
+ *
+ * Static call analysis can't resolve cross-package function calls — they appear
+ * as external imports (e.g. `import { ... } from "rex"`). This function maps
+ * those external package names back to zones and creates weighted edges so the
+ * call graph diagram shows inter-package traffic.
+ */
+export function buildExternalImportEdges(
+  external: ExternalImport[],
+  fileToZoneMap: Map<string, FileZone>,
+  zones: Zones,
+): WeightedEdge[] {
+  const pkgToZone = mapPackagesToZones(external, zones);
 
   // Build cross-zone edges: for each external import, map importedBy files to their zones
   const pairCounts = new Map<string, number>();
@@ -123,15 +145,11 @@ export function buildExternalImportEdges(
     for (const file of ext.importedBy) {
       const fromZoneInfo = fileToZoneMap.get(file);
       if (!fromZoneInfo || fromZoneInfo.id === targetZone) continue;
-      const key = `${fromZoneInfo.id}->${targetZone}`;
-      pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+      countPair(pairCounts, fromZoneInfo.id, targetZone);
     }
   }
 
-  return [...pairCounts.entries()].map(([key, weight]) => {
-    const [from, to] = key.split("->");
-    return { from, to, weight };
-  });
+  return pairEdges(pairCounts);
 }
 
 /** Build flow nodes for FlowDiagram from zones. */

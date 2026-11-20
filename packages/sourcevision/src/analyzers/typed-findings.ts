@@ -47,6 +47,7 @@ import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { buildZoneEvidence } from "./enrich-judge.js";
 import type { FindingEvidence } from "./enrich-judge.js";
 import { extractTopLevelDeclarations, isTestPath } from "./zone-symbols.js";
+import { addCallTokens } from "./token-usage.js";
 
 export type TypedFindingKind =
   | "layering-violation"
@@ -408,10 +409,7 @@ export async function judgeTypedFindings(
       break;
     }
     result.calls++;
-    if (response.tokenUsage) {
-      usage.input += response.tokenUsage.input;
-      usage.output += response.tokenUsage.output;
-    }
+    addCallTokens(usage, response.tokenUsage);
     slice.forEach((t, i) => {
       const a = response.answers[`t${i}`];
       if (a?.type !== "noul") return;

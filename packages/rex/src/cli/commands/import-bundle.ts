@@ -33,7 +33,7 @@
  * which the resulting tree records.
  */
 
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDStore } from "../../store/index.js";
@@ -47,6 +47,7 @@ import { ensureSnapshot } from "../snapshot-guard.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
+import { confirmPrompt } from "../prompt.js";
 
 /** `3 items` / `1 item` — the log detail reads like the command's own output. */
 function plural(count: number, noun: string): string {
@@ -56,20 +57,9 @@ function plural(count: number, noun: string): string {
 /** Ask before discarding the local tree. Non-interactive callers must pass --yes. */
 async function confirmReplace(itemCount: number): Promise<boolean> {
   if (!process.stdin.isTTY) return false;
-
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = await new Promise<string>((res) => {
-      rl.question(
-        `Replace the existing PRD (${itemCount} item${itemCount === 1 ? "" : "s"}) with the bundle? [y/N] `,
-        res,
-      );
-    });
-    return /^y(es)?$/i.test(answer.trim());
-  } finally {
-    rl.close();
-  }
+  return confirmPrompt(
+    `Replace the existing PRD (${itemCount} item${itemCount === 1 ? "" : "s"}) with the bundle? [y/N] `,
+  );
 }
 
 async function readBundleFile(path: string): Promise<ParsedBundle> {

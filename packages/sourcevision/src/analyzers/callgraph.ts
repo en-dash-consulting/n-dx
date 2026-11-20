@@ -21,6 +21,7 @@ import type {
   ImportEdge,
 } from "../schema/index.js";
 import { sortCallGraph } from "../util/sort.js";
+import { parseJsTsSource } from "./ts-source.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -33,15 +34,7 @@ const JS_TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"])
  * Returns FunctionNode[] with qualified names for class/object methods.
  */
 export function extractFunctions(sourceText: string, filePath: string): FunctionNode[] {
-  const ext = extname(filePath);
-  const scriptKind =
-    ext === ".tsx" || ext === ".jsx"
-      ? ts.ScriptKind.TSX
-      : ext === ".ts"
-        ? ts.ScriptKind.TS
-        : ts.ScriptKind.JS;
-
-  const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, scriptKind);
+  const sf = parseJsTsSource(filePath, sourceText);
   const functions: FunctionNode[] = [];
 
   function getLineAndCol(pos: number): { line: number; column: number } {
@@ -258,15 +251,7 @@ export function extractCalls(
   filePath: string,
   functions: FunctionNode[],
 ): RawCall[] {
-  const ext = extname(filePath);
-  const scriptKind =
-    ext === ".tsx" || ext === ".jsx"
-      ? ts.ScriptKind.TSX
-      : ext === ".ts"
-        ? ts.ScriptKind.TS
-        : ts.ScriptKind.JS;
-
-  const sf = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, scriptKind);
+  const sf = parseJsTsSource(filePath, sourceText);
   const calls: RawCall[] = [];
 
   // Build a position-based lookup for enclosing function

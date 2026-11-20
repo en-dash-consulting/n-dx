@@ -68,6 +68,7 @@ import {
 import { userInfo } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { execFileSyncCli, execFileSyncNoShell } from "./exec.js";
+import { isRecord } from "./json.js";
 import { resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
 
 export const CREDENTIALS_FILENAME = "credentials.json";
@@ -1357,10 +1358,6 @@ function sleepSync(ms: number): void {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function errorCode(err: unknown): string | undefined {
   return (err as NodeJS.ErrnoException | null)?.code;

@@ -23,13 +23,23 @@ declare global {
 
 /** Check whether the viewer is running in deployed (static export) mode. */
 export function isDeployedMode(): boolean {
-  return typeof window !== "undefined" && window.__NDX_DEPLOYED__ != null;
+  return getDeployedConfig() !== null;
 }
 
 /** Return the deployed config, or null if not in deployed mode. */
 export function getDeployedConfig(): DeployedConfig | null {
   if (typeof window === "undefined") return null;
   return window.__NDX_DEPLOYED__ ?? null;
+}
+
+/** A synthetic JSON answer for a request the static export cannot serve. */
+function jsonResponse(body: unknown, status: number): Promise<Response> {
+  return Promise.resolve(
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
 }
 
 /**
@@ -81,22 +91,12 @@ export function installFetchAdapter(): void {
 
     // Non-GET mutations → 405
     if (method !== "GET" && (pathname.startsWith("/api/") || pathname.startsWith("/data"))) {
-      return Promise.resolve(
-        new Response(JSON.stringify({ error: "Not available in deployed mode" }), {
-          status: 405,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+      return jsonResponse({ error: "Not available in deployed mode" }, 405);
     }
 
     // GET /data/status → synthetic empty mtimes (prevents polling changes)
     if (pathname === "/data/status") {
-      return Promise.resolve(
-        new Response(JSON.stringify({ mtimes: {} }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+      return jsonResponse({ mtimes: {} }, 200);
     }
 
     // GET /data → data/index.json (mode detection)

@@ -302,7 +302,7 @@
 
 /* Failing status */
 .prd-failure-reason { color: var(--red); font-style: italic; }
-.task-failure-reason { border-left: 3px solid var(--red); padding-left: var(--space-2); }
+.task-failure-reason { background: color-mix(in srgb, var(--red) 8%, transparent); padding: var(--space-2); border-radius: var(--radius-sm); }
 .task-failure-text { color: var(--red); font-style: italic; }
 
 .task-failure-reason-header {
@@ -493,7 +493,6 @@
 /* Selected state */
 .prd-node-selected {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-left: 2px solid var(--accent);
 }
 
 .prd-node-selected:hover {
@@ -503,7 +502,7 @@
 /* Deep-link highlight state */
 .prd-node-highlighted {
   animation: prd-node-highlight-pulse 2s ease-out;
-  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 @keyframes prd-node-highlight-pulse {
@@ -988,8 +987,9 @@
 }
 
 .task-run-verdict {
-  border-left: 3px solid var(--red);
-  padding-left: var(--space-2);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
 }
 
 .task-run-verdict-header {
@@ -5087,6 +5087,87 @@ a.tracker-link {
   min-height: 0;
 }
 
+/* Image attachments: the "+" beside the input and the thumbnails below it. */
+.smart-add-attach {
+  display: inline-flex;
+  margin-top: var(--space-2);
+  margin-left: var(--space-2);
+}
+
+.smart-add-btn-attach {
+  min-width: 2.25rem;
+  font-size: var(--font-lg, 1.125rem);
+  line-height: 1;
+}
+
+.smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+.smart-add-panel-bar .smart-add-input-area > .smart-add-attach { grid-area: 1 / 2; margin: 0; }
+.smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) > .smart-add-btn-generate { grid-area: 1 / 3; }
+.smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) > :nth-child(4) { grid-area: 1 / 4; }
+.smart-add-panel-bar .smart-add-btn-attach { align-self: stretch; }
+
+.smart-add-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.smart-add-attachment {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+  width: 96px;
+  margin: 0;
+  padding: var(--space-1, 4px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.smart-add-attachment-thumb {
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-subtle, transparent);
+}
+
+.smart-add-attachment-name {
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smart-add-attachment-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.smart-add-attachment-remove:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.smart-add-attachment-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* Context scope selector */
 .smart-add-scope {
   display: flex;
@@ -6535,6 +6616,10 @@ a.tracker-link {
   .smart-add-panel-bar .smart-add-btn-generate { grid-area: 2 / 1; }
   .smart-add-panel-bar .smart-add-input-area > :nth-child(4) { grid-area: 2 / 2; }
   .smart-add-panel-bar .smart-add-input-status { grid-area: 3 / 1 / 4 / -1; }
+  .smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .smart-add-panel-bar .smart-add-input-area > .smart-add-attach { grid-area: 2 / 1; }
+  .smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) > .smart-add-btn-generate { grid-area: 2 / 2; }
+  .smart-add-panel-bar .smart-add-input-area:has(> .smart-add-attach) > :nth-child(4) { grid-area: 2 / 3; }
 }
 
 @media (max-width: 640px) {

@@ -269,6 +269,41 @@ async function readSourcevisionFile<T>(
   }
 }
 
+/** Inventory paths that are tests, by role or by name. */
+function collectTestFiles(inventory: SVInventory): Set<string> {
+  const testFiles = new Set<string>();
+  for (const file of inventory.files) {
+    if (file.role === "test" || isTestFilePath(file.path)) {
+      testFiles.add(file.path);
+    }
+  }
+  return testFiles;
+}
+
+/**
+ * Whether a per-file pass reads this inventory entry: JS/TS source that is
+ * not a test and matches no exclude pattern.
+ */
+function isScannableSource(
+  file: SVFileEntry,
+  testFiles: Set<string>,
+  options: DeadCodeAnalyzerOptions,
+): boolean {
+  if (file.role !== "source") return false;
+  if (testFiles.has(file.path)) return false;
+  if (!JS_TS_EXTENSIONS.has(extname(file.path))) return false;
+  return !options.excludePatterns?.some((p) => p.test(file.path));
+}
+
+/** A source file's text, or undefined when it cannot be read and the pass skips it. */
+async function readSourceText(projectDir: string, path: string): Promise<string | undefined> {
+  try {
+    return await readFile(join(projectDir, path), "utf-8");
+  } catch {
+    return undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Dead Export Detection
 // ---------------------------------------------------------------------------
@@ -287,13 +322,7 @@ async function findDeadExports(
   const candidates: DeadExportCandidate[] = [];
   const maxCandidates = options.maxCandidatesPerCategory ?? DEFAULT_MAX_CANDIDATES;
 
-  // Build set of test files
-  const testFiles = new Set<string>();
-  for (const file of inventory.files) {
-    if (file.role === "test" || isTestFilePath(file.path)) {
-      testFiles.add(file.path);
-    }
-  }
+  const testFiles = collectTestFiles(inventory);
 
   // Build map of file -> imported symbols (excluding test consumer imports)
   const importedSymbols = new Map<string, Set<string>>();
@@ -332,19 +361,11 @@ async function findDeadExports(
 
   // Analyze each source file for dead exports
   for (const file of inventory.files) {
-    if (file.role !== "source") continue;
-    if (testFiles.has(file.path)) continue;
     if (isEntryPointFile(file.path)) continue;
-    if (!JS_TS_EXTENSIONS.has(extname(file.path))) continue;
-    if (options.excludePatterns?.some((p) => p.test(file.path))) continue;
+    if (!isScannableSource(file, testFiles, options)) continue;
 
-    const filePath = join(projectDir, file.path);
-    let sourceText: string;
-    try {
-      sourceText = await readFile(filePath, "utf-8");
-    } catch {
-      continue;
-    }
+    const sourceText = await readSourceText(projectDir, file.path);
+    if (sourceText === undefined) continue;
 
     // Parse and find exports
     const exports = extractExports(sourceText, file.path);
@@ -524,28 +545,14 @@ async function findUnusedImports(
   const candidates: UnusedImportCandidate[] = [];
   const maxCandidates = options.maxCandidatesPerCategory ?? DEFAULT_MAX_CANDIDATES;
 
-  // Build set of test files
-  const testFiles = new Set<string>();
-  for (const file of inventory.files) {
-    if (file.role === "test" || isTestFilePath(file.path)) {
-      testFiles.add(file.path);
-    }
-  }
+  const testFiles = collectTestFiles(inventory);
 
   // Analyze each source file
   for (const file of inventory.files) {
-    if (file.role !== "source") continue;
-    if (testFiles.has(file.path)) continue;
-    if (!JS_TS_EXTENSIONS.has(extname(file.path))) continue;
-    if (options.excludePatterns?.some((p) => p.test(file.path))) continue;
+    if (!isScannableSource(file, testFiles, options)) continue;
 
-    const filePath = join(projectDir, file.path);
-    let sourceText: string;
-    try {
-      sourceText = await readFile(filePath, "utf-8");
-    } catch {
-      continue;
-    }
+    const sourceText = await readSourceText(projectDir, file.path);
+    if (sourceText === undefined) continue;
 
     const unusedImports = findFileUnusedImports(sourceText, file.path);
 
@@ -750,13 +757,7 @@ async function findDuplicateUtilities(
   const maxCandidates = options.maxCandidatesPerCategory ?? DEFAULT_MAX_CANDIDATES;
   const similarityThreshold = options.duplicateSimilarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
 
-  // Build set of test files
-  const testFiles = new Set<string>();
-  for (const file of inventory.files) {
-    if (file.role === "test" || isTestFilePath(file.path)) {
-      testFiles.add(file.path);
-    }
-  }
+  const testFiles = collectTestFiles(inventory);
 
   // Collect all utility functions from source files
   interface FunctionSignature {
@@ -779,22 +780,14 @@ async function findDuplicateUtilities(
   ];
 
   for (const file of inventory.files) {
-    if (file.role !== "source") continue;
-    if (testFiles.has(file.path)) continue;
-    if (!JS_TS_EXTENSIONS.has(extname(file.path))) continue;
-    if (options.excludePatterns?.some((p) => p.test(file.path))) continue;
+    if (!isScannableSource(file, testFiles, options)) continue;
 
     // Skip non-utility files for duplicate detection
     const isUtilityPath = utilityPathPatterns.some((p) => p.test(file.path));
     if (!isUtilityPath) continue;
 
-    const filePath = join(projectDir, file.path);
-    let sourceText: string;
-    try {
-      sourceText = await readFile(filePath, "utf-8");
-    } catch {
-      continue;
-    }
+    const sourceText = await readSourceText(projectDir, file.path);
+    if (sourceText === undefined) continue;
 
     const functions = extractFunctions(sourceText, file.path);
     allFunctions.push(...functions);

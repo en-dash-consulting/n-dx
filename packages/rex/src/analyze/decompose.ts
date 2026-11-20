@@ -12,16 +12,15 @@
 import type { LoEConfig, AnalyzeTokenUsage } from "../schema/index.js";
 import { LOE_DEFAULTS } from "../schema/index.js";
 import type { Proposal, ProposalTask, ProposalFeature } from "./propose.js";
-import type {ClaudeResult} from "./reason.js";import {
+import type { ClaudeResult } from "./reason.js";
+import {
   spawnClaude,
   resolveConfiguredModel,
   extractJson,
   repairTruncatedJson,
   emptyAnalyzeTokenUsage,
   accumulateTokenUsage,
-  PRD_SCHEMA,
   TASK_QUALITY_RULES,
-  OUTPUT_INSTRUCTION,
 } from "./reason.js";
 import { z } from "zod";
 import type { PromptEnvelope } from "@n-dx/llm-client";

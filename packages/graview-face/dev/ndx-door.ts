@@ -42,6 +42,7 @@ import { createReadStream, existsSync, readdirSync, readFileSync, realpathSync, 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { Plugin } from "vite";
+import { DOOR_EMIT_PATH, DOOR_KEY_HEADER, DOOR_KEY_META, DOOR_MCP_PATH, DOOR_SYNC_INFO_PATH } from "../src/sync/door.js";
 
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as { name: string; version: string };
 
@@ -57,10 +58,6 @@ export function rangeOf(header: string | undefined, size: number): { start: numb
   if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return undefined;
   return { start, end };
 }
-
-/** The header a page sends the door's key in, and the meta tag the key is written to. */
-export const DOOR_KEY_HEADER = "x-ndx-door";
-export const DOOR_KEY_META = "ndx-door";
 
 /** What the projection reads, under either layout, relative to the project. */
 const READS = [".rex", ".ndx/rex", ".hench/runs", ".ndx/hench/runs", ".sourcevision", ".ndx/sourcevision", ".n-dx.json", ".n-dx.local.json", ".ndx/config.json"];
@@ -87,10 +84,12 @@ export function projectStamp(root: string): string {
     for (const name of readdirSync(path)) if (name !== ".cache") walk(join(path, name));
   };
   for (const rel of READS) walk(join(root, rel));
+  const git = (args: string[]): string =>
+    execFileSync("git", args, { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
   let refs = "";
   try {
-    refs = execFileSync("git", ["for-each-ref", "--format=%(objectname) %(refname)"], { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
-    refs += execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
+    refs = git(["for-each-ref", "--format=%(objectname) %(refname)"]);
+    refs += git(["rev-parse", "HEAD"]);
   } catch {
     // Not a repository: the files alone decide.
   }
@@ -109,6 +108,11 @@ export function ndxDoor(): Plugin {
 
   let workspaceKey: string | undefined;
   const token = () => (tokenFile && existsSync(tokenFile) ? readFileSync(tokenFile, "utf-8").trim() : undefined);
+  /** The per-user token as the hub wants it, read from its file once per call; none when there is no token. */
+  const tokenHeader = (): Record<string, string> => {
+    const value = token();
+    return value ? { "x-ndx-token": value } : {};
+  };
   const real = (p: string) => {
     try {
       return realpathSync(p);
@@ -121,7 +125,7 @@ export function ndxDoor(): Plugin {
   const resolveWorkspace = async (): Promise<void> => {
     if (!worktree || workspaceKey) return;
     if (!workspacesUrl) throw new Error("this is a worktree but no workspace listing was given; sync is off");
-    const response = await fetch(workspacesUrl, { headers: { accept: "application/json", ...(token() ? { "x-ndx-token": token()! } : {}) } });
+    const response = await fetch(workspacesUrl, { headers: { accept: "application/json", ...tokenHeader() } });
     if (!response.ok) throw new Error(`workspaces: ${response.status}`);
     const { workspaces } = (await response.json()) as { workspaces?: { key: string; path: string }[] };
     const mine = workspaces?.find((w) => real(w.path) === real(worktree));
@@ -132,7 +136,7 @@ export function ndxDoor(): Plugin {
   /** The token and the workspace, read when a call is made and never handed to the page. */
   const headers = async (): Promise<Record<string, string>> => {
     await resolveWorkspace();
-    return { ...(token() ? { "x-ndx-token": token()! } : {}), ...(workspaceKey ? { "x-ndx-workspace": workspaceKey } : {}) };
+    return { ...tokenHeader(), ...(workspaceKey ? { "x-ndx-workspace": workspaceKey } : {}) };
   };
 
   const rex: ToolCall = rexUrl
@@ -140,9 +144,11 @@ export function ndxDoor(): Plugin {
     : async () => {
         throw new Error("sync is off: no rex endpoint (run ndx start . and ndx graview serve .)");
       };
-  const door = mcpDoor({ path: "/ndx/mcp", call: rex, allow: ALLOWED_TOOLS });
+  const door = mcpDoor({ path: DOOR_MCP_PATH, call: rex, allow: ALLOWED_TOOLS });
   const key = randomBytes(24).toString("hex");
   const keyed = (req: IncomingMessage) => req.headers[DOOR_KEY_HEADER] === key;
+  /** The 403 for a request that is not from this face's own pages. */
+  const notOurs = { ok: false, error: "refused: not from this face's own pages" } as const;
 
   // One re-emit at a time: the loop, "Sync now" and a second tab all ask, and every asker gets the run in flight.
   let emitting: Promise<{ ok: boolean; output: string }> | undefined;
@@ -172,7 +178,7 @@ export function ndxDoor(): Plugin {
   /** The re-emit takes JSON from our own pages and nothing else, as the door does; the answer says why when it refuses. */
   const admit = (req: IncomingMessage, res: ServerResponse): boolean => {
     if (!sameOrigin(req.headers) || !keyed(req)) {
-      json(res, 403, { ok: false, error: "refused: not from this face's own pages" });
+      json(res, 403, notOurs);
       return false;
     }
     if ((req.headers["content-type"] ?? "").split(";")[0]!.trim() !== "application/json") {
@@ -239,15 +245,15 @@ export function ndxDoor(): Plugin {
             if (!existsSync(file)) return next();
             return serveData(req, res, file);
           }
-          if (url === "/ndx/sync-info") {
+          if (url === DOOR_SYNC_INFO_PATH) {
             return json(res, 200, { rex: Boolean(rexUrl), emit: Boolean(graviewCli && projectRoot), project: projectRoot ?? null, live: Boolean(graviewDir), worktree: Boolean(worktree) });
           }
-          if (url === "/ndx/emit" && req.method === "POST") {
+          if (url === DOOR_EMIT_PATH && req.method === "POST") {
             if (!admit(req, res)) return;
             return json(res, 200, await emit());
           }
-          if (url === "/ndx/mcp") {
-            if (!keyed(req)) return json(res, 403, { ok: false, error: "refused: not from this face's own pages" });
+          if (url === DOOR_MCP_PATH) {
+            if (!keyed(req)) return json(res, 403, notOurs);
             // The door matches its path exactly, so it is handed the path without the base.
             req.url = url + (req.url ?? "").slice(asked.length);
             return door(req, res, next);

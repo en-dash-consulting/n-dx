@@ -10,7 +10,7 @@ import { act } from "preact/test-utils";
 
 let capturedPoll: (() => Promise<void>) | null = null;
 
-vi.mock("../../../src/viewer/views/use-polling.js", () => ({
+vi.mock("../../../src/viewer/hooks/use-polling.js", () => ({
   usePolling: vi.fn((_key: string, cb: () => Promise<void>) => {
     capturedPoll = cb;
   }),

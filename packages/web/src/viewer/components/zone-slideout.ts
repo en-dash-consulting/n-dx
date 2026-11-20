@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "preact/hooks";
 import { useFocusTrap } from "../hooks/index.js";
 import type { Zone, ZoneCrossing } from "../external.js";
 import { getZoneColorByIndex } from "../visualization/colors.js";
-import { meterClass } from "../visualization/metrics.js";
+import { ZoneMeter } from "./zone-meter.js";
 import { basename } from "../utils.js";
 import type { NavigateTo } from "../types.js";
 import { GlossaryLine } from "./glossary-line.js";
@@ -155,39 +155,13 @@ export function ZoneSlideout({
       // Cohesion meter
       h("div", { class: "zone-slideout-meter-row" },
         h("span", { class: "zone-slideout-meter-label" }, "Cohesion"),
-        h("div", {
-          class: "meter",
-          role: "meter",
-          "aria-label": "Cohesion",
-          "aria-valuemin": 0,
-          "aria-valuemax": 1,
-          "aria-valuenow": zone.cohesion,
-          "aria-valuetext": zone.cohesion.toFixed(2),
-        },
-          h("div", {
-            class: `meter-fill ${meterClass(zone.cohesion)}`,
-            style: `width: ${zone.cohesion * 100}%`,
-          }),
-        ),
+        h(ZoneMeter, { label: "Cohesion", value: zone.cohesion }),
       ),
 
       // Coupling meter
       h("div", { class: "zone-slideout-meter-row" },
         h("span", { class: "zone-slideout-meter-label" }, "Coupling"),
-        h("div", {
-          class: "meter",
-          role: "meter",
-          "aria-label": "Coupling",
-          "aria-valuemin": 0,
-          "aria-valuemax": 1,
-          "aria-valuenow": zone.coupling,
-          "aria-valuetext": zone.coupling.toFixed(2),
-        },
-          h("div", {
-            class: `meter-fill ${meterClass(zone.coupling, true)}`,
-            style: `width: ${zone.coupling * 100}%`,
-          }),
-        ),
+        h(ZoneMeter, { label: "Coupling", value: zone.coupling, invert: true }),
       ),
 
       // Entry points

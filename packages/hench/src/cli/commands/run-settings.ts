@@ -774,7 +774,6 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // -- Model ---------------------------------------------------------------
   const routed = resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor });
   const cliModel = selectCliModelOverride(flags, vendor).value;
-  const savedModelRaw = saved?.models?.[vendor]?.trim();
   // Normalized the way every other model in the chain is: through
   // `resolveTaskModel`, which applies the active vendor's own rules — Claude's
   // aliases expand, and Codex's retired ids (`gpt-5.4`, `gpt-5-codex`, …) remap
@@ -782,18 +781,21 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // aliases, so a saved `gpt-5.4` passed the vendor check unchanged and the run
   // was sent to a model Codex has withdrawn. Normalizing *before* the
   // compatibility check also means the check judges the id that will actually
-  // be sent, not the one that was typed.
-  const savedModel = savedModelRaw
-    ? resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor, model: savedModelRaw }).model
-    : undefined;
+  // be sent, not the one that was typed. `local` serves whatever LM Studio has
+  // loaded, so every string is legitimate there and the check does not apply.
+  const normalizeModel = (raw: string | undefined): { model: string | undefined; usable: boolean } => {
+    const model = raw ? resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor, model: raw }).model : undefined;
+    const usable =
+      model !== undefined
+      && model.length > 0
+      && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, model));
+    return { model, usable };
+  };
+  const savedModelRaw = saved?.models?.[vendor]?.trim();
   // A pin saved under this vendor's name that this vendor cannot run is the
   // one saved value that must never wedge a loop: warn, skip it, carry on down
-  // the chain. `local` serves whatever LM Studio has loaded, so every string
-  // is legitimate there and the check does not apply.
-  const savedModelUsable =
-    savedModel !== undefined
-    && savedModel.length > 0
-    && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, savedModel));
+  // the chain.
+  const { model: savedModel, usable: savedModelUsable } = normalizeModel(savedModelRaw);
   if (savedModelRaw !== undefined && savedModelRaw.length > 0 && !savedModelUsable) {
     warnings.push({
       code: "saved-model-incompatible",
@@ -813,13 +815,7 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // model the escalation vendor cannot run is skipped with a warning rather
   // than failing the attempt that was meant to rescue the task.
   const escalationModelRaw = input.escalation?.model?.trim();
-  const escalationModel = escalationModelRaw
-    ? resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor, model: escalationModelRaw }).model
-    : undefined;
-  const escalationModelUsable =
-    escalationModel !== undefined
-    && escalationModel.length > 0
-    && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, escalationModel));
+  const { model: escalationModel, usable: escalationModelUsable } = normalizeModel(escalationModelRaw);
   if (escalationModelRaw && !escalationModelUsable) {
     warnings.push({
       code: "escalation-model-incompatible",
@@ -1002,25 +998,22 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     else if (saved.skipTestGate && !operatorGate.value) widenWarning("skipTestGate", true, operatorGate);
   }
 
-  const operatorMaxTurns: Resolved<number> =
-    budgets.maxTurns !== undefined
-      ? { value: budgets.maxTurns, source: "cli-flag" }
-      : { value: config.maxTurns, source: henchSource("maxTurns") };
-  let maxTurns: Resolved<number> = operatorMaxTurns;
-  if (saved?.maxTurns !== undefined && operatorMaxTurns.source !== "cli-flag") {
-    if (capIsTighter(saved.maxTurns, operatorMaxTurns.value)) maxTurns = { value: saved.maxTurns, source: "task.run" };
-    else if (capIsWider(saved.maxTurns, operatorMaxTurns.value)) widenWarning("maxTurns", saved.maxTurns, operatorMaxTurns);
-  }
-
-  const operatorBudget: Resolved<number> =
-    budgets.tokenBudget !== undefined
-      ? { value: budgets.tokenBudget, source: "cli-flag" }
-      : { value: config.tokenBudget, source: henchSource("tokenBudget") };
-  let tokenBudget: Resolved<number> = operatorBudget;
-  if (saved?.tokenBudget !== undefined && operatorBudget.source !== "cli-flag") {
-    if (capIsTighter(saved.tokenBudget, operatorBudget.value)) tokenBudget = { value: saved.tokenBudget, source: "task.run" };
-    else if (capIsWider(saved.tokenBudget, operatorBudget.value)) widenWarning("tokenBudget", saved.tokenBudget, operatorBudget);
-  }
+  // Turn and token caps: the flag, else config; a saved value tightens the
+  // config value but never a flag.
+  const resolveRunCap = (key: "maxTurns" | "tokenBudget"): Resolved<number> => {
+    const flagValue = budgets[key];
+    const operator: Resolved<number> =
+      flagValue !== undefined
+        ? { value: flagValue, source: "cli-flag" }
+        : { value: config[key], source: henchSource(key) };
+    const savedValue = saved?.[key];
+    if (savedValue === undefined || operator.source === "cli-flag") return operator;
+    if (capIsTighter(savedValue, operator.value)) return { value: savedValue, source: "task.run" };
+    if (capIsWider(savedValue, operator.value)) widenWarning(key, savedValue, operator);
+    return operator;
+  };
+  const maxTurns = resolveRunCap("maxTurns");
+  const tokenBudget = resolveRunCap("tokenBudget");
 
   // Spend caps: config only, tightened (never widened) by a saved value.
   const savedCaps = saved as Partial<Record<"maxCostUsdPerRun" | "maxCostUsdPerDay", unknown>> | undefined;

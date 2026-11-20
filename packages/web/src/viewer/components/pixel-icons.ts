@@ -19,8 +19,8 @@ import { h } from "preact";
 export type PixelIconName = "robot-wrangler" | "project" | "workflow" | "commands" | "settings";
 export type PixelTileName = Exclude<PixelIconName, "settings">;
 
-export const TILE_SIZE = 22;
-export const GLYPH_SIZE = 11;
+const TILE_SIZE = 22;
+const GLYPH_SIZE = 11;
 
 const PALETTE: Record<string, { literal: string; token: string }> = {
   P: { literal: "#6c41f0", token: "--pixel-purple" },

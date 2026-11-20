@@ -39,7 +39,6 @@ import { resolveHenchPaths } from "./paths.js";
 import {
   enforceRetentionPolicy,
   loadRetentionConfig,
-  type RetentionConfig,
   type RetentionResult,
 } from "./run-retention.js";
 

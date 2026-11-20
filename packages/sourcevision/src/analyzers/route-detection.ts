@@ -9,7 +9,6 @@ import { existsSync } from "node:fs";
 import ts from "typescript";
 import { toPosix } from "../util/paths.js";
 import type {
-  RouteExportKind,
   RouteModule,
   RouteTreeNode,
 } from "../schema/index.js";

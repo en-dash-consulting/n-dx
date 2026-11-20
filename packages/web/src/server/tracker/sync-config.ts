@@ -23,6 +23,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { isLocalConfigTracked, resolveLayout } from "@n-dx/llm-client";
 import { TRACKER_EVENTS, type TrackerEvent } from "./server-profiles.js";
+import { isRecord } from "../../shared/index.js";
 
 export const TRACKER_RULE_MODES = ["off", "dry-run", "on"] as const;
 export type TrackerRuleMode = (typeof TRACKER_RULE_MODES)[number];
@@ -37,9 +38,6 @@ export interface TrackerSyncConfig {
   rules: Record<TrackerEvent, TrackerRuleMode>;
 }
 
-type Json = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is Json => !!value && typeof value === "object" && !Array.isArray(value);
 const isString = (value: unknown): value is string => typeof value === "string" && value !== "";
 
 /** A requestId segment: what a project name may hold so the key splits on `:` unambiguously. */

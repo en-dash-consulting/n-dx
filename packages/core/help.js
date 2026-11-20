@@ -17,43 +17,10 @@
  * @module n-dx/help
  */
 
+// Color detection is cli-brand.js's, so help output and the rest of ndx agree.
+import { bold, cyan, dim, yellow } from "./cli-brand.js";
+
 // ── ANSI color support ──────────────────────────────────────────────────
-
-/**
- * Detect whether the terminal supports color output.
- * Mirrors the logic in @n-dx/llm-client/help-format.
- */
-function supportsColor() {
-  if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
-    return true;
-  }
-  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
-    return false;
-  }
-  if (process.stdout && typeof process.stdout.isTTY === "boolean") {
-    return process.stdout.isTTY;
-  }
-  return false;
-}
-
-let _colorEnabled = null;
-
-function isColorEnabled() {
-  if (_colorEnabled === null) {
-    _colorEnabled = supportsColor();
-  }
-  return _colorEnabled;
-}
-
-function ansi(code, text, reset) {
-  if (!isColorEnabled()) return text;
-  return `\x1b[${code}m${text}\x1b[${reset}m`;
-}
-
-function bold(text) { return ansi("1", text, "22"); }
-function dim(text) { return ansi("2", text, "22"); }
-function cyan(text) { return ansi("36", text, "39"); }
-function yellow(text) { return ansi("33", text, "39"); }
 
 /** Format a command name (cyan). */
 function cmd(text) { return cyan(text); }
@@ -178,7 +145,7 @@ const COMMAND_REGISTRY = [
     name: "start",
     category: "Orchestration",
     summary: "Start dashboard and MCP server",
-    keywords: ["server", "web", "dashboard", "MCP", "HTTP", "background", "daemon", "preview", "mockup", "layout"],
+    keywords: ["server", "web", "dashboard", "MCP", "HTTP", "background", "daemon"],
     related: ["status"],
   },
   {
@@ -1169,8 +1136,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       {
         title: "Access token",
         content:
-          "Every account on a machine can reach 127.0.0.1, so the hub, the project\n" +
-          "servers and the preview server require a per-user token. 'ndx start'\n" +
+          "Every account on a machine can reach 127.0.0.1, so the hub and the\n" +
+          "project servers require a per-user token. 'ndx start'\n" +
           "creates it at <ndx home>/auth.token (mode 0600) and passes it to every\n" +
           "server it starts. The URL it prints carries a one-time sign-in nonce,\n" +
           "never the token: valid once, for about a minute, it signs that browser\n" +
@@ -1179,30 +1146,13 @@ const ORCHESTRATOR_HELP_DEFS = {
           "<token>'; the printed 'claude mcp add' lines include the header.\n" +
           "--no-auth, or web.auth false in .n-dx.local.json, turns it off.",
       },
-      {
-        title: "Preview mode (--preview)",
-        content:
-          "Serves an editable UI layout document (packages/web/src/preview/index.html)\n" +
-          "instead of the dashboard, on port 3118. Drag sections, tabs and panels\n" +
-          "around, rename them, group sections into named dropdowns; every change is\n" +
-          "saved to <document>.layout.json beside the document, which is also the file\n" +
-          "to hand-edit and to review as a diff. Renames render as\n" +
-          "'New name (previously Old name)', and moves/additions/removals are marked.\n" +
-          "\n" +
-          "It runs no analysis, opens no MCP endpoints and writes nothing under .rex/\n" +
-          "or .sourcevision/ — the layout file and its own .n-dx-preview.pid/.port are\n" +
-          "all it touches — so it is safe alongside a real 'ndx start'. It never kills\n" +
-          "a port occupant; it relocates instead.",
-      },
     ],
     options: [
-      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.ndx/config.json); with --here, this server's port; with --preview, 3118" },
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.ndx/config.json); with --here, this server's port" },
       { flag: "--here", description: "Single-project server instead of the hub (also: web.mode \"here\" in .n-dx.json)" },
       { flag: "--hub", description: "Register with the hub — the default since 0.7.0; accepted for compatibility" },
       { flag: "--background", description: "With --here, run as a background daemon" },
       { flag: "--open", description: "Open the project URL in the browser (through an owner-only sign-in page in the ndx home, so the one-time link never appears in a process list)" },
-      { flag: "--preview", description: "Serve the UI layout preview document instead of the dashboard" },
-      { flag: "--file=<path>", description: "With --preview: serve this HTML document instead of the default" },
       { flag: "--replace-hub", description: "Replace a hub that is another build than this ndx now, even while an agent run or MCP session is live on it" },
       { flag: "--no-auth", description: "Run without the per-user dashboard token (also: web.auth false in .n-dx.local.json; the tracked .n-dx.json cannot turn it off). Loopback is shared by every account on the host; the token is what keeps another account out" },
     ],
@@ -1212,8 +1162,6 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx start stop .", description: "Unregister this worktree" },
       { command: "ndx start --here .", description: "Single-project server on this port" },
       { command: "ndx start --here --background .", description: "Single-project server as a background daemon" },
-      { command: "ndx start --preview .", description: "Serve the UI layout preview on :3118" },
-      { command: "ndx start --preview stop .", description: "Stop a background preview server" },
     ],
     related: ["hub", "web", "dev"],
   },

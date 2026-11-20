@@ -1286,7 +1286,6 @@ import type {
   DependencyAuditResult,
   DependencyAuditCommandRecord,
   DependencyVulnerability,
-  DependencyOutdated,
   DependencyAuditPackageResult,
 } from "../schema/index.js";
 

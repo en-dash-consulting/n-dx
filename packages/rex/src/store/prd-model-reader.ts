@@ -47,7 +47,7 @@ import type { ItemLevel, PRDItem } from "../schema/index.js";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../schema/index.js";
 import { ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type ItemState, type Layer, type NodeType, type StateFile } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
-import { parseFolderTree, parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
+import { markSkipped, parseFolderTree, parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "./paths.js";
 import { STATE_FILE_NAME, extraTopLevelKeys, loadStateFile } from "./state-writer.js";
 import { parseTreeMeta } from "./tree-meta.js";
@@ -127,6 +127,11 @@ export interface LoadPrdModelOptions {
    * are not listed.
    */
   folderState?: FolderStateKeys;
+  /**
+   * v2 only: filled with the folder each folder node (every change, and any
+   * other node with children) is stored in, by id. Leaf `.md` nodes have none.
+   */
+  folders?: Map<string, string>;
 }
 
 /**
@@ -242,7 +247,7 @@ export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions 
   }
 
   const warnings: ParseWarning[] = [...header.warnings];
-  const ctx: ReadContext = { warnings, ignoreStamp: readOnly !== undefined, stateRows: options.stateRows, folderState: options.folderState };
+  const ctx: ReadContext = { warnings, ignoreStamp: readOnly !== undefined, stateRows: options.stateRows, folderState: options.folderState, folders: options.folders };
   const tree = v2
     ? {
         product: await readLayer(productDir, "product", ctx),
@@ -319,6 +324,7 @@ interface ReadContext {
   ignoreStamp: boolean;
   stateRows?: Map<string, ItemState>;
   folderState?: FolderStateKeys;
+  folders?: Map<string, string>;
 }
 
 async function readLayer(layerDir: string, layer: Layer, ctx: ReadContext): Promise<RuleNode[]> {
@@ -384,16 +390,12 @@ async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode |
   const node = await readNode(indexPath, basename(dir), folder.state, ctx);
   if (!node) return null;
   folder.claimed.add(node.id);
+  ctx.folders?.set(node.id, dir);
   warnOrphanRows(dir, folder, ctx.warnings);
   const extra = extraTopLevelKeys(folder.state);
   if (extra) ctx.folderState?.nodes.set(node.id, extra);
   if (folder.named.length) node.children = childrenOf(folder);
   return node;
-}
-
-/** Mark the warnings pushed since index `from` as the reason a node was dropped. */
-function markSkipped(warnings: ParseWarning[], from: number): void {
-  for (let i = from; i < warnings.length; i++) warnings[i] = { ...warnings[i], skipped: true };
 }
 
 function warnOrphanRows(dir: string, folder: FolderRead, warnings: ParseWarning[]): void {

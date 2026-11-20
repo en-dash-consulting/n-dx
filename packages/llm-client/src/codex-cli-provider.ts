@@ -34,25 +34,14 @@ import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-con
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
-import { printRetryLine } from "./progress-reporter.js";
-import { formatRetryCountdown } from "./rate-limit.js";
+import { printRateLimitRetryLine } from "./progress-reporter.js";
+import { CLI_RATE_LIMIT_PATTERN, CLI_TRANSIENT_PATTERNS } from "./rate-limit.js";
 import { resolveVendorCliEnv } from "./child-env.js";
+import { isLlmDebugEnabled } from "./output.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
-const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
-const TRANSIENT_PATTERNS = [
-  /\b500\b/,
-  /\b502\b/,
-  /\b503\b/,
-  /\b529\b/,
-  /\b429\b/,
-  /overloaded/i,
-  /ETIMEDOUT/,
-  /ECONNRESET/,
-  /ECONNREFUSED/,
-  /socket hang up/i,
-  /stream disconnected/i,
-];
+/** The shared CLI transient failures, plus a Codex stream the CLI lost mid-response. */
+const TRANSIENT_PATTERNS = [...CLI_TRANSIENT_PATTERNS, /stream disconnected/i];
 
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BASE_DELAY_MS = 1000;
@@ -86,11 +75,6 @@ export interface CodexCliProviderOptions {
 // ── Policy flag compilation ──────────────────────────────────────────────
 
 /**
- * Map an n-dx {@link SandboxMode} to the Codex CLI `--sandbox` flag value.
- *
- * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
- */
-/**
  * The `--sandbox` values `codex exec` accepts.
  *
  * From `codex exec --help`: `[possible values: read-only, workspace-write,
@@ -120,6 +104,11 @@ export type CodexApprovalPolicy =
   | "granular"
   | "never";
 
+/**
+ * Map an n-dx {@link SandboxMode} to the Codex CLI `--sandbox` flag value.
+ *
+ * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
+ */
 export function mapSandboxToCodexFlag(mode: SandboxMode): CodexSandboxMode {
   switch (mode) {
     case "read-only":
@@ -268,13 +257,8 @@ export function codexShellEnvFlags(extraHidden: readonly string[] = []): string[
 /** A portable environment variable name, which is also a bare TOML key. */
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-function isDebugEnabled(): boolean {
-  const v = process.env.NDX_DEBUG_LLM ?? process.env.NDX_DEBUG;
-  return v === "1" || v === "true" || v === "yes";
-}
-
 function debugLog(message: string): void {
-  if (isDebugEnabled()) {
+  if (isLlmDebugEnabled()) {
     // eslint-disable-next-line no-console
     console.error(`[ndx:llm:codex] ${message}`);
   }
@@ -303,7 +287,7 @@ function classifyStderr(stderr: string): { reason: "auth" | "rate-limit" | "unkn
   if (AUTH_PATTERNS.test(classificationText)) {
     return { reason: "auth", retryable: false };
   }
-  if (RATE_LIMIT_PATTERNS.test(classificationText)) {
+  if (CLI_RATE_LIMIT_PATTERN.test(classificationText)) {
     return { reason: "rate-limit", retryable: true };
   }
   return { reason: "unknown", retryable: isTransientError(classificationText) };
@@ -441,18 +425,13 @@ async function spawnOnce(
   }
 }
 
-function defaultRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
-  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
-  printRetryLine(attempt, maxAttempts, `rate limited, waiting ${countdown}`);
-}
-
 export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeClient {
   const cliBinary = resolveCodexCliPath(options.codexConfig);
   const defaultModel = resolveCodexModel(options.codexConfig);
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
-  const onRetry = options.onRetry ?? defaultRateLimitOnRetry;
+  const onRetry = options.onRetry ?? printRateLimitRetryLine;
 
   return {
     mode: "cli",
