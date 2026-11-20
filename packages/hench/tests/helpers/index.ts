@@ -4,6 +4,7 @@
  */
 
 import { vi } from "vitest";
+import { configReadChild, decodeWindowsCommandLine } from "./cli-process-fixtures.js";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
@@ -339,8 +340,16 @@ function benignChild(): EventEmitter {
 export function cliSpawnsOnly(
   cliMock: (command: string, args?: string[], opts?: unknown) => unknown,
 ): (command: string, args?: string[], opts?: unknown) => unknown {
-  return (command: string, args?: string[], opts?: unknown) =>
-    isAncillarySpawn(command, args) ? benignChild() : cliMock(command, args, opts);
+  return (command: string, args: string[] = [], opts?: unknown) => {
+    // Native config/read is protocol setup, never a scripted model turn.
+    // Decode the same cmd.exe wrapper used by the real Windows spawn path.
+    const base = command.replace(/^.*[\\/]/, "").replace(/\.exe$/i, "").toLowerCase();
+    const wrapped = args.at(-1) ?? "";
+    const line = wrapped.startsWith('"') && wrapped.endsWith('"') ? wrapped.slice(1, -1) : wrapped;
+    const cliArgs = base === "cmd" ? decodeWindowsCommandLine(line).slice(1) : args;
+    if (cliArgs.includes("app-server")) return configReadChild(cliArgs);
+    return isAncillarySpawn(command, args) ? benignChild() : cliMock(command, args, opts);
+  };
 }
 
 // ── Git fixture repos ─────────────────────────────────────────────────────────
