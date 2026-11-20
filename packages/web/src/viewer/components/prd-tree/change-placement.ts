@@ -554,6 +554,37 @@ export function previewOf({ changeTitle, changeWhere, chosen, relation, placemen
 
 type PlaceMode = "place" | "next" | "another";
 
+/** Longest target title a secondary place button shows whole. */
+export const BUTTON_TARGET_MAX = 28;
+
+/** A target title cut to fit a button, at a word break where one is near; whole when it fits. */
+export function shortTargetTitle(title: string, max: number = BUTTON_TARGET_MAX): string {
+  if (title.length <= max) return title;
+  const cut = title.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space >= max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/**
+ * What "Place & next" and "Place & add another" say: the relation and target,
+ * as the confirm button names them ("Amend Refunds & next"), the target cut
+ * short when long. The full wording is the tooltip, and the accessible name
+ * when the visible one is cut. Before a target and relation are chosen they
+ * read "Place & …".
+ */
+export function placeThenLabel(relation: PlacementRelation | null, targetTitle: string | null, then: "next" | "another"): { text: string; label?: string; title: string } {
+  const suffix = then === "next" ? "& next" : "& add another";
+  const after = then === "next" ? "then open the next change" : "then add another place";
+  if (!relation || !targetTitle) return { text: `Place ${suffix}`, title: `Place, ${after}` };
+  const verb = relation === "touches" ? "Touch" : "Amend";
+  const short = shortTargetTitle(targetTitle);
+  return {
+    text: `${verb} ${short} ${suffix}`,
+    ...(short !== targetTitle ? { label: `${verb} ${targetTitle} ${suffix}` } : {}),
+    title: `${verb} ${targetTitle}, ${after}`,
+  };
+}
+
 interface PlaceFormProps {
   changeId: string;
   changeTitle: string;
@@ -793,6 +824,11 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const preview = chosen
     ? previewOf({ changeTitle, changeWhere: touchesOnly ? "Applied" : another ? "Already placed" : "Inbox", chosen, relation: effectiveRelation, placement, onShortlist: !searchPick, byModel: chosen.target === modelTarget, drafts, criteriaLoading, proposed })
     : null;
+  // The secondary buttons name the target as the confirm button does.
+  const thenLabel = (then: "next" | "another") => {
+    const l = placeThenLabel(chosen ? effectiveRelation : null, chosen?.title ?? null, then);
+    return { title: l.title, ...(l.label ? { "aria-label": l.label } : {}), children: l.text };
+  };
   const relationChoice = (target?: PlacementTarget) => another || touchesOnly
     ? null
     : h(RelationChoice, { name: relationName, relation, onChange: setRelation, target });
@@ -896,9 +932,9 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
         ? h("button", { type: "button", class: "btn btn-sm cp-done", onClick: onDone }, "Done")
         : [
             hasNext
-              ? h("button", { key: "next", type: "button", class: "btn btn-sm cp-place-next", disabled: cannotPlace, onClick: () => submit("next") }, "Place & next")
+              ? h("button", { key: "next", type: "button", class: "btn btn-sm cp-place-next", disabled: cannotPlace, onClick: () => submit("next"), ...thenLabel("next") })
               : null,
-            h("button", { key: "another", type: "button", class: "btn btn-sm cp-place-another", disabled: cannotPlace, onClick: () => submit("another") }, "Place & add another"),
+            h("button", { key: "another", type: "button", class: "btn btn-sm cp-place-another", disabled: cannotPlace, onClick: () => submit("another"), ...thenLabel("another") }),
             // An applied change's amendments have already reached the map: nothing new to propose.
             touchesOnly
               ? null

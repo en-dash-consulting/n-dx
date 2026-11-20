@@ -11,6 +11,7 @@ import { h, render } from "preact";
 import type { VNode } from "preact";
 import { act } from "preact/test-utils";
 import {
+  BUTTON_TARGET_MAX,
   ChangePlacementSection,
   PLACEMENT_DRAFT_FEATURE,
   REFUSAL_HINTS,
@@ -18,8 +19,10 @@ import {
   draftNoteText,
   inboxPosition,
   nextCriterionId,
+  placeThenLabel,
   placedLine,
   requestPlacement,
+  shortTargetTitle,
   takePlacementRequest,
   takeTitleFocus,
 } from "../../../src/viewer/components/prd-tree/change-placement.js";
@@ -447,7 +450,7 @@ describe("an applied change's panel", () => {
     const spies = await mountSection("a");
     expect($(".cp-position")?.textContent).toBe("1 of 2 · Next ›");
     await pick("cap-a");
-    await click(button("Place & next"));
+    await click($(".cp-place-next"));
     expect(spies.onOpenChange).toHaveBeenCalledWith("b");
   });
 });
@@ -477,11 +480,43 @@ describe("placing", () => {
     const spies = await mountSection("a");
     expect($(".cp-position")?.textContent).toBe("2 of 3 · Next ›");
     await pick("cap-a");
-    await click(button("Place & next"));
+    await click($(".cp-place-next"));
 
     expect(posts.map((p) => p.url)).toEqual(["/api/rex/changes/a/place"]);
     expect(spies.onOpenChange).toHaveBeenCalledWith("b");
     expect(takeTitleFocus("b")).toBe(true);
+  });
+
+  it("names the chosen relation and target on Place & next and Place & add another", async () => {
+    serve([change("a"), change("b")], [placement("a", [candidate("cap-1")]), placement("b", [candidate("cap-2", { score: 1 })])]);
+    await mountSection("a");
+    const next = () => $<HTMLButtonElement>(".cp-place-next")!;
+    const another = () => $<HTMLButtonElement>(".cp-place-another")!;
+    expect([next().textContent, another().textContent]).toEqual(["Place & next", "Place & add another"]);
+
+    await pick("cap-1");
+    expect(placeButton()?.textContent).toBe("Touch Home cap-1");
+    expect(next().textContent).toBe("Touch Home cap-1 & next");
+    expect(next().title).toBe("Touch Home cap-1, then open the next change");
+    expect(another().textContent).toBe("Touch Home cap-1 & add another");
+    expect(another().title).toBe("Touch Home cap-1, then add another place");
+    // Short enough to show whole: the visible text is the accessible name.
+    expect(next().getAttribute("aria-label")).toBeNull();
+
+    await click($('.cp-relation input[value="amends"]'));
+    expect(next().textContent).toBe("Amend Home cap-1 & next");
+    expect(another().textContent).toBe("Amend Home cap-1 & add another");
+  });
+
+  it("shortens a long target on the secondary buttons, keeping the whole name in the label and tooltip", () => {
+    const title = "Codex Multi-line Token Count Parsing Fix";
+    const next = placeThenLabel("touches", title, "next");
+    expect(next.text).toBe("Touch Codex Multi-line Token… & next");
+    expect(next.label).toBe(`Touch ${title} & next`);
+    expect(next.title).toBe(`Touch ${title}, then open the next change`);
+    expect(placeThenLabel("amends", title, "another").text).toBe("Amend Codex Multi-line Token… & add another");
+    expect(shortTargetTitle("Refunds")).toBe("Refunds");
+    expect(shortTargetTitle(title).length).toBeLessThanOrEqual(BUTTON_TARGET_MAX);
   });
 
   it("Next › moves on without writing", async () => {
@@ -498,7 +533,7 @@ describe("placing", () => {
     await mountSection("a");
     await pick("cap-1");
     await click($('.cp-relation input[value="touches"]'));
-    await click(button("Place & add another"));
+    await click($(".cp-place-another"));
 
     expect($('[data-change-placement="another"]')).not.toBeNull();
     expect($(".cp-shortlist legend")?.textContent).toBe("Add another place");
@@ -935,7 +970,7 @@ describe("the change detail panel", () => {
     }));
     await show("a");
     await pick("cap-1");
-    await click(button("Place & next"));
+    await click($(".cp-place-next"));
     // The host opens the item it was asked for, as the tree's selection does.
     expect(onNavigateToItem).toHaveBeenCalledWith("b");
     await show("b");
