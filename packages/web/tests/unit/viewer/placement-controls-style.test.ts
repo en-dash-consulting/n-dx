@@ -69,3 +69,12 @@ describe("Touches / Amends choice", () => {
     }
   });
 });
+
+describe("placement diagram arrowhead", () => {
+  it("is a clipped triangle in the edge's colour, with no coloured border edge", () => {
+    const head = declarations(prdTree, ".pp-edge-line::after");
+    expect(value(head, "background")).toBe("currentColor");
+    expect(value(head, "clip-path")).toBe("polygon(0 0, 100% 50%, 0 100%)");
+    expect(head).not.toMatch(/border-(left|right|top|bottom)(-color)?:/);
+  });
+});

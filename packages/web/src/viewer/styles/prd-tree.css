@@ -2076,14 +2076,17 @@ a.tracker-link {
   border-top: 2px dotted var(--text-muted);
 }
 
+/* The arrowhead: a 5×10px triangle in the edge's colour, cut from a filled box
+   (not a border trick, whose coloured left edge reads as a stripe). */
 .pp-edge-line::after {
   content: "";
   position: absolute;
   right: -1px;
   top: -6px;
-  border: 5px solid transparent;
-  border-left-color: currentColor;
-  border-right-width: 0;
+  width: 5px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
 .pp-edge[data-relation="touches"] { color: var(--accent); }
