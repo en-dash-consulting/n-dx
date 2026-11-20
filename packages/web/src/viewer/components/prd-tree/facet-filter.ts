@@ -16,25 +16,20 @@
  * status group, OR logic applies (item matches ANY selected status).
  *
  * @see ./tree-search.ts — SearchFacets type and searchTree integration
- * @see ./status-filter.ts — reuses status display config
+ * @see ./status-display.ts — the status glyphs, labels and classes
  */
 
 import { h } from "preact";
 import { ActionIcon } from "../action-icon.js";
 import { useCallback, useState, useRef, useEffect, useMemo } from "preact/hooks";
 import type { ItemStatus } from "./types.js";
+import { STATUS_DISPLAY } from "./status-display.js";
+import { toggled } from "../set-toggle.js";
 
-// ── Status display config (mirrors status-filter.ts) ─────────────────────
+// ── Status facets, in chip order ──────────────────────────────────────────
 
-const STATUS_FACETS: { status: ItemStatus; label: string; icon: string; cssClass: string }[] = [
-  { status: "pending",     label: "Pending",     icon: "\u25CB", cssClass: "prd-status-pending" },
-  { status: "in_progress", label: "In Progress", icon: "\u25D0", cssClass: "prd-status-in-progress" },
-  { status: "completed",   label: "Completed",   icon: "\u25CF", cssClass: "prd-status-completed" },
-  { status: "failing",     label: "Failing",     icon: "\u26A0", cssClass: "prd-status-failing" },
-  { status: "blocked",     label: "Blocked",     icon: "\u2298", cssClass: "prd-status-blocked" },
-  { status: "deferred",    label: "Deferred",    icon: "\u25CC", cssClass: "prd-status-deferred" },
-  { status: "deleted",     label: "Deleted",     icon: "\u2715", cssClass: "prd-status-deleted" },
-];
+const FACET_STATUSES: readonly ItemStatus[] = ["pending", "in_progress", "completed", "failing", "blocked", "deferred", "deleted"];
+const STATUS_FACETS = FACET_STATUSES.map((status) => ({ status, ...STATUS_DISPLAY[status] }));
 
 /** Max suggestions shown in the typeahead dropdown. */
 const MAX_SUGGESTIONS = 20;
@@ -103,10 +98,7 @@ export function FacetFilter({
   );
 
   const toggleStatus = (status: ItemStatus) => {
-    const next = new Set(activeStatuses);
-    if (next.has(status)) next.delete(status);
-    else next.add(status);
-    onStatusesChange(next);
+    onStatusesChange(toggled(activeStatuses, status));
   };
 
   // Trigger-button summary label.

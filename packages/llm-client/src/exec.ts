@@ -328,6 +328,26 @@ export function exec(
       else child.kill("SIGKILL");
     };
 
+    /**
+     * Settle as killed once {@link stopChild} is done, however the kill went —
+     * the timeout and abort paths both resolve this way (see the timeout path
+     * for why). A tree that outlived its kill is surfaced by child-lifecycle's
+     * diagnostics, not by hanging the caller.
+     */
+    const stopThenFinish = (killed: () => Error): void => {
+      void stopChild()
+        .catch(() => { /* best effort — see above */ })
+        .then(() => {
+          finish({
+            stdout: text(stdoutChunks),
+            stderr: text(stderrChunks),
+            exitCode: null,
+            error: killed(),
+            launched: true,
+          });
+        });
+    };
+
     // maxBuffer is a ceiling, not a suggestion: past it, stop the command rather
     // than accumulate without bound. Counted in bytes, and chunks are concatenated
     // as Buffers rather than decoded per chunk so a multi-byte character split
@@ -427,20 +447,8 @@ export function exec(
         // defers to it (see there for why). So it must always settle, including when
         // the kill itself fails: a rejected stopChild used to leave nothing to
         // resolve the promise, which only went unnoticed because "close" was
-        // finishing first. Report the timeout regardless of how the kill went; a
-        // tree that outlived its kill is surfaced by child-lifecycle's diagnostics,
-        // not by hanging the caller.
-        void stopChild()
-          .catch(() => { /* best effort — see above */ })
-          .then(() => {
-            finish({
-              stdout: text(stdoutChunks),
-              stderr: text(stderrChunks),
-              exitCode: null,
-              error: killedError(display, timeout, true, null),
-              launched: true,
-            });
-          });
+        // finishing first. Report the timeout regardless of how the kill went.
+        stopThenFinish(() => killedError(display, timeout, true, null));
       }, timeout);
     }
 
@@ -449,17 +457,7 @@ export function exec(
         if (settled || timedOut) return;
         aborted = true;
         // Like the timeout path, settle only once the tree has been stopped.
-        void stopChild()
-          .catch(() => { /* best effort — see the timeout path */ })
-          .then(() => {
-            finish({
-              stdout: text(stdoutChunks),
-              stderr: text(stderrChunks),
-              exitCode: null,
-              error: killedError(display, timeout, false, "SIGTERM"),
-              launched: true,
-            });
-          });
+        stopThenFinish(() => killedError(display, timeout, false, "SIGTERM"));
       };
       abortSignal.addEventListener("abort", onAbort, { once: true });
       detachAbort = () => abortSignal.removeEventListener("abort", onAbort);
@@ -688,6 +686,24 @@ export function getCurrentHead(cwd: string): string | undefined {
 /** Environment variables that change how git reads every pathspec. */
 const PATHSPEC_MODE_VARS = ["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const;
 
+/**
+ * `relPath` as a literal pathspec (`icase` with `ignoreCase`), and the
+ * environment to run git in without {@link PATHSPEC_MODE_VARS}, which would
+ * change how git reads it.
+ */
+function literalPathspec(relPath: string, ignoreCase: boolean | undefined): { pathspec: string; env: NodeJS.ProcessEnv } {
+  const pathspec = `:(literal${ignoreCase ? ",icase" : ""})${relPath}`;
+  const env = { ...process.env };
+  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  return { pathspec, env };
+}
+
+/** Why a git probe gave no answer: git's first stderr line, else the error's message. */
+function gitFailureReason(err: { stderr?: string | Buffer; message?: string }): string {
+  const stderrLine = String(err.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+  return stderrLine ?? err.message ?? "git failed";
+}
+
 /** git's answer to "is this path in the index?", or why it gave none. */
 export type GitTrackAnswer =
   /** `paths`: the index entries git matched, as git spells them (its case; a symlink itself, not a path through it). */
@@ -712,9 +728,7 @@ export type GitTrackAnswer =
  * turns the magic off, so a committed file would read as untracked.
  */
 export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitTrackAnswer {
-  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
-  const env = { ...process.env };
-  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  const { pathspec, env } = literalPathspec(relPath, options.ignoreCase);
   try {
     // -z: raw names, not git's octal quoting of non-ASCII paths.
     const out = execFileSync("git", ["ls-files", "-z", "--error-unmatch", "--", pathspec], {
@@ -731,8 +745,7 @@ export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCas
   } catch (err) {
     const e = err as { status?: number | null; stderr?: string | Buffer; message?: string };
     if (e.status === 1) return { state: "untracked" };
-    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
-    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
+    return { state: "unanswered", reason: gitFailureReason(e) };
   }
 }
 
@@ -747,9 +760,7 @@ export type GitlinkAnswer = { state: "answered"; gitlink: boolean } | { state: "
  * Any git failure is unanswered, with git's first stderr line as the reason.
  */
 export function gitlinkAt(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitlinkAnswer {
-  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
-  const env = { ...process.env };
-  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  const { pathspec, env } = literalPathspec(relPath, options.ignoreCase);
   const same = (a: string) => (options.ignoreCase ? a.toLowerCase() === relPath.toLowerCase() : a === relPath);
   try {
     // -s: `<mode> <object> <stage>\t<path>`; -z: raw names, NUL-terminated.
@@ -767,9 +778,7 @@ export function gitlinkAt(cwd: string, relPath: string, options: { ignoreCase?: 
     });
     return { state: "answered", gitlink };
   } catch (err) {
-    const e = err as { stderr?: string | Buffer; message?: string };
-    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
-    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
+    return { state: "unanswered", reason: gitFailureReason(err as { stderr?: string | Buffer; message?: string }) };
   }
 }
 
@@ -1319,7 +1328,7 @@ export function spawnTool(
   args: string[],
   opts: SpawnToolOptions = {},
 ): Promise<SpawnToolResult> {
-  const { cwd, env, detached = false, timeout } = opts;
+  const { cwd, env, detached = false } = opts;
 
   // Detached mode: fire and forget, optionally leaving a log behind.
   if (detached) {
@@ -1343,14 +1352,40 @@ export function spawnTool(
 
   const stdio = opts.stdio ?? "inherit";
 
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, {
+  let child: ChildProcess;
+  try {
+    child = spawn(cmd, args, {
       cwd,
       env,
       stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
       windowsHide: opts.windowsHide ?? true,
     });
+  } catch (err) {
+    // A synchronous spawn failure rejects; it never throws past the promise.
+    return Promise.reject(err);
+  }
+  // A child killed by a signal has no exit code; spawnTool reports it as 1.
+  return settleChild(child, stdio === "pipe", opts, 1);
+}
 
+/**
+ * Wait for a spawned child and settle with its {@link SpawnToolResult}.
+ *
+ * Shared by {@link spawnTool} and {@link spawnManaged}. With `pipe`, stdout
+ * and stderr are accumulated (each stdout chunk also goes to
+ * `opts.onStdout`). A spawn `error` settles with exit code 1; `close`
+ * settles with the child's code, or `signalExitCode` when a signal ended it.
+ * A positive `opts.timeout` settles with `exitCode: null` and sends SIGTERM,
+ * then SIGKILL after {@link KILL_ESCALATION_MS}.
+ */
+function settleChild(
+  child: ChildProcess,
+  pipe: boolean,
+  opts: SpawnToolOptions,
+  signalExitCode: number | null,
+): Promise<SpawnToolResult> {
+  const { timeout } = opts;
+  return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -1381,7 +1416,7 @@ export function spawnTool(
       }, timeout);
     }
 
-    if (stdio === "pipe") {
+    if (pipe) {
       child.stdout!.on("data", (chunk: Buffer) => {
         const text = chunk.toString();
         stdout += text;
@@ -1397,7 +1432,7 @@ export function spawnTool(
     });
 
     child.on("close", (code) => {
-      finish(code ?? 1);
+      finish(code ?? signalExitCode);
     });
   });
 }
@@ -1422,7 +1457,7 @@ export function spawnManaged(
   args: string[],
   opts: SpawnToolOptions = {},
 ): ManagedChild {
-  const { cwd, env, timeout } = opts;
+  const { cwd, env } = opts;
   const logFd = opts.logFile ? openSync(opts.logFile, "a") : undefined;
   // A log file replaces both stdio modes, so nothing is buffered either.
   const stdio = logFd === undefined ? opts.stdio ?? "inherit" : "inherit";
@@ -1440,56 +1475,8 @@ export function spawnManaged(
     if (logFd !== undefined) closeSync(logFd);
   }
 
-  const done = new Promise<SpawnToolResult>((resolve) => {
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const finish = (exitCode: number | null) => {
-      if (timer) clearTimeout(timer);
-      if (killTimer) clearTimeout(killTimer);
-      if (settled) return;
-      settled = true;
-      resolve({ exitCode, stdout, stderr });
-    };
-
-    if (timeout && timeout > 0) {
-      timer = setTimeout(() => {
-        timer = undefined;
-        child.kill("SIGTERM");
-        // Escalate to SIGKILL after grace period if still alive
-        killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_ESCALATION_MS);
-        // Resolve immediately — caller sees timeout (exitCode: null).
-        // Keep the close/error handlers active so they can clear the
-        // escalation timer if the child exits before SIGKILL is needed.
-        if (!settled) {
-          settled = true;
-          resolve({ exitCode: null, stdout, stderr });
-        }
-      }, timeout);
-    }
-
-    if (stdio === "pipe") {
-      child.stdout!.on("data", (chunk: Buffer) => {
-        const text = chunk.toString();
-        stdout += text;
-        opts.onStdout?.(text);
-      });
-      child.stderr!.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-    }
-
-    child.on("error", () => {
-      finish(1);
-    });
-
-    child.on("close", (code) => {
-      finish(code);
-    });
-  });
+  // A child killed by a signal has no exit code; spawnManaged reports null.
+  const done = settleChild(child, stdio === "pipe", opts, null);
 
   return {
     done,

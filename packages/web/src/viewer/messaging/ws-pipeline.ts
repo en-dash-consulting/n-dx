@@ -84,6 +84,24 @@ export interface WSPipeline {
   dispose(): void;
 }
 
+// ─── Workspace routing ───────────────────────────────────────────────────────
+
+/**
+ * Whether a frame is meant for the workspace a viewer shows.
+ *
+ * One socket carries every worktree's frames; the server tags each with the
+ * workspace it is about (`"*"` for process-wide frames such as socket health).
+ * An untagged frame comes from a server that predates tags and meant the
+ * anchor. So: no tag → anchor only; `"*"` → everyone; otherwise the keys must
+ * match.
+ */
+export function frameIsForWorkspace(frame: Readonly<Record<string, unknown>>, current: string | null): boolean {
+  const tag = frame["workspace"];
+  if (tag === undefined || tag === null) return current === null;
+  if (tag === "*") return true;
+  return tag === current;
+}
+
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -105,22 +123,6 @@ export interface WSPipeline {
  * };
  * ```
  */
-/**
- * Whether a frame is meant for the workspace a viewer shows.
- *
- * One socket carries every worktree's frames; the server tags each with the
- * workspace it is about (`"*"` for process-wide frames such as socket health).
- * An untagged frame comes from a server that predates tags and meant the
- * anchor. So: no tag → anchor only; `"*"` → everyone; otherwise the keys must
- * match.
- */
-export function frameIsForWorkspace(frame: Readonly<Record<string, unknown>>, current: string | null): boolean {
-  const tag = frame["workspace"];
-  if (tag === undefined || tag === null) return current === null;
-  if (tag === "*") return true;
-  return tag === current;
-}
-
 export function createWSPipeline(config: WSPipelineConfig): WSPipeline {
   const coalescer: MessageCoalescer = createMessageCoalescer({
     onMessage: config.onMessage,

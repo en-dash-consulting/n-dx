@@ -3,7 +3,7 @@
  * Exposes codebase analysis data via MCP protocol (stdio or HTTP).
  */
 
-import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { McpServer, type ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -75,23 +75,6 @@ function loadData(targetDir: string): SourcevisionData {
   return data;
 }
 
-/**
- * Create a configured Sourcevision MCP server without connecting a transport.
- *
- * Returns the McpServer instance with all tools and resources registered.
- * The caller is responsible for connecting a transport (stdio, HTTP, etc.):
- *
- * ```ts
- * // Stdio (CLI usage)
- * const server = await createSourcevisionMcpServer(dir);
- * await server.connect(new StdioServerTransport());
- *
- * // HTTP (web server usage)
- * const server = await createSourcevisionMcpServer(dir);
- * const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
- * await server.connect(transport);
- * ```
- */
 /** Return manifest.json mtime (ms), or 0 on error. */
 function manifestMtime(svDir: string): number {
   try {
@@ -111,6 +94,23 @@ export interface CreateSourcevisionMcpServerOptions {
   resolveWorkspaceFromClientRoots?: boolean;
 }
 
+/**
+ * Create a configured Sourcevision MCP server without connecting a transport.
+ *
+ * Returns the McpServer instance with all tools and resources registered.
+ * The caller is responsible for connecting a transport (stdio, HTTP, etc.):
+ *
+ * ```ts
+ * // Stdio (CLI usage)
+ * const server = await createSourcevisionMcpServer(dir);
+ * await server.connect(new StdioServerTransport());
+ *
+ * // HTTP (web server usage)
+ * const server = await createSourcevisionMcpServer(dir);
+ * const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
+ * await server.connect(transport);
+ * ```
+ */
 export function createSourcevisionMcpServer(
   targetDir: string,
   options: CreateSourcevisionMcpServerOptions = {},
@@ -218,6 +218,16 @@ function registerTool<S extends ZodRawShape>(
   }) as ToolCallback<S>);
 }
 
+/** A tool result holding one text block. */
+function textResult(text: string): CallToolResult {
+  return { content: [{ type: "text", text }] };
+}
+
+/** A tool result holding `value` as pretty-printed JSON. */
+function jsonResult(value: unknown): CallToolResult {
+  return textResult(JSON.stringify(value, null, 2));
+}
+
 // ── Tool registration groups ─────────────────────────────────────────
 // Each function registers a cohesive group of related MCP tools.
 
@@ -225,7 +235,7 @@ function registerOverviewTools(server: McpServer, context: McpContext): void {
   registerTool(server, context, "get_overview","Get project summary statistics. Good starting point when the user asks about the project or its architecture.", {}, () => {
     const data = context.freshData();
     if (!data.manifest || !data.inventory) {
-      return { content: [{ type: "text", text: "No analysis data available. Run 'sourcevision analyze' first." }] };
+      return textResult("No analysis data available. Run 'sourcevision analyze' first.");
     }
 
     const summary = {
@@ -245,7 +255,7 @@ function registerOverviewTools(server: McpServer, context: McpContext): void {
       serverRoutes: data.components?.summary.totalServerRoutes ?? 0,
     };
 
-    return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+    return jsonResult(summary);
   });
 
   registerTool(
@@ -260,7 +270,7 @@ function registerOverviewTools(server: McpServer, context: McpContext): void {
     ({ priority, limit }) => {
       const data = context.freshData();
       if (!data.zones) {
-        return { content: [{ type: "text", text: "No zones data available." }] };
+        return textResult("No zones data available.");
       }
 
       let steps = deriveNextSteps(data.zones);
@@ -272,12 +282,7 @@ function registerOverviewTools(server: McpServer, context: McpContext): void {
       const maxResults = limit ?? 10;
       steps = steps.slice(0, maxResults);
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({ steps, total: steps.length }, null, 2),
-        }],
-      };
+      return jsonResult({ steps, total: steps.length });
     }
   );
 }
@@ -344,14 +349,14 @@ function registerZoneTools(server: McpServer, context: McpContext): void {
     ({ id }) => {
       const data = context.freshData();
       if (!data.zones) {
-        return { content: [{ type: "text", text: "No zones data available." }] };
+        return textResult("No zones data available.");
       }
 
       // A zone renamed from a numbered id still answers to the old one.
       const zone = findZoneById(data.zones.zones, id);
       if (!zone) {
         const available = data.zones.zones.map((z) => z.id).join(", ");
-        return { content: [{ type: "text", text: `Zone "${id}" not found. Available: ${available}` }] };
+        return textResult(`Zone "${id}" not found. Available: ${available}`);
       }
 
       const findings = (data.zones.findings ?? []).filter((f) => f.scope === zone.id);
@@ -359,12 +364,7 @@ function registerZoneTools(server: McpServer, context: McpContext): void {
         (c) => c.fromZone === zone.id || c.toZone === zone.id
       );
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({ ...zone, findings, crossings }, null, 2),
-        }],
-      };
+      return jsonResult({ ...zone, findings, crossings });
     }
   );
 
@@ -388,12 +388,7 @@ function registerZoneTools(server: McpServer, context: McpContext): void {
         findings = findings.filter((f) => f.severity === severity);
       }
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({ findings, total: findings.length }, null, 2),
-        }],
-      };
+      return jsonResult({ findings, total: findings.length });
     }
   );
 }
@@ -409,7 +404,7 @@ function registerFileTools(server: McpServer, context: McpContext): void {
       const data = context.freshData();
       const file = data.inventory?.files.find((f) => f.path === path);
       if (!file) {
-        return { content: [{ type: "text", text: `File "${path}" not found in inventory.` }] };
+        return textResult(`File "${path}" not found in inventory.`);
       }
 
       const zone = data.zones?.zones.find((z) => z.files.includes(path));
@@ -419,20 +414,15 @@ function registerFileTools(server: McpServer, context: McpContext): void {
       const component = data.components?.components.find((c) => c.file === path);
       const routeModule = data.components?.routeModules.find((m) => m.file === path);
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            file,
-            archetype: classification?.archetype ?? null,
-            zone: zone ? { id: zone.id, name: zone.name } : null,
-            importsFrom,
-            importedBy,
-            component: component ?? null,
-            routeModule: routeModule ?? null,
-          }, null, 2),
-        }],
-      };
+      return jsonResult({
+        file,
+        archetype: classification?.archetype ?? null,
+        zone: zone ? { id: zone.id, name: zone.name } : null,
+        importsFrom,
+        importedBy,
+        component: component ?? null,
+        routeModule: routeModule ?? null,
+      });
     }
   );
 
@@ -449,7 +439,7 @@ function registerFileTools(server: McpServer, context: McpContext): void {
     ({ query, role, language }) => {
       const data = context.freshData();
       if (!data.inventory) {
-        return { content: [{ type: "text", text: "No inventory data available." }] };
+        return textResult("No inventory data available.");
       }
 
       let files = data.inventory.files;
@@ -465,15 +455,10 @@ function registerFileTools(server: McpServer, context: McpContext): void {
         files = files.filter((f) => f.language.toLowerCase() === lang);
       }
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            files: files.slice(0, 50),
-            total: files.length,
-          }, null, 2),
-        }],
-      };
+      return jsonResult({
+        files: files.slice(0, 50),
+        total: files.length,
+      });
     }
   );
 
@@ -486,7 +471,7 @@ function registerFileTools(server: McpServer, context: McpContext): void {
     ({ file }) => {
       const data = context.freshData();
       if (!data.imports) {
-        return { content: [{ type: "text", text: "No imports data available." }] };
+        return textResult("No imports data available.");
       }
 
       let edges = data.imports.edges;
@@ -494,16 +479,11 @@ function registerFileTools(server: McpServer, context: McpContext): void {
         edges = edges.filter((e) => e.from === file || e.to === file);
       }
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            edges: edges.slice(0, 100),
-            total: edges.length,
-            circulars: data.imports.summary.circulars,
-          }, null, 2),
-        }],
-      };
+      return jsonResult({
+        edges: edges.slice(0, 100),
+        total: edges.length,
+        circulars: data.imports.summary.circulars,
+      });
     }
   );
 }
@@ -521,7 +501,7 @@ function registerClassificationTools(server: McpServer, context: McpContext): vo
     ({ archetype, path }) => {
       const data = context.freshData();
       if (!data.classifications) {
-        return { content: [{ type: "text", text: "No classifications data available. Run 'sourcevision analyze' first." }] };
+        return textResult("No classifications data available. Run 'sourcevision analyze' first.");
       }
 
       let files = data.classifications.files;
@@ -533,17 +513,12 @@ function registerClassificationTools(server: McpServer, context: McpContext): vo
         files = files.filter((f) => f.path.toLowerCase().includes(q));
       }
 
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            archetypes: data.classifications.archetypes.map((a) => ({ id: a.id, name: a.name })),
-            files: files.slice(0, 50),
-            total: files.length,
-            summary: data.classifications.summary,
-          }, null, 2),
-        }],
-      };
+      return jsonResult({
+        archetypes: data.classifications.archetypes.map((a) => ({ id: a.id, name: a.name })),
+        files: files.slice(0, 50),
+        total: files.length,
+        summary: data.classifications.summary,
+      });
     }
   );
 
@@ -563,28 +538,18 @@ function registerClassificationTools(server: McpServer, context: McpContext): vo
       const data = context.freshData();
       const file = data.inventory?.files.find((f) => f.path === path);
       if (!file) {
-        return { content: [{ type: "text", text: `File "${path}" not found in inventory.` }] };
+        return textResult(`File "${path}" not found in inventory.`);
       }
 
       const validArchetypes = data.classifications?.archetypes.map((a) => a.id) ?? [];
       if (validArchetypes.length > 0 && !validArchetypes.includes(archetype)) {
-        return {
-          content: [{
-            type: "text",
-            text: `Unknown archetype "${archetype}". Valid archetypes: ${validArchetypes.join(", ")}`,
-          }],
-        };
+        return textResult(`Unknown archetype "${archetype}". Valid archetypes: ${validArchetypes.join(", ")}`);
       }
 
       setArchetypeOverride(context.absDir, path, archetype);
       context.invalidateCache();
 
-      return {
-        content: [{
-          type: "text",
-          text: `Set archetype override: "${path}" → "${archetype}". Run 'sourcevision analyze' to apply.`,
-        }],
-      };
+      return textResult(`Set archetype override: "${path}" → "${archetype}". Run 'sourcevision analyze' to apply.`);
     }
   );
 }
@@ -593,20 +558,15 @@ function registerComponentTools(server: McpServer, context: McpContext): void {
   registerTool(server, context, "get_route_tree","Get the route structure (pages, API routes, layouts). Use when working on routing or navigation.", {}, () => {
     const data = context.freshData();
     if (!data.components) {
-      return { content: [{ type: "text", text: "No components data available." }] };
+      return textResult("No components data available.");
     }
 
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          routeTree: data.components.routeTree,
-          routeModules: data.components.routeModules,
-          serverRoutes: data.components.serverRoutes,
-          conventions: data.components.summary.routeConventions,
-        }, null, 2),
-      }],
-    };
+    return jsonResult({
+      routeTree: data.components.routeTree,
+      routeModules: data.components.routeModules,
+      serverRoutes: data.components.serverRoutes,
+      conventions: data.components.summary.routeConventions,
+    });
   });
 }
 
@@ -624,12 +584,7 @@ function registerReadinessTools(server: McpServer, context: McpContext): void {
       // moves the score without rewriting the profile underneath it.
       try {
         const score = computeReadinessForProject(context.absDir);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({ ...score, caveat: READINESS_CAVEAT }, null, 2),
-          }],
-        };
+        return jsonResult({ ...score, caveat: READINESS_CAVEAT });
       } catch (err) {
         // Marked as an error so a client that branches on `isError` does not
         // read "No SDLC profile found" as a scorecard. The suggestion travels

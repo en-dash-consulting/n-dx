@@ -17,7 +17,8 @@
  */
 
 import type { MemoryLevel, MemorySnapshot } from "./memory-monitor.js";
-import {onSnapshot, getLatestSnapshot} from "./memory-monitor.js";
+import { onSnapshot, getLatestSnapshot } from "./memory-monitor.js";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /**
@@ -80,13 +81,6 @@ const TIER_SUMMARIES: Record<MemoryLevel, string> = {
     "High memory usage detected. Animations have been disabled. Close unused tabs or refresh the page.",
   critical:
     "Critical memory pressure. Most features are disabled to prevent a crash. Refresh the page to restore full functionality.",
-};
-
-const SEVERITY_ORDER: Record<MemoryLevel, number> = {
-  normal: 0,
-  elevated: 1,
-  warning: 2,
-  critical: 3,
 };
 
 // ─── Module state ────────────────────────────────────────────────────────────

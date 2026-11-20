@@ -15,6 +15,7 @@
 import { fetchSnapshot } from "@graview/core/snapshot";
 import { doorClient, mcpRemote, type RemoteChange, type RemoteSystem, type RemoteWrite, type ToolCall } from "@graview/core/sync";
 import { BASE } from "../base.js";
+import { DOOR_EMIT_PATH, DOOR_KEY_HEADER, DOOR_KEY_META, DOOR_MCP_PATH, DOOR_PATH_PREFIX } from "./door.js";
 import { isSyncedKind, SYNC_FIELDS, SYNCED_KINDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -32,7 +33,7 @@ export interface NdxRemoteOptions {
 /** The key the dev server wrote into this page, if it is one. */
 function pageKey(): string | undefined {
   if (typeof document === "undefined") return undefined;
-  return document.querySelector('meta[name="ndx-door"]')?.getAttribute("content") ?? undefined;
+  return document.querySelector(`meta[name="${DOOR_KEY_META}"]`)?.getAttribute("content") ?? undefined;
 }
 
 interface Item {
@@ -72,9 +73,9 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
   const key = options.key ?? pageKey();
   // A call to the door carries its key; the snapshot is a plain read, sent as it was asked.
   const doFetch: Fetch = (input, init) => {
-    if (!key || !String(input).includes("/ndx/")) return send(input, init);
+    if (!key || !String(input).includes(DOOR_PATH_PREFIX)) return send(input, init);
     const headers = new Headers(init?.headers);
-    headers.set("x-ndx-door", key);
+    headers.set(DOOR_KEY_HEADER, key);
     return send(input, { ...init, headers });
   };
   const base = options.base ?? BASE;
@@ -88,7 +89,7 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
 
   async function pull(_call: ToolCall, cursor?: string): Promise<{ changes: RemoteChange[]; cursor: string }> {
     // A fresh projection first; when the door cannot re-emit, the last emitted snapshot still answers, and the rail says it is stale.
-    lastEmit = await doFetch(`${base}/ndx/emit`, { method: "POST", headers: JSON_HEADERS, body: "{}" })
+    lastEmit = await doFetch(`${base}${DOOR_EMIT_PATH}`, { method: "POST", headers: JSON_HEADERS, body: "{}" })
       .then(async (r) => (r.ok ? ((await r.json()) as EmitOutcome) : { ok: false, output: `emit: ${r.status}` }))
       .catch((error: unknown) => ({ ok: false, output: error instanceof Error ? error.message : String(error) }));
     const file = await fetchSnapshot(`${base}/data/snapshot.json`, { fetch: doFetch, kinds: [...SYNCED_KINDS], init: { cache: "no-store" } });
@@ -141,6 +142,6 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
     return { id: write.id, version: after.lastModified ?? before.lastModified ?? "" };
   }
 
-  const remote = mcpRemote({ name: SYSTEM, call: doorClient({ path: "/ndx/mcp", base, fetch: doFetch }), pull, push });
+  const remote = mcpRemote({ name: SYSTEM, call: doorClient({ path: DOOR_MCP_PATH, base, fetch: doFetch }), pull, push });
   return { ...remote, lastEmit: () => lastEmit };
 }

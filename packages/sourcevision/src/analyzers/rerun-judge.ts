@@ -52,6 +52,8 @@ import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { askJev, noul } from "@n-dx/llm-client";
 import type { JevQuestion, JsonValue } from "@n-dx/llm-client";
 import { collectFileHeaders, extractFileHeader } from "./file-headers.js";
+import { SV_CACHE_DIRNAME } from "../paths.js";
+import { addCallTokens } from "./token-usage.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -365,10 +367,7 @@ export async function judgeRerun(
       break;
     }
     outcome.calls++;
-    if (response.tokenUsage) {
-      usage.input += response.tokenUsage.input;
-      usage.output += response.tokenUsage.output;
-    }
+    addCallTokens(usage, response.tokenUsage);
 
     for (const [qid, delta] of request.zoneIds) {
       const a = response.answers[qid];
@@ -439,7 +438,7 @@ let _logPath: string | undefined;
  * see no files — the same contract as `configureJudgmentCache`.
  */
 export function configureRerunLog(opts: { svDir: string } | undefined): void {
-  _logPath = opts ? join(opts.svDir, ".cache", "rerun-log.jsonl") : undefined;
+  _logPath = opts ? join(opts.svDir, SV_CACHE_DIRNAME, "rerun-log.jsonl") : undefined;
 }
 
 /** `append_log`'s entry shape, written to sourcevision's own log (see the module header). */

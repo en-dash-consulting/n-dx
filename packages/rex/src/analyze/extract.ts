@@ -20,7 +20,6 @@ import { z } from "zod";
 import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import {
-  detectFileFormat,
   extractJson,
   repairTruncatedJson,
   emptyAnalyzeTokenUsage,
@@ -1052,6 +1051,23 @@ function buildFromStructuredText(
     depthRole[depths[0]] = "feature";
   }
 
+  // A section's new tasks: its bullets, then the requirement sentences in
+  // its paragraphs, skipping titles the PRD already has.
+  const sectionTasks = (section: TextSection): { proseText: string; tasks: ProposalTask[] } => {
+    const bulletTasks = section.bullets
+      .filter((b) => !existingTitles.has(normalizeTitle(b)))
+      .map((b) => makeTask(b, undefined, undefined, sourceFile));
+
+    // Extract requirement sentences from paragraphs
+    const proseText = section.paragraphs.join(" ");
+    const reqSentences = extractRequirementSentences(proseText);
+    const reqTasks = reqSentences
+      .filter((s) => !existingTitles.has(normalizeTitle(s)))
+      .map((s) => makeTask(s, undefined, undefined, sourceFile));
+
+    return { proseText, tasks: [...bulletTasks, ...reqTasks] };
+  };
+
   // Track the most recent epic proposal so features are associated correctly
   let currentEpic: Proposal | null = null;
 
@@ -1062,19 +1078,8 @@ function buildFromStructuredText(
     if (role === "epic") {
       const features: { title: string; source: string; description?: string; tasks: ProposalTask[] }[] = [];
 
-      // Direct bullets → tasks under a default feature
-      const bulletTasks = section.bullets
-        .filter((b) => !existingTitles.has(normalizeTitle(b)))
-        .map((b) => makeTask(b, undefined, undefined, sourceFile));
-
-      // Extract requirement sentences from paragraphs
-      const proseText = section.paragraphs.join(" ");
-      const reqSentences = extractRequirementSentences(proseText);
-      const reqTasks = reqSentences
-        .filter((s) => !existingTitles.has(normalizeTitle(s)))
-        .map((s) => makeTask(s, undefined, undefined, sourceFile));
-
-      const allTasks = [...bulletTasks, ...reqTasks];
+      // Direct bullets and prose requirements → tasks under a default feature
+      const { proseText, tasks: allTasks } = sectionTasks(section);
       if (allTasks.length > 0) {
         features.push({
           title: section.header,
@@ -1093,18 +1098,7 @@ function buildFromStructuredText(
         currentEpic = proposal;
       }
     } else if (role === "feature") {
-      const tasks = section.bullets
-        .filter((b) => !existingTitles.has(normalizeTitle(b)))
-        .map((b) => makeTask(b, undefined, undefined, sourceFile));
-
-      // Extract requirement sentences from paragraphs
-      const proseText = section.paragraphs.join(" ");
-      const reqSentences = extractRequirementSentences(proseText);
-      const reqTasks = reqSentences
-        .filter((s) => !existingTitles.has(normalizeTitle(s)))
-        .map((s) => makeTask(s, undefined, undefined, sourceFile));
-
-      const allTasks = [...tasks, ...reqTasks];
+      const { proseText, tasks: allTasks } = sectionTasks(section);
       if (existingTitles.has(normalizeTitle(section.header)) && allTasks.length === 0) continue;
 
       const feature = {

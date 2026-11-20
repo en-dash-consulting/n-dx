@@ -44,7 +44,7 @@ const VENDOR_REGISTRY = {
     skipFlag: "--no-codex",
     setup: setupCodexIntegration,
     summarize: (r) =>
-      `AGENTS.md, ${r.skills.written} skills, ${r.config.serverCount} MCP servers`,
+      `AGENTS.md, ${r.skills.written} skills, ${r.config.written ? `${r.config.serverCount} MCP servers` : "config skipped"}`,
   },
 };
 
@@ -148,6 +148,7 @@ export function formatInitReport(results, opts = {}) {
     if (result.skipped || !verbose || !result.detail || isNonActive) {
       // Compact single-line form (skipped vendors, non-verbose mode, or non-active vendor)
       lines.push(`    ${label}${result.summary}`);
+      if (result.detail?.config?.error) lines.push(`      reason: ${result.detail.config.error}`);
       if (result.error) {
         lines.push(`      reason: ${result.error}`);
       }
@@ -262,6 +263,7 @@ function formatVendorArtifacts(vendor, detail) {
     if (detail.skills) {
       lines.push(`.agents/skills/ — ${detail.skills.written} skill${detail.skills.written === 1 ? "" : "s"}`);
     }
+    if (detail.config?.error) lines.push(`.codex/config.toml — skipped: ${detail.config.error}`);
     if (detail.config?.written) {
       lines.push(`.codex/config.toml — ${detail.config.serverCount} MCP server${detail.config.serverCount === 1 ? "" : "s"} (stdio)`);
     }

@@ -198,7 +198,6 @@ ndx start .                 # register with the hub; dashboard + MCP at /p/<id>/
 ndx start status .          # hub, project and URL
 ndx start stop .            # unregister this worktree
 ndx start --here .          # single-project server that owns the port instead
-ndx start --preview .       # editable UI layout mock-up on :3118, runs alongside the dashboard
 ndx usage .                 # token usage analytics
 ```
 
@@ -237,7 +236,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx add "<desc>" [dir]` | Add PRD items from descriptions, files, or stdin |
 | `ndx work [dir]` | Run next task (`--task=ID`, `--epic=ID`, `--auto`, `--loop`, `--yes`) |
 | `ndx self-heal [N] [dir]` | Iterative improvement loop (analyze + recommend + execute) |
-| `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `--preview`, `stop`, `status`) |
+| `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `stop`, `status`) |
 
 ### More
 
@@ -359,7 +358,7 @@ claude mcp add --transport http sourcevision http://127.0.0.1:3117/p/<id>/mcp/so
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
 ```
 
-**Per-user token.** Loopback is shared by every account on a machine, so the hub, the project servers and the preview server require a token that `ndx start` creates in your ndx home (`~/.ndx/auth.token`, mode 0600). The browser never holds the token: the URL `ndx start` prints carries a single-use sign-in nonce (`?ndx_nonce=…`, valid for about a minute), which the page exchanges for a session credential of its own, kept in that tab's `sessionStorage` and scoped to that port. Reloading the tab keeps it; a tab opened from a signed-in one is handed it; anything else shows a sign-in notice — run `ndx start` again for a fresh link. No cookie is set. Scripts and MCP clients send it as `X-Ndx-Token` or `Authorization: Bearer`. A request without it is answered 401. Disable with `ndx start --no-auth`, or with `"web": { "auth": false }` in your git-ignored `.n-dx.local.json` (`ndx config web.auth false` writes it there) or in `<ndx home>/config.json` for every project. The same setting in the shared `.n-dx.json`, or in a `.n-dx.local.json` the repository commits, is ignored with a warning: a checkout cannot turn the token off for whoever clones it. A bare `web serve` without `--token-file` also runs without one. Printed URLs and the registration lines above use `127.0.0.1` rather than `localhost`, because the servers bind only `127.0.0.1` and `localhost` may resolve to `[::1]` first, where another account could be listening.
+**Per-user token.** Loopback is shared by every account on a machine, so the hub and the project servers require a token that `ndx start` creates in your ndx home (`~/.ndx/auth.token`, mode 0600). The browser never holds the token: the URL `ndx start` prints carries a single-use sign-in nonce (`?ndx_nonce=…`, valid for about a minute), which the page exchanges for a session credential of its own, kept in that tab's `sessionStorage` and scoped to that port. Reloading the tab keeps it; a tab opened from a signed-in one is handed it; anything else shows a sign-in notice — run `ndx start` again for a fresh link. No cookie is set. Scripts and MCP clients send it as `X-Ndx-Token` or `Authorization: Bearer`. A request without it is answered 401. Disable with `ndx start --no-auth`, or with `"web": { "auth": false }` in your git-ignored `.n-dx.local.json` (`ndx config web.auth false` writes it there) or in `<ndx home>/config.json` for every project. The same setting in the shared `.n-dx.json`, or in a `.n-dx.local.json` the repository commits, is ignored with a warning: a checkout cannot turn the token off for whoever clones it. A bare `web serve` without `--token-file` also runs without one. Printed URLs and the registration lines above use `127.0.0.1` rather than `localhost`, because the servers bind only `127.0.0.1` and `localhost` may resolve to `[::1]` first, where another account could be listening.
 
 Sessions (`Mcp-Session-Id`), SSE responses and `DELETE` for session close are handled by the project's own server; the hub only proxies. Two registered projects have independent sessions, and a tool call on `/p/A/mcp/rex` writes to A's tree only. `GET /api/hub/projects` lists the registered ids.
 

@@ -22,6 +22,7 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { SettingRow, Switch, type SettingRowSpec } from "./setting-row.js";
 import type { ProjectSectionId } from "./project-sections.js";
 import { PROJECT_LANGUAGES } from "../external.js";
+import { responseError } from "../utils/response-error.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -163,8 +164,7 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
     try {
       const res = await fetch("/api/project-settings");
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Failed to load" }));
-        setLoadError((body as { error?: string }).error ?? "Failed to load project settings");
+        setLoadError(await responseError(res, "Failed to load", "Failed to load project settings"));
         return;
       }
       adopt(await res.json() as ProjectSettingsResponse);
@@ -233,8 +233,7 @@ export function useProjectSettingsForm(): ProjectSettingsForm {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Save failed" }));
-        setSaveError((errBody as { error?: string }).error ?? "Failed to save");
+        setSaveError(await responseError(res, "Save failed", "Failed to save"));
         return false;
       }
       const saved = (await res.json() as { settings: ProjectSettingsResponse }).settings;

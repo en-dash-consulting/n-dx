@@ -20,13 +20,13 @@
 import { h, type ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import type { SidecarCallProblem, SidecarExternalCall, SidecarFieldOption } from "../hooks/sidecar.js";
+import { isRecord } from "../utils/is-record.js";
 
 type Json = Record<string, unknown>;
 
 /** The properties whose value an approval cannot change; mirrors `IDEMPOTENCY_KEY_PROPERTIES` in the server's external-call.ts. */
 const IDEMPOTENCY_KEY_PROPERTIES = ["requestId", "idempotencyKey"] as const;
 
-const isRecord = (value: unknown): value is Json => !!value && typeof value === "object" && !Array.isArray(value);
 const isScalar = (value: unknown): value is string | number | boolean =>
   typeof value === "string" || typeof value === "number" || typeof value === "boolean";
 

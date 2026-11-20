@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { execFile as execFileCb } from "node:child_process";
-import { performPreRunCommitGateIfNeeded, PLANNING_COMMIT_SUBJECT } from "../../src/agent/lifecycle/shared.js";
+import { performPreRunCommitGateIfNeeded, PLANNING_COMMIT_SUBJECT } from "../../src/agent/lifecycle/pre-run-commit-gate.js";
 import { resolveTaskRefId } from "../../src/cli/commands/run.js";
 import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 

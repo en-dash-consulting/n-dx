@@ -25,7 +25,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse } from "./response-utils.js";
+import { jsonResponse, errorResponse, pageParams } from "./response-utils.js";
 import { AggregationResultCache } from "./aggregation-cache.js";
 import {
   dashboardUsagePath,
@@ -39,6 +39,7 @@ import {
   type BillableTokens,
 } from "@n-dx/llm-client";
 import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
+import { isRecord } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)
@@ -246,10 +247,6 @@ function normalizeEventMetadata(value: unknown): string | undefined {
 function normalizeBudgetKey(value: unknown): string | undefined {
   const normalized = normalizeEventMetadata(value);
   return normalized?.toLowerCase();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isValidBudget(value: unknown): value is number {
@@ -860,6 +857,16 @@ function parseQuery(url: string): URLSearchParams {
   return idx === -1 ? new URLSearchParams() : new URLSearchParams(url.slice(idx));
 }
 
+/** The `?period=` a grouping route buckets by (default `day`), or null once a 400 has refused an unknown one. */
+function periodOr400(params: URLSearchParams, res: ServerResponse): TimePeriod | null {
+  const period = (params.get("period") || "day") as TimePeriod;
+  if (!["day", "week", "month"].includes(period)) {
+    errorResponse(res, 400, `Invalid period: ${period}. Use "day", "week", or "month".`);
+    return null;
+  }
+  return period;
+}
+
 function loadConfiguredModel(projectDir: string): ConfiguredModel {
   const path = resolveLayout(projectDir).configFile;
   if (!existsSync(path)) return { vendor: DEFAULT_LLM_VENDOR, model: "default" };
@@ -1004,11 +1011,6 @@ export function resetAggregationCache(): void {
   aggregationCache = null;
 }
 
-/** Get the current cache instance (for testing/monitoring). */
-export function getAggregationCacheInstance(): AggregationResultCache | null {
-  return aggregationCache;
-}
-
 /**
  * Build a cache key from query scope parameters.
  * Encodes all parameters that affect the events result.
@@ -1068,10 +1070,7 @@ export async function handleTokenUsageRoute(
     const total = filtered.length;
 
     // Support pagination via ?offset=N&limit=N
-    const offsetStr = params.get("offset");
-    const limitStr = params.get("limit");
-    const offset = offsetStr ? Math.max(0, parseInt(offsetStr, 10) || 0) : 0;
-    const limit = limitStr ? Math.max(0, parseInt(limitStr, 10) || 0) : 0;
+    const { offset, limit } = pageParams(params);
 
     if (offset > 0 || limit > 0) {
       const sliced = limit > 0
@@ -1097,11 +1096,8 @@ export async function handleTokenUsageRoute(
 
   // GET /api/token/by-period — grouped by time period
   if (path === "by-period") {
-    const period = (params.get("period") || "day") as TimePeriod;
-    if (!["day", "week", "month"].includes(period)) {
-      errorResponse(res, 400, `Invalid period: ${period}. Use "day", "week", or "month".`);
-      return true;
-    }
+    const period = periodOr400(params, res);
+    if (!period) return true;
     const events = await getCachedEvents(ctx, since, until);
     const buckets = groupByTimePeriod(events, period);
     jsonResponse(res, 200, { period, buckets });
@@ -1121,11 +1117,8 @@ export async function handleTokenUsageRoute(
 
   // GET /api/token/utilization — config + usage grouped by vendor/model
   if (path === "utilization") {
-    const period = (params.get("period") || "day") as TimePeriod;
-    if (!["day", "week", "month"].includes(period)) {
-      errorResponse(res, 400, `Invalid period: ${period}. Use "day", "week", or "month".`);
-      return true;
-    }
+    const period = periodOr400(params, res);
+    if (!period) return true;
 
     const configured = loadConfiguredModel(ctx.projectDir);
     const events = await getCachedEvents(ctx, since, until);

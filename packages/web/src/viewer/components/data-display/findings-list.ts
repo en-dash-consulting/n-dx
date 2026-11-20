@@ -3,6 +3,7 @@ import { useState, useMemo, useCallback } from "preact/hooks";
 import type { Finding } from "../../external.js";
 import { CollapsibleSection } from "./collapsible-section.js";
 import { SearchFilter } from "../search-filter.js";
+import { toggled } from "../set-toggle.js";
 
 interface FindingsListProps {
   findings: Finding[];
@@ -72,15 +73,7 @@ export function FindingsList({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleExpanded = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setExpandedIds((prev) => toggled(prev, id));
   }, []);
 
   // Compute distinct filter option values from findings

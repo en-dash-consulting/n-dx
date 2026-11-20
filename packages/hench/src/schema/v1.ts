@@ -162,7 +162,7 @@ export interface PruneConfig {
  * number trades a known cadence for an unmeasured one, so it wants a batch
  * that actually exercises an API loop first.
  *
- * `2000`: matches `MAX_TOOL_OUTPUT_STORED` in `agent/lifecycle/loop.ts`, the
+ * `2000`: matches {@link MAX_TOOL_OUTPUT_STORED}, the
  * size at which hench truncates a tool result for the run record. Below that the
  * summarizer sees less of a tool result than the run itself keeps — at the
  * original 800 a 2,000-character result lost 60% of its characters before
@@ -808,6 +808,32 @@ export const DEFAULT_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
 export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient" | "cancelled";
 
+/**
+ * Statuses a run ends in when it failed. The rollback gate
+ * (`agent/lifecycle/shared.ts`) and the consecutive-failure counter
+ * (`cli/commands/consecutive-failures.ts`) both answer "did this run end in
+ * failure?" from this one set, so a status cannot be rolled back yet still
+ * reset the counter (or vice versa).
+ */
+export const FAILED_RUN_STATUSES: ReadonlySet<string> = new Set<RunStatus>([
+  "failed",
+  "timeout",
+  "budget_exceeded",
+  "error_transient",
+  "cancelled",
+]);
+
+/**
+ * Statuses that count as a hard failure for stuck-task detection and workflow
+ * analysis. Transient errors (API rate limits, network blips) do not count
+ * because they are expected to self-resolve on retry.
+ */
+export const HARD_FAILURE_RUN_STATUSES: ReadonlySet<string> = new Set<RunStatus>([
+  "failed",
+  "timeout",
+  "budget_exceeded",
+]);
+
 export interface ToolCallRecord {
   turn: number;
   tool: string;
@@ -815,6 +841,9 @@ export interface ToolCallRecord {
   output: string;
   durationMs: number;
 }
+
+/** How much of a tool's output a run record keeps in {@link ToolCallRecord.output}. */
+export const MAX_TOOL_OUTPUT_STORED = 2000;
 
 export interface TokenUsage {
   input: number;
@@ -1724,6 +1753,9 @@ export interface RunEscalation {
   reason: string;
 }
 
+/** How much of the agent's closing message a run record keeps as {@link RunRecord.summary}. */
+export const MAX_SUMMARY_LENGTH = 500;
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -2431,6 +2463,12 @@ export interface TaskBrief {
    * code that reads single fields (title, status, acceptance criteria).
    */
   changeBrief?: TaskBriefChangeSection[];
+  /**
+   * On a v2 tree, the images attached to the unit's change (and to the unit
+   * itself when it has a folder of its own), as paths relative to the project
+   * directory when it is known, else absolute. Absent when there are none.
+   */
+  attachments?: string[];
   task: TaskBriefTask;
   parentChain: TaskBriefParent[];
   siblings: TaskBriefSibling[];

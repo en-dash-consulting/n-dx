@@ -12,7 +12,6 @@ import {
   type PRDItem,
   type PRDDocument,
   walkTree,
-  findItem,
   collectAllIds,
   prdLayout,
   loadPrdModel,
@@ -20,6 +19,7 @@ import {
 } from "./rex-gateway.js";
 import { type ItemType, TYPE_PARENTS, isItemType, itemTypeOf } from "../shared/index.js";
 import { loadPRDSync } from "./prd-io.js";
+import { findItemById } from "./routes-rex/rex-route-helpers.js";
 
 const VALIDATION_PREFIX = "/api/rex/validate";
 const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
@@ -31,12 +31,6 @@ const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
 /** Get the parent's type from a parents array (null for root items). */
 function parentType(parents: PRDItem[]): ItemType | null {
   return parents.length > 0 ? itemTypeOf(parents[parents.length - 1]) : null;
-}
-
-/** Find an item by ID, returning just the item (or null). */
-function findItemById(items: PRDItem[], id: string): PRDItem | null {
-  const entry = findItem(items, id);
-  return entry ? entry.item : null;
 }
 
 // ── Validation checks ────────────────────────────────────────────────

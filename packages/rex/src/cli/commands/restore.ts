@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { readdir, stat } from "node:fs/promises";
 import { CLIError, requireRexDir } from "../errors.js";
 import { info, result, warn } from "../output.js";
+import { confirmPrompt } from "../prompt.js";
 
 import { getAvailableBackups, restoreFromBackup, V2_RESTORE_REFUSAL } from "../../core/backup-snapshots.js";
 import { resolveRexPaths } from "../../store/index.js";
@@ -41,15 +42,6 @@ async function countFiles(dir: string): Promise<number> {
     else total++;
   }
   return total;
-}
-
-async function confirmPrompt(question: string): Promise<boolean> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise<string>((resolve) => rl.question(question, resolve));
-  rl.close();
-  const normalized = answer.trim().toLowerCase();
-  return normalized === "y" || normalized === "yes";
 }
 
 export async function cmdRestore(

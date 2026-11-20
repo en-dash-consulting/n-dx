@@ -15,7 +15,8 @@
  * @module
  */
 
-import {readFile, writeFile, stat} from "node:fs/promises";import { join, relative, resolve } from "node:path";
+import { readFile, writeFile, stat, unlink } from "node:fs/promises";
+import { resolve } from "node:path";
 import { repoCommandEnv } from "../prd/llm-gateway.js";
 import { execRepoShellCmd } from "../guard/sandbox.js";
 
@@ -229,18 +230,11 @@ async function backupFile(filePath: string): Promise<FileBackup> {
 
 async function restoreBackup(backup: FileBackup): Promise<void> {
   await writeFile(backup.filePath, backup.originalContent, "utf-8");
-  // Clean up backup file (ignore errors if it doesn't exist)
-  try {
-    const { unlink } = await import("node:fs/promises");
-    await unlink(backup.backupPath);
-  } catch {
-    // Backup file may already be cleaned up
-  }
+  await cleanupBackup(backup);
 }
 
 async function cleanupBackup(backup: FileBackup): Promise<void> {
   try {
-    const { unlink } = await import("node:fs/promises");
     await unlink(backup.backupPath);
   } catch {
     // Backup file may already be cleaned up
@@ -252,75 +246,79 @@ async function cleanupBackup(backup: FileBackup): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Remove dead exports from a file.
- * Returns the transformation record and new file content.
+ * Cut each item's line range out of one file, bottom-up so the ranges still
+ * to be cut keep their line numbers, then validate the write with tsc and
+ * roll it back on failure. Dead exports and unused imports both go through
+ * here; only the record each removal leaves differs.
+ *
+ * A {@link TestFileGuardError} is rethrown; any other failure restores the
+ * file and comes back as a rolled-back batch.
  */
-async function removeDeadExport(
+async function applyLineRemovals<T extends { file: string; startLine: number; endLine: number }>(
   projectDir: string,
-  deadExport: DeadExport,
-): Promise<{ transformation: CleanupTransformation; newContent: string }> {
-  const filePath = resolve(projectDir, deadExport.file);
-  assertNotTestFile(deadExport.file);
+  file: string,
+  items: T[],
+  describe: (item: T, removedCode: string) => CleanupTransformation,
+  dryRun: boolean,
+  typecheckTimeout: number,
+): Promise<CleanupBatch> {
+  const filePath = resolve(projectDir, file);
+  const transformations: CleanupTransformation[] = [];
+  let backup: FileBackup | undefined;
 
-  const content = await readFile(filePath, "utf-8");
-  const lines = content.split("\n");
+  try {
+    // Check file exists
+    await stat(filePath);
+    backup = await backupFile(filePath);
 
-  // Extract the lines to remove
-  const startIdx = deadExport.startLine - 1;
-  const endIdx = deadExport.endLine;
-  const removedLines = lines.slice(startIdx, endIdx);
-  const removedCode = removedLines.join("\n");
+    // Sort by line number descending to preserve line numbers during removal
+    const sorted = [...items].sort((a, b) => b.startLine - a.startLine);
 
-  // Remove the lines
-  const newLines = [...lines.slice(0, startIdx), ...lines.slice(endIdx)];
-  const newContent = newLines.join("\n");
+    let content = backup.originalContent;
+    for (const item of sorted) {
+      const lines = content.split("\n");
+      const startIdx = item.startLine - 1;
+      const endIdx = item.endLine;
+      const removedCode = lines.slice(startIdx, endIdx).join("\n");
 
-  return {
-    transformation: {
-      type: "dead_export_removal",
-      file: deadExport.file,
-      startLine: deadExport.startLine,
-      endLine: deadExport.endLine,
-      description: `Removed dead export: ${deadExport.name}`,
-      removedCode,
-    },
-    newContent,
-  };
-}
+      transformations.push(describe(item, removedCode));
 
-/**
- * Prune unused imports from a file.
- * Returns the transformation record and new file content.
- */
-async function pruneUnusedImport(
-  projectDir: string,
-  unusedImport: UnusedImport,
-): Promise<{ transformation: CleanupTransformation; newContent: string }> {
-  const filePath = resolve(projectDir, unusedImport.file);
-  assertNotTestFile(unusedImport.file);
+      content = [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
+    }
 
-  const content = await readFile(filePath, "utf-8");
-  const lines = content.split("\n");
+    if (dryRun) {
+      // Dry run — just log
+      return { transformations, validated: true, rolledBack: false };
+    }
 
-  const startIdx = unusedImport.startLine - 1;
-  const endIdx = unusedImport.endLine;
-  const removedLines = lines.slice(startIdx, endIdx);
-  const removedCode = removedLines.join("\n");
+    await writeFile(filePath, content, "utf-8");
 
-  const newLines = [...lines.slice(0, startIdx), ...lines.slice(endIdx)];
-  const newContent = newLines.join("\n");
+    // Validate with typecheck
+    const { passed, error } = await runTypecheck(projectDir, typecheckTimeout);
+    if (!passed) {
+      // Roll back
+      await restoreBackup(backup);
+      return { transformations, validated: false, rolledBack: true, error };
+    }
+    await cleanupBackup(backup);
+    return { transformations, validated: true, rolledBack: false };
+  } catch (err) {
+    if (backup) {
+      try {
+        await restoreBackup(backup);
+      } catch {
+        // Ignore restore errors
+      }
+    }
 
-  return {
-    transformation: {
-      type: "unused_import_prune",
-      file: unusedImport.file,
-      startLine: unusedImport.startLine,
-      endLine: unusedImport.endLine,
-      description: `Pruned unused import: ${unusedImport.symbols.join(", ")}`,
-      removedCode,
-    },
-    newContent,
-  };
+    // Re-throw hard guard errors
+    if (err instanceof TestFileGuardError) {
+      throw err;
+    }
+
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return { transformations, validated: false, rolledBack: true, error: errorMsg };
+  }
 }
 
 /**
@@ -412,190 +410,55 @@ export async function runCleanupTransformations(
     assertNotTestFile(file);
   }
 
+  /** Keep a batch and count its transformations as applied or rolled back. */
+  const tally = (batch: CleanupBatch): void => {
+    batches.push(batch);
+    if (batch.rolledBack) {
+      rolledBackCount += batch.transformations.length;
+    } else {
+      appliedCount += batch.transformations.length;
+    }
+  };
+
   // Phase 2: Process dead exports (grouped by file)
   if (hasDeadExports) {
-    const groupedDeadExports = groupByFile(analyzerOutput.deadExports!);
-
-    for (const [file, exports] of groupedDeadExports) {
-      const filePath = resolve(projectDir, file);
-      const transformations: CleanupTransformation[] = [];
-      let backup: FileBackup | undefined;
-
-      try {
-        // Check file exists
-        await stat(filePath);
-        backup = await backupFile(filePath);
-
-        // Sort by line number descending to preserve line numbers during removal
-        const sorted = [...exports].sort((a, b) => b.startLine - a.startLine);
-
-        let content = backup.originalContent;
-        for (const deadExport of sorted) {
-          const lines = content.split("\n");
-          const startIdx = deadExport.startLine - 1;
-          const endIdx = deadExport.endLine;
-          const removedCode = lines.slice(startIdx, endIdx).join("\n");
-
-          transformations.push({
-            type: "dead_export_removal",
-            file: deadExport.file,
-            startLine: deadExport.startLine,
-            endLine: deadExport.endLine,
-            description: `Removed dead export: ${deadExport.name}`,
-            removedCode,
-          });
-
-          content = [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
-        }
-
-        if (!dryRun) {
-          await writeFile(filePath, content, "utf-8");
-
-          // Validate with typecheck
-          const { passed, error } = await runTypecheck(projectDir, typecheckTimeout);
-
-          if (!passed) {
-            // Roll back
-            await restoreBackup(backup);
-            batches.push({
-              transformations,
-              validated: false,
-              rolledBack: true,
-              error,
-            });
-            rolledBackCount += transformations.length;
-          } else {
-            await cleanupBackup(backup);
-            batches.push({
-              transformations,
-              validated: true,
-              rolledBack: false,
-            });
-            appliedCount += transformations.length;
-          }
-        } else {
-          // Dry run — just log
-          batches.push({
-            transformations,
-            validated: true,
-            rolledBack: false,
-          });
-          appliedCount += transformations.length;
-        }
-      } catch (err) {
-        if (backup) {
-          try {
-            await restoreBackup(backup);
-          } catch {
-            // Ignore restore errors
-          }
-        }
-        const errorMsg = err instanceof Error ? err.message : String(err);
-
-        // Re-throw hard guard errors
-        if (err instanceof TestFileGuardError) {
-          throw err;
-        }
-
-        batches.push({
-          transformations,
-          validated: false,
-          rolledBack: true,
-          error: errorMsg,
-        });
-        rolledBackCount += transformations.length;
-      }
+    for (const [file, exports] of groupByFile(analyzerOutput.deadExports!)) {
+      tally(await applyLineRemovals(
+        projectDir,
+        file,
+        exports,
+        (deadExport, removedCode) => ({
+          type: "dead_export_removal",
+          file: deadExport.file,
+          startLine: deadExport.startLine,
+          endLine: deadExport.endLine,
+          description: `Removed dead export: ${deadExport.name}`,
+          removedCode,
+        }),
+        dryRun,
+        typecheckTimeout,
+      ));
     }
   }
 
   // Phase 3: Process unused imports (grouped by file)
   if (hasUnusedImports) {
-    const groupedUnusedImports = groupByFile(analyzerOutput.unusedImports!);
-
-    for (const [file, imports] of groupedUnusedImports) {
-      const filePath = resolve(projectDir, file);
-      const transformations: CleanupTransformation[] = [];
-      let backup: FileBackup | undefined;
-
-      try {
-        await stat(filePath);
-        backup = await backupFile(filePath);
-
-        // Sort by line number descending
-        const sorted = [...imports].sort((a, b) => b.startLine - a.startLine);
-
-        let content = backup.originalContent;
-        for (const unusedImport of sorted) {
-          const lines = content.split("\n");
-          const startIdx = unusedImport.startLine - 1;
-          const endIdx = unusedImport.endLine;
-          const removedCode = lines.slice(startIdx, endIdx).join("\n");
-
-          transformations.push({
-            type: "unused_import_prune",
-            file: unusedImport.file,
-            startLine: unusedImport.startLine,
-            endLine: unusedImport.endLine,
-            description: `Pruned unused import: ${unusedImport.symbols.join(", ")}`,
-            removedCode,
-          });
-
-          content = [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
-        }
-
-        if (!dryRun) {
-          await writeFile(filePath, content, "utf-8");
-
-          const { passed, error } = await runTypecheck(projectDir, typecheckTimeout);
-
-          if (!passed) {
-            await restoreBackup(backup);
-            batches.push({
-              transformations,
-              validated: false,
-              rolledBack: true,
-              error,
-            });
-            rolledBackCount += transformations.length;
-          } else {
-            await cleanupBackup(backup);
-            batches.push({
-              transformations,
-              validated: true,
-              rolledBack: false,
-            });
-            appliedCount += transformations.length;
-          }
-        } else {
-          batches.push({
-            transformations,
-            validated: true,
-            rolledBack: false,
-          });
-          appliedCount += transformations.length;
-        }
-      } catch (err) {
-        if (backup) {
-          try {
-            await restoreBackup(backup);
-          } catch {
-            // Ignore
-          }
-        }
-
-        if (err instanceof TestFileGuardError) {
-          throw err;
-        }
-
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        batches.push({
-          transformations,
-          validated: false,
-          rolledBack: true,
-          error: errorMsg,
-        });
-        rolledBackCount += transformations.length;
-      }
+    for (const [file, imports] of groupByFile(analyzerOutput.unusedImports!)) {
+      tally(await applyLineRemovals(
+        projectDir,
+        file,
+        imports,
+        (unusedImport, removedCode) => ({
+          type: "unused_import_prune",
+          file: unusedImport.file,
+          startLine: unusedImport.startLine,
+          endLine: unusedImport.endLine,
+          description: `Pruned unused import: ${unusedImport.symbols.join(", ")}`,
+          removedCode,
+        }),
+        dryRun,
+        typecheckTimeout,
+      ));
     }
   }
 
@@ -675,32 +538,16 @@ export async function runCleanupTransformations(
             for (const backup of backups) {
               await restoreBackup(backup);
             }
-            batches.push({
-              transformations,
-              validated: false,
-              rolledBack: true,
-              error,
-            });
-            rolledBackCount += transformations.length;
+            tally({ transformations, validated: false, rolledBack: true, error });
           } else {
             // Clean up backups
             for (const backup of backups) {
               await cleanupBackup(backup);
             }
-            batches.push({
-              transformations,
-              validated: true,
-              rolledBack: false,
-            });
-            appliedCount += transformations.length;
+            tally({ transformations, validated: true, rolledBack: false });
           }
         } else {
-          batches.push({
-            transformations,
-            validated: true,
-            rolledBack: false,
-          });
-          appliedCount += transformations.length;
+          tally({ transformations, validated: true, rolledBack: false });
         }
       } catch (err) {
         // Roll back on any error
@@ -717,13 +564,7 @@ export async function runCleanupTransformations(
         }
 
         const errorMsg = err instanceof Error ? err.message : String(err);
-        batches.push({
-          transformations,
-          validated: false,
-          rolledBack: true,
-          error: errorMsg,
-        });
-        rolledBackCount += transformations.length;
+        tally({ transformations, validated: false, rolledBack: true, error: errorMsg });
       }
     }
   }

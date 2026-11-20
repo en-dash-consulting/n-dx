@@ -34,11 +34,10 @@
  * @module web/hub/home
  */
 
-import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES } from "../shared/index.js";
+import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES, injectSessionScript } from "../shared/index.js";
 import type { ExtensionView } from "./extensions.js";
 import type { HubOverview, ProjectCard } from "./overview.js";
 import type { HubUsageTotals } from "./usage-ledger.js";
-import { injectSessionScript } from "../shared/index.js";
 
 export function escapeHtml(value: string): string {
   return value
@@ -126,19 +125,16 @@ export function cardFacts(card: ProjectCard): string[] {
   if (!card.reachable) {
     return [card.error ? `not answering — ${card.error}` : "not answering"];
   }
-  const facts: string[] = needsInit(card) ? ["not initialized"] : [];
-  const running = runningLabel(card);
-  if (running) facts.push(running);
-  if (card.branch) facts.push(card.branch);
-  const dirty = dirtyLabel(card);
-  if (dirty) facts.push(dirty);
-  const progress = progressLabel(card);
-  if (progress) facts.push(progress);
-  const readiness = readinessLabel(card);
-  if (readiness) facts.push(readiness);
-  const infrastructure = infrastructureLabel(card);
-  if (infrastructure) facts.push(infrastructure);
-  return facts;
+  const facts = [
+    needsInit(card) ? "not initialized" : null,
+    runningLabel(card),
+    card.branch,
+    dirtyLabel(card),
+    progressLabel(card),
+    readinessLabel(card),
+    infrastructureLabel(card),
+  ];
+  return facts.filter((fact): fact is string => !!fact);
 }
 
 /** The docked hub session drawer's width, the viewer drawer's default. */

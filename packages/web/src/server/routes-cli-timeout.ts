@@ -10,10 +10,10 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
+import { readNdxConfig, writeNdxConfig } from "./ndx-config-file.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
@@ -84,23 +84,6 @@ const COMMAND_TIMEOUT_DEFAULTS: Record<string, number> = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Read the project config, returning empty object on failure. */
-function readNdxConfig(projectDir: string): Record<string, unknown> {
-  const configPath = resolveLayout(projectDir).configFile;
-  if (!existsSync(configPath)) return {};
-  try {
-    return JSON.parse(readFileSync(configPath, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-/** Write the project config preserving existing content. */
-function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = resolveLayout(projectDir).configFile;
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-}
 
 /** Extract the CLI timeout config section from the project config. */
 function extractCliTimeouts(projectDir: string): CliTimeoutsResponse {
