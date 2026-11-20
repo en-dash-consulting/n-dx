@@ -213,8 +213,19 @@ export function renderTreeView(
     coverageMap?: CoverageMap;
   },
 ): void {
+  renderTreeWithStats(items, computeStats(items), opts);
+}
+
+/**
+ * Print `items` as a tree — completed and deleted items hidden unless
+ * `showAll` — followed by the stats line for `stats`.
+ */
+function renderTreeWithStats(
+  items: PRDItem[],
+  stats: TreeStats,
+  opts: { showAll: boolean; coverageMap?: CoverageMap },
+): void {
   const displayItems = opts.showAll ? items : filterDeleted(filterCompleted(items));
-  const stats = computeStats(items);
   const hidingCompleted = !opts.showAll && (stats.completed > 0 || stats.deleted > 0);
 
   for (const line of renderTree(displayItems, 0, opts.coverageMap)) {
@@ -437,17 +448,7 @@ export function renderShowIndividualHuman(
       continue;
     }
 
-    const displayItems = opts.showAll
-      ? section.items
-      : filterDeleted(filterCompleted(section.items));
-    const hidingCompleted =
-      !opts.showAll && (section.stats.completed > 0 || section.stats.deleted > 0);
-
-    for (const line of renderTree(displayItems, 0, opts.coverageMap)) {
-      result(line);
-    }
-    info("");
-    info(formatStats(section.stats, { hidingCompleted }));
+    renderTreeWithStats(section.items, section.stats, opts);
   }
 }
 

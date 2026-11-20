@@ -349,7 +349,6 @@
   padding: 0.5rem 0.65rem;
   margin-bottom: 0.5rem;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
   border-radius: 6px;
   background: var(--accent-subtle);
 }

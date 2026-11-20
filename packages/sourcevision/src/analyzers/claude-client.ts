@@ -15,7 +15,6 @@ import {
   DEFAULT_LLM_VENDOR,
   createLLMClient,
   detectLLMAuthMode,
-  ClaudeClientError,
   NEWEST_MODELS,
   resolveVendorModel,
   resolveTaskModel,

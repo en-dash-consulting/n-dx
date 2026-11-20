@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import { detectIssues, applyFixes } from "../../fix/index.js";
 import type { FixAction, FixKind } from "../../fix/index.js";

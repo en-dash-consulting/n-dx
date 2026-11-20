@@ -26,7 +26,7 @@ export * from "./use-live-analyze.js";
 export * from "./use-memory-monitor.js";
 export * from "./use-pan-zoom.js";
 export * from "./use-persistent-filter.js";
-export * from "../views/use-polling.js";
+export * from "./use-polling.js";
 export * from "./use-prd-actions.js";
 export * from "./use-prd-data.js";
 export * from "./use-prd-deep-link.js";

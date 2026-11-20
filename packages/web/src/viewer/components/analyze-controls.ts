@@ -25,6 +25,7 @@ import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { findOperation } from "../hooks/index.js";
 import type { JobTray } from "../hooks/index.js";
 import { ActionIcon } from "./action-icon.js";
+import { errorOrHttpStatus } from "../utils/response-error.js";
 
 export interface AnalyzeControlsProps {
   jobs: JobTray;
@@ -69,8 +70,7 @@ export function AnalyzeControls({ jobs }: AnalyzeControlsProps) {
         body: JSON.stringify({ deep }),
       });
       if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: "Analysis failed" })) as { error?: string };
-        throw new Error(d.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Analysis failed"));
       }
       setState("done");
       setTimeout(() => setState("idle"), 4000);
@@ -92,8 +92,7 @@ export function AnalyzeControls({ jobs }: AnalyzeControlsProps) {
       });
       // 409 means one is already running — the tray reports that one.
       if (!res.ok && res.status !== 409) {
-        const d = await res.json().catch(() => ({ error: "Full analysis failed to start" })) as { error?: string };
-        throw new Error(d.error || `HTTP ${res.status}`);
+        throw new Error(await errorOrHttpStatus(res, "Full analysis failed to start"));
       }
     } catch (err) {
       setError(String(err));

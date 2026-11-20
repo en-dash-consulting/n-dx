@@ -12,7 +12,8 @@ import { appUrl } from "../base-path.js";
 import { useCliName, useFeatureToggle } from "../hooks/index.js";
 import { viewPathname } from "../route-state.js";
 import type { NavigateTo } from "../types.js";
-import { ROBOT_WRANGLER_SECTIONS, type RobotWranglerSection } from "./robot-wrangler-sections.js";
+import { getJson } from "../utils/json-requests.js";
+import type { RobotWranglerSection } from "./robot-wrangler-sections.js";
 import {
   summarizeSidecarTooling,
   summarizeTooling,
@@ -38,15 +39,6 @@ type Load =
   | { state: "loading" }
   | { state: "error" }
   | { state: "ready"; config: ToolingConfig; catalog: ToolingCatalog | null; auth: ToolingAuth };
-
-async function getJson<T>(url: string, init?: RequestInit): Promise<T | null> {
-  try {
-    const res = await fetch(url, init);
-    return res.ok ? await res.json() as T : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * The verdict of the last credential check Robot Wrangler ran; only the active

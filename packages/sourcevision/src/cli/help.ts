@@ -14,6 +14,7 @@
 
 import { formatHelp, formatUsage } from "@n-dx/llm-client";
 import type { HelpDefinition } from "@n-dx/llm-client";
+import { DEFAULT_SERVE_PORT } from "../constants.js";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {
@@ -98,7 +99,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Requires .sourcevision/ to exist (run 'sourcevision init' and\n" +
       "'sourcevision analyze' first).",
     options: [
-      { flag: "--port=<N>", description: "Server port (default: 3117)" },
+      { flag: "--port=<N>", description: `Server port (default: ${DEFAULT_SERVE_PORT})` },
     ],
     examples: [
       { command: "sourcevision serve", description: "Start viewer on default port" },

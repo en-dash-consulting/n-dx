@@ -31,6 +31,8 @@ import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
+import { shortChangeId } from "./product-model.js";
+import { errorMessage } from "../utils/format.js";
 
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
@@ -113,10 +115,6 @@ function ageOf(row: InboxRow): string | null {
   return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
-function shortId(change: ChangeRow): string {
-  return change.displayId ?? change.id.slice(0, 8);
-}
-
 function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => void; onPlace?: (id: string) => void }) {
   const { change } = row;
   const tags = row.shortlist && "placement" in row.shortlist ? row.shortlist.placement.change.tags ?? [] : [];
@@ -128,7 +126,7 @@ function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => 
   // otherwise bubbles to the row too.
   return h("li", { class: "inbox-row", "data-change-id": change.id, onClick: () => onOpen(change.id) },
     h("div", { class: "inbox-row-head" },
-      h("span", { class: "ch-display-id" }, shortId(change)),
+      h("span", { class: "ch-display-id" }, shortChangeId(change)),
       h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),
@@ -206,7 +204,7 @@ function AppliedRow({ row, onOpen }: { row: InboxRow; onOpen: (id: string) => vo
   const { change } = row;
   return h("li", { class: "inbox-row inbox-applied-row", "data-change-id": change.id, onClick: () => onOpen(change.id) },
     h("div", { class: "inbox-row-head" },
-      h("span", { class: "ch-display-id" }, shortId(change)),
+      h("span", { class: "ch-display-id" }, shortChangeId(change)),
       h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
       change.appliedAt ? h("span", { class: "tag inbox-applied-at" }, `applied ${appliedDay(change.appliedAt)}`) : null,
     ),
@@ -310,7 +308,7 @@ async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<strin
       else reads.set(id, { placement: read });
     }
   } catch (err) {
-    failAll(err instanceof Error ? err.message : String(err));
+    failAll(errorMessage(err));
   }
   return reads;
 }

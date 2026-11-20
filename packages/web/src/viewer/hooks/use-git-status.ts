@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback, useEffect } from "preact/hooks";
-import { usePolling } from "../views/use-polling.js";
+import { usePolling } from "./use-polling.js";
 
 export type GitFileStatus =
   | "modified" | "added" | "deleted" | "renamed" | "untracked" | "unmerged" | "other";

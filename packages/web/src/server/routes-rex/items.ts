@@ -1,10 +1,10 @@
 /**
- * Item CRUD routes: add, get, patch, delete, bulk update, merge.
+ * Item CRUD routes: add, get, patch, delete, bulk update, merge, image attachments.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody, readJsonObject, errorMessage } from "../response-utils.js";
@@ -13,15 +13,14 @@ import { itemLinkRefs, type LinkFields } from "../tracker/link-refs.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
   findItemById, updateInTree,
-  appendLog, API_SETTABLE_STATUSES,
+  appendLog, API_SETTABLE_STATUSES, loadPRDOr404, broadcastPrdChanged,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
-import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
   type PRDItem,
-  type TreeEntry,
   isPriority,
   validateMerge,
   previewMerge,
@@ -96,6 +95,11 @@ export function routeItems(
       return handleItemLink(req, res, ctx, itemId, method === "POST" ? "link" : "unlink", broadcast);
     }
 
+    // POST /api/rex/items/:id/attachments { images: [{ name, mediaType, data }] } — store images in a change's folder
+    if (path === `items/${itemId}/attachments` && method === "POST") {
+      return handleItemAttach(req, res, ctx, itemId);
+    }
+
     // Requirements sub-routes: /api/rex/items/:id/requirements[/:reqId]
     if (routeItemRequirements) {
       const reqResult = routeItemRequirements(
@@ -106,11 +110,8 @@ export function routeItems(
 
     // GET /api/rex/items/:id — single item
     if (method === "GET") {
-      const doc = loadPRDSync(ctx.rexDir);
-      if (!doc) {
-        errorResponse(res, 404, "No PRD data found");
-        return true;
-      }
+      const doc = loadPRDOr404(ctx, res);
+      if (!doc) return true;
       const item = findItemById(doc.items, itemId);
       if (!item) {
         errorResponse(res, 404, `Item "${itemId}" not found`);
@@ -284,7 +285,7 @@ async function handleItemPatch(
     await publishItemUpdate(ctx, store, itemId, updates, broadcast);
     // The item event names one item; the ancestors that closed with it need a
     // whole-tree refresh in every open viewer.
-    if (autoCompleted.length > 0) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+    if (autoCompleted.length > 0) broadcastPrdChanged(broadcast);
     // Say why a change was held open or left unapplied (rex.applyOn), so the dashboard can.
     jsonResponse(res, 200, {
       ok: true,
@@ -337,6 +338,53 @@ async function handleItemLink(
     broadcast?.({ type: "rex:item-updated", itemId, updates: { links: result.refs }, timestamp: new Date().toISOString() });
   }
   jsonResponse(res, 200, { ok: true, changed: result.changed, refs: result.refs });
+  return true;
+}
+
+/**
+ * Handle POST /api/rex/items/:id/attachments — store images in the folder of
+ * change `itemId` (v2 only). `data` is the image's bytes in base64. Rex checks
+ * each image's type, signature and size and refuses the whole call, writing
+ * nothing, when one fails; that refusal is a 400. The tree is unchanged, so
+ * nothing is broadcast.
+ */
+async function handleItemAttach(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  itemId: string,
+): Promise<boolean> {
+  const body = await readJsonObject(req, res);
+  if (typeof body === "string") {
+    errorResponse(res, 400, body);
+    return true;
+  }
+  const raw = (body as { images?: unknown }).images;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    errorResponse(res, 400, "images must be a non-empty array of { name, mediaType, data }");
+    return true;
+  }
+  const images = [];
+  for (const entry of raw) {
+    const { name, mediaType, data } = (entry ?? {}) as { name?: unknown; mediaType?: unknown; data?: unknown };
+    if (typeof mediaType !== "string" || typeof data !== "string") {
+      errorResponse(res, 400, "Each image needs a mediaType and base64 data");
+      return true;
+    }
+    images.push({ name: typeof name === "string" ? name : "", mediaType, data: Buffer.from(data, "base64") });
+  }
+  try {
+    const written = await attachImages(ctx.rexDir, itemId, images);
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "item_edited",
+      itemId,
+      detail: `Attached ${written.length} image${written.length === 1 ? "" : "s"} (via web)`,
+    });
+    jsonResponse(res, 200, { ok: true, files: written.map((path) => basename(path)) });
+  } catch (err) {
+    errorResponse(res, err instanceof AttachmentError ? 400 : 500, errorMessage(err));
+  }
   return true;
 }
 
@@ -549,12 +597,7 @@ async function handleItemAdd(
       detail: `Added ${type}: ${item.title} (via web)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     // `level` rides along for a client still reading the v1 spelling.
     jsonResponse(res, 201, { ok: true, id, type, level, title: item.title });
@@ -601,7 +644,7 @@ async function addInboxChange(
     itemId: id,
     detail: `Added change: ${input.title} (via web)`,
   });
-  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  broadcastPrdChanged(broadcast);
   jsonResponse(res, 201, { ok: true, id, type: "change", title: input.title, needsPlacement: true });
   return true;
 }
@@ -618,36 +661,17 @@ async function addPlacedChange(
   input: { title: string; summary?: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches: string[] },
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  let node: { id: string; title: string };
-  try {
-    ({ result: node } = await store.withModelTransaction((model) => {
-      const added = addChangeNode(
-        model.tree,
-        {
-          type: "change",
-          title: input.title,
-          touches: input.touches.map((t) => t.trim()),
-          ...summaryField(input),
-          description: input.description || undefined,
-          acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
-          tags: Array.isArray(input.tags) ? input.tags : undefined,
-          priority: input.priority && isPriority(input.priority) ? input.priority : undefined,
-        },
-        { now: new Date() },
-      );
-      return { tree: added.tree, result: added.node };
-    }));
-  } catch (err) {
-    const message = errorMessage(err);
-    if (message.includes("Could not acquire PRD lock")) {
-      errorResponse(res, 409, message);
-    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
-      errorResponse(res, 400, message);
-    } else {
-      errorResponse(res, 500, message);
-    }
-    return true;
-  }
+  const node = await addV2NodeOrRefuse(res, store, {
+    type: "change",
+    title: input.title,
+    touches: input.touches.map((t) => t.trim()),
+    ...summaryField(input),
+    description: input.description || undefined,
+    acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
+    tags: Array.isArray(input.tags) ? input.tags : undefined,
+    priority: input.priority && isPriority(input.priority) ? input.priority : undefined,
+  });
+  if (!node) return true;
 
   refreshPRDCache(ctx.rexDir, await store.loadDocument());
   const timestamp = new Date().toISOString();
@@ -663,6 +687,39 @@ const V2_CHILD_TYPE: Readonly<Record<string, "task" | "subtask">> = { change: "t
 
 /** Rex's own refusals of an add, matched by name so no error class crosses the gateway. */
 const V2_ADD_REFUSALS: ReadonlySet<string> = new Set(["AddChangeNodeError", "ClosedChangeError", "ChangeLayerWriteError"]);
+
+/** What rex's add rule takes for one node. */
+type V2AddInput = Parameters<typeof addChangeNode>[1];
+
+/**
+ * Add one node through rex's add rule inside the change-layer store's
+ * transaction, or answer why not and resolve null. As PATCH: a held lock is
+ * 409 and names the holder's PID; rex's refusal (a closed change, a broken v2
+ * rule) is 400 with its reason; anything else is 500.
+ */
+async function addV2NodeOrRefuse(
+  res: ServerResponse,
+  store: Parameters<typeof completeV2Work>[0],
+  input: V2AddInput,
+): Promise<{ id: string; title: string } | null> {
+  try {
+    const { result } = await store.withModelTransaction((model) => {
+      const added = addChangeNode(model.tree, input, { now: new Date() });
+      return { tree: added.tree, result: added.node };
+    });
+    return result;
+  } catch (err) {
+    const message = errorMessage(err);
+    if (message.includes("Could not acquire PRD lock")) {
+      errorResponse(res, 409, message);
+    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
+      errorResponse(res, 400, message);
+    } else {
+      errorResponse(res, 500, message);
+    }
+    return null;
+  }
+}
 
 /**
  * Add a task under a change (or a subtask under a task) on a v2 tree, through
@@ -701,43 +758,22 @@ async function addV2Child(
     return true;
   }
 
-  let node: { id: string; title: string };
-  try {
-    ({ result: node } = await store.withModelTransaction((model) => {
-      const added = addChangeNode(
-        model.tree,
-        {
-          type,
-          title: input.title,
-          parentId: parent.id,
-          ...summaryField(input),
-          description: input.description || undefined,
-          acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
-          tags: Array.isArray(input.tags) ? input.tags : undefined,
-          // A subtask carries no priority: a sent one goes through so rex's add
-          // rule refuses it (400, "A subtask does not carry priority") rather
-          // than the route answering 201 with the pick silently dropped.
-          priority: type === "subtask"
-            ? (input.priority ? input.priority as Parameters<typeof addChangeNode>[1]["priority"] : undefined)
-            : input.priority && isPriority(input.priority) ? input.priority : undefined,
-        },
-        { now: new Date() },
-      );
-      return { tree: added.tree, result: added.node };
-    }));
-  } catch (err) {
-    // As PATCH: a held lock is 409 and names the holder's PID; rex's refusal (a
-    // closed change, a broken v2 rule) is 400 with its reason; anything else is 500.
-    const message = errorMessage(err);
-    if (message.includes("Could not acquire PRD lock")) {
-      errorResponse(res, 409, message);
-    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
-      errorResponse(res, 400, message);
-    } else {
-      errorResponse(res, 500, message);
-    }
-    return true;
-  }
+  const node = await addV2NodeOrRefuse(res, store, {
+    type,
+    title: input.title,
+    parentId: parent.id,
+    ...summaryField(input),
+    description: input.description || undefined,
+    acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
+    tags: Array.isArray(input.tags) ? input.tags : undefined,
+    // A subtask carries no priority: a sent one goes through so rex's add
+    // rule refuses it (400, "A subtask does not carry priority") rather
+    // than the route answering 201 with the pick silently dropped.
+    priority: type === "subtask"
+      ? (input.priority ? input.priority as V2AddInput["priority"] : undefined)
+      : input.priority && isPriority(input.priority) ? input.priority : undefined,
+  });
+  if (!node) return true;
 
   refreshPRDCache(ctx.rexDir, await store.loadDocument());
   appendLog(ctx, {
@@ -746,7 +782,7 @@ async function addV2Child(
     itemId: node.id,
     detail: `Added ${type}: ${node.title} (via web)`,
   });
-  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  broadcastPrdChanged(broadcast);
   jsonResponse(res, 201, { ok: true, id: node.id, type, title: node.title, parentId: parent.id });
   return true;
 }
@@ -880,12 +916,7 @@ async function handleBulkUpdate(
       detail: `Bulk updated ${successCount}/${input.ids.length} items (via web)`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, results, ...(autoCompleteError ? { autoCompleteError } : {}) });
   } catch (err) {
@@ -977,12 +1008,7 @@ async function handleItemMerge(
       detail: `Merged ${input.sourceIds.length} items into "${input.targetId}". Absorbed: ${result.absorbedIds.join(", ")}. ${result.reparentedChildIds.length} children reparented, ${result.rewrittenDependencyCount} dependency refs rewritten (via web).`,
     });
 
-    if (broadcast) {
-      broadcast({
-        type: "rex:prd-changed",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastPrdChanged(broadcast);
 
     jsonResponse(res, 200, { ok: true, ...result });
   } catch (err) {

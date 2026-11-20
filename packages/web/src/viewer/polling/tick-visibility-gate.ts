@@ -39,11 +39,7 @@
  * Designed as a standalone module with zero framework dependencies.
  */
 
-import {
-  onVisibilityChange,
-  isTabVisible,
-  type TabVisibilitySnapshot,
-} from "./tab-visibility.js";
+import { onDebouncedVisibilityChange, isTabVisible } from "./tab-visibility.js";
 import { suspendTickTimer, resumeTickTimer } from "./tick-timer.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -94,10 +90,6 @@ export interface TickVisibilityGate {
   dispose(): void;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const DEFAULT_RESUME_DEBOUNCE_MS = 100;
-
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -115,24 +107,15 @@ const DEFAULT_RESUME_DEBOUNCE_MS = 100;
 export function createTickVisibilityGate(
   config: TickVisibilityGateConfig = {},
 ): TickVisibilityGate {
-  const resumeDebounceMs = config.resumeDebounceMs ?? DEFAULT_RESUME_DEBOUNCE_MS;
   const onSuspend = config.onSuspend;
   const onResume = config.onResume;
 
   let running = true;
   let suspensionCount = 0;
   let resumeCount = 0;
-  let resumeTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
 
   // ─── Internal helpers ─────────────────────────────────────────────
-
-  function clearResumeTimer(): void {
-    if (resumeTimer !== null) {
-      clearTimeout(resumeTimer);
-      resumeTimer = null;
-    }
-  }
 
   function suspend(): void {
     if (!running) return;
@@ -168,25 +151,12 @@ export function createTickVisibilityGate(
     }
   }
 
-  function handleVisibilityChange(snapshot: TabVisibilitySnapshot): void {
-    if (disposed) return;
-
-    if (snapshot.isVisible) {
-      // Tab became visible — resume with debounce to prevent thrash.
-      clearResumeTimer();
-      resumeTimer = setTimeout(() => {
-        resumeTimer = null;
-        resume();
-      }, resumeDebounceMs);
-    } else {
-      // Tab became hidden — suspend immediately.
-      clearResumeTimer();
-      suspend();
-    }
-  }
-
-  // Subscribe to tab visibility changes.
-  const unsubVisibility = onVisibilityChange(handleVisibilityChange);
+  // Subscribe to tab visibility changes: suspend immediately when hidden,
+  // resume after the debounce when visible again.
+  const stopVisibility = onDebouncedVisibilityChange(
+    { onHidden: suspend, onVisible: resume },
+    config.resumeDebounceMs,
+  );
 
   // If the tab is currently hidden, suspend immediately.
   if (!isTabVisible()) {
@@ -210,8 +180,7 @@ export function createTickVisibilityGate(
 
   function dispose(): void {
     disposed = true;
-    clearResumeTimer();
-    unsubVisibility();
+    stopVisibility();
   }
 
   return { isRunning, getSnapshot, dispose };

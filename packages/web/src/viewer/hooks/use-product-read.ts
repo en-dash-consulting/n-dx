@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { usePrdChangedRefresh } from "./use-prd-changed-refresh.js";
+import { errorMessage } from "../utils/format.js";
 
 /** What every product read answers on a v1 tree. */
 interface V1Answer { layout: "v1" }
@@ -73,7 +74,7 @@ export function useRefetchableProductRead<T>(
         setLoad({ state: "ready", data: pick(body as Record<string, unknown>) });
       }
     })().catch((err: unknown) => {
-      if (live) setLoad((prev) => failed(prev, err instanceof Error ? err.message : String(err)));
+      if (live) setLoad((prev) => failed(prev, errorMessage(err)));
     });
     return () => { live = false; };
   }, [url, revision]);

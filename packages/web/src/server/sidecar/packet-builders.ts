@@ -358,7 +358,7 @@ function areaSections(tree: V2Tree, found: Found, now: string): PacketSection[] 
   ];
 }
 
-async function zoneSections(sources: PacketSources, ref: string, now: string): Promise<PacketSection[] | null> {
+async function zoneSections(sources: PacketSources, ref: string): Promise<PacketSection[] | null> {
   const zone = await sources.zone(ref);
   if (!zone) return null;
   const source = sources.sourcePaths.zones;
@@ -420,7 +420,7 @@ export async function buildExplainPacket(sources: PacketSources, target: PacketT
     }
   }
 
-  const zone = await zoneSections(sources, target.ref, now);
+  const zone = await zoneSections(sources, target.ref);
   if (zone) return done([...v1Note, ...zone]);
   if (!prd) return refused("no readable PRD, and no zone by that name");
   return done([...v1Note, gap("prd", "Target", `"${target.ref}" names no product area, capability, zone, epic or feature`, now, PRD_SOURCE)]);

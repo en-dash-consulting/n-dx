@@ -24,7 +24,8 @@
  *  - a dry run writes nothing at all
  *
  * @see packages/hench/src/cli/commands/run.ts — resetDeferredTasks, resetDeferredAndCommit
- * @see packages/hench/src/agent/lifecycle/shared.ts — commitResetDeferredChanges, performPreRunCommitGateIfNeeded
+ * @see packages/hench/src/agent/lifecycle/shared.ts — commitResetDeferredChanges
+ * @see packages/hench/src/agent/lifecycle/pre-run-commit-gate.ts — performPreRunCommitGateIfNeeded
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -34,11 +35,11 @@ import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { execFile as execFileCb } from "node:child_process";
 import { resetDeferredTasks, resetDeferredAndCommit } from "../../src/cli/commands/run.js";
+import { commitResetDeferredChanges } from "../../src/agent/lifecycle/shared.js";
 import {
-  commitResetDeferredChanges,
   performPreRunCommitGateIfNeeded,
   PLANNING_COMMIT_SUBJECT,
-} from "../../src/agent/lifecycle/shared.js";
+} from "../../src/agent/lifecycle/pre-run-commit-gate.js";
 import { listUncommittedPrdPaths } from "../../src/agent/lifecycle/uncommitted-work-gate.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
 import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";

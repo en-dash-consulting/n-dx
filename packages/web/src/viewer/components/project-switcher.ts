@@ -18,10 +18,11 @@
  */
 
 import { h } from "preact";
-import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useState } from "preact/hooks";
 import type { ViewId } from "../types.js";
 import { detectBasePath } from "../external.js";
 import { hubUrl } from "../base-path.js";
+import { useBreadcrumbMenu } from "./breadcrumb-menu.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -133,24 +134,12 @@ export interface ProjectSwitcherProps {
  * which case it opens a menu of them with a status dot each.
  */
 export function ProjectSwitcher({ label, title, view, hub, navigate }: ProjectSwitcherProps) {
-  const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const go = navigate ?? ((url: string) => { window.location.assign(url); });
   const { projects, reload } = hub;
+  const { open, setOpen, highlight, setHighlight, rootRef, buttonRef, onOpenMenuKey } = useBreadcrumbMenu(projects);
   const switchable = hub.hub && projects.length > 1;
 
   useEffect(() => { if (open) void reload(); }, [open, reload]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
 
   // A reload can shorten the list under the highlight.
   useEffect(() => {
@@ -183,16 +172,7 @@ export function ProjectSwitcher({ label, title, view, hub, navigate }: ProjectSw
       }
       return;
     }
-    switch (e.key) {
-      case "ArrowDown": e.preventDefault(); setHighlight((i) => Math.min(projects.length - 1, i + 1)); break;
-      case "ArrowUp": e.preventDefault(); setHighlight((i) => Math.max(0, i - 1)); break;
-      case "Home": e.preventDefault(); setHighlight(0); break;
-      case "End": e.preventDefault(); setHighlight(projects.length - 1); break;
-      case "Enter":
-      case " ": e.preventDefault(); if (projects[highlight]) select(projects[highlight]); break;
-      case "Escape": e.preventDefault(); setOpen(false); buttonRef.current?.focus(); break;
-      case "Tab": setOpen(false); break;
-    }
+    onOpenMenuKey(e, select);
   };
 
   const listId = "project-switcher-list";

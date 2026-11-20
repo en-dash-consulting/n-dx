@@ -20,6 +20,7 @@
 
 import { LLM_VENDOR } from "../prd/llm-gateway.js";
 import type { QuotaRemaining } from "./types.js";
+import { MISSING_CODEX_KEY_MESSAGE, OPENAI_DEFAULT_ENDPOINT, toISODate } from "./openai-billing.js";
 
 // ── Error types ──────────────────────────────────────────────────────────────
 
@@ -92,8 +93,6 @@ interface UsageResponse {
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-const DEFAULT_ENDPOINT = "https://api.openai.com";
-
 function classifyStatus(status: number): QuotaFetchErrorKind {
   if (status === 401 || status === 403) return "auth";
   if (status === 429) return "rate-limit";
@@ -139,14 +138,6 @@ async function fetchJson<T>(
   return { ok: true, data };
 }
 
-/** Return an ISO date string (YYYY-MM-DD) for the given Date object. */
-function toISODate(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 // ── Public adapter ────────────────────────────────────────────────────────────
 
 /**
@@ -181,12 +172,12 @@ export async function fetchCodexQuota(options: FetchCodexQuotaOptions): Promise<
       ok: false,
       error: {
         kind: "auth",
-        message: "No Codex API key available: export OPENAI_API_KEY or store one with 'ndx config credentials.codex' (storing it does not switch modes; 'ndx config llm.codex.auth api' does)",
+        message: MISSING_CODEX_KEY_MESSAGE,
       },
     };
   }
 
-  const base = (options.apiEndpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
+  const base = (options.apiEndpoint ?? OPENAI_DEFAULT_ENDPOINT).replace(/\/+$/, "");
   const fetchFn = options.fetchFn ?? fetch;
 
   // 1. Fetch the hard spending cap from the subscription endpoint.

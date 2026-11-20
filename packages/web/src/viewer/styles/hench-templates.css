@@ -80,11 +80,11 @@
 }
 
 .hench-template-card.built-in {
-  border-left: 3px solid var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 5%, var(--bg-surface));
 }
 
 .hench-template-card.user-defined {
-  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
 }
 
 .hench-template-card-header {

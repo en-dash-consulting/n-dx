@@ -17,7 +17,7 @@
 
 import { posix } from "node:path";
 import type { ResourceAttributes, SourceSpan } from "@n-dx/lang-kit";
-import type { Capture, PackSourceFile, RuleProvenance } from "@n-dx/lang-runtime";
+import { contains, type Capture, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
 
 // ── Model ───────────────────────────────────────────────────────────────────
 
@@ -336,9 +336,6 @@ const span = (capture: Capture): SourceSpan => ({ start: capture.start, end: cap
 
 const before = (a: SourceSpan["start"], b: SourceSpan["start"]): number => a.line - b.line || a.column - b.column;
 
-const within = (outer: SourceSpan, inner: SourceSpan): boolean =>
-  before(outer.start, inner.start) <= 0 && before(inner.end, outer.end) <= 0;
-
 const named = (file: PackSourceFile, query: string, name: string): Capture[] =>
   (file.captures[query] ?? []).filter((c) => c.name === name);
 
@@ -374,7 +371,7 @@ function allWithin<T extends Positioned>(sorted: readonly T[], outer: SourceSpan
   }
   const found: T[] = [];
   for (let i = low; i < sorted.length && before(sorted[i].start, outer.end) <= 0; i++) {
-    if (within(outer, sorted[i])) found.push(sorted[i]);
+    if (contains(outer, sorted[i])) found.push(sorted[i]);
   }
   return found;
 }
@@ -400,7 +397,7 @@ function readArguments(file: PackSourceFile): Argument[] {
     else {
       // A name or value belongs to the latest argument around it.
       const argument = found.at(-1);
-      if (!argument || !within(argument.span, at)) continue;
+      if (!argument || !contains(argument.span, at)) continue;
       if (capture.name === "argument.name") argument.name ??= capture.text;
       else if (capture.name === "argument.value") argument.value ??= capture.text;
     }
@@ -410,7 +407,7 @@ function readArguments(file: PackSourceFile): Argument[] {
   const blocks = [...nested].sort((a, b) => byStart(a.span, b.span));
   const open: Array<{ span: SourceSpan; type?: string }> = [];
   const closeUnless = (inner: SourceSpan): void => {
-    while (open.length > 0 && !within(open[open.length - 1].span, inner)) open.pop();
+    while (open.length > 0 && !contains(open[open.length - 1].span, inner)) open.pop();
   };
   let next = 0;
   const read: Argument[] = [];
@@ -618,7 +615,7 @@ function readFile(parsed: PackSourceFile): FileModel {
       else high = middle;
     }
     const owner = owners[low - 1];
-    return owner !== undefined && within(owner.span, at) ? owner : undefined;
+    return owner !== undefined && contains(owner.span, at) ? owner : undefined;
   };
 
   const referencesFrom = named(file, "references", "reference").flatMap((reference) => {

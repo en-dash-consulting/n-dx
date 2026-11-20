@@ -34,10 +34,12 @@ import type {
   RuntimeEventType,
 } from "./runtime-contract.js";
 import type { UsageMessageFilter } from "./usage-dedup.js";
+import { asRecord } from "./json.js";
 import { codexShellEnvFlags } from "./codex-cli-provider.js";
 import {
   mapCodexUsageToTokenUsage,
   parseStreamTokenUsageWithDiagnostic,
+  type TokenParseResult,
 } from "./token-usage.js";
 
 /** Default cap on assistant and completion text: hench keeps run summaries short. */
@@ -520,19 +522,13 @@ export function extractClaudeSessionId(rawJson: unknown): string | undefined {
   return typeof id === "string" && id ? id : undefined;
 }
 
-function usageRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
 function claudeUsageEvent(
   rawJson: unknown,
   turn: number,
   seen: UsageMessageFilter,
   turnHasUsage: boolean,
 ): RuntimeEvent | null {
-  const raw = usageRecord(rawJson);
+  const raw = asRecord(rawJson);
   if (!raw) return null;
 
   let usage: Record<string, unknown> | undefined;
@@ -540,18 +536,22 @@ function claudeUsageEvent(
     // The turn's total. Counting it beside the per-message usage would count
     // the turn twice, so it only stands in when no message reported any.
     if (turnHasUsage) return null;
-    usage = usageRecord(raw.usage);
+    usage = asRecord(raw.usage);
   } else {
-    usage = usageRecord(usageRecord(raw.message)?.usage);
+    usage = asRecord(asRecord(raw.message)?.usage);
   }
   if (!usage) return null;
   if (!seen.accept(rawJson)) return null;
 
-  const parsed = parseStreamTokenUsageWithDiagnostic(usage);
+  return tokenUsageEvent(LLM_VENDOR.CLAUDE, turn, parseStreamTokenUsageWithDiagnostic(usage));
+}
+
+/** The `token_usage` event for a turn's parsed usage; null when none was reported. */
+function tokenUsageEvent(vendor: LLMVendor, turn: number, parsed: TokenParseResult): RuntimeEvent | null {
   if (parsed.diagnosticStatus === "unavailable") return null;
   return {
     type: "token_usage",
-    vendor: LLM_VENDOR.CLAUDE,
+    vendor,
     turn,
     timestamp: new Date().toISOString(),
     tokenUsage: parsed.usage,
@@ -1204,22 +1204,12 @@ function codexUsageEvent(
   turn: number,
   seen: UsageMessageFilter,
 ): RuntimeEvent | null {
-  const raw = usageRecord(rawJson);
+  const raw = asRecord(rawJson);
   // `turn.completed` carries the turn's usage; nothing else in `--json` does.
-  if (!raw || !usageRecord(raw.usage)) return null;
+  if (!raw || !asRecord(raw.usage)) return null;
   if (!seen.accept(rawJson)) return null;
 
-  const mapped = mapCodexUsageToTokenUsage(raw);
-  if (mapped.diagnosticStatus === "unavailable") return null;
-  return {
-    type: "token_usage",
-    vendor: LLM_VENDOR.CODEX,
-    turn,
-    timestamp: new Date().toISOString(),
-    tokenUsage: mapped.usage,
-    tokenDiagnosticStatus: mapped.diagnosticStatus,
-    tokenCacheProvenance: mapped.cacheProvenance,
-  };
+  return tokenUsageEvent(LLM_VENDOR.CODEX, turn, mapCodexUsageToTokenUsage(raw));
 }
 
 class CodexForkConfigurationError extends Error {}

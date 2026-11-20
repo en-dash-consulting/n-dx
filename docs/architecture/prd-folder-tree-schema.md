@@ -38,6 +38,14 @@ schema version and directory layout are independent. This repository uses
 task's body. Structure comes from directories, with no generated Children
 tables. Changes nested inside another change remain changes.
 
+A folder node may also hold files that are not tree files (anything but
+`.md` and `state.yaml`). The writer leaves them in place, carries them along
+when the folder moves, and refuses a product-layer write that would strand
+them. Image attachments use this: `attachImages` (`core/change-attachments.ts`)
+stores PNG, JPEG, GIF or WebP files beside a change's `index.md` under the PRD
+lock, and `listAttachments` lists them for the agent brief. There is no intent
+field for them; the folder is the record.
+
 The slug is frozen at creation. A title edit never recomputes it. A move
 changes the parent path, preserving the slug and id. Clearing a change's
 `needsPlacement` moves it from `changes/inbox/` to the change root. The Inbox

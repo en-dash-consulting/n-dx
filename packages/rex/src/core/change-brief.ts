@@ -303,11 +303,6 @@ export function buildChangeBrief(options: ChangeBriefOptions): ChangeBrief {
 }
 
 /**
- * A section before the budget sees it: a header, and the entries under it that
- * may be trimmed one at a time. An atomic section has no entries and is taken
- * whole or not at all.
- */
-/**
  * One entry of a list section, in both the forms the budget may use.
  *
  * `compact` is the entry reduced to its identity — a capability's title,
@@ -323,6 +318,11 @@ interface SectionEntry {
   compact: string;
 }
 
+/**
+ * A section before the budget sees it: a header, and the entries under it that
+ * may be trimmed one at a time. An atomic section has no entries and is taken
+ * whole or not at all.
+ */
 interface SectionDraft {
   name: BriefSectionName;
   head: string;

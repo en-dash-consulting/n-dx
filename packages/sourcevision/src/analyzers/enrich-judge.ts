@@ -36,6 +36,7 @@ import { collectFileHeaders } from "./file-headers.js";
 import { markBatch } from "./analyze-progress.js";
 import { collectZoneSymbols, emptyZoneSymbols, isEmptyZoneSymbols } from "./zone-symbols.js";
 import type { ZoneSymbolOptions } from "./zone-symbols.js";
+import { addCallTokens } from "./token-usage.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -435,10 +436,7 @@ export async function judgeFindings(
     try {
       const response = await askJev(request, { taskClass: "finding.judge" });
       calls++;
-      if (response.tokenUsage) {
-        usage.input += response.tokenUsage.input;
-        usage.output += response.tokenUsage.output;
-      }
+      addCallTokens(usage, response.tokenUsage);
       apply(slice, request, response.answers);
       return true;
     } catch (err) {
@@ -610,10 +608,7 @@ export async function assessZoneFragility(
       throw err;
     }
     calls++;
-    if (response.tokenUsage) {
-      usage.input += response.tokenUsage.input;
-      usage.output += response.tokenUsage.output;
-    }
+    addCallTokens(usage, response.tokenUsage);
     for (const [qid, { zone, kind }] of ids) {
       const answer = response.answers[qid];
       if (answer?.type !== "noul") continue;
@@ -739,10 +734,7 @@ export async function judgeHeuristicFindings(
       break;
     }
     calls++;
-    if (response.tokenUsage) {
-      usage.input += response.tokenUsage.input;
-      usage.output += response.tokenUsage.output;
-    }
+    addCallTokens(usage, response.tokenUsage);
     slice.forEach(({ f, index }, i) => {
       const a = response.answers[`h${i}`];
       if (a?.type !== "noul") return;
