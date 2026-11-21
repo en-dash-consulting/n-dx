@@ -92,16 +92,20 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 
 **Find them.**
 
-- **Plan.** An Inbox tile sits beside Open changes, below the capture bar and the full-width Product map tile, and is always present. Its badge shows the open count. It lists open changes awaiting placement, strongest rex match first, weak and tied guesses last. It shows five rows and links to the rest (`N more · Open ↗`). At zero the tile keeps its place and reads "Inbox is empty".
+- **Plan.** An Inbox tile sits beside Open changes, below the capture bar and the full-width Product map tile, and is always present. Its badge shows the open count. It lists open changes awaiting placement, strongest rex match first, weak and tied guesses last. It shows five rows and links to the rest (`N more · Open ↗`). At zero the tile keeps its place and reads "Inbox is empty". Unlike other tiles it is a working surface, not a preview: its buttons take clicks in place, and its header opens the Inbox page rather than a full-screen view.
 - **Counts.** The open count shows on the Plan tab and the bottom bar. It counts only open changes that need placement.
 - **Applied history.** Changes applied before they were placed (migrated history) show as a collapsed line ("N applied changes were never placed") under the list. Expanding it lists each with its title, applied date and best guess. Open one to place it: the panel offers **touches** only, with a note, and Place & next walks that list. Amends is not offered, because the change's amendments have already reached the map.
 - **Tasks tree.** In the Tree tab of Open changes, an Inbox change carries an **Inbox** badge, and the **In the Inbox** facet filters the tree to them.
 - **Changes page.** An open change awaiting placement is tagged **Needs placement**; selecting the tag opens it.
 
-**Place one.** A row, badge or tag opens the change's detail panel. Its **Where it goes** section shows rex's shortlist, each entry with a strength and its reasons.
+**Accept a guess.** A row with a best guess has **Accept**: one click places the change on that guess as **Touches**. A refusal shows under the row in rex's words.
+
+**Place best guesses.** **Place best guesses (N)** above the list reviews every change that has a guess: each with its best guess, strength and a checkbox. Weak guesses (a word match and little more) start unticked. **Place N** records the ticked ones as **Touches** in one write (`POST /api/rex/changes/place-best`); a pair rex refuses is listed and the rest are placed. The write is then committed: one commit of exactly the PRD files it moved, with an `N-DX-Item` trailer per change, leaving anything else in the tree (staged or not) alone and never pushing. The result line gives the commit's sha, or why nothing was committed (not a git repository, a merge in progress); the placement stands either way. On the Plan tile the button opens the Inbox page with the review showing. Applied changes never placed are included, marked *applied*. Amending a spec is never done in bulk.
+
+**Place one.** A row's **Place** opens the Inbox page on that change; a row, badge or tag opens its detail panel. Either way its **Where it goes** section shows rex's shortlist, each entry with a strength and its reasons.
 
 1. Pick a candidate, or search capabilities and constraints.
-2. Choose the relation: **Touches**, or **Amends** with a criteria edit or a replacement statement.
+2. Choose the relation. The form opens on **Touches**, even when rex's rules suggest Amends. **Amends** needs a criteria edit or a replacement statement: until it has one, Place stays disabled and the form says so.
 3. **Place** writes it. **Place & next** moves to the next Inbox change in the section's order. **Place & add another** adds a further touched place to the same change, for umbrella changes.
 4. If nothing fits, **Nothing fits** opens a form that proposes a new capability or constraint under an area.
 
@@ -109,7 +113,7 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 
 **Place at capture.** The capture Preview lists rex's shortlist for each new change as a choice, with strength, area and a Touches or Amends relation. The top pick is pre-selected only when it is strong and untied; otherwise the default is **Leave it in the Inbox**. The primary button names what Add will do: **Add to Inbox**, **Add 1 change & place it** (**Add N changes & place M** for several), or **Add & amend…**, which opens the change's placement form on Amends once it is added. Most new changes never enter the Inbox.
 
-**Clear a backlog.** **Open ↗** on the Inbox tile, or the bottom-bar Inbox pill, opens the full Inbox page: the queue on the left in the section's order, the change's **Where it goes** section on the right. The breadcrumb counts changes still to place and changes placed this visit. **Place & next** is the default action. Shortcuts are inactive while typing in a field, with a modifier held, or while a dialog is open:
+**Clear a backlog.** The Inbox tile's header, its `N more · Open ↗`, or the bottom-bar Inbox pill opens the full Inbox page: the queue on the left in the section's order, the change's **Where it goes** section on the right. The breadcrumb counts changes still to place and changes placed this visit. **Place & next** is the default action. Shortcuts are inactive while typing in a field, with a modifier held, or while a dialog is open:
 
 | Key | Action |
 |-----|--------|
@@ -121,21 +125,21 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 | `N` | Nothing fits |
 | `/` | Search capabilities and constraints |
 
-**Place on the map.** Every **Place** (an Inbox tile row, the Inbox page's **Place on the map ↗**, the area view's *Waiting in the Inbox* card) opens placement mode at `/product/place/<changeId>`: the spec map beside a wide "Where it goes" panel. The change detail panel keeps its compact 320px version, with a **Place on the map** switch. The breadcrumb reads "Placing N of M · title".
+**Place on the map.** The Inbox page's **Place on the map ↗** and the area view's *Waiting in the Inbox* card's **Place** open placement mode at `/product/place/<changeId>`: the spec map beside a wide "Where it goes" panel. The change detail panel keeps its compact 320px version, with a **Place on the map** switch. The breadcrumb reads "Placing N of M · title".
 
 - **Where it starts.** A strong, untied top pick zooms straight into its area with that block lit. Any other shortlist (possible, weak, tied, empty or unreadable) opens at the area level with each area's candidate count; a note says why, including "rex found no candidate" and "Could not read rex's shortlist". Choosing an area zooms in.
 - **Candidate cards.** The panel has one card per candidate: strength, reasons, area. A card lights its block, and a block selects its card; a block off the shortlist becomes the panel's pick. Candidates in other areas show as chips above the zoomed map and as cards; picking one moves the map. Switching to another candidate clears the previous target's criteria edits, so each target starts from its own criteria. Off-list blocks dim, except those sharing words with the change, marked `near`.
-- **Touches or amends.** rex's relation is pre-selected only for a strong, untied pick; otherwise the card asks whether the change alters what the capability promises. **Touches** writes at once. **Amends** is edited in the card (criteria or a replacement statement); each edit is re-checked by rex's read-only `POST /api/rex/changes/:id/placement/check`, and the card shows the same dry-run line as the Sidecar's placement card. **Place** waits for an accepted check, and for the target's criteria to load. The target's block shows the criteria count the amendment would leave ("12 → 13").
+- **Touches or amends.** Touches is pre-selected for a strong, untied pick whose rules say Touches; Amends is never pre-selected. Otherwise the card asks whether the change alters what the capability promises. **Touches** writes at once. **Amends** is edited in the card (criteria or a replacement statement); each edit is re-checked by rex's read-only `POST /api/rex/changes/:id/placement/check`, and the card shows the same dry-run line as the Sidecar's placement card. **Place** waits for an accepted check, and for the target's criteria to load. The target's block shows the criteria count the amendment would leave ("12 → 13").
 - **Nothing fits.** Swaps the card for the proposal form and draws a dashed ghost block, titled as the form is, in the area the form names. A map pick of another area moves the form, and its ghost, there; choosing an area in the form moves the map back. The ghost goes when the form closes.
 - **Place & next, Place & add another.** **Place & next** opens the next Inbox change in placement mode, strongest first, and its own shortlist decides where its map starts. **Place & add another** keeps the panel open for an umbrella change; every home placed in the visit is marked on the map. Writes use the existing `/place` and `/propose` routes.
 - **Keys.** The Inbox page's keys work on the panel (table above): `J`/`K` and `S` open another change (after a plain Place, `J` lands on the change that took its slot), and `1`–`5`, `T`/`A`, `N`, `/` and `Enter` press the panel's controls.
 - **Drafts.** Leaving (Esc, the breadcrumb, another tab) with a pick or an edit keeps it as a draft for the browser session, one per change. The Inbox row says "draft · …", and **Place** resumes it at the step it was left with. Esc with no edits just leaves. A draft never reaches the PRD, and is dropped once the change is placed.
 
-Nothing is placed automatically. Every write goes through the placement routes below. Until a change is placed, the panel's **+ Add Task** carries a note that the task won't run.
+Nothing is placed without a click: **Accept** and **Place best guesses** write only what was shown. Every write goes through the placement routes below. Until a change is placed, the panel's **+ Add Task** carries a note that the task won't run.
 
 ## Inbox placement routes (v2)
 
-On a v2 project a change captured without a home waits in the Inbox. Three routes
+On a v2 project a change captured without a home waits in the Inbox. These routes
 read and settle it. Rex decides everything (`suggestPlacement`, `recordPlacement`,
 `recordProposal`, `recordUnplacement`); the server enriches the shortlist and writes through rex's v2
 transaction, the execution log and the `rex:prd-changed` broadcast. A v1 tree
@@ -147,6 +151,7 @@ and a held PRD lock `409` naming its PID.
 | `GET /api/rex/changes/:id/placement` | `{ layout: "v2", change, relation, tied, shortlist }`. Each shortlist entry carries `target`, `type`, `title`, `area`, `statement`, `criteria`, `score`, `strength` (`strong`/`possible`/`weak`) and `reasons`. |
 | `POST /api/rex/changes/:id/place` | Places the change on a capability or constraint (`touches` or `amends`): `{ change, target, relation, warnings? }`. |
 | `POST /api/rex/changes/:id/propose` | Records a new capability or constraint when nothing fits: `{ change, proposed: { target, under, title, type }, warnings? }`. |
+| `POST /api/rex/changes/place-best` | Places each `{ change, target }` of `{ placements: [...] }` (at most 500) as a `touches`, in one transaction: `{ placed: [{ change, changeTitle, target, title }], refused: [{ change, target, error, kind }], commit }`. A refused pair is reported and skipped; the rest are written, each logged as `change_placed`, then committed: `commit` is `{ sha }`, or `{ skipped }` with the reason. Used by **Accept** and **Place best guesses**. |
 | `POST /api/rex/changes/:id/unplace` | Takes back one `touches` (`{ target }`) through rex's `recordUnplacement`: `{ change, target }`. A change left with no home returns to the Inbox. A cancelled change answers `422 change-not-open`, a target it does not touch `422 not-touched`. |
 
 `POST /api/rex/items` on v2 also accepts `touches`, so a change captured with a
