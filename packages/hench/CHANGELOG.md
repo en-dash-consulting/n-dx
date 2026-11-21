@@ -1,5 +1,80 @@
 # @n-dx/hench
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`9593571`](https://github.com/en-dash-consulting/n-dx/commit/959357134677d6d2faddd95653eb856b9112cf7d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench.testGate.hostSlot` makes hench run one managed test execution at a time per OS user on the host, across worktrees, and records queue time apart from run time.
+  
+  It is off by default, which changes nothing. Set it with `ndx config hench.testGate.hostSlot true .`. The slot covers the test gate and its re-run, the post-task tests and the completion test run; it does not cover an agent's own shell commands, which only `hench.testGate.maxWorkers` bounds. A waiting run prints the holder. Run records and `hench show` gain `queueMs` and `executionMs`. The slot lives under `<ndx home>/validation-slot/`, and a stale holder record is reclaimed automatically. The holder record names the running test command (its process group on POSIX), so a hench process that crashes or is killed mid-run keeps the slot held until its tests have exited.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`12f8590`](https://github.com/en-dash-consulting/n-dx/commit/12f85901302afb7e5aa9455cc7e2ed233681d5d4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work` in a PHP project now runs `php -l` on each changed PHP file and, when Composer files changed, `composer validate`; the test gate runs the project's own `vendor/bin/phpunit`.
+  
+  Action needed: a PHP checkout (as detected below) is now judged against the PHP guard baseline (`php`, `composer`, `phpunit`, `git`). If its `.hench/config.json` was written with the JavaScript defaults, `ndx trust .` reports the extra commands; run `ndx trust accept .` to keep them, or replace the guard with the PHP defaults.
+  
+  A project with a root `composer.json` is detected as PHP by `hench init` and by repository trust. When a root `package.json` sits beside it, the project is PHP only if it has more PHP files than JavaScript/TypeScript files, so a JavaScript app with a little PHP keeps its npm tools while a Laravel app stays PHP. A PHP project gets the PHP guard defaults and the new `php-project` template. Each check runs only when its prerequisite exists: `php -l` and `composer validate` need the tool on PATH, `composer validate` runs only when the change touched `composer.json` or `composer.lock`, and PHPUnit needs `phpunit.xml` or `phpunit.xml.dist` plus an installed `vendor/bin/phpunit`. n-dx installs nothing; a missing tool skips its check. A failing `php -l` or `composer validate` fails the run, so the task is not marked done. These checks run even with `--skip-test-gate`.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`e0d1d99`](https://github.com/en-dash-consulting/n-dx/commit/e0d1d99e274dae23cdbb98728b161383066490ab) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A test run killed inside hench's Linux sandbox no longer leaves later sandboxed test runs waiting on the validation slot until they time out.
+  
+  Under bubblewrap each confined command gets its own PID namespace, and a confined runner cannot tell whether a holder in another sandbox is still alive. Hench runs on the host, where it can, so it now clears a stale holder record before each confined spawn (`run_command`, `git`, the vendor CLI) and before each of its own validation commands. This runs whether or not `hench.testGate.hostSlot` is on, never waits, and never stops the spawn.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`506c354`](https://github.com/en-dash-consulting/n-dx/commit/506c354e5469d1fdef19fca2306f82f0fb298922) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A failing machine-id lookup no longer delays each sandboxed command, or fails a test run started inside another run's validation slot.
+  
+  Hench now reads the slot directory on the host and passes it as `NDX_VALIDATION_SLOT_DIR` (the directory only, no token) to every command it confines: `run_command`, `git`, its own validation commands and the vendor CLI session. An absolute `NDX_VALIDATION_SLOT_DIR` is the slot directory for hench and for `scripts/run-all-tests.mjs`, with or without a token, so a run handed one does no lookup of its own. A transient lookup failure is remembered for 60 s instead of being retried by every caller, and the stale-holder check before each confined spawn never waits on a lookup: until the host's identity is known, it skips that spawn's check.
+  
+  The vendor CLI session, Codex's included, waits for the lookup when it is still running, up to the 10 s lookup limit, and Ctrl-C stops the wait, so a session started early no longer runs without the directory for its whole life. If the lookup fails, the session starts without it and one warning says so.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`f07f977`](https://github.com/en-dash-consulting/n-dx/commit/f07f9776a0de58b274ba0c0748e975352a14caf6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, a network change that renames the host (macOS `ryans-mbp.local` → `ryans-mbp.lan`) no longer lets two test runs on one machine run at once.
+  
+  The slot directory is now named after a hash of the machine id (Linux `/etc/machine-id`, macOS `IOPlatformUUID`, Windows `MachineGuid`), falling back to a hash of the hostname when none can be read; no raw id is written to disk. The command hench runs inside the slot also gets the slot's directory as `NDX_VALIDATION_SLOT_DIR` beside its token, so a slot acquire it starts nests in its parent's slot even if its own lookup would differ.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`4e8c9c3`](https://github.com/en-dash-consulting/n-dx/commit/4e8c9c3c92cc5113ae46fb0cae8d2186b5d891e7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, the validation slot is now per host: it lives in `<ndx home>/validation-slot/<host>/`, one directory per machine.
+  
+  Hosts that share one ndx home over a network filesystem no longer clear each other's slot and run their tests at the same time. A rare race between two waiters clearing a crashed holder could also let both run at once; a waiter now removes only its own reclaim lock.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`cf31738`](https://github.com/en-dash-consulting/n-dx/commit/cf317382fb3db5b07ff855223eb505d8e676cd93) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, a restarted hench no longer waits forever on a slot record left under its own process id, and the wait message names the record to delete.
+  
+  When hench dies without giving the slot back, the operating system can give its process id to another process. Windows does this within moments. A hench process now treats a `holder.json` or `reclaim.lock` that names its own process id, but a token it does not hold, as left by a dead process and reclaims it at once, unless the record's test command is still running. Another hench process cannot tell whether that process id has been reused, so it keeps waiting. The wait line now ends with the full `holder.json` path: confirm no ndx test run is active, then delete that file. Only an interrupt (Ctrl-C, SIGTERM) stops a wait; there is no maximum wait.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`2be1521`](https://github.com/en-dash-consulting/n-dx/commit/2be15210f623e6d606e5ebdc718bf71e7161421a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, a validation slot that cannot be taken no longer lets a run finish without running its tests.
+  
+  If the slot directory cannot be written (no permission, a read-only or full disk, a filesystem without hard links), the test gate, its re-run, the post-task tests and the completion check now run their command without the slot and report its real result. A warning says the slot was skipped, why, and names the slot directory. Before, the gate was reported as not run and the task was completed and committed untested. Interrupting a wait (Ctrl-C, SIGTERM) still stops without running the tests.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`2292ea5`](https://github.com/en-dash-consulting/n-dx/commit/2292ea556159b9fa13cf4a2dc9073f26b96a792f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench.testGate.maxWorkers` caps the test workers of every test command a run starts, passed as `NDX_TEST_MAX_WORKERS`.
+  
+  It reaches the test gate and its re-run, the post-task tests, the completion test run and the agent's shell. It is unset by default, which changes nothing. A lower `NDX_TEST_MAX_WORKERS` already in the environment wins, so the setting can lower a cap you exported but never raise it. Set it with `ndx config hench.testGate.maxWorkers 2 .`; it only takes effect in a project whose vitest configs read `NDX_TEST_MAX_WORKERS`. An invalid value is refused.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: every package suite can measure line, branch and function coverage with per-line hit counts, and fails below its recorded coverage floor.
+  
+  `pnpm test:coverage` runs each package's new `test:coverage` script, which writes HTML, lcov and JSON reports to `packages/<pkg>/coverage/`. `pnpm coverage:lines <pkg>` prints how many times the suite executed each line. Shared settings live in `tests/vitest-coverage.mjs`; see TESTING.md, "Code Coverage".
+
+- [#1085](https://github.com/en-dash-consulting/n-dx/pull/1085) [`6d42dbc`](https://github.com/en-dash-consulting/n-dx/commit/6d42dbce2a9121f03a6c4e7a4d23b2b490e5aaa1) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard's add-change box shows a `+` for attaching images when the model `ndx work` runs takes images, with thumbnails below the box until you add.
+  
+  Pick images with `+` or paste one into the box. PNG, JPEG, GIF and WebP up to 5 MB each are accepted, at most eight per change. Add creates the change first, then stores each image beside its `index.md` in the change's folder under `changes/`. The image moves with the change when it is placed or reparented. If an image cannot be stored, the change is still added and the box says which image failed.
+  
+  `ndx work` lists a change's images in the agent's brief, under Attached Images, with their paths, so the agent opens them before starting. The `+` is offered for Claude, Codex and Gemini models. For a local model it is offered only when the model's name marks it as a vision model (for example `llava` or `qwen2.5vl`). It is offered only on v2 PRDs.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`624a286`](https://github.com/en-dash-consulting/n-dx/commit/624a2866587ec56dcb72b05163566b9780cfa835) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: remove dead code without changing behaviour: empty placeholder modules, unused re-export barrels and shims, unexported helpers and exports nothing imported, and unused locals in the dashboard.
+  
+  Removed `hench/src/tools/pr-status-trailers.ts`, `hench/src/process/exec-shell.ts`, `hench/src/types/index.ts`, `rex/src/core/compact-single-children.ts` and `sourcevision/src/analyzers/index.ts`; none had an importer. The `./dist/*` subpaths of those files no longer exist; that export is an internal escape hatch with no stability guarantee.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`196c89c`](https://github.com/en-dash-consulting/n-dx/commit/196c89c94357fe21bb71f97081e60799c33eb9c1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The OS sandbox lets confined test gates and agent shells use the host validation slot in `<ndx home>/validation-slot/`, so the slot works with `NDX_SANDBOX` on.
+  
+  Before this, a confined command that took the slot (the repository's own test runner, or a gate with `hench.testGate.hostSlot` on) failed with `EPERM` before any test ran, because the sandbox denies the ndx home. Tool children and the vendor CLI now get read and write access to that one directory, which holds only pids, tokens, timestamps and project paths. The dashboard token, the credential store and the rest of the ndx home stay denied, and git hooks get no access. The directory is created before the spawn. A nested acquire now reads the holder record before it creates or writes anything, so it needs read access only.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`c38983e`](https://github.com/en-dash-consulting/n-dx/commit/c38983e92756424a1126f8b553268b07cdcff9fc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Under bubblewrap on Linux, a confined test runner now nests inside its gate's validation slot and waits for a live holder instead of taking the slot from it.
+  
+  bubblewrap gives the confined command its own PID namespace, where the holder's pid outside it looked dead. A gate's runner then queued behind its own gate, and an agent shell with no token removed a live holder's record and ran beside it. Each slot record now names the PID namespace it was written in, and the sandbox tells the confined command which namespaces enclose it. A holder outside the reader's namespace, or in a sibling sandbox, is never judged dead. One inside it is judged by its pid there. Seatbelt on macOS, and records written by earlier versions, keep the plain pid check.
+
+- [#1065](https://github.com/en-dash-consulting/n-dx/pull/1065) [`5d4fad4`](https://github.com/en-dash-consulting/n-dx/commit/5d4fad41c207e4086726d6ae571a226b69b5f997) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: refactor hench without changing behaviour: the three API loops share their scaffolding, the pre-run commit gate moves out of shared.ts, and run-record caps and local endpoint defaults are named once.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`1799c93`](https://github.com/en-dash-consulting/n-dx/commit/1799c934c784eae570c14d5471432baf579fbe73) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On Linux, the host validation slot is now reclaimed after a sandboxed holder exits, so later test gates no longer wait forever behind a slot nobody holds.
+  
+  Before, hench treated some of your own processes that Linux will not let it inspect as possibly the gone holder. It now skips processes that cannot be inside a sandbox.
+- Updated dependencies [[`59b22c4`](https://github.com/en-dash-consulting/n-dx/commit/59b22c401d4bcc421af760f0f22f7f884a53a995), [`12f8590`](https://github.com/en-dash-consulting/n-dx/commit/12f85901302afb7e5aa9455cc7e2ed233681d5d4), [`0b2cff4`](https://github.com/en-dash-consulting/n-dx/commit/0b2cff4f72112b52261b2bb41eeaba48ff86d4e2), [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95), [`6d42dbc`](https://github.com/en-dash-consulting/n-dx/commit/6d42dbce2a9121f03a6c4e7a4d23b2b490e5aaa1), [`624a286`](https://github.com/en-dash-consulting/n-dx/commit/624a2866587ec56dcb72b05163566b9780cfa835), [`196c89c`](https://github.com/en-dash-consulting/n-dx/commit/196c89c94357fe21bb71f97081e60799c33eb9c1), [`c38983e`](https://github.com/en-dash-consulting/n-dx/commit/c38983e92756424a1126f8b553268b07cdcff9fc), [`1dc0110`](https://github.com/en-dash-consulting/n-dx/commit/1dc01107170e5152c4874798bacd765fa490b8f8), [`7cafacd`](https://github.com/en-dash-consulting/n-dx/commit/7cafacd93a2369e4d6375b4e1a0815b13f9f345e), [`2f58d1c`](https://github.com/en-dash-consulting/n-dx/commit/2f58d1c309c8ee327a9209f8bff28c67bead098f)]:
+  - @n-dx/llm-client@0.10.5
+  - @n-dx/rex@0.10.5
+
 ## 0.10.4
 
 ### Patch Changes

@@ -1,5 +1,51 @@
 # @n-dx/llm-client
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`59b22c4`](https://github.com/en-dash-consulting/n-dx/commit/59b22c401d4bcc421af760f0f22f7f884a53a995) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Claude CLI calls now record their token counts, so `ndx analyze` ledgers and run costs include Claude escalations and zone enrichment instead of showing 0 tokens.
+  
+  The run ledger also keeps prompt-cache tokens per task class (`cacheCreationTokens`, `cacheReadTokens`, omitted when zero), prices them at the model's cache rates, and shows them as `+ N cached` in the per-class and run token lines.
+  
+  The current Claude CLI prints one JSON result object with its counts nested under `usage`; only top-level counts used to be read. A TypeSafe cascade run that also reached a text model now writes the startup primer instead of skipping it as "cascade mode". When stdout isn't a terminal, analyze notes on stderr, even under `--quiet`, that background zone narration continues after it exits, with the log path and `--wait`.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`12f8590`](https://github.com/en-dash-consulting/n-dx/commit/12f85901302afb7e5aa9455cc7e2ed233681d5d4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work` in a PHP project now runs `php -l` on each changed PHP file and, when Composer files changed, `composer validate`; the test gate runs the project's own `vendor/bin/phpunit`.
+  
+  Action needed: a PHP checkout (as detected below) is now judged against the PHP guard baseline (`php`, `composer`, `phpunit`, `git`). If its `.hench/config.json` was written with the JavaScript defaults, `ndx trust .` reports the extra commands; run `ndx trust accept .` to keep them, or replace the guard with the PHP defaults.
+  
+  A project with a root `composer.json` is detected as PHP by `hench init` and by repository trust. When a root `package.json` sits beside it, the project is PHP only if it has more PHP files than JavaScript/TypeScript files, so a JavaScript app with a little PHP keeps its npm tools while a Laravel app stays PHP. A PHP project gets the PHP guard defaults and the new `php-project` template. Each check runs only when its prerequisite exists: `php -l` and `composer validate` need the tool on PATH, `composer validate` runs only when the change touched `composer.json` or `composer.lock`, and PHPUnit needs `phpunit.xml` or `phpunit.xml.dist` plus an installed `vendor/bin/phpunit`. n-dx installs nothing; a missing tool skips its check. A failing `php -l` or `composer validate` fails the run, so the task is not marked done. These checks run even with `--skip-test-gate`.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`0b2cff4`](https://github.com/en-dash-consulting/n-dx/commit/0b2cff4f72112b52261b2bb41eeaba48ff86d4e2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `exec` takes an optional `onSpawn` callback that receives the child's pid as soon as it starts, and whether that pid is also its process group.
+  
+  Callers that omit it behave exactly as before. hench uses it to record a test command in the host validation slot.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: every package suite can measure line, branch and function coverage with per-line hit counts, and fails below its recorded coverage floor.
+  
+  `pnpm test:coverage` runs each package's new `test:coverage` script, which writes HTML, lcov and JSON reports to `packages/<pkg>/coverage/`. `pnpm coverage:lines <pkg>` prints how many times the suite executed each line. Shared settings live in `tests/vitest-coverage.mjs`; see TESTING.md, "Code Coverage".
+
+- [#1085](https://github.com/en-dash-consulting/n-dx/pull/1085) [`6d42dbc`](https://github.com/en-dash-consulting/n-dx/commit/6d42dbce2a9121f03a6c4e7a4d23b2b490e5aaa1) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard's add-change box shows a `+` for attaching images when the model `ndx work` runs takes images, with thumbnails below the box until you add.
+  
+  Pick images with `+` or paste one into the box. PNG, JPEG, GIF and WebP up to 5 MB each are accepted, at most eight per change. Add creates the change first, then stores each image beside its `index.md` in the change's folder under `changes/`. The image moves with the change when it is placed or reparented. If an image cannot be stored, the change is still added and the box says which image failed.
+  
+  `ndx work` lists a change's images in the agent's brief, under Attached Images, with their paths, so the agent opens them before starting. The `+` is offered for Claude, Codex and Gemini models. For a local model it is offered only when the model's name marks it as a vision model (for example `llava` or `qwen2.5vl`). It is offered only on v2 PRDs.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`196c89c`](https://github.com/en-dash-consulting/n-dx/commit/196c89c94357fe21bb71f97081e60799c33eb9c1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The OS sandbox lets confined test gates and agent shells use the host validation slot in `<ndx home>/validation-slot/`, so the slot works with `NDX_SANDBOX` on.
+  
+  Before this, a confined command that took the slot (the repository's own test runner, or a gate with `hench.testGate.hostSlot` on) failed with `EPERM` before any test ran, because the sandbox denies the ndx home. Tool children and the vendor CLI now get read and write access to that one directory, which holds only pids, tokens, timestamps and project paths. The dashboard token, the credential store and the rest of the ndx home stay denied, and git hooks get no access. The directory is created before the spawn. A nested acquire now reads the holder record before it creates or writes anything, so it needs read access only.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`c38983e`](https://github.com/en-dash-consulting/n-dx/commit/c38983e92756424a1126f8b553268b07cdcff9fc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Under bubblewrap on Linux, a confined test runner now nests inside its gate's validation slot and waits for a live holder instead of taking the slot from it.
+  
+  bubblewrap gives the confined command its own PID namespace, where the holder's pid outside it looked dead. A gate's runner then queued behind its own gate, and an agent shell with no token removed a live holder's record and ran beside it. Each slot record now names the PID namespace it was written in, and the sandbox tells the confined command which namespaces enclose it. A holder outside the reader's namespace, or in a sibling sandbox, is never judged dead. One inside it is judged by its pid there. Seatbelt on macOS, and records written by earlier versions, keep the plain pid check.
+
+- [#1065](https://github.com/en-dash-consulting/n-dx/pull/1065) [`1dc0110`](https://github.com/en-dash-consulting/n-dx/commit/1dc01107170e5152c4874798bacd765fa490b8f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: refactor llm-client and the language packs without changing behaviour: shared HTTP retry and child-process settling, one merged project-config loader, vendor failover as a table, and shared span helpers in the packs.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`2f58d1c`](https://github.com/en-dash-consulting/n-dx/commit/2f58d1c309c8ee327a9209f8bff28c67bead098f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv analyze --fast` now makes no model or network calls: no TypeSafe (Jev) judgment requests and no `claude_commands.log` in the project, even with a TypeSafe key set.
+  
+  Action needed: a run that relied on Jev judgments (move, finding, fragility, typed-finding grading) while passing `--fast` gets none now; drop `--fast` to keep them.
+  
+  Every judgment route resolves to none under `--fast`, and a text-model call is refused, so no phase can reach a model whatever keys or config exist. The `rex tree` and `rex tree-diff` reads behind `pr-markdown.md`, and the `ps` liveness check, are no longer written to `claude_commands.log`: they are not vendor-CLI calls. `pr-markdown.md` is unchanged. `execFileSyncCli` takes `logInvocation: false` for such calls.
+
 ## 0.10.4
 
 ### Patch Changes

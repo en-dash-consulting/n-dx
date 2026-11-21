@@ -1,5 +1,19 @@
 # @n-dx/graview-face
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: every package suite can measure line, branch and function coverage with per-line hit counts, and fails below its recorded coverage floor.
+  
+  `pnpm test:coverage` runs each package's new `test:coverage` script, which writes HTML, lcov and JSON reports to `packages/<pkg>/coverage/`. `pnpm coverage:lines <pkg>` prints how many times the suite executed each line. Shared settings live in `tests/vitest-coverage.mjs`; see TESTING.md, "Code Coverage".
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`624a286`](https://github.com/en-dash-consulting/n-dx/commit/624a2866587ec56dcb72b05163566b9780cfa835) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: remove dead code without changing behaviour: empty placeholder modules, unused re-export barrels and shims, unexported helpers and exports nothing imported, and unused locals in the dashboard.
+  
+  Removed `hench/src/tools/pr-status-trailers.ts`, `hench/src/process/exec-shell.ts`, `hench/src/types/index.ts`, `rex/src/core/compact-single-children.ts` and `sourcevision/src/analyzers/index.ts`; none had an importer. The `./dist/*` subpaths of those files no longer exist; that export is an internal escape hatch with no stability guarantee.
+
+- [#1065](https://github.com/en-dash-consulting/n-dx/pull/1065) [`9008d2b`](https://github.com/en-dash-consulting/n-dx/commit/9008d2b0340cdc5f8b1fccd5dcdfd05f1391c646) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: refactor graview and graview-face without changing output: shared door constants and caught-error message, named snapshot passes, and graview's hub port pinned to the web hub's.
+
 ## 0.10.4
 
 No changes in this release.
