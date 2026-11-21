@@ -27,7 +27,6 @@
 export {
   ZONE_COLORS,
   getZoneColorByIndex,
-  getZoneColor,
   buildZoneColorMap,
 } from "./colors.js";
 
@@ -40,7 +39,6 @@ export {
   buildFlowEdges,
   buildCallFlowEdges,
   buildExternalImportEdges,
-  buildFlowNodes,
   mapPackagesToZones,
 } from "./flow.js";
 

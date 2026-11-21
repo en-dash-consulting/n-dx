@@ -206,13 +206,6 @@ function ExecutionCard({ exec }: { exec: ExecutionState }) {
 
 // ── Browser notification helper ───────────────────────────────────
 
-/** Request notification permission once, silently. */
-function requestNotificationPermission() {
-  if (typeof Notification !== "undefined" && Notification.permission === "default") {
-    Notification.requestPermission().catch(() => { /* ignore */ });
-  }
-}
-
 function fireNotification(title: string, body: string) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   try {

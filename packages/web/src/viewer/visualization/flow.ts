@@ -151,14 +151,3 @@ export function buildExternalImportEdges(
 
   return pairEdges(pairCounts);
 }
-
-/** Build flow nodes for FlowDiagram from zones. */
-export function buildFlowNodes(
-  zones: Zones,
-): Array<{ id: string; label: string; color: string }> {
-  return zones.zones.map((z, i) => ({
-    id: z.id,
-    label: z.name,
-    color: getZoneColorByIndex(i),
-  }));
-}

@@ -2,7 +2,7 @@ import { recordFacts, useStoreTick } from "@graview/pages";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import type { App } from "../../app.js";
-import { inward, inwardOf, isOpen, label, nodeOf, nodesOf, out, said, STATUS_ORDER, statusOf, toneOfStatus, tokens, when, type Node, type Of } from "../../model/graph.js";
+import { inward, inwardOf, isOpen, label, nodeOf, nodesOf, out, said, STATUS_ORDER, toneOfStatus, tokens, when, type Node, type Of } from "../../model/graph.js";
 import { orderChanges, runsFor, workUnder } from "../../model/work.js";
 import { DeclaredBlocks, declaredPage, opening } from "../declared.js";
 import { Badge, Empty, Facts, Hero, Icon, Page, RecordRow, Rows, Section, Stat, Stats, StatusBadge, type Ctx } from "../kit.js";
