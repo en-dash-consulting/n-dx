@@ -295,6 +295,7 @@ items:
   "b772b0c5-c910-4e92-83bf-776a266c413a":
     appliedAt: "2026-11-16T18:26:30.780Z"
     appliedAmendsHash: "de835cabc2e02daf88c8e99dad66dcad4c0031adfa2e7e365e33bdaa7058cc31"
+    shippedIn: "0.10.5"
     createdAt: "2026-11-12T17:26:37.734Z"
     lastModified: "2026-11-16T18:26:30.780Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
