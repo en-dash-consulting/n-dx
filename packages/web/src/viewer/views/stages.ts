@@ -99,7 +99,7 @@ export type StageSectionBadge = "inbox";
 export type StagePanelId =
   | "capture" | "map" | "glance" | "recommendations" | "changes-glance" | "plan-health" | "spec-gaps"
   | "outcomes" | "running" | "up-next" | "run-queue" | "agent-settings"
-  | "plan-glance" | "plan-areas" | "inbox" | "work-stats" | "prd-tools";
+  | "plan-glance" | "plan-flow" | "plan-areas" | "inbox" | "work-stats" | "prd-tools";
 
 /**
  * A panel behind a vertical tab at the page's right edge: pressing the tab
@@ -113,6 +113,8 @@ export interface StageSidePanel {
   label: string;
   /** The panel's heading. */
   title: string;
+  /** Its heading while Plan is in Solo mode ("Your inbox"), when that differs. */
+  soloTitle?: string;
   /** One line under the heading: what the panel is for. */
   blurb: string;
   /** Where the panel's "Open" goes; also what is rendered when `panel` is unset. */
@@ -333,13 +335,14 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
         id: "create",
         label: "Create",
         focus: "How, why and what",
-        // What you are doing, what matters most and what is next; then the
-        // product areas the work lands in, filtered by whose work and by stage
-        // from the tile's own chips. Adding work, the analysis findings and
-        // the Inbox are side panels (`sidePanels`). No lifecycle counts band:
-        // the Inbox tab carries its count and the glance card the next pick.
+        // What you are doing, what matters most and what is next; then How
+        // work moves, the stages with their counts, each focusing the areas
+        // and the Inbox panel on it; then the product areas the work lands
+        // in, filtered by whose work from the tile's own toggle. Adding work,
+        // the analysis findings and the Inbox are side panels (`sidePanels`).
         tiles: [
           { view: "changes", panel: "plan-glance", title: "At a glance", band: true, v2Only: true, requiresServer: true },
+          { view: "changes", panel: "plan-flow", title: "How work moves", band: true, v2Only: true, requiresServer: true },
           // The Product page's areas, each with the open changes moving it.
           // Full-screen and "Open" show the whole Product page.
           { view: "product", panel: "plan-areas", title: "Product areas", embedsView: true, cols: 12, rows: 3, grow: true, v2Only: true, requiresServer: true },
@@ -380,7 +383,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { id: "new-change", label: "New change", title: "Add to the plan", blurb: "Describe it, and n-dx suggests where it goes.", view: "analysis", panel: "capture", requiresServer: true },
       // The Analysis page's recommended fixes; "Open" goes to its Suggestions.
       { id: "from-analysis", label: "From analysis", title: "From analysis", blurb: "Findings from the last run, ready to plan.", view: "suggestions", panel: "recommendations" },
-      { id: "inbox", label: "Inbox", title: "Inbox", blurb: "Waiting to be placed on the map.", view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true },
+      { id: "inbox", label: "Inbox", title: "Inbox", soloTitle: "Your inbox", blurb: "Waiting to be placed on the map.", view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true },
       // Create's tiles the new layout does not place yet, kept rather than removed.
       { id: "open-changes", label: "Open changes", title: "Open changes", blurb: "Placed open changes by stage, with their gaps.", view: "changes", panel: "changes-glance", v2Only: true, requiresServer: true, transitional: true },
       { id: "plan-health", label: "Plan health", title: "Plan health", blurb: "The last validation of the PRD, as lights.", view: "validation", panel: "plan-health", transitional: true },

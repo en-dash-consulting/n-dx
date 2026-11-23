@@ -6,8 +6,9 @@
  * change no area counts is listed under "Not in an area", so nothing open
  * drops out of sight.
  *
- * Above the boxes, For me / Everyone and the stage chips narrow what they list
- * (`plan-view-state.ts`). Boxes in a row are one height; a box opens its area
+ * Above the boxes, For me / Everyone narrows what they list, and so does the
+ * stage How work moves focuses (`plan-flow.ts`, `plan-view-state.ts`): the
+ * Inbox stage empties every box, since nothing in the Inbox has an area yet. Boxes in a row are one height; a box opens its area
  * on a click anywhere outside its change titles, or Enter, and its summary
  * shows three lines at most, the third fading when there is more. An Inbox row
  * dragged from the side panel can be dropped on an area to plan it there
@@ -24,7 +25,7 @@ import { useProductRead } from "../hooks/index.js";
 import { placementTab } from "../route-state.js";
 import { useChangesSummary } from "./changes-summary-context.js";
 import { isMyChange } from "./plan-glance.js";
-import { ScopeToggle, StageChips } from "./plan-controls.js";
+import { ScopeToggle } from "./plan-controls.js";
 import { usePlanView, type PlanViewState } from "./plan-view-state.js";
 import {
   PLAN_DRAG_EVENT, candidateInArea, carriesInboxRow, draggedRow, endPlanDrag, placeTouches, rowCandidates,
@@ -59,14 +60,15 @@ export function areaBoxes(map: ProductMap, open: readonly GlanceChange[]): AreaB
   return rest.length > 0 ? [...boxes, box(null, "Not in an area", rest, "Open changes placed on a top-level constraint, or on nothing yet.")] : boxes;
 }
 
-/** The open changes the view lets through: yours under For me, and only the focused stage. */
+/** The open changes the view lets through: yours under For me, and only the focused stage (none for the Inbox). */
 export function filterForView(open: readonly GlanceChange[], view: Pick<PlanViewState, "scope" | "stage" | "mode">, me: string | null): GlanceChange[] {
+  if (view.stage === "inbox") return [];
   return open.filter((c) =>
     (view.mode === "solo" || view.scope !== "me" || isMyChange(c, me))
     && (view.stage === null || c.stage === view.stage));
 }
 
-/** How many of `open` sit in each stage, for the chips. */
+/** How many of `open` sit in each stage, for How work moves. */
 export function stageCounts(open: readonly GlanceChange[]): Record<OpenChangeStage, number> {
   const counts: Record<OpenChangeStage, number> = { proposed: 0, ready: 0, "in-progress": 0, "awaiting-apply": 0 };
   for (const c of open) counts[c.stage]++;
@@ -158,7 +160,7 @@ function AreaBoxView({ box, solo, dragging, onOpenArea, onOpenChange, onDropChan
       : h("p", { class: "plan-area-empty" }, "Nothing here for this view."),
     slug && dragging
       ? h("div", { class: over ? "plan-area-drop plan-area-drop--over" : "plan-area-drop", "aria-hidden": "true" },
-          "Drop an Inbox item here to plan it in this area")
+          solo ? "Drop an Inbox item here to plan it in this area" : "Drop an Inbox item here to accept it into this area")
       : null,
   );
 }
@@ -190,7 +192,7 @@ export function PlanAreas({ navigateTo }: { navigateTo: NavigateTo }) {
   const me = people?.me ?? null;
   const solo = view.mode === "solo";
   const scoped = filterForView(summary.data.open, { ...view, stage: null }, me);
-  const shown = view.stage ? scoped.filter((c) => c.stage === view.stage) : scoped;
+  const shown = filterForView(scoped, view, me);
   const boxes = areaBoxes(product.data, shown);
 
   const dropOn = async (box: AreaBox) => {
@@ -212,7 +214,7 @@ export function PlanAreas({ navigateTo }: { navigateTo: NavigateTo }) {
   return h("div", { class: "plan-areas" },
     h("div", { class: "plan-areas-toolbar" },
       h(ScopeToggle, null),
-      h(StageChips, { counts: stageCounts(scoped) }),
+      h("span", { class: "plan-areas-hint" }, "Drag an Inbox item onto an area to plan it."),
     ),
     h("p", { class: "plan-areas-intro" }, "Accepted work, grouped by the part of the product it changes. Each box shows what is planned and in progress in that area."),
     note ? h("p", { class: note.error ? "plan-areas-note plan-areas-note--error" : "plan-areas-note", role: note.error ? "alert" : "status" }, note.text) : null,

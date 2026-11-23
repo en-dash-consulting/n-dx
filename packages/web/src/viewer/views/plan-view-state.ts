@@ -1,6 +1,7 @@
 /**
  * What narrows the Plan page, shared by its parts: whose work it shows (For me
- * or Everyone), which stage it focuses on, and whether the project is worked
+ * or Everyone), which stage How work moves focuses on (the Inbox or a placed
+ * change's stage), and whether the project is worked
  * Solo or as a Team. The product areas, the Inbox side panel and the head's
  * controls each read and set it, so one module-level store keeps them in step.
  *
@@ -16,10 +17,12 @@ import type { OpenChangeStage } from "./product-model.js";
 
 export type PlanScope = "me" | "all";
 export type PlanMode = "team" | "solo";
+/** A stage How work moves can focus: the Inbox, then the stages of a placed open change. */
+export type PlanStage = "inbox" | OpenChangeStage;
 
 export interface PlanViewState {
   scope: PlanScope;
-  stage: OpenChangeStage | null;
+  stage: PlanStage | null;
   mode: PlanMode;
 }
 

@@ -12,7 +12,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PlanAreas, filterForView, stageCounts } from "../../../src/viewer/views/plan-areas.js";
 import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
-import { InboxView } from "../../../src/viewer/views/inbox.js";
+import { InboxView, PLAN_INBOX_EMPTY, planInLabels } from "../../../src/viewer/views/inbox.js";
+import { FLOW_STAGES } from "../../../src/viewer/views/plan-controls.js";
+import { PlanFlow } from "../../../src/viewer/views/plan-flow.js";
+import { PLAN_INBOX_HINT, PlanInbox } from "../../../src/viewer/views/plan-inbox.js";
 import type { InboxRow } from "../../../src/viewer/views/inbox-read.js";
 import { PLAN_DRAG_EVENT, candidateInArea, endPlanDrag, startPlanDrag } from "../../../src/viewer/views/plan-placement.js";
 import { PlanHeadControls, TOUR_STEPS, cardPosition } from "../../../src/viewer/views/plan-tour.js";
@@ -49,6 +52,20 @@ const MAP: ProductMap = {
   constraints: [],
 };
 
+/** The change list: two open Inbox changes (one yours), an applied one never placed, and a placed one. */
+const inboxChange = (id: string, extra: Record<string, unknown> = {}) =>
+  ({ id, title: `Inbox ${id}`, stage: "proposed", inbox: true, needsPlacement: true, amends: [], touches: [], taskCount: 0, completedTaskCount: 0, criteriaGap: false, openBlockers: 0, ...extra });
+const CHANGES = [
+  inboxChange("in-mine", { assignee: ME, priority: "high" }),
+  inboxChange("in-theirs", { assignee: "Bo <bo@x.io>", priority: "low" }),
+  inboxChange("old-applied", { appliedAt: "2026-11-01T00:00:00Z" }),
+  { ...inboxChange("placed"), inbox: false, needsPlacement: false },
+];
+const PLACEMENTS = Object.fromEntries(["in-mine", "in-theirs", "old-applied"].map((id) => [id, {
+  layout: "v2", change: { id, title: id, status: "pending", taskCount: 0 }, relation: "touches", relationRule: "r", tied: false,
+  shortlist: [{ target: "cap-checkout", type: "capability", title: "Cap checkout", area: "Checkout", criteria: [], score: 5, strength: "strong", reasons: [] }],
+}]));
+
 let root: HTMLDivElement;
 let fetchSpy: ReturnType<typeof vi.fn>;
 
@@ -66,6 +83,8 @@ beforeEach(() => {
     const url = String(input);
     const body = url === "/api/rex/changes/summary" ? { layout: "v2", summary: SUMMARY }
       : url === "/api/rex/product" ? { layout: "v2", map: MAP }
+      : url === "/api/rex/changes" ? { layout: "v2", changes: CHANGES }
+      : url === "/api/rex/changes/placements" ? { layout: "v2", placements: PLACEMENTS }
       : url.endsWith("/place") && init?.method === "POST" ? { change: "x", target: "cap-1", relation: "touches" }
       : {};
     return { ok: true, status: 200, json: async () => body } as Response;
@@ -111,20 +130,117 @@ describe("filtering the product areas", () => {
     expect(boxIds("checkout")).toEqual(["mine-ready", "bo-working"]);
   });
 
-  it("a stage chip focuses the boxes on that stage; pressing it again, or Show all, clears it", async () => {
+  it("drops the Inbox stage's boxes empty, since nothing in the Inbox has an area", () => {
+    expect(filterForView(OPEN, { scope: "all", stage: "inbox", mode: "team" }, ME)).toEqual([]);
+  });
+
+  it("tells you to drag Inbox items onto an area, and has no stage chips of its own", async () => {
     await mountAreas();
-    const chip = () => root.querySelector<HTMLButtonElement>('.plan-stage-chip[data-stage="in-progress"]')!;
-    expect(chip().textContent).toBe("In progress1");
-    expect(chip().getAttribute("aria-pressed")).toBe("false");
-    act(() => { chip().click(); });
-    expect(chip().getAttribute("aria-pressed")).toBe("true");
+    expect(root.querySelector(".plan-areas-hint")?.textContent).toBe("Drag an Inbox item onto an area to plan it.");
+    expect(root.querySelector(".plan-flow-stage, .plan-stage-chip")).toBeNull();
+  });
+});
+
+describe("How work moves", () => {
+  async function mountFlowAndAreas() {
+    await act(async () => {
+      render(h(ChangesSummaryProvider, null, h("div", null, h(PlanFlow, null), h(PlanAreas, { navigateTo: vi.fn() }))), root);
+    });
+    await flush();
+  }
+  const stage = (s: string) => root.querySelector<HTMLButtonElement>(`.plan-flow-stage[data-stage="${s}"]`)!;
+  const count = (s: string) => stage(s).querySelector(".plan-flow-stage-count")?.textContent;
+
+  it("lists the stages in order with counts, a line each and arrows between, under its instruction", async () => {
+    await mountFlowAndAreas();
+    expect(root.querySelector(".plan-flow-title")?.textContent).toBe("How work moves");
+    expect(root.querySelector(".plan-flow-hint")?.textContent).toBe("Click a stage to focus on it");
+    expect([...root.querySelectorAll<HTMLElement>(".plan-flow-stage")].map((b) => b.dataset.stage))
+      .toEqual(["inbox", "proposed", "ready", "in-progress", "awaiting-apply"]);
+    expect(FLOW_STAGES.map((s) => s.label)).toEqual(["Inbox", "Proposed", "Ready", "In progress", "Awaiting apply"]);
+    expect(root.querySelectorAll(".plan-flow-arrow")).toHaveLength(4);
+    // Two open Inbox changes; the applied one never placed is history, not counted.
+    expect(count("inbox")).toBe("2");
+    expect(count("in-progress")).toBe("1");
+    expect(stage("inbox").querySelector(".plan-flow-stage-sub")?.textContent).toBe("Bugs & requests come in");
+    act(() => { setPlanView({ mode: "solo" }); });
+    expect(stage("inbox").querySelector(".plan-flow-stage-sub")?.textContent).toBe("Your ideas & bugs");
+  });
+
+  it("counts follow For me, the Inbox's included", async () => {
+    await mountFlowAndAreas();
+    act(() => { root.querySelector<HTMLButtonElement>('.plan-seg[data-scope="me"]')!.click(); });
+    expect(count("inbox")).toBe("1");
+    expect(count("ready")).toBe("1");
+    expect(count("in-progress")).toBe("0");
+  });
+
+  it("a stage focuses the boxes on it; clicking it again, or Show all, clears it", async () => {
+    await mountFlowAndAreas();
+    expect(stage("in-progress").getAttribute("aria-pressed")).toBe("false");
+    expect(root.querySelector(".plan-show-all")).toBeNull();
+    act(() => { stage("in-progress").click(); });
+    expect(stage("in-progress").getAttribute("aria-pressed")).toBe("true");
     expect(boxIds("checkout")).toEqual(["bo-working"]);
     act(() => { root.querySelector<HTMLButtonElement>(".plan-show-all")!.click(); });
     expect(boxIds("checkout")).toEqual(["mine-ready", "bo-working"]);
-    act(() => { chip().click(); });
-    act(() => { chip().click(); });
-    expect(chip().getAttribute("aria-pressed")).toBe("false");
+    act(() => { stage("in-progress").click(); });
+    act(() => { stage("in-progress").click(); });
+    expect(stage("in-progress").getAttribute("aria-pressed")).toBe("false");
     expect(root.querySelector(".plan-show-all")).toBeNull();
+  });
+
+  it("focused on the Inbox, every area is empty", async () => {
+    await mountFlowAndAreas();
+    act(() => { stage("inbox").click(); });
+    expect(boxIds("checkout")).toEqual([]);
+    expect(boxIds("search")).toEqual([]);
+  });
+});
+
+describe("the Inbox panel follows How work moves", () => {
+  async function mountInbox() {
+    await act(async () => { render(h(PlanInbox, { navigateTo: vi.fn() }), root); });
+    await flush();
+  }
+  const rowIds = () => [...root.querySelectorAll<HTMLElement>(".inbox-row:not(.inbox-applied-row)")].map((r) => r.dataset.changeId);
+
+  it("lists the Inbox unfocused and focused on the Inbox, with the design's hint for each mode", async () => {
+    await mountInbox();
+    expect(rowIds()).toEqual(["in-mine", "in-theirs"]);
+    expect(root.querySelector(".plan-inbox-hint")?.textContent).toBe(PLAN_INBOX_HINT.team);
+    act(() => { setPlanView({ stage: "inbox" }); });
+    await flush(2);
+    expect(rowIds()).toEqual(["in-mine", "in-theirs"]);
+    act(() => { setPlanView({ mode: "solo" }); });
+    expect(root.querySelector(".plan-inbox-hint")?.textContent).toBe(PLAN_INBOX_HINT.solo);
+  });
+
+  it("focused on a later stage it lists nothing and offers Show all", async () => {
+    await mountInbox();
+    act(() => { setPlanView({ stage: "ready" }); });
+    expect(rowIds()).toEqual([]);
+    expect(root.querySelector(".plan-inbox-stage-empty p")?.textContent).toBe("Nothing in the Inbox is at Ready: Inbox work has not been placed yet.");
+    act(() => { root.querySelector<HTMLButtonElement>(".plan-inbox-stage-empty .plan-show-all")!.click(); });
+    await flush(2);
+    expect(rowIds()).toEqual(["in-mine", "in-theirs"]);
+  });
+
+  it("says so when nothing waits for the view", async () => {
+    await act(async () => { render(h(InboxView, { rows: [], appliedUnplaced: 0, onOpenChange: vi.fn(), scope: "all" }), root); });
+    expect(root.querySelector(".inbox-empty p")?.textContent).toBe(PLAN_INBOX_EMPTY);
+    const theirs = { ...inboxRow("t", []), change: { ...inboxRow("t", []).change, assignee: "Bo <bo@x.io>" } as ChangeRow };
+    await act(async () => { render(h(InboxView, { rows: [theirs], appliedUnplaced: 0, onOpenChange: vi.fn(), scope: "me" }), root); });
+    await flush(2);
+    expect(root.querySelector(".inbox-filtered-empty p")?.textContent).toBe(PLAN_INBOX_EMPTY);
+  });
+
+  it("is titled Your inbox in Solo", () => {
+    const panels: StageSidePanel[] = [{ id: "inbox", label: "Inbox", title: "Inbox", soloTitle: "Your inbox", blurb: "b", view: "inbox" }];
+    act(() => { render(h(StageSidePanels, { stage: "plan", panels, openId: "inbox", onToggle: vi.fn(), renderPanel: () => null, navigateTo: vi.fn() }), root); });
+    expect(root.querySelector(".stage-side-title")?.textContent).toBe("Inbox");
+    act(() => { setPlanView({ mode: "solo" }); });
+    expect(root.querySelector(".stage-side-title")?.textContent).toBe("Your inbox");
   });
 });
 
@@ -173,6 +289,24 @@ describe("planning from the Inbox", () => {
     expect(candidateInArea(list, "Billing")).toBeNull();
   });
 
+  it("names the step on the button: 'Accept → <area>' in Team, 'Plan in <area>' in Solo", () => {
+    expect(planInLabels("accept", "Fix it", "Checkout")).toEqual({ text: "Accept → Checkout", aria: "Accept Fix it into Checkout" });
+    expect(planInLabels("plan", "Fix it", "Checkout")).toEqual({ text: "Plan in Checkout", aria: "Plan Fix it in Checkout" });
+  });
+
+  it("the Inbox panel's button reads 'Accept →' in Team and 'Plan in' in Solo, placing the same way", async () => {
+    await act(async () => { render(h(PlanInbox, { navigateTo: vi.fn() }), root); });
+    await flush();
+    const button = () => root.querySelector<HTMLButtonElement>('.inbox-row[data-change-id="in-mine"] .inbox-plan-in')!;
+    expect(button().textContent).toBe("Accept → Checkout");
+    act(() => { setPlanView({ mode: "solo" }); });
+    expect(button().textContent).toBe("Plan in Checkout");
+    await act(async () => { button().click(); });
+    await flush(2);
+    const place = fetchSpy.mock.calls.find(([url]) => String(url) === "/api/rex/changes/in-mine/place")!;
+    expect(JSON.parse(String(place[1]!.body))).toEqual({ target: "cap-checkout", relation: "touches" });
+  });
+
   it("offers 'Plan in <area>' for a row's best guess, and drags under Plan", async () => {
     const onPlanIn = vi.fn();
     const row = inboxRow("i1", [candidate("c2", "Checkout")]);
@@ -206,6 +340,8 @@ describe("planning from the Inbox", () => {
     const row = inboxRow("i1", [candidate("cap-search", "Search"), candidate("cap-checkout", "Checkout")]);
     act(() => { startPlanDrag(row, new Event("dragstart") as DragEvent); });
     const box = root.querySelector<HTMLElement>('.plan-area[data-area="checkout"]')!;
+    expect(box.querySelector(".plan-area-drop")?.textContent).toBe("Drop an Inbox item here to accept it into this area");
+    act(() => { setPlanView({ mode: "solo" }); });
     expect(box.querySelector(".plan-area-drop")?.textContent).toBe("Drop an Inbox item here to plan it in this area");
     await act(async () => { box.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true })); });
     await flush(2);
@@ -274,7 +410,10 @@ describe("Solo / Team and the newcomer tour", () => {
   });
 
   it("names the four parts it spotlights, and places its card under a part, else above, else centred", () => {
-    expect(TOUR_STEPS.map((s) => s.target)).toEqual([".plan-glance", ".plan-areas-toolbar", '.stage-side-tab[data-panel="inbox"]', ".plan-areas-grid"]);
+    expect(TOUR_STEPS.map((s) => s.target)).toEqual([".plan-glance", ".plan-flow", '.stage-side-tab[data-panel="inbox"]', ".plan-areas-grid"]);
+    // The last step names the button the mode shows.
+    expect(TOUR_STEPS[3]!.body).toContain("Accept →");
+    expect(TOUR_STEPS[3]!.soloBody).toContain("Plan in");
     const view = { width: 1200, height: 800 };
     expect(cardPosition({ top: 100, left: 40, width: 300, height: 100 }, view)).toEqual({ top: 212, left: 40 });
     expect(cardPosition({ top: 600, left: 40, width: 300, height: 150 }, view).top).toBe(600 - 240 - 12);

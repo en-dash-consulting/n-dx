@@ -6,8 +6,9 @@
  * Everyone, since all the work is yours. The choice is remembered per browser.
  *
  * "Take the tour" walks a newcomer through the page in four steps, each
- * spotlighting its part (the glance cards, the filters, the Inbox tab, the
- * product areas) with a card that says what it is for. Skip, Back, Next and
+ * spotlighting its part (the glance cards, How work moves, the Inbox tab, the
+ * product areas) with a card that says what it is for; the last step names
+ * the Inbox button the current mode shows. Skip, Back, Next and
  * Done move through it; Escape closes it. A step whose part is not on screen
  * (Preparation, a v1 project) shows its card in the middle with no spotlight.
  *
@@ -24,6 +25,8 @@ export interface TourStep {
   target: string;
   title: string;
   body: string;
+  /** The body in Solo, when it differs: the Inbox button reads "Plan in" there, "Accept →" in Team. */
+  soloBody?: string;
 }
 
 export const TOUR_STEPS: readonly TourStep[] = [
@@ -33,9 +36,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body: "These three cards answer the questions this page exists for: what you're working on, what matters most right now, and what's next for the product. They update on their own.",
   },
   {
-    target: ".plan-areas-toolbar",
+    target: ".plan-flow",
     title: "Focus the page",
-    body: "Show only your work, or one stage of it: Proposed, Ready, In progress or Awaiting apply. Press a stage again, or Show all, to see everything.",
+    body: "Work moves from the Inbox through Proposed, Ready and In progress to Awaiting apply. Click a stage to focus the areas and the Inbox on it; click it again, or Show all, to see everything. For me, above the areas, shows only your work.",
+    soloBody: "Work moves from the Inbox through Proposed, Ready and In progress to Awaiting apply. Click a stage to focus the areas and the Inbox on it; click it again, or Show all, to see everything.",
   },
   {
     target: '.stage-side-tab[data-panel="inbox"]',
@@ -45,7 +49,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".plan-areas-grid",
     title: "Plan work onto the product map",
-    body: "Drag an Inbox item onto a product area, or press its Plan in button, to place it there. Click an area to open it.",
+    body: "Drag an Inbox item onto a product area, or press its Accept → button, to accept it into that area. Click an area to open it.",
+    soloBody: "Drag an Inbox item onto a product area, or press its Plan in button, to place it there. Click an area to open it.",
   },
 ];
 
@@ -78,6 +83,7 @@ export function PlanTour({ onClose }: { onClose: () => void }) {
   const [rect, setRect] = useState<Rect | null>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const step = TOUR_STEPS[index]!;
+  const solo = usePlanView().mode === "solo";
   const last = index === TOUR_STEPS.length - 1;
   useEscapeKey(true, onClose);
 
@@ -115,7 +121,7 @@ export function PlanTour({ onClose }: { onClose: () => void }) {
           TOUR_STEPS.map((_, i) => h("span", { key: i, class: i === index ? "plan-tour-dot plan-tour-dot--on" : "plan-tour-dot" }))),
       ),
       h("h2", { class: "plan-tour-title", id: "plan-tour-title" }, step.title),
-      h("p", { class: "plan-tour-body", id: "plan-tour-body" }, step.body),
+      h("p", { class: "plan-tour-body", id: "plan-tour-body" }, solo && step.soloBody ? step.soloBody : step.body),
       h("div", { class: "plan-tour-actions" },
         h("button", { type: "button", class: "plan-tour-skip", onClick: onClose }, last ? "Close" : "Skip tour"),
         h("span", { class: "plan-tour-spacer" }),

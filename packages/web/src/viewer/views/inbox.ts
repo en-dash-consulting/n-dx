@@ -289,7 +289,17 @@ function ageOf(row: InboxRow): string | null {
   return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
-function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAssignee = false, dragToPlan = false, onPlanIn }: {
+/** What the best-guess button says it does: an owner accepts the change into the area (Team), or you plan it there (Solo). */
+export type PlanInVerb = "accept" | "plan";
+
+/** The best-guess button's text and its accessible name. */
+export function planInLabels(verb: PlanInVerb, title: string, area: string): { text: string; aria: string } {
+  return verb === "accept"
+    ? { text: `Accept → ${area}`, aria: `Accept ${title} into ${area}` }
+    : { text: `Plan in ${area}`, aria: `Plan ${title} in ${area}` };
+}
+
+function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAssignee = false, dragToPlan = false, onPlanIn, planInVerb = "plan" }: {
   row: InboxRow;
   onOpen: (id: string) => void;
   onPlace?: (id: string) => void;
@@ -302,8 +312,9 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAss
   hideAssignee?: boolean;
   /** Plan's Inbox panel: the row can be dragged onto a product area. */
   dragToPlan?: boolean;
-  /** Plan's Inbox panel: "Plan in <area>" places the change on its best guess (in place of Accept). */
+  /** Plan's Inbox panel: "Plan in <area>" (or "Accept → <area>") places the change on its best guess, in place of Accept. */
   onPlanIn?: (row: InboxRow, candidate: PlacementCandidate) => void;
+  planInVerb?: PlanInVerb;
 }) {
   const { change } = row;
   const guess = guessOf(row);
@@ -324,6 +335,7 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAss
   // An unsaved placement left in placement mode (WF10).
   const draftNote = placementDraftNote(change.id);
   const age = ageOf(row);
+  const planIn = guess?.candidate.area ? planInLabels(planInVerb, change.title, guess.candidate.area) : null;
   // The row is the target; the title button gives it keyboard reach, and its
   // click bubbles here. Place opens placement mode when the page can, and
   // otherwise bubbles to the row too.
@@ -361,7 +373,7 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAss
     h("div", { class: "inbox-row-foot" },
       h(GuessLine, { row }),
       draftNote ? h("span", { class: "tag inbox-draft", "data-draft": "placement" }, draftNote) : null,
-      // Plan's panel names the step and the area ("Plan in <area>"), so it does not also offer Accept.
+      // Plan's panel names the step and the area ("Accept → <area>", "Plan in <area>"), so it does not also offer Accept.
       guess && onAccepted && !onPlanIn
         ? h("button", {
             type: "button",
@@ -372,13 +384,13 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAss
             onClick: accept,
           }, accepting ? "Placing…" : "Accept")
         : null,
-      onPlanIn && guess?.candidate.area
+      onPlanIn && guess && planIn
         ? h("button", {
             type: "button",
             class: "btn btn-sm inbox-plan-in",
-            "aria-label": `Plan ${change.title} in ${guess.candidate.area}`,
+            "aria-label": planIn.aria,
             onClick: (e: MouseEvent) => { e.stopPropagation(); onPlanIn(row, guess.candidate); },
-          }, `Plan in ${guess.candidate.area}`)
+          }, planIn.text)
         : null,
       h("button", {
         type: "button",
@@ -427,6 +439,8 @@ export interface InboxViewProps {
   dragToPlan?: boolean;
   /** Each row with a guessed area offers "Plan in <area>". */
   onPlanIn?: (row: InboxRow, candidate: PlacementCandidate) => void;
+  /** How that button names the step: "Accept → <area>" or "Plan in <area>" (the default). */
+  planInVerb?: PlanInVerb;
 }
 
 /** The filter's view of Inbox rows: every one is open work, assigned by the change or its open tasks. */
@@ -434,7 +448,10 @@ export function assignableInboxRows(rows: readonly InboxRow[]): AssignableRow[] 
   return rows.map((r) => ({ assignees: changeAssignees(r.change), open: true }));
 }
 
-export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced, onAssigned, scope, hideAssignees = false, dragToPlan = false, onPlanIn }: InboxViewProps) {
+/** Plan's Inbox panel with nothing in it for the view. */
+export const PLAN_INBOX_EMPTY = "Nothing waiting on you. Nice.";
+
+export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced, onAssigned, scope, hideAssignees = false, dragToPlan = false, onPlanIn, planInVerb }: InboxViewProps) {
   const cliName = useCliName();
   const peopleRead = usePeople();
   const assignable = useMemo(() => assignableInboxRows(rows), [rows]);
@@ -461,7 +478,9 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
       ? h(PlaceBestGuesses, { rows: sorted, applied: appliedRows, onPlaced, onOpenReview: onOpenAll })
       : null,
     sorted.length > 0 && !planScoped && !filter.pending ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
-    sorted.length === 0
+    sorted.length === 0 && planScoped
+      ? h("div", { class: "empty-state inbox-empty", role: "status" }, h("p", null, PLAN_INBOX_EMPTY))
+      : sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" },
           h("p", null, "Inbox is empty"),
           h("p", { class: "section-sub" }, resolveCliLabel(HELD_EXPLANATION, cliName)))
@@ -470,9 +489,9 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
         ? h(AssigneeFilterPending, null)
       : visible.length === 0
         ? h("div", { class: "empty-state inbox-empty inbox-filtered-empty", role: "status" },
-            h("p", null, planScoped ? "Nothing in the Inbox is assigned to you." : "No Inbox changes match this filter."))
+            h("p", null, planScoped ? PLAN_INBOX_EMPTY : "No Inbox changes match this filter."))
         : h("ul", { class: "inbox-list" },
-            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, me, onAssigned, onAccepted: onPlaced, hideAssignee: hideAssignees, dragToPlan, onPlanIn })),
+            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, me, onAssigned, onAccepted: onPlaced, hideAssignee: hideAssignees, dragToPlan, onPlanIn, planInVerb })),
           ),
     hidden > 0 && onOpenAll
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
@@ -534,8 +553,8 @@ export function AppliedHistory({ count, rows = [], onOpen }: {
 export function InboxPage({ navigateTo, limit, plan }: {
   navigateTo?: NavigateTo;
   limit?: number;
-  /** Plan's Inbox panel: its scope, Solo mode, dragging and "Plan in". */
-  plan?: Pick<InboxViewProps, "scope" | "hideAssignees" | "dragToPlan" | "onPlanIn">;
+  /** Plan's Inbox panel: its scope, Solo mode, dragging and "Plan in" / "Accept →". */
+  plan?: Pick<InboxViewProps, "scope" | "hideAssignees" | "dragToPlan" | "onPlanIn" | "planInVerb">;
 }) {
   const { load, rows, applied, refetch } = useInbox();
   const status = useProjectStatus();

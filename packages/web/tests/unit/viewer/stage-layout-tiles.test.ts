@@ -54,7 +54,7 @@ afterEach(() => {
 
 describe("Plan tiles before the first status", () => {
   // Tiles are keyed by panel when they have one: Create's glance band and product areas.
-  const V2_ONLY = ["plan-glance", "plan-areas"];
+  const V2_ONLY = ["plan-glance", "plan-flow", "plan-areas"];
 
   it("mounts no v2-only tile with null status, only its placeholder, then a v1 status", () => {
     status = null;
@@ -106,8 +106,8 @@ describe("Plan tiles before the first status", () => {
     status = withLayout("v2");
     mount();
     expect(loading).toEqual(tiles());
-    // The glance, then the product areas.
-    expect(loading).toEqual(["plan-glance", "plan-areas"]);
+    // The glance, How work moves, then the product areas.
+    expect(loading).toEqual(["plan-glance", "plan-flow", "plan-areas"]);
   });
 
   it("shows Tasks, and no tile that says to migrate, when status arrives with no PRD", () => {

@@ -119,7 +119,7 @@ describe("the Plan side panel", () => {
   it("is the third of Plan's side panels, after New change and From analysis, server-backed, with the Inbox badge", () => {
     expect(STAGES.plan.sidePanels!.filter((p) => !p.transitional).map((p) => p.id)).toEqual(["new-change", "from-analysis", "inbox"]);
     expect(STAGES.plan.sidePanels!.find((p) => p.id === "inbox")).toEqual({
-      id: "inbox", label: "Inbox", title: "Inbox", blurb: "Waiting to be placed on the map.",
+      id: "inbox", label: "Inbox", title: "Inbox", soloTitle: "Your inbox", blurb: "Waiting to be placed on the map.",
       view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true,
     });
     // It places no view: the route stays Plan's through `alsoOwns`.

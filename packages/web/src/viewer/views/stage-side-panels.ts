@@ -21,6 +21,7 @@ import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { PLAN_DRAG_EVENT } from "./plan-placement.js";
+import { usePlanView } from "./plan-view-state.js";
 import type { NavigateTo } from "../types.js";
 import { ActionIcon, useEscapeKey, useProjectStatus } from "../components/index.js";
 import { LiveBadge } from "./stage-badge.js";
@@ -53,7 +54,9 @@ export function StageSidePanels({ stage, panels, openId, onToggle, renderPanel, 
   const status = useProjectStatus();
   const layout = status ? (status.rex?.exists === false ? "none" : status.rex?.layout ?? "v2") : null;
   const shown = sidePanelsForLayout(panels, layout);
-  const open = shown.find((p) => p.id === openId) ?? null;
+  const found = shown.find((p) => p.id === openId) ?? null;
+  const solo = usePlanView().mode === "solo";
+  const open = found && solo && found.soloTitle ? { ...found, title: found.soloTitle } : found;
   const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   /** The control that opened the panel, focused again when it closes. */

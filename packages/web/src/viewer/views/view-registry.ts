@@ -77,6 +77,7 @@ import { AnalyzeActionsProvider } from "./analyze-actions-context.js";
 import { SpendSummary } from "./spend-summary.js";
 import { PlanGlance } from "./plan-glance.js";
 import { PlanAreas } from "./plan-areas.js";
+import { PlanFlow } from "./plan-flow.js";
 import { PlanInbox } from "./plan-inbox.js";
 import { PlanHeadControls } from "./plan-tour.js";
 import { PrdTools, WorkStats } from "./work-stats.js";
@@ -231,6 +232,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "run-queue": return h(RunQueuePanel, { navigateTo: ctx.navigateTo });
     case "agent-settings": return h(AgentSettingsPanel, { navigateTo: ctx.navigateTo });
     case "plan-glance": return h(PlanGlance, { navigateTo: ctx.navigateTo });
+    case "plan-flow": return h(PlanFlow, null);
     // Full-screen and "Open" show the whole Product page.
     case "plan-areas": return opened
       ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo })
