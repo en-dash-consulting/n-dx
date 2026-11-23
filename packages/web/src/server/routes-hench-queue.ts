@@ -6,10 +6,14 @@
  * not code).
  *
  *   GET /api/hench/queue → { items: QueueItemWire[] }
- *   PUT /api/hench/queue   { taskIds: string[] } → the queue as saved, like GET
+ *   PUT /api/hench/queue   { taskIds: string[], base?: string[] } → the queue as saved, like GET
  *
  * A PUT replaces the whole order: the panel sends it after an add, a move or a
- * removal. Each kept item keeps when it was first added. The file is written
+ * removal, with `base`, the order it last saw. When the file no longer holds
+ * that order (another window saved, or `ndx work` took an item), the PUT is
+ * refused with 409 and the queue as it stands, so a stale panel never puts
+ * back what was taken or drops what someone else added. Each kept item keeps
+ * when it was first added. The file is written
  * to a temporary name and renamed, so `ndx work` never reads half a queue.
  *
  * @module web/server/routes-hench-queue
@@ -69,11 +73,23 @@ function writeQueueFile(path: string, items: readonly QueueFileItem[]): void {
   renameSync(temp, path);
 }
 
+function idList(value: unknown): string[] | null {
+  if (!Array.isArray(value) || !value.every((id) => typeof id === "string")) return null;
+  return [...new Set((value as string[]).map((id) => id.trim()).filter(Boolean))];
+}
+
 /** The order a PUT asks for: strings only, trimmed, first occurrence kept. Null when the body is not one. */
 export function parseQueueOrder(body: unknown): string[] | null {
-  const ids = (body as { taskIds?: unknown } | null)?.taskIds;
-  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) return null;
-  return [...new Set((ids as string[]).map((id) => id.trim()).filter(Boolean))];
+  return idList((body as { taskIds?: unknown } | null)?.taskIds);
+}
+
+/**
+ * The order the client last saw (`base`), parsed like the order; undefined when
+ * the body carries none, null when it carries one that is not a list of ids.
+ */
+export function parseQueueBase(body: unknown): string[] | null | undefined {
+  const base = (body as { base?: unknown } | null)?.base;
+  return base === undefined ? undefined : idList(base);
 }
 
 function describe(ctx: ServerContext, items: readonly QueueFileItem[]): QueueItemWire[] {
@@ -113,7 +129,20 @@ export async function handleHenchQueueRoute(req: IncomingMessage, res: ServerRes
       errorResponse(res, 400, `The run queue holds at most ${RUN_QUEUE_MAX} items`);
       return true;
     }
-    const added = new Map(readQueueFile(file).map((item) => [item.taskId, item.addedAt]));
+    const base = parseQueueBase(body);
+    if (base === null) {
+      errorResponse(res, 400, "Expected base to be a list of task ids");
+      return true;
+    }
+    const current = readQueueFile(file);
+    if (base && JSON.stringify(current.map((item) => item.taskId)) !== JSON.stringify(base)) {
+      jsonResponse(res, 409, {
+        error: "The run queue changed since it was read",
+        items: describe(ctx, current),
+      });
+      return true;
+    }
+    const added = new Map(current.map((item) => [item.taskId, item.addedAt]));
     const now = new Date().toISOString();
     const items = order.map((taskId) => ({ taskId, addedAt: added.get(taskId) || now }));
     try {

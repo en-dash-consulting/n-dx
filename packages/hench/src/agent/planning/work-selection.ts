@@ -130,6 +130,17 @@ export function v2RefPriority(tree: V2Tree, ref: string): PRDItem["priority"] {
   return unit ? (unit.node.priority ?? unit.change.priority) : undefined;
 }
 
+/** `--task` named nothing in the PRD. Typed so the run queue can tell a gone item from a passing refusal. */
+export class TaskNotFoundError extends Error {
+  readonly taskId: string;
+
+  constructor(taskId: string) {
+    super(`Task not found: ${taskId}`);
+    this.name = "TaskNotFoundError";
+    this.taskId = taskId;
+  }
+}
+
 /** `--task` named a change whose open tasks are all claimed elsewhere, blocked or not actionable. */
 export class ChangeTasksUnavailableError extends CLIError {
   /** Every open task is claimed by another worktree. */
@@ -209,7 +220,7 @@ export function resolveV2Entry(
   if (found) return found;
   const unavailable = changeTasksRefusal(tree, ref, foreign, cliName);
   if (unavailable) throw unavailable;
-  throw notRunnableRefusal(tree, items, ref) ?? new Error(`Task not found: ${ref}`);
+  throw notRunnableRefusal(tree, items, ref) ?? new TaskNotFoundError(ref);
 }
 
 /**

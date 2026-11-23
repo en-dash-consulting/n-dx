@@ -169,7 +169,8 @@ function ReadyList({ navigateTo, estimates, me, areaOf }: ReadyListProps & { are
     estimates,
     split: { me, areaOf },
     queue: { has: (id) => queued.has(id), add: (id) => void addToRunQueue(id) },
-    onPrepare: (taskId: string) => navigateTo("work", { taskId }),
+    // Ready to run is on Tune: Prepare opens over Tune and closes back to it.
+    onPrepare: (taskId: string) => navigateTo("tune", { taskId }),
     onOpenLive: (taskId: string) => navigateTo("live-task", { taskId }),
     onOpenPrd: () => navigateTo("prd"),
   });

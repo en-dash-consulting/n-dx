@@ -90,6 +90,21 @@ describe("the run queue routes", () => {
     expect(readQueueFile(queueFile())).toEqual([]);
   });
 
+  it("refuses a save made over a stale order with 409 and the queue as it stands, writing nothing", async () => {
+    await call("PUT", { taskIds: ["t1", "t2"] });
+    // ndx work took t1 after this client read [t1, t2].
+    await call("PUT", { taskIds: ["t2"], base: ["t1", "t2"] });
+    const stale = await call("PUT", { taskIds: ["t1"], base: ["t1", "t2"] });
+    expect(stale.status).toBe(409);
+    expect(stale.body.items.map((i: { taskId: string }) => i.taskId)).toEqual(["t2"]);
+    expect(readQueueFile(queueFile()).map((i) => i.taskId)).toEqual(["t2"]);
+    // A save over the order as it stands goes through.
+    const fresh = await call("PUT", { taskIds: ["t2", "t1"], base: ["t2"] });
+    expect(fresh.status).toBe(200);
+    expect(readQueueFile(queueFile()).map((i) => i.taskId)).toEqual(["t2", "t1"]);
+    expect((await call("PUT", { taskIds: [], base: "t2" })).status).toBe(400);
+  });
+
   it("parses an order by trimming, dropping blanks and keeping the first of each id", () => {
     expect(parseQueueOrder({ taskIds: [" a ", "b", "a", ""] })).toEqual(["a", "b"]);
     expect(parseQueueOrder({})).toBeNull();

@@ -167,6 +167,19 @@ describe("How work moves", () => {
     expect(stage("inbox").querySelector(".plan-flow-stage-sub")?.textContent).toBe("Your ideas & bugs");
   });
 
+  it("says so when its counts cannot be read, and still focuses the page", async () => {
+    const inner = fetchSpy.getMockImplementation() as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input) === "/api/rex/changes"
+        ? { ok: false, status: 500, json: async () => ({ error: "boom" }) } as Response
+        : inner(input, init)));
+    await mountFlowAndAreas();
+    expect(root.querySelector(".plan-flow-error")?.textContent).toBe("Could not read the Inbox count: boom");
+    expect(count("inbox")).toBe("…");
+    act(() => { stage("in-progress").click(); });
+    expect(boxIds("checkout")).toEqual(["bo-working"]);
+  });
+
   it("counts follow For me, the Inbox's included", async () => {
     await mountFlowAndAreas();
     act(() => { root.querySelector<HTMLButtonElement>('.plan-seg[data-scope="me"]')!.click(); });

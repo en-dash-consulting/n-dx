@@ -247,27 +247,36 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
   }
 }
 
+/**
+ * A Work page (Now at `/work`, Tune at `/tune`) with the Prepare task modal
+ * open over it while the route names a task; closing returns to the same page.
+ */
+function withPrepare(route: "work" | "tune", page: ViewRenderer): ViewRenderer {
+  return (ctx) => h(Fragment, null,
+    page(ctx),
+    ctx.selectedTaskId
+      ? h(PrepareTaskModal, {
+          key: ctx.selectedTaskId,
+          taskId: ctx.selectedTaskId,
+          onClose: () => ctx.navigateTo(route),
+          onOpenLive: (taskId: string) => ctx.navigateTo("live-task", { taskId }),
+        })
+      : null,
+  );
+}
+
 const REGISTRY: Record<string, ViewRenderer> = {
   "home": (ctx) =>
     h(HomeView, { validViews: validViewsOf(ctx), navigateTo: ctx.navigateTo }),
 
   "analyze": stage("analyze"),
   "plan": stage("plan"),
-  // Work's Tune mode: the Work page, opened on Tune.
-  "tune": stage("work", "tune"),
+  // Work's Tune mode: the Work page, opened on Tune. `/tune/prep/<taskId>` opens
+  // the Prepare task modal over it (Ready to run is on Tune), closing to `/tune`.
+  "tune": withPrepare("tune", stage("work", "tune")),
   // `/work/prep/<taskId>` is the Work page with the Prepare task modal open
   // over it; closing returns to `/work`, a start hands off to Live.
-  "work": (ctx) => h(Fragment, null,
-    stage("work")(ctx),
-    ctx.selectedTaskId
-      ? h(PrepareTaskModal, {
-          key: ctx.selectedTaskId,
-          taskId: ctx.selectedTaskId,
-          onClose: () => ctx.navigateTo("work"),
-          onOpenLive: (taskId: string) => ctx.navigateTo("live-task", { taskId }),
-        })
-      : null,
-  ),
+  "work": withPrepare("work", stage("work")),
 
   // A Settings page: the worktree list behind a dropdown that expands it.
   "workspaces": ({ attachWorktree, attachedWorktree }) =>

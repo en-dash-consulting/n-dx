@@ -1929,6 +1929,7 @@ button.wn-run-title:focus-visible { outline: 2px solid var(--accent); outline-of
 .plan-flow-stage--on .plan-flow-stage-count { color: var(--accent); }
 .plan-flow-stage-sub { color: var(--text-dim); font-size: 12px; }
 .plan-flow-arrow { flex: none; align-self: center; color: var(--text-dim); font-size: var(--font-md); }
+.plan-flow-error { margin: 0; color: var(--red); font-size: var(--font-base); }
 .plan-areas-hint { color: var(--text-dim); font-size: var(--font-base); }
 .plan-inbox-stage-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 .plan-show-all { all: unset; cursor: pointer; color: var(--accent); font-size: var(--font-base); }

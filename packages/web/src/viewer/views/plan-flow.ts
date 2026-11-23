@@ -47,5 +47,11 @@ export function PlanFlow() {
         ...stageCounts(filterForView(summary.data.open, { ...view, stage: null }, me)),
       }
     : null;
-  return h(HowWorkMoves, { counts });
+  // A failed read says so; the stages still focus the page without their counts.
+  const error = summary.state === "error"
+    ? `Could not read the stage counts: ${summary.message}`
+    : changes.state === "error"
+      ? `Could not read the Inbox count: ${changes.message}`
+      : null;
+  return h(HowWorkMoves, { counts, error });
 }

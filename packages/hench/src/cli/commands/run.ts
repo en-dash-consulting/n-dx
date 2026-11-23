@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock, prdLayout } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
-import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry } from "../../agent/planning/brief.js";
+import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry, TaskNotActionableError } from "../../agent/planning/brief.js";
 import type { EscalationConfig, PermissionMode, RunEscalation, RunLoopPosition, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
@@ -33,7 +33,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
-import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, v2RefPriority, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
+import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, TaskNotFoundError, v2RefPriority, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -44,8 +44,7 @@ import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failur
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
-import { takeFromRunQueue } from "../../queue/run-queue.js";
-import { TaskClaimedElsewhereError } from "../../process/task-claims.js";
+import { readRunQueue, takeFromRunQueue } from "../../queue/run-queue.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { section, detail, formatDuration } from "../../types/output.js";
@@ -1561,13 +1560,17 @@ async function runOne(
   // The planned run queue (the dashboard's Queue panel) steers plain
   // autoselection: its first item that can run goes next, before rex's own
   // pick. A filter the person asked for (--task, --epic, --tags, --mine) wins
-  // over it. Each item is taken as an explicit --task would be, so a blocked,
-  // finished or missing one is refused and dropped, and one another worktree
-  // holds is passed over and kept.
-  if (!taskId && !epicId && !tags?.length && !assignee) {
+  // over it. Each item is taken as an explicit --task would be. Only a final
+  // refusal takes an item off: one that is finished (or otherwise not
+  // actionable) or no longer in the PRD. One that is blocked, still in the
+  // Inbox or held by another worktree may run later, so it is passed over and
+  // kept. The PRD is read once, before the queue is touched: a read that fails
+  // throws here, as rex's own pick would, and leaves the queue as it was.
+  if (!taskId && !epicId && !tags?.length && !assignee && (await readRunQueue(henchDir)).length > 0) {
+    const queueItems = (await store.loadDocument()).items;
     const queued = await takeFromRunQueue(
       henchDir,
-      async (id) => selectTaskEntry((await store.loadDocument()).items, {
+      async (id) => selectTaskEntry(queueItems, {
         ...(selectionTree ? { tree: selectionTree } : {}),
         taskId: id,
         requireUnblocked: true,
@@ -1576,12 +1579,13 @@ async function runOne(
       }),
       {
         dryRun,
-        keep: (_id, err) => err instanceof TaskClaimedElsewhereError,
+        final: (_id, err) => err instanceof TaskNotActionableError || err instanceof TaskNotFoundError,
         ...(excludeTaskIds ? { skip: excludeTaskIds } : {}),
       },
     );
     for (const skip of queued.skipped) {
-      info(`Run queue: passed over ${skip.taskId} (${skip.reason})${skip.dropped ? " and took it off the queue" : ""}.`);
+      const off = skip.dropped ? (dryRun ? " and would take it off the queue" : " and took it off the queue") : "";
+      info(`Run queue: passed over ${skip.taskId} (${skip.reason})${off}.`);
     }
     if (queued.picked) {
       info(`Run queue: running ${queued.picked.taskId}, next in the queue.`);

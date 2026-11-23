@@ -38,14 +38,14 @@ describe("the run queue file", () => {
 describe("taking from the queue", () => {
   it("takes the first item that can run, drops the ones that never will, and keeps the passing ones", async () => {
     await writeRunQueue(dir, [item("done"), item("claimed"), item("stuck"), item("go"), item("later")]);
-    class Claimed extends Error {}
+    class Finished extends Error {}
     const tried: string[] = [];
     const result = await takeFromRunQueue(dir, async (id) => {
       tried.push(id);
-      if (id === "done") throw new Error("already completed");
-      if (id === "claimed") throw new Claimed("claimed by another worktree");
+      if (id === "done") throw new Finished("already completed");
+      if (id === "claimed") throw new Error("claimed by another worktree");
       return { id };
-    }, { keep: (_id, err) => err instanceof Claimed, skip: new Set(["stuck"]) });
+    }, { final: (_id, err) => err instanceof Finished, skip: new Set(["stuck"]) });
 
     expect(result.picked).toEqual({ taskId: "go", value: { id: "go" } });
     expect(tried).toEqual(["done", "claimed", "go"]);
@@ -58,12 +58,20 @@ describe("taking from the queue", () => {
     expect((await readRunQueue(dir)).map((i) => i.taskId)).toEqual(["claimed", "stuck", "later"]);
   });
 
+  it("keeps every item when no refusal is final, so a bad read never empties the queue", async () => {
+    await writeRunQueue(dir, [item("a"), item("b")]);
+    const result = await takeFromRunQueue(dir, async () => { throw new Error("EBUSY: the PRD is being written"); });
+    expect(result.picked).toBeNull();
+    expect(result.skipped.every((s) => !s.dropped)).toBe(true);
+    expect((await readRunQueue(dir)).map((i) => i.taskId)).toEqual(["a", "b"]);
+  });
+
   it("changes nothing on a dry run", async () => {
     await writeRunQueue(dir, [item("done"), item("go")]);
     const result = await takeFromRunQueue(dir, async (id) => {
       if (id === "done") throw new Error("completed");
       return id;
-    }, { dryRun: true });
+    }, { dryRun: true, final: () => true });
     expect(result.picked?.taskId).toBe("go");
     expect((await readRunQueue(dir)).map((i) => i.taskId)).toEqual(["done", "go"]);
   });

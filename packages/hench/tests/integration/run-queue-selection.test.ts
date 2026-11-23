@@ -28,6 +28,7 @@ const DOC = {
         { id: "t-first", title: "Rex picks this first", level: "task" as const, status: "pending" as const, priority: "critical" as const },
         { id: "t-queued", title: "The queued task", level: "task" as const, status: "pending" as const, priority: "low" as const },
         { id: "t-done", title: "Already done", level: "task" as const, status: "completed" as const },
+        { id: "t-blocked", title: "Waits on the first", level: "task" as const, status: "pending" as const, blockedBy: ["t-first"] },
       ],
     },
   ],
@@ -77,6 +78,19 @@ describe("the planned run queue", () => {
     expect(out).not.toContain("ID: t-first");
     // A dry run takes nothing off the queue.
     expect((await readRunQueue(henchDir)).map((i) => i.taskId)).toEqual(["t-done", "t-queued"]);
+  });
+
+  it("marks a finished or missing item for removal, and keeps a blocked one for later", async () => {
+    await writeRunQueue(henchDir, [queued("t-blocked"), queued("t-done"), queued("t-gone"), queued("t-queued")]);
+    const out = await dryRun();
+    const line = (id: string) => out.split("\n").find((l) => l.includes(`passed over ${id} `)) ?? "";
+    expect(line("t-blocked")).not.toBe("");
+    expect(line("t-blocked")).not.toContain("off the queue");
+    // A dry run only says what a real run would take off.
+    expect(line("t-done")).toContain("would take it off the queue");
+    expect(line("t-gone")).toContain("Task not found: t-gone");
+    expect(line("t-gone")).toContain("would take it off the queue");
+    expect(out).toContain("Run queue: running t-queued");
   });
 
   it("falls back to rex's own pick with an empty queue", async () => {

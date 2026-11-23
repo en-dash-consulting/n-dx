@@ -65,7 +65,7 @@ export function ShowAll() {
  * pressing one focuses the areas and the Inbox panel on it, and pressing it
  * again, or Show all, clears the focus.
  */
-export function HowWorkMoves({ counts }: { counts: Readonly<Record<PlanStage, number>> | null }) {
+export function HowWorkMoves({ counts, error }: { counts: Readonly<Record<PlanStage, number>> | null; error?: string | null }) {
   const view = usePlanView();
   const solo = view.mode === "solo";
   return h("div", { class: "plan-flow" },
@@ -97,5 +97,6 @@ export function HowWorkMoves({ counts }: { counts: Readonly<Record<PlanStage, nu
         );
       }),
     ),
+    error ? h("p", { class: "plan-flow-error", role: "alert" }, error) : null,
   );
 }

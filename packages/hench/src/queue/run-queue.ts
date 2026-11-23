@@ -78,14 +78,17 @@ export interface QueueSkip {
 /**
  * The first queued item `tryItem` accepts, trying them in order. `tryItem`
  * resolves the item to what would run (and claims it), or throws why it
- * cannot; `keep` says whether that failure is passing (claimed by another
- * worktree, skipped as stuck) rather than final. A final failure takes the
- * item off the queue. The accepted item is taken off too, unless `dryRun`.
+ * cannot; `final` says whether that failure means the item will never run as
+ * it stands (finished, gone). Only a final failure takes the item off the
+ * queue: any other (blocked, claimed elsewhere, an error reading the PRD) is
+ * passing, and the item waits, so the queue is never lost to a bad moment.
+ * Items in `skip` (stuck) are passed over and kept. The accepted item is taken
+ * off too, unless `dryRun`.
  */
 export async function takeFromRunQueue<T>(
   henchDir: string,
   tryItem: (taskId: string) => Promise<T>,
-  options: { dryRun?: boolean; keep?: (taskId: string, err: unknown) => boolean; skip?: ReadonlySet<string> } = {},
+  options: { dryRun?: boolean; final?: (taskId: string, err: unknown) => boolean; skip?: ReadonlySet<string> } = {},
 ): Promise<{ picked: { taskId: string; value: T } | null; skipped: QueueSkip[] }> {
   const items = await readRunQueue(henchDir);
   const skipped: QueueSkip[] = [];
@@ -99,7 +102,7 @@ export async function takeFromRunQueue<T>(
       picked = { taskId, value: await tryItem(taskId) };
       break;
     } catch (err) {
-      const dropped = !(options.keep?.(taskId, err) ?? false);
+      const dropped = options.final?.(taskId, err) ?? false;
       skipped.push({ taskId, reason: err instanceof Error ? err.message : String(err), dropped });
     }
   }

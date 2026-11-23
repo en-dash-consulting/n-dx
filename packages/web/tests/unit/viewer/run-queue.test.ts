@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { RunQueuePanel, _resetRunQueueForTests } from "../../../src/viewer/views/run-queue.js";
+import { QUEUE_CHANGED_NOTE, RunQueuePanel, _resetRunQueueForTests, addToRunQueue } from "../../../src/viewer/views/run-queue.js";
 import { ReadyToRun } from "../../../src/viewer/components/ready-to-run.js";
 
 interface Item { taskId: string; addedAt: string; title?: string; status?: string; priority?: string | null; missing?: true }
@@ -107,6 +107,45 @@ describe("the Queue panel", () => {
     await act(async () => { root.querySelector<HTMLButtonElement>('[aria-label="Remove gone from the queue"]')!.click(); });
     await flush(2);
     expect(root.querySelector(".rq-note")?.textContent).toContain("Nothing queued.");
+  });
+});
+
+describe("saving safely", () => {
+  it("sends the order it last read as the base", async () => {
+    const bodies: unknown[] = [];
+    const inner = fetch as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") bodies.push(JSON.parse(String(init.body)));
+      return inner(input, init);
+    }));
+    await addToRunQueue("r1");
+    expect(bodies).toEqual([{ taskIds: ["a", "b", "c", "r1"], base: ["a", "b", "c"] }]);
+  });
+
+  it("never replaces the queue when it could not be read", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") puts.push(["unexpected"]);
+      return { ok: false, status: 500, json: async () => ({ error: "boom" }) } as Response;
+    }));
+    expect(await addToRunQueue("r1")).toBe(false);
+    expect(puts).toEqual([]);
+    await act(async () => { render(h(RunQueuePanel, { navigateTo: vi.fn() }), root); });
+    await flush();
+    expect(root.querySelector(".rq-error")?.textContent).toContain("Could not read the run queue");
+    expect(root.querySelector(".rq-note")?.textContent ?? "").not.toContain("Nothing queued");
+  });
+
+  it("shows the queue as it stands, with a note, when a save is refused as stale", async () => {
+    await act(async () => { render(h(RunQueuePanel, { navigateTo: vi.fn() }), root); });
+    await flush();
+    vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === "PUT"
+        ? { ok: false, status: 409, json: async () => ({ error: "changed", items: [item("b"), item("c")] }) } as Response
+        : { ok: true, status: 200, json: async () => ({ items: [item("b"), item("c")] }) } as Response));
+    await act(async () => { root.querySelector<HTMLButtonElement>('[aria-label="Remove Task c from the queue"]')!.click(); });
+    await flush(2);
+    expect(rows()).toEqual(["b", "c"]);
+    expect(root.querySelector(".rq-error")?.textContent).toBe(QUEUE_CHANGED_NOTE);
   });
 });
 

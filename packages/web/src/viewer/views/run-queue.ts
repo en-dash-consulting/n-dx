@@ -7,6 +7,12 @@
  * Preparation) and Ready to run's "Add to queue". It reads again when a run
  * starts or ends, since a run takes its item off the queue.
  *
+ * Every change is made to the queue as last read and saved with that order as
+ * its `base`; the server refuses a save whose base is stale (another window,
+ * or `ndx work` taking an item) and answers with the queue as it stands,
+ * which the store then shows. A queue that could not be read is unknown, not
+ * empty: nothing is changed until it has been read.
+ *
  * @module viewer/views/run-queue
  */
 
@@ -48,7 +54,8 @@ export function refreshRunQueue(): Promise<void> {
       const body = await res.json() as { items?: QueueItem[] };
       publish({ items: Array.isArray(body.items) ? body.items : [], error: null });
     } catch (err) {
-      publish({ items: state.items ?? [], error: `Could not read the run queue: ${err instanceof Error ? err.message : String(err)}` });
+      // The queue stays unknown (or as last read): an empty list here would let the next add replace it.
+      publish({ items: state.items, error: `Could not read the run queue: ${err instanceof Error ? err.message : String(err)}` });
     } finally {
       inflight = null;
     }
@@ -56,15 +63,22 @@ export function refreshRunQueue(): Promise<void> {
   return inflight;
 }
 
-/** Save `taskIds` as the queue's order; the answer is the queue as saved. */
-export async function saveRunQueue(taskIds: readonly string[]): Promise<boolean> {
+/** The note shown when a save was refused because the queue had changed. */
+export const QUEUE_CHANGED_NOTE = "The run queue changed while you were editing it (another window, or a run took an item). Here it is now; try again.";
+
+/** Save `taskIds` as the queue's order over `base`, the order last read; the answer is the queue as saved. */
+export async function saveRunQueue(taskIds: readonly string[], base: readonly string[]): Promise<boolean> {
   try {
     const res = await fetch("/api/hench/queue", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskIds }),
+      body: JSON.stringify({ taskIds, base }),
     });
     const body = await res.json().catch(() => null) as { items?: QueueItem[]; error?: string } | null;
+    if (res.status === 409 && Array.isArray(body?.items)) {
+      publish({ items: body!.items!, error: QUEUE_CHANGED_NOTE });
+      return false;
+    }
     if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
     publish({ items: Array.isArray(body?.items) ? body!.items! : [], error: null });
     return true;
@@ -74,24 +88,36 @@ export async function saveRunQueue(taskIds: readonly string[]): Promise<boolean>
   }
 }
 
-const ids = () => (state.items ?? []).map((i) => i.taskId);
+/**
+ * Change the queue: `next` turns the order as last read into the new one (null
+ * for no change). Reads the queue first when it is not known yet, and changes
+ * nothing when it still cannot be read.
+ */
+async function changeRunQueue(next: (order: string[]) => string[] | null): Promise<boolean> {
+  if (state.items === null) await refreshRunQueue();
+  if (state.items === null) return false;
+  const base = state.items.map((i) => i.taskId);
+  const order = next([...base]);
+  return order === null ? true : saveRunQueue(order, base);
+}
 
 /** Put a task at the end of the queue (no-op when it is already on it). */
 export function addToRunQueue(taskId: string): Promise<boolean> {
-  return ids().includes(taskId) ? Promise.resolve(true) : saveRunQueue([...ids(), taskId]);
+  return changeRunQueue((order) => (order.includes(taskId) ? null : [...order, taskId]));
 }
 
 /** Move the item at `index` up (-1) or down (+1). */
 export function moveInRunQueue(index: number, by: -1 | 1): Promise<boolean> {
-  const order = ids();
-  const to = index + by;
-  if (to < 0 || to >= order.length) return Promise.resolve(true);
-  [order[index], order[to]] = [order[to]!, order[index]!];
-  return saveRunQueue(order);
+  return changeRunQueue((order) => {
+    const to = index + by;
+    if (to < 0 || to >= order.length) return null;
+    [order[index], order[to]] = [order[to]!, order[index]!];
+    return order;
+  });
 }
 
 export function removeFromRunQueue(taskId: string): Promise<boolean> {
-  return saveRunQueue(ids().filter((id) => id !== taskId));
+  return changeRunQueue((order) => (order.includes(taskId) ? order.filter((id) => id !== taskId) : null));
 }
 
 /** The queue, read once per page and kept current across its panels. */
@@ -165,7 +191,7 @@ export function RunQueuePanel({ navigateTo }: { navigateTo: NavigateTo }) {
     h("p", { class: "rq-intro" }, "The agent runs these next, top first, before its own pick."),
     error ? h("p", { class: "rq-error", role: "alert" }, error) : null,
     items === null
-      ? h("p", { class: "rq-note", role: "status" }, "Loading…")
+      ? (error ? null : h("p", { class: "rq-note", role: "status" }, "Loading…"))
       : items.length === 0
         ? h("p", { class: "rq-note" }, "Nothing queued. Add a ready task here, or from Ready to run on Work › Tune.")
         : h("ol", { class: "rq-list", "aria-label": "Run queue" },
