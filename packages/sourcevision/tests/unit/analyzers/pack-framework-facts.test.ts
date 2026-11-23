@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import type { OutboundCallFact, RouteFact } from "@n-dx/lang-kit";
 import {
+  packEntryPointSignals,
   packOutboundDependencies,
   packRouteGroups,
   withPackOutbound,
@@ -147,5 +148,52 @@ describe("withPackOutbound", () => {
     const merged = withPackOutbound(data, inventory({ "m/C.java": "source" }), [{ path: "m/C.java", outboundCalls: [call(4)] }]);
     expect(merged.dependencies.map((d) => d.file)).toEqual(["a.ts", "m/C.java", "z.ts"]);
     expect(merged.contracts).toEqual(data.contracts);
+  });
+});
+
+describe("packEntryPointSignals", () => {
+  it("gives one entrypoint signal per fact, a cron job's schedule in its detail", () => {
+    const signals = packEntryPointSignals([
+      { path: "a.php", routes: [route("/a")] },
+      {
+        path: "bin/x.php",
+        entryPoints: [
+          { kind: "cli", source: "shebang", position: at(1) },
+          { kind: "cron", source: "crontab:3", schedule: "*/5 * * * *", position: at(1) },
+        ],
+      },
+    ]);
+    expect([...signals]).toEqual([
+      [
+        "bin/x.php",
+        [
+          { archetypeId: "entrypoint", detail: "cli entry point: shebang (line 1)", weight: 1 },
+          { archetypeId: "entrypoint", detail: "cron entry point: */5 * * * * (crontab:3)", weight: 1 },
+        ],
+      ],
+    ]);
+  });
+
+  it("is empty without entry-point facts", () => {
+    expect(packEntryPointSignals(undefined).size).toBe(0);
+    expect(packEntryPointSignals([{ path: "a.php", entryPoints: [] }]).size).toBe(0);
+  });
+});
+
+describe("packRouteGroups and mirror copies", () => {
+  it("leaves out a mirror copy's routes, which its source file already serves", async () => {
+    const { packRouteGroups } = await import("../../../src/analyzers/pack-framework-facts.js");
+    const file = (path: string, mirrorOf?: string) => ({ path, size: 1, language: "PHP", lineCount: 1, hash: path, role: "source" as const, category: "general", ...(mirrorOf ? { mirrorOf } : {}) });
+    const inventory = { files: [file("app/htdocs/a.php"), file("edit/htdocs/a.php", "app/htdocs/a.php"), file("edit/htdocs/b.php")], summary: {} } as never;
+    const route = { method: "GET", path: "/a.php", source: "docroot x", position: { line: 1, column: 0 } };
+    const groups = packRouteGroups(
+      [
+        { path: "app/htdocs/a.php", routes: [route] },
+        { path: "edit/htdocs/a.php", routes: [route] },
+        { path: "edit/htdocs/b.php", routes: [{ ...route, path: "/b.php" }] },
+      ] as never,
+      inventory,
+    );
+    expect(groups.map((g) => g.file)).toEqual(["app/htdocs/a.php", "edit/htdocs/b.php"]);
   });
 });

@@ -1,0 +1,19 @@
+---
+id: "0508bb06-2369-418d-8e8e-f9f34fcee361"
+type: "task"
+title: "Exclude or mark copied-in third-party libraries across sourcevision"
+slug: "exclude-or-mark-copied-in-third-party"
+summary: "Let analysis recognise third-party libraries that were copied into a repository by hand, not installed through a package manager, and keep them out of the system map, so the map shows the application's own code."
+description: "**Problem (real deep run, shape only).** The repository had a copied-in spreadsheet library and an old copied-in JS UI framework (plus charting and editor libraries), none of them under `vendor/` or installed by a manifest. Because analysis treats them as first-party code:\n- one zone held 68% of the files (cohesion 1, coupling 0), mixing framework, library and a mirrored tree, and most of the other 77 zones were small library modules;\n- zone entry points were library files;\n- 2,368 of 3,351 files got no archetype, at a median confidence of 0.00;\n- the escalation pass took 95 model calls and about 19 minutes, against about 35 s for the first-pass classifier, because nearly every batch escalated library files;\n- `project-profile.json` said primaryLanguage `javascript` while the manifest said `php`;\n- readiness's testing evidence was a library test file;\n- `callgraph.json` stayed 33 MB of library JS after the minified exclusion.\n\n**Fix.**\n- **A third-party set** that sourcevision computes once per analysis and every phase honours. It's made of:\n  - existing vendor rules (`vendor/` beside a manifest, and so on);\n  - new configured globs, for example `sourcevision.thirdParty: [\"lib/PHPExcel/**\", \"js/yui/**\"]` in `.n-dx.json`, with a CLI flag to pass extra globs, so a caller like recon can pass its library catalogue through;\n  - built-in fingerprints for common hand-copied libraries, recognised by directory shape plus a version or license header or a `@package` docblock. Fingerprints come from invented or public examples only.\n- **What a third-party file still gets:**\n  - it stays in the inventory, marked third-party, with the reason;\n  - its import edges still resolve, so application code can depend on it.\n- **What a third-party file is left out of:**\n  - zones and zone entry points (a third-party zone may be shown as one collapsed node, if that's simpler);\n  - archetype classification and the model escalation pass;\n  - primary-language detection;\n  - readiness evidence;\n  - the call graph (unless `--include-third-party`);\n  - dynamic-code, legacy-construct and outbound totals, which report library counts separately, so migration numbers describe the application.\n- **Report:** one analyze log line saying how many files were marked third-party, and why.\n\n**Tests:** an invented fixture repo with a small app plus a fake copied-in library under `lib/<Name>/` (with a version header) and a fake JS framework under `js/<name>/`. Assert:\n- the library files are marked third-party;\n- they're not in any zone or entry point;\n- primaryLanguage follows the first-party code;\n- the call graph and totals exclude them;\n- configured globs and the CLI flag work.\n\nTargeted tests only."
+acceptanceCriteria:
+  - "Copied-in libraries found by configured globs, a CLI-passed list or built-in fingerprints are marked third-party in the inventory, with a reason"
+  - "Third-party files are kept out of zones, zone entry points, classification and escalation, primary-language detection, readiness evidence and the call graph by default"
+  - "Migration totals (dynamic code, legacy constructs, outbound) report third-party counts separately from first-party counts"
+  - "Analyze logs how many files were marked third-party, and why"
+priority: "high"
+run: {"tier":"heavy","review":true,"reviewTier":"heavy","skipTestGate":true,"maxTurns":200}
+tags:
+  - "sourcevision"
+  - "lang-php"
+  - "third-party"
+---

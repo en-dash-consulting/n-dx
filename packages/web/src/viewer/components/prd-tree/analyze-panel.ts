@@ -169,7 +169,6 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
         throw new Error(await errorOrHttpStatus(res, "Accept failed"));
       }
 
-      const data = await res.json();
       setAcceptedIndices(new Set([...acceptedIndices, ...selectedIndices]));
 
       // Remove accepted proposals from the list

@@ -4,7 +4,8 @@
   display: inline-flex; align-items: center; padding: 0 var(--space-2);
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   font-size: var(--font-xs); line-height: 1.6; white-space: nowrap;
-  color: var(--text-muted); cursor: help;
+  /* --text-dim: --text-muted fell under 4.5:1 on a tinted card (4.29:1). */
+  color: var(--text-dim); cursor: help;
 }
 .impact-security { color: var(--red); border-color: var(--red); font-weight: 600; }
 .impact-essential { color: var(--purple); border-color: var(--purple); font-weight: 600; }

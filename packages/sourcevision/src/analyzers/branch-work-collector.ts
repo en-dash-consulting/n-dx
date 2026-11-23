@@ -210,6 +210,9 @@ export interface CollectorOptions {
  */
 const REX_STDOUT_MAX_BUFFER = 64 * 1024 * 1024;
 
+// Both spawns pass `logInvocation: false`: rex is not a vendor CLI, and
+// `claude_commands.log` at the root of a scanned project reads as a model call.
+
 /**
  * Read the PRD of a checkout by spawning `rex tree --format=json`.
  *
@@ -224,6 +227,7 @@ export function readPRDViaRex(dir: string): PRDDocumentShape | null {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
       maxBuffer: REX_STDOUT_MAX_BUFFER,
+      logInvocation: false,
     });
     const parsed = JSON.parse(out as string);
     if (!parsed || !Array.isArray(parsed.items)) return null;
@@ -275,6 +279,7 @@ export function diffCompletedViaRex(
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
         maxBuffer: REX_STDOUT_MAX_BUFFER,
+        logInvocation: false,
       },
     );
     const parsed = JSON.parse(out as string) as TreeDiffOutput;

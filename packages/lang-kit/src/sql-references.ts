@@ -10,7 +10,7 @@
  * after FROM, and JPQL paths such as `JOIN o.pets`. Bracket-quoted names
  * (`[dbo].[t]`) and dollar-quoted strings are not read.
  *
- * Pure text, so every pack that reads embedded SQL (Java, Go) shares it
+ * Pure text, so every pack that reads embedded SQL (Java, Go, PHP) shares it
  * without depending on another pack.
  *
  * @module lang-kit/sql-references

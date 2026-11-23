@@ -1,0 +1,91 @@
+schema: "rex/v2"
+items:
+  "01376afa-1f03-4da1-b42e-2baef55d2c9b":
+    status: "completed"
+    startedAt: "2026-11-17T02:13:56.196Z"
+    completedAt: "2026-11-17T02:13:56.196Z"
+    endedAt: "2026-11-17T02:13:56.196Z"
+    activeIntervals: [{"end":"2026-11-17T02:13:56.196Z","start":"2026-11-17T02:13:56.196Z"}]
+    appliedAt: "2026-11-17T02:13:56.196Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-17T00:10:50.148Z"
+    lastModified: "2026-11-17T02:13:56.196Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0db6172b-4827-4226-98b5-60ca5841656c":
+    status: "completed"
+    startedAt: "2026-11-17T01:07:12.108Z"
+    completedAt: "2026-11-17T01:17:37.890Z"
+    endedAt: "2026-11-17T01:17:37.890Z"
+    activeIntervals: [{"end":"2026-11-17T01:17:37.890Z","start":"2026-11-17T01:07:12.108Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Minified files (name or long line in first 64 KiB) get role generated; call graph and components skip generated/asset; --include-minified re-admits minified files to the call graph; log line counts those left out; docs say callgraph.json is JS/TS only."
+    lastModified: "2026-11-17T01:17:37.890Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4e33c0c3-8233-4480-92eb-d1d74a089ed8":
+    status: "completed"
+    startedAt: "2026-11-17T00:25:14.370Z"
+    completedAt: "2026-11-17T00:39:08.167Z"
+    endedAt: "2026-11-17T00:39:08.167Z"
+    activeIntervals: [{"end":"2026-11-17T00:39:08.167Z","start":"2026-11-17T00:25:14.370Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx init --no-llm: no auth preflight (config --no-preflight), no claude lookup in MCP registration (noVendorCli), no update check, no prompts, static path only; vendor optional; summary line + one skip notice; help, docs, command-effects, changeset; e2e tests with fake vendors and a fetch recorder."
+    lastModified: "2026-11-17T00:39:08.167Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7bb107a8-6831-44c8-9dc8-4a1cc51ffa70":
+    status: "completed"
+    startedAt: "2026-11-17T00:14:28.098Z"
+    completedAt: "2026-11-17T00:23:58.070Z"
+    endedAt: "2026-11-17T00:23:58.070Z"
+    activeIntervals: [{"end":"2026-11-17T00:23:58.070Z","start":"2026-11-17T00:14:28.098Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Static-only switch in sourcevision's LLM bridge set from --fast (no judgment route, callClaude refused); rex/ps spawns pass logInvocation: false so no claude_commands.log; help/docs updated."
+    lastModified: "2026-11-17T00:23:58.070Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7ffab98a-95f7-4d90-86df-e3aad31a3a3c":
+    status: "completed"
+    startedAt: "2026-11-17T01:41:56.432Z"
+    completedAt: "2026-11-17T01:51:07.006Z"
+    endedAt: "2026-11-17T01:51:07.006Z"
+    activeIntervals: [{"end":"2026-11-17T01:51:07.006Z","start":"2026-11-17T01:41:56.432Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit PackParseReport on PackProjectResult.parse; lang-runtime createPackEntry classifies syntax-error/oversized/unreadable/non-UTF-8 files; sourcevision writes imports.json summary.parseIssues (absent when clean) and one [<pack>-parse] notice."
+    lastModified: "2026-11-17T01:51:07.006Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "845a96b6-0a33-4fe6-96fb-03a9a6369299":
+    status: "completed"
+    startedAt: "2026-11-17T02:05:02.701Z"
+    completedAt: "2026-11-17T02:13:56.196Z"
+    endedAt: "2026-11-17T02:13:56.196Z"
+    activeIntervals: [{"end":"2026-11-17T02:13:56.196Z","start":"2026-11-17T02:05:02.701Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Invented fixture packages/sourcevision/tests/fixtures/php-legacy-estate (19 KB; non-UTF-8 files written by the test) + e2e tests/e2e/cli-legacy-php-estate.test.ts running ndx init --no-llm then ndx analyze --fast through core with fake vendors, TypeSafe key and fetch recorder. Test found ndx analyze --fast still ran the npm update check; core now skips it for analyze --fast (help, docs, changeset)."
+    lastModified: "2026-11-17T02:13:56.196Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8480df4a-5852-49f0-a6bf-7a8cc5532364":
+    status: "completed"
+    startedAt: "2026-11-17T01:30:13.872Z"
+    completedAt: "2026-11-17T01:40:37.949Z"
+    endedAt: "2026-11-17T01:40:37.949Z"
+    activeIntervals: [{"end":"2026-11-17T01:40:37.949Z","start":"2026-11-17T01:30:13.872Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sourcevision redacts URL userinfo, secret query values and DSN passwords in every artifact via util/redact-literals.ts (toCanonicalJSON + CONTEXT.md/llms.txt/zone context.md)."
+    lastModified: "2026-11-17T01:40:37.949Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e8389da6-6103-4c66-9144-c21e3e98a55f":
+    status: "completed"
+    startedAt: "2026-11-17T01:52:34.522Z"
+    completedAt: "2026-11-17T02:04:30.330Z"
+    endedAt: "2026-11-17T02:04:30.330Z"
+    activeIntervals: [{"end":"2026-11-17T02:04:30.330Z","start":"2026-11-17T01:52:34.522Z"}]
+    lastModified: "2026-11-17T02:04:30.330Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f9173794-5641-4098-b703-826467da5886":
+    status: "completed"
+    startedAt: "2026-11-17T00:41:17.950Z"
+    completedAt: "2026-11-17T01:03:25.128Z"
+    endedAt: "2026-11-17T01:03:25.128Z"
+    activeIntervals: [{"end":"2026-11-17T01:03:25.128Z","start":"2026-11-17T00:41:17.950Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "findSubSvDirs skips symlinked dirs (lstat) and symlinked analysis dirs; detectSubAnalyses (shared by --deep) refuses candidates whose dir or analysis realpath is outside the root realpath. IaC, contract, go.mod and Java root walks read regular files only. Integration + lang-kit tests, red before."
+    lastModified: "2026-11-17T01:03:25.128Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

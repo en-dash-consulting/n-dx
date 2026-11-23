@@ -111,9 +111,12 @@ const MCP_TOOLS = new Set(
 /** First words of real tool names; a snake_case token starting with one is a tool reference. */
 const TOOL_VERBS = new Set([...MCP_TOOLS].filter((t) => t.includes("_")).map((t) => t.split("_")[0]));
 
-/** snake_case MCP tool references, with any `mcp__<server>__` prefix removed. */
+/**
+ * snake_case MCP tool references, with any `mcp__<server>__` prefix removed.
+ * A name written as a call (`get_headers()`) is a language's function, not a tool.
+ */
 export function mcpToolRefs(chunk) {
-  return [...chunk.matchAll(/\b(?:mcp__[a-z]+__)?([a-z]+(?:_[a-z]+)+)\b/g)]
+  return [...chunk.matchAll(/\b(?:mcp__[a-z]+__)?([a-z]+(?:_[a-z]+)+)\b(?!\()/g)]
     .map((m) => m[1])
     .filter((name) => TOOL_VERBS.has(name.split("_")[0]));
 }
@@ -151,6 +154,10 @@ describe("docs reference parsing", () => {
       "get_product",
       "place_changes",
     ]);
+  });
+
+  it("reads a name written as a call as a function, not a tool", () => {
+    expect(mcpToolRefs("`get_headers()` and `$wpdb->get_var()` and `get_next_task`")).toEqual(["get_next_task"]);
   });
 });
 

@@ -232,6 +232,8 @@ function findIaCFiles(root: string, limit = 400): { terraform: string[]; yaml: s
         walk(full, depth + 1);
         continue;
       }
+      // A symlink is never read: its target may be outside the project.
+      if (!entry.isFile()) continue;
       const ext = extname(entry.name);
       const path = relative(root, full).split(sep).join("/");
       if (ext === ".tf" && terraform.length < limit) terraform.push(path);

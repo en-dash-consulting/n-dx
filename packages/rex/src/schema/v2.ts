@@ -214,7 +214,6 @@ export interface Criterion {
 export const CriterionSchema = z.object({ id: z.string().min(1), text: z.string() }).passthrough();
 
 export type AmendmentDelta = "added" | "modified" | "removed";
-export const AMENDMENT_DELTAS: ReadonlySet<AmendmentDelta> = new Set<AmendmentDelta>(["added", "modified", "removed"]);
 
 /** Criterion-level edits an amendment applies to its target. */
 export interface CriteriaDelta {
@@ -652,14 +651,6 @@ export const StateFileSchema = z
   .passthrough();
 
 /** Root `index.md` frontmatter of the product layer: project title, stamp, project-wide requirements, stewards. */
-export interface RootHeader {
-  title: string;
-  schema: string;
-  requirements?: Requirement[];
-  stewards?: Steward[];
-  [key: string]: unknown;
-}
-
 export const RootHeaderSchema = z
   .object({
     title: z.string(),
