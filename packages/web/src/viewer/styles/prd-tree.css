@@ -1908,6 +1908,13 @@ a.tracker-link {
   color: var(--orange);
 }
 
+/* Amends chosen with nothing edited: what Place is waiting for. */
+.cp-amends-hint {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--orange);
+}
+
 .cp-shortlist-error,
 .cp-refusal {
   font-size: var(--font-sm);

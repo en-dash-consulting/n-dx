@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "eee4b5b6-030d-4ed3-a8c7-49cc9a75b7a2":
+    status: "completed"
+    startedAt: "2026-10-15T03:51:29.343Z"
+    completedAt: "2026-10-15T03:55:14.310Z"
+    endedAt: "2026-10-15T03:55:14.310Z"
+    resolutionType: "code-change"
+    resolutionDetail: "collapsible-list class with no list markers"
+    appliedAt: "2026-10-15T03:55:14.310Z"
+    lastModified: "2026-11-19T15:14:21.832Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

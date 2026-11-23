@@ -4,8 +4,13 @@
  * `ndx work` skips an Inbox change's tasks until it is placed, so this lists
  * each one with rex's best guess for its home, strongest guesses first (IB7):
  * those are the quickest to confirm. A row opens the change's detail panel in
- * the Tasks tree; its Place opens placement mode on the area view (WF1,
- * `/product/place/<id>`). Nothing here writes.
+ * the Tasks tree; its Accept places it on that guess as a touches, and its
+ * Place opens the Inbox page on it, where the shortlist and relation are.
+ *
+ * "Place best guesses" reviews every guess at once: each change with its best
+ * guess and a checkbox, weak guesses left unticked, then one write
+ * (`POST /api/rex/changes/place-best`) records the ticked ones as touches. In
+ * the Plan tile it opens the Inbox page with the review open.
  *
  * Applied changes still flagged for placement are history: they stay out of
  * the open count and appear as a collapsed line that expands to a list (IB2).
@@ -20,7 +25,7 @@
  * @module viewer/views/inbox
  */
 
-import { h } from "preact";
+import { h, Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { PlaceWithSidecarButton, StrengthChip, useProjectStatus } from "../components/index.js";
 import type { GuessStrength } from "../components/index.js";
@@ -28,7 +33,6 @@ import { placementDraftNote, prunePlacementDrafts } from "../components/prd-tree
 import { resolveCliLabel, useCliName, useRefetchableProductRead } from "../hooks/index.js";
 import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { placementTab } from "../route-state.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
 import { shortChangeId } from "./product-model.js";
@@ -86,6 +90,194 @@ export function sortInbox(rows: readonly InboxRow[]): InboxRow[] {
   return keyed.map((k) => k.row);
 }
 
+// ── Best-guess placement ─────────────────────────────────────────────
+
+/** One change and the guess "Place best guesses" would place it on. */
+export interface BestGuessPick {
+  change: ChangeRow;
+  guess: Guess;
+  /** An applied change never placed: history, which a touches links to what it built. */
+  applied: boolean;
+}
+
+/** Every row with a guess, open changes first, each list in its own order. */
+export function bestGuessPicks(rows: readonly InboxRow[], applied: readonly InboxRow[] = []): BestGuessPick[] {
+  const picks: BestGuessPick[] = [];
+  for (const [list, isApplied] of [[rows, false], [applied, true]] as const) {
+    for (const row of list) {
+      const guess = guessOf(row);
+      if (guess) picks.push({ change: row.change, guess, applied: isApplied });
+    }
+  }
+  return picks;
+}
+
+/** Ticked to begin with: every guess but a weak one, which is a word match and little more. */
+export function tickedByDefault(pick: BestGuessPick): boolean {
+  return pick.guess.strength !== "weak";
+}
+
+export interface PlaceBestResult {
+  placed: Array<{ change: string; changeTitle?: string; target: string; title: string }>;
+  refused: Array<{ change: string; target: string; error: string; kind?: string }>;
+  /** The server's commit of what it placed: a short sha, or why there was none. */
+  commit?: { sha: string } | { skipped: string };
+}
+
+/** `POST /api/rex/changes/place-best`: each pair as a touches, in one write. */
+export async function placeBestGuesses(pairs: ReadonlyArray<{ change: string; target: string }>): Promise<PlaceBestResult | { error: string }> {
+  try {
+    const res = await fetch("/api/rex/changes/place-best", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ placements: pairs }),
+    });
+    const body = await res.json() as Partial<PlaceBestResult> & { error?: unknown };
+    if (!res.ok || !body.placed || !body.refused) {
+      return { error: typeof body.error === "string" ? body.error : `HTTP ${res.status}` };
+    }
+    return { placed: body.placed, refused: body.refused, ...(body.commit ? { commit: body.commit } : {}) };
+  } catch (err) {
+    return { error: errorMessage(err) };
+  }
+}
+
+/** What the last write did, said beside the button. */
+export function placeBestLine(result: PlaceBestResult | { error: string }): string {
+  if ("error" in result) return `Nothing placed: ${result.error}`;
+  const placed = `Placed ${result.placed.length} change${result.placed.length === 1 ? "" : "s"}`;
+  const refused = result.refused.length ? `; ${result.refused.length} refused` : "";
+  const commit = !result.commit ? ""
+    : "sha" in result.commit ? ` · committed ${result.commit.sha}`
+    : ` · not committed: ${result.commit.skipped}`;
+  return `${placed}${refused}${commit}`;
+}
+
+/** Set by the Plan tile's button; the Inbox page opens with the review showing. */
+let reviewRequested = false;
+export function requestBestGuessReview(): void { reviewRequested = true; }
+function takeBestGuessReview(): boolean {
+  const asked = reviewRequested;
+  reviewRequested = false;
+  return asked;
+}
+
+/** Set by a row's Place; the Inbox page opens with that change selected. */
+let selectRequested: string | null = null;
+export function requestInboxSelection(id: string): void { selectRequested = id; }
+export function takeInboxSelection(): string | null {
+  const id = selectRequested;
+  selectRequested = null;
+  return id;
+}
+
+/**
+ * "Place best guesses": a button, then the review — each change and its best
+ * guess, ticked unless weak — and one write for the ticked ones. With
+ * `onOpenReview` (the Plan tile) the button hands off to the Inbox page instead.
+ */
+export function PlaceBestGuesses({ rows, applied = [], onPlaced, onOpenReview }: {
+  rows: readonly InboxRow[];
+  applied?: readonly InboxRow[];
+  /** After a write: read the Inbox again. */
+  onPlaced: () => void;
+  /** Open the review elsewhere (the Inbox page); absent, it opens here. */
+  onOpenReview?: () => void;
+}) {
+  const picks = useMemo(() => bestGuessPicks(rows, applied), [rows, applied]);
+  const [open, setOpen] = useState(() => !onOpenReview && takeBestGuessReview());
+  const [unticked, setUnticked] = useState<ReadonlySet<string> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<PlaceBestResult | { error: string } | null>(null);
+
+  // Until the person changes a box the defaults stand, so shortlists that arrive later still get them.
+  const isTicked = (pick: BestGuessPick) => unticked ? !unticked.has(pick.change.id) : tickedByDefault(pick);
+  const toggle = (pick: BestGuessPick) => {
+    const next = new Set(unticked ?? picks.filter((p) => !tickedByDefault(p)).map((p) => p.change.id));
+    if (next.has(pick.change.id)) next.delete(pick.change.id);
+    else next.add(pick.change.id);
+    setUnticked(next);
+  };
+  const ticked = picks.filter(isTicked);
+  const reading = rows.some((r) => !r.shortlist) || applied.some((r) => !r.shortlist);
+
+  const place = async () => {
+    setBusy(true);
+    const answer = await placeBestGuesses(ticked.map((p) => ({ change: p.change.id, target: p.guess.candidate.target })));
+    setBusy(false);
+    setResult(answer);
+    if (!("error" in answer) && answer.placed.length) {
+      setOpen(false);
+      setUnticked(null);
+      onPlaced();
+    }
+  };
+
+  if (!picks.length && !result) return null;
+  return h("div", { class: "inbox-best", "data-open": String(open) },
+    h("div", { class: "inbox-best-bar" },
+      open
+        ? null
+        : h("button", {
+            type: "button",
+            class: "btn btn-sm inbox-best-open",
+            disabled: !picks.length,
+            title: "Review each change's best guess, then place the ticked ones as Touches",
+            onClick: (e: MouseEvent) => {
+              e.stopPropagation();
+              setResult(null);
+              if (onOpenReview) { requestBestGuessReview(); onOpenReview(); } else setOpen(true);
+            },
+          }, `Place best guesses (${picks.length})`),
+      result
+        ? h("span", { class: `inbox-best-result${"error" in result || result.refused.length || (result.commit && "skipped" in result.commit) ? " is-warning" : ""}`, role: "status" }, placeBestLine(result))
+        : null,
+    ),
+    result && !("error" in result) && result.refused.length
+      ? h("ul", { class: "inbox-best-refused" },
+          result.refused.map((r) => h("li", { key: r.change }, `${titleOf(picks, r.change)}: ${r.error}`)))
+      : null,
+    open
+      ? h(Fragment, null,
+          h("p", { class: "section-sub" },
+            "Each ticked change goes on its best guess as Touches: it works on that capability without changing its requirements. ",
+            "Weak guesses start unticked. Amending a spec stays a choice you make on the change itself."),
+          h("ul", { class: "inbox-best-list", "aria-label": "Best guesses to place" },
+            picks.map((pick) => {
+              const { candidate, strength } = pick.guess;
+              const id = `inbox-best-${pick.change.id}`;
+              return h("li", { key: pick.change.id, class: "inbox-best-row", "data-change-id": pick.change.id },
+                h("input", { type: "checkbox", id, checked: isTicked(pick), onChange: () => toggle(pick) }),
+                h("label", { for: id, class: "inbox-best-label" },
+                  h("span", { class: "inbox-best-change" }, pick.change.title),
+                  pick.applied ? h("span", { class: "tag inbox-applied-at" }, "applied") : null,
+                  h("span", { class: "inbox-best-arrow", "aria-hidden": "true" }, " → "),
+                  candidate.area ? h("span", { class: "inbox-guess-area" }, `${candidate.area} › `) : null,
+                  h("span", { class: "inbox-best-target" }, candidate.title),
+                  h(StrengthChip, { strength }),
+                ),
+              );
+            }),
+          ),
+          h("div", { class: "inbox-best-actions" },
+            h("button", {
+              type: "button",
+              class: "btn btn-sm btn-primary inbox-best-place",
+              disabled: busy || ticked.length === 0,
+              onClick: place,
+            }, busy ? "Placing…" : `Place ${ticked.length}`),
+            h("button", { type: "button", class: "btn btn-sm inbox-best-cancel", disabled: busy, onClick: () => setOpen(false) }, "Cancel"),
+            reading ? h("span", { class: "section-sub" }, "Still reading some shortlists…") : null,
+          ),
+        )
+      : null,
+  );
+}
+
+function titleOf(picks: readonly BestGuessPick[], id: string): string {
+  return picks.find((p) => p.change.id === id)?.change.title ?? id;
+}
+
 // ── Rows ─────────────────────────────────────────────────────────────
 
 function GuessLine({ row }: { row: InboxRow }) {
@@ -115,8 +307,28 @@ function ageOf(row: InboxRow): string | null {
   return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
-function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => void; onPlace?: (id: string) => void }) {
+function Row({ row, onOpen, onPlace, onAccepted }: {
+  row: InboxRow;
+  onOpen: (id: string) => void;
+  onPlace?: (id: string) => void;
+  /** After Accept wrote: read the Inbox again. Absent, no Accept. */
+  onAccepted?: () => void;
+}) {
   const { change } = row;
+  const guess = guessOf(row);
+  const [accepting, setAccepting] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const accept = async (e: MouseEvent) => {
+    e.stopPropagation();
+    if (!guess || !onAccepted) return;
+    setAccepting(true);
+    setRefusal(null);
+    const answer = await placeBestGuesses([{ change: change.id, target: guess.candidate.target }]);
+    setAccepting(false);
+    if ("error" in answer) setRefusal(answer.error);
+    else if (answer.refused.length) setRefusal(answer.refused[0].error);
+    else onAccepted();
+  };
   const tags = row.shortlist && "placement" in row.shortlist ? row.shortlist.placement.change.tags ?? [] : [];
   // An unsaved placement left in placement mode (WF10).
   const draftNote = placementDraftNote(change.id);
@@ -135,6 +347,16 @@ function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => 
     h("div", { class: "inbox-row-foot" },
       h(GuessLine, { row }),
       draftNote ? h("span", { class: "tag inbox-draft", "data-draft": "placement" }, draftNote) : null,
+      guess && onAccepted
+        ? h("button", {
+            type: "button",
+            class: "btn btn-sm btn-primary inbox-accept",
+            "aria-label": `Place ${change.title} on ${guess.candidate.title}`,
+            title: `Place on ${guess.candidate.title} as Touches`,
+            disabled: accepting,
+            onClick: accept,
+          }, accepting ? "Placing…" : "Accept")
+        : null,
       h("button", {
         type: "button",
         class: "btn btn-sm inbox-place",
@@ -147,6 +369,7 @@ function Row({ row, onOpen, onPlace }: { row: InboxRow; onOpen: (id: string) => 
       h("span", { class: "inbox-place-sidecar", onClick: (e: MouseEvent) => e.stopPropagation() },
         h(PlaceWithSidecarButton, { changeId: change.id })),
     ),
+    refusal ? h("div", { class: "inbox-row-refusal", role: "alert" }, `Not placed: ${refusal}`) : null,
   );
 }
 
@@ -166,21 +389,26 @@ export interface InboxViewProps {
   onPlace?: (id: string) => void;
   /** Opens the Inbox on its own page; required for the "more" link. */
   onOpenAll?: () => void;
+  /** After a row's Accept or "Place best guesses" wrote: read again. Absent, neither is offered. */
+  onPlaced?: () => void;
 }
 
-export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll }: InboxViewProps) {
+export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced }: InboxViewProps) {
   const cliName = useCliName();
   const sorted = sortInbox(rows);
   const shown = limit === undefined ? sorted : sorted.slice(0, limit);
   const hidden = sorted.length - shown.length;
 
   return h("div", { class: "inbox-container" },
+    onPlaced
+      ? h(PlaceBestGuesses, { rows: sorted, applied: appliedRows, onPlaced, onOpenReview: onOpenAll })
+      : null,
     sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" },
           h("p", null, "Inbox is empty"),
           h("p", { class: "section-sub" }, resolveCliLabel(HELD_EXPLANATION, cliName)))
       : h("ul", { class: "inbox-list" },
-          shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace })),
+          shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, onAccepted: onPlaced })),
         ),
     hidden > 0 && onOpenAll
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
@@ -318,7 +546,7 @@ async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<strin
  * the Tasks tree. Its own page is `InboxTriagePage` (inbox-triage.ts).
  */
 export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limit?: number }) {
-  const { load, rows, applied } = useInbox();
+  const { load, rows, applied, refetch } = useInbox();
   const status = useProjectStatus();
   if (load.state === "v1") return null;
   if (load.state !== "ready") return h(Pending, { load });
@@ -330,8 +558,10 @@ export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limi
       appliedRows: applied,
       limit,
       onOpenChange: (id) => navigateTo?.("prd", { taskId: id }),
-      onPlace: navigateTo ? (id) => navigateTo("product", { tab: placementTab(id) }) : undefined,
+      // Place opens the Inbox page on the change: its shortlist, relation and Place & next.
+      onPlace: navigateTo ? (id) => { requestInboxSelection(id); navigateTo("inbox"); } : undefined,
       onOpenAll: navigateTo ? () => navigateTo("inbox") : undefined,
+      onPlaced: refetch,
     }),
   );
 }

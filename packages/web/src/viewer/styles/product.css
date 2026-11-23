@@ -583,6 +583,96 @@
   border-color: var(--accent);
 }
 
+/* Accept: one click places the row on its best guess, beside Place. */
+.inbox-row-foot .inbox-guess {
+  flex: 1 1 12rem;
+}
+
+.inbox-accept {
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+}
+
+.inbox-row-refusal {
+  margin-top: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--red);
+}
+
+/* "Place best guesses": a button, then the review list with a checkbox per change. */
+.inbox-best {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.inbox-best[data-open="true"] {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.inbox-best-bar,
+.inbox-best-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.inbox-best-result {
+  font-size: var(--font-xs);
+  color: var(--green);
+}
+
+.inbox-best-result.is-warning,
+.inbox-best-refused {
+  color: var(--orange);
+}
+
+.inbox-best-refused {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: var(--font-xs);
+}
+
+.inbox-best-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 24rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.inbox-best-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+}
+
+.inbox-best-label {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.inbox-best-arrow,
+.inbox-best-label .inbox-guess-area {
+  color: var(--text-muted);
+}
+
+.inbox-best-target {
+  font-weight: var(--weight-medium);
+}
+
 .inbox-age,
 .inbox-guess-score {
   color: var(--text-muted);
