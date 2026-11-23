@@ -130,6 +130,28 @@ describe("TileGrid", () => {
     expect(document.activeElement).toBe(head("problems"));
   });
 
+  it("a working tile (opensPage) takes clicks in its body and goes to its view's page from its header", () => {
+    const navigateTo = vi.fn();
+    const clicked = vi.fn();
+    mount({
+      tiles: [{ view: "inbox", opensPage: true, rows: 2 }, ...TILES],
+      renderView: (v: ViewId) => h("button", { class: `view view-${v}`, onClick: clicked }, `view:${v}`),
+      navigateTo,
+    });
+    // Not a preview: no pointer-events: none class on its body.
+    expect(tile("inbox").querySelector(".stage-tile-body--view")).toBeNull();
+    act(() => tile("inbox").querySelector<HTMLButtonElement>(".view-inbox")!.click());
+    expect(clicked).toHaveBeenCalledTimes(1);
+    expect(head("inbox").getAttribute("aria-haspopup")).toBeNull();
+    expect(head("inbox").getAttribute("aria-label")).toBe("Open Inbox on its own page");
+    act(() => head("inbox").click());
+    expect(navigateTo).toHaveBeenCalledWith("inbox");
+    expect(dialog()).toBeNull();
+    // Any other tile still opens full-screen.
+    act(() => head("files").click());
+    expect(dialog()).not.toBeNull();
+  });
+
   it("offers no Open ↗ without a navigateTo", () => {
     mount();
     act(() => head("files").click());

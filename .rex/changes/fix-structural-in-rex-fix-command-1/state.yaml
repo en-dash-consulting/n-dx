@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "5d586da2-f978-41f3-b5d5-2d25080f865b":
+    status: "completed"
+    startedAt: "2026-04-19T02:44:53.874Z"
+    completedAt: "2026-04-19T02:44:53.874Z"
+    appliedAt: "2026-04-19T02:44:53.874Z"
+    lastModified: "2026-11-19T15:36:20.751Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "b2b4436a-6956-4c00-afac-86d379da88d9":
+    status: "completed"
+    startedAt: "2026-04-19T02:41:23.354Z"
+    completedAt: "2026-04-19T02:44:53.838Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Renamed tests/unit/core/fix.test.ts → tests/unit/fix/index.test.ts. All 3344 tests pass."

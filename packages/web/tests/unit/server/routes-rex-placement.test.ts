@@ -177,6 +177,63 @@ describe("placement routes on a v2 project", () => {
     expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
   });
 
+  it("POST place-best places each pair as a touches in one write, logs each and broadcasts once", async () => {
+    const second = (await (await send("items", { title: "Gift cards can be refunded", description: "A refund to a gift card." })).json()).id;
+    frames.length = 0;
+    const { status, body } = await json(await send("changes/place-best", {
+      placements: [{ change: inboxId, target: "A1.1" }, { change: second, target: CAPABILITY_ID }],
+    }));
+    expect(status).toBe(200);
+    expect(body.refused).toEqual([]);
+    expect(body.placed.map((p: { change: string; target: string }) => [p.change, p.target])).toEqual([[inboxId, CAPABILITY_ID], [second, CAPABILITY_ID]]);
+    expect(body.placed[1].changeTitle).toBe("Gift cards can be refunded");
+    // The fixture is not a git repository: the placement stands, and the answer says why nothing was committed.
+    expect(body.commit).toEqual({ skipped: "the project is not a git repository" });
+    const index = indexTree((await loadModel(rexDir)).tree);
+    for (const id of [inboxId, second]) {
+      expect(index.resolve(id)).toMatchObject({ touches: [CAPABILITY_ID] });
+      expect(index.resolve(id)).not.toHaveProperty("needsPlacement");
+      expect(folderOf(id)?.split(sep)[0]).not.toBe("inbox");
+    }
+    expect(logEvents().slice(-2)).toEqual([
+      expect.objectContaining({ event: "change_placed", itemId: inboxId, detail: `touches ${CAPABILITY_ID} (via web, best guess)` }),
+      expect.objectContaining({ event: "change_placed", itemId: second }),
+    ]);
+    expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
+  });
+
+  it("POST place-best reports a refused pair and still writes the rest", async () => {
+    const { status, body } = await json(await send("changes/place-best", {
+      placements: [{ change: "no-such-change", target: CAPABILITY_ID }, { change: inboxId, target: CAPABILITY_ID }],
+    }));
+    expect(status).toBe(200);
+    expect(body.refused).toEqual([expect.objectContaining({ change: "no-such-change", target: CAPABILITY_ID, kind: "no-such-change" })]);
+    expect(body.placed).toEqual([expect.objectContaining({ change: inboxId, target: CAPABILITY_ID })]);
+    expect(folderOf(inboxId)?.split(sep)[0]).not.toBe("inbox");
+  });
+
+  it("POST place-best writes nothing, and does not broadcast, when every pair is refused", async () => {
+    const before = logEvents().length;
+    const { status, body } = await json(await send("changes/place-best", { placements: [{ change: inboxId, target: "no-such-node" }] }));
+    expect(status).toBe(200);
+    expect(body.placed).toEqual([]);
+    expect(body.refused).toHaveLength(1);
+    expect(folderOf(inboxId)?.split(sep)[0]).toBe("inbox");
+    expect(logEvents()).toHaveLength(before);
+    expect(frames).toEqual([]);
+  });
+
+  it.each([
+    ["no placements", {}],
+    ["an empty list", { placements: [] }],
+    ["a pair without a target", { placements: [{ change: "x" }] }],
+    ["a non-string change", { placements: [{ change: 1, target: "t" }] }],
+  ])("POST place-best answers 400 for %s", async (_label, payload) => {
+    const res = await send("changes/place-best", payload);
+    expect(res.status).toBe(400);
+    expect(folderOf(inboxId)?.split(sep)[0]).toBe("inbox");
+  });
+
   it("POST unplace takes back a touches: the change returns to the Inbox, logs and broadcasts", async () => {
     await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "touches" });
     frames.length = 0;

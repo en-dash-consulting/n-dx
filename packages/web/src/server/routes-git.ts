@@ -89,12 +89,28 @@ const MAX_UNTRACKED_PREVIEW_BYTES = 20_000;
 // path is rendered as an escaped, quoted string that matches no file and
 // classifies as "other" — which makes the tree look permanently mixed and
 // silently disables both the quick commit and auto-commit for the repo.
+//
+// `input` goes to git's stdin. A failure that never reached git (a spawn error,
+// a timeout) has an empty stderr; its own message stands in, so the panel never
+// reads "unknown error" for a failure it could name.
 async function gitCommand(
   projectDir: string,
   args: string[],
+  input?: string,
 ): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  const result = await exec("git", args, { cwd: projectDir, timeout: 10_000 });
-  return { ok: !result.error && result.exitCode === 0, stdout: result.stdout, stderr: result.stderr };
+  const result = await exec("git", args, { cwd: projectDir, timeout: 30_000, ...(input !== undefined ? { input } : {}) });
+  const ok = !result.error && result.exitCode === 0;
+  const stderr = result.stderr.trim() || (ok ? "" : result.error?.message ?? "");
+  return { ok, stdout: result.stdout, stderr };
+}
+
+/**
+ * `paths` as a pathspec file for `--pathspec-from-file=-`: one literal path a
+ * line. A scoped commit after a batch placement names hundreds of files, and as
+ * arguments they overran Windows' command-line limit, so git never started.
+ */
+export function literalPathspec(paths: readonly string[]): string {
+  return paths.map((p) => `:(literal)${p}`).join("\n") + "\n";
 }
 
 function classify(code: string): GitFileStatus {
@@ -354,16 +370,18 @@ async function handleGitCommit(
     return true;
   }
 
-  const add = paths
-    ? await gitCommand(ctx.projectDir, ["add", "--", ...paths])
+  // A scoped commit's paths travel on stdin, never as arguments (literalPathspec).
+  const spec = paths ? literalPathspec(paths) : undefined;
+  const add = spec
+    ? await gitCommand(ctx.projectDir, ["add", "-A", "--pathspec-from-file=-"], spec)
     : await gitCommand(ctx.projectDir, ["add", "-A"]);
   if (!add.ok) {
     errorResponse(res, 500, `git add failed: ${add.stderr.trim() || "unknown error"}`);
     return true;
   }
 
-  const commit = paths
-    ? await gitCommand(ctx.projectDir, ["commit", "-m", message, "--", ...paths])
+  const commit = spec
+    ? await gitCommand(ctx.projectDir, ["commit", "-m", message, "--pathspec-from-file=-"], spec)
     : await gitCommand(ctx.projectDir, ["commit", "-m", message]);
   if (!commit.ok) {
     errorResponse(res, 500, `git commit failed: ${(commit.stderr || commit.stdout).trim() || "unknown error"}`);
