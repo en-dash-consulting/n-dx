@@ -10,7 +10,9 @@
  * shortcut presses the control the section renders, so a key does exactly
  * what its button does.
  *
- * Reached from the Plan section's "Open ↗" and the bottom-bar Inbox pill.
+ * Reached from the Plan tile's header, a row's Place (opening on that
+ * change) and the bottom-bar Inbox pill. "Place best guesses" above the queue
+ * places many at once; the Plan tile's button opens it here.
  *
  * @module viewer/views/inbox-triage
  */
@@ -21,7 +23,7 @@ import { PlaceWithSidecarContext, StrengthChip, useProjectStatus } from "../comp
 import { ChangePlacementSection, takeTitleFocus } from "../components/prd-tree/change-placement.js";
 import type { NavigateTo } from "../types.js";
 import { placementTab } from "../route-state.js";
-import { AppliedHistory, bestGuess, useInbox, type InboxRow } from "./inbox.js";
+import { AppliedHistory, PlaceBestGuesses, bestGuess, takeInboxSelection, useInbox, type InboxRow } from "./inbox.js";
 import { Pending, StaleNotice } from "./product-pages.js";
 import { shortChangeId } from "./product-model.js";
 
@@ -183,7 +185,8 @@ function QueueItem({ row, selected, onSelect }: { row: InboxRow; selected: boole
 export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
   const { load, rows, applied, refetch } = useInbox();
   const status = useProjectStatus();
-  const [selected, setSelected] = useState<string | null>(null);
+  // A row's Place on the Plan tile asked for this change.
+  const [selected, setSelected] = useState<string | null>(() => takeInboxSelection());
   const [placed, setPlaced] = useState<ReadonlySet<string>>(new Set());
   const listRef = useRef<HTMLUListElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
@@ -251,6 +254,7 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
       h("span", { class: "inbox-crumb-counts", role: "status" },
         ` · ${rows.length} to place · ${placed.size} placed this visit`),
     ),
+    h(PlaceBestGuesses, { rows, applied, onPlaced: refetch }),
     h("div", { class: "inbox-triage" },
       h("div", { class: "inbox-queue" },
         rows.length

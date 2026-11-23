@@ -126,6 +126,12 @@ export interface StageTile {
    * places no view; `view` is only where it belongs.
    */
   band?: boolean;
+  /**
+   * The tile is a working surface, not a preview (Plan's Inbox): its body takes
+   * clicks, and its header and "Open to see all" go to `view`'s own page rather
+   * than opening the tile full-screen.
+   */
+  opensPage?: boolean;
   /** Grid columns spanned, of 12 (default 4: three tiles a row). */
   cols?: TileCols;
   /** Grid rows spanned (default 1). Every row has the same fixed height. */
@@ -230,7 +236,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
       // No product area map: readers could not tell what its blocks meant. The
       // Product page is a tab of Open changes, and its routes still open it.
-      { view: "inbox", cols: 4, rows: 2, badge: "inbox", v2Only: true, requiresServer: true },
+      // Its rows' Place buttons and "Place best guesses" work in the tile; the header opens the Inbox page.
+      { view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true },
       { view: "changes", panel: "changes-glance", title: "Open changes", embedsView: true, cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
       // The last check as lights; full-screen and "Open" show the whole Validation view.
       // Up to two rows: tiles shrink to their content, so this only lets the check's buttons show.
