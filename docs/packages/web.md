@@ -96,7 +96,7 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 
 **Find them.**
 
-- **Plan.** The Inbox is a side panel on Plan, its tab always present on v2 with the open count. It lists every open change awaiting placement, strongest rex match first, weak and tied guesses last, and **Open ↗** goes to the triage page. At zero it reads "Inbox is empty". It is a working surface: each row's **Accept** and the **Place best guesses** button take clicks in place.
+- **Plan.** The Inbox is a side panel on Plan, its tab always present on v2 with the open count. It lists every open change awaiting placement, strongest rex match first, weak and tied guesses last, and **Open ↗** goes to the triage page. At zero it reads "Inbox is empty". It is a working surface: each row's best-guess button (**Accept → <area>** in Team, **Plan in <area>** in Solo, in place of the Inbox page's plain **Accept**) and **Place best guesses** take clicks in place.
 - **Counts.** The open count shows on the Plan tab and the bottom bar. It counts only open changes that need placement.
 - **Applied history.** Changes applied before they were placed (migrated history) show as a collapsed line ("N applied changes were never placed") under the list. Expanding it lists each with its title, applied date and best guess. Open one to place it: the panel offers **touches** only, with a note, and Place & next walks that list. Amends is not offered, because the change's amendments have already reached the map.
 - **Tasks tree.** In the Tree tab of Open changes, an Inbox change carries an **Inbox** badge, and the **In the Inbox** facet filters the tree to them.

@@ -341,6 +341,24 @@ describe("planning from the Inbox", () => {
     expect(JSON.parse(String(place[1]!.body))).toEqual({ target: "cap-checkout", relation: "touches" });
   });
 
+  it("offers one best-guess button per row: Plan's named one in the panel, the plain Accept elsewhere", async () => {
+    const row = inboxRow("i1", [candidate("c2", "Checkout")]);
+    // The Inbox page (PR 1095): the plain Accept, and Place best guesses.
+    await act(async () => { render(h(InboxView, { rows: [row], appliedUnplaced: 0, onOpenChange: vi.fn(), onPlaced: vi.fn() }), root); });
+    await flush(2);
+    expect(root.querySelector(".inbox-accept")?.textContent).toBe("Accept");
+    expect(root.querySelector(".inbox-plan-in")).toBeNull();
+    expect(root.querySelector(".inbox-best-open")).not.toBeNull();
+    // Plan's panel names the step and the area, so it does not also offer Accept.
+    await act(async () => {
+      render(h(InboxView, { rows: [row], appliedUnplaced: 0, onOpenChange: vi.fn(), onPlaced: vi.fn(), scope: "all", onPlanIn: vi.fn(), planInVerb: "accept" }), root);
+    });
+    await flush(2);
+    expect(root.querySelector(".inbox-accept")).toBeNull();
+    expect(root.querySelector(".inbox-plan-in")?.textContent).toBe("Accept → Checkout");
+    expect(root.querySelector(".inbox-best-open")).not.toBeNull();
+  });
+
   it("offers 'Plan in <area>' for a row's best guess, and drags under Plan", async () => {
     const onPlanIn = vi.fn();
     const row = inboxRow("i1", [candidate("c2", "Checkout")]);
