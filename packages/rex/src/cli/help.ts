@@ -258,8 +258,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "update an existing PRD item",
     usage: "rex update <id> [options] [dir]",
     description:
-      "Modify the status, priority, prioritized flag, title, short title, summary, description, acceptance criteria, source, or assignee of a PRD item.
-" +
+      "Modify the status, priority, prioritized flag, title, short title, summary, description, acceptance criteria, source, or assignee of a PRD item.\n" +
       "Status transitions are validated (e.g. completed → pending requires --force).",
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },

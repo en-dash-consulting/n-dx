@@ -23,6 +23,10 @@ export interface PlacementTarget {
   criteria?: Array<{ id: string; text: string }>;
   strength?: PlacementStrength;
   reasons?: string[];
+  /** Other open changes that already amend this target (shortlist rows only). */
+  amendedBy?: string[];
+  /** Rex's score (shortlist rows only). */
+  score?: number;
 }
 
 /** A target criterion as the Amends form holds it while it is edited. */
