@@ -122,15 +122,24 @@ describe("Sourcevision finalization and downstream readers", () => {
     ["mixed", [{ usageStatus: "measured", tokenUsage: { input: 20, output: 5 } }, { usageStatus: "unavailable" }], "partial", 20, 5],
     ["measured zero", [{ usageStatus: "measured", tokenUsage: { input: 0, output: 0 } }], "complete", 0, 0],
     ["mixed zero", [{ usageStatus: "measured", tokenUsage: { input: 0, output: 0 } }, { usageStatus: "unavailable" }], "partial", 0, 0],
+    ["measured cache only", [{ usageStatus: "measured", tokenUsage: { input: 0, output: 0, cacheCreationInput: 10, cacheReadInput: 80 } }], "complete", 0, 0],
+    ["partial cache only", [{ usageStatus: "partial", tokenUsage: { input: 0, output: 0, cacheReadInput: 80 } }], "partial", 0, 0],
   ])("persists %s through the real ledger and readers", async (_name, records, status, input, output) => {
     manifest();
     records.forEach((rec, i) => recordLLMCall({ taskClass: `zone.test-${i}`, vendor: "codex", model, durationMs: 1, ...rec }));
     finalizeTokenUsage({ absDir: projectDir, svDir: ctx.svDir, tokenUsage: { calls: 0, inputTokens: 0, outputTokens: 0 } }, { vendor: "codex", codex: { model } });
     const saved = JSON.parse(readFileSync(join(ctx.svDir, "manifest.json"), "utf8"));
     expect(saved.tokenUsage.diagnosticStatus).toBe(status);
+    const cacheWrites = records.reduce((sum, rec) => sum + (rec.tokenUsage?.cacheCreationInput ?? 0), 0);
+    const cacheReads = records.reduce((sum, rec) => sum + (rec.tokenUsage?.cacheReadInput ?? 0), 0);
+    expect(saved.tokenUsage.cacheCreationInputTokens).toBe(cacheWrites);
+    expect(saved.tokenUsage.cacheReadInputTokens).toBe(cacheReads);
     expect(saved.lastAnalysis.llm.costUsd !== undefined).toBe(status === "complete");
     expect((await extractSvTokenEvents(projectDir))[0].diagnosticStatus).toBe(status);
     await assertReports("sv", status, input, output, records.length, 1);
+    const summary = await route("summary");
+    expect(summary.usage.totalCacheCreationTokens).toBe(cacheWrites);
+    expect(summary.usage.totalCacheReadTokens).toBe(cacheReads);
   });
   it("keeps complete measurement distinct from unknown pricing", async () => {
     manifest({ calls: 1, model: "custom-unpriced", inputTokens: 10, outputTokens: 5, diagnosticStatus: "complete" });
