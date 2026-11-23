@@ -92,7 +92,7 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "tooling" | "shipped-timeline";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -274,13 +274,15 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "hench-runs", cols: 8, rows: 2, tabs: [{ view: "activity" }] },
       { view: "token-usage", title: "Spend" },
       { view: "hench-optimization", title: "Suggestions", tabs: [{ view: "hench-adaptive" }] },
-      { view: "merge-graph", title: "Shipped" },
       // Panel tile: "Open" goes to the Runs view, whose records it summarises.
-      { view: "hench-runs", panel: "outcomes", title: "Outcomes by tier", rows: 2 },
+      { view: "hench-runs", panel: "outcomes", title: "Outcomes by tier", cols: 6, rows: 2 },
       // Read-only. A settings page cannot be a stage view, so the tile borrows
       // Suggestions' view for its glyph and "Open"; each line links to the
       // Settings page that edits it.
-      { view: "hench-optimization", panel: "tooling", title: "Your tooling", rows: 2, requiresServer: true },
+      { view: "hench-optimization", panel: "tooling", title: "Your tooling", cols: 6, rows: 2, requiresServer: true },
+      // What shipped, when: the PRD's timeline, with the open top-level items to
+      // the right of today. "Open" goes to the Merge Graph the tile used to show.
+      { view: "merge-graph", panel: "shipped-timeline", title: "Shipped", embedsView: true, cols: 12, rows: 2 },
     ],
   },
 };

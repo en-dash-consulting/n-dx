@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "135930a9-e370-4bcc-a736-6bab7d34ee87":
+    status: "completed"
+    startedAt: "2026-11-23T21:56:02.697Z"
+    completedAt: "2026-11-23T21:56:02.697Z"
+    endedAt: "2026-11-23T21:56:02.697Z"
+    activeIntervals: [{"end":"2026-11-23T21:56:02.697Z","start":"2026-11-23T21:56:02.697Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "timeline-graph(-model) ported; PRDView Tree | Timeline switch; ShippedTimeline panel as Tune's Shipped tile (12 x 2, panelTab Timeline, Graph tab); CSS lines kept structural; tests for model, switch and tile."
+    appliedAt: "2026-11-23T21:56:02.697Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-23T21:55:52.606Z"
+    lastModified: "2026-11-23T21:56:02.697Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
