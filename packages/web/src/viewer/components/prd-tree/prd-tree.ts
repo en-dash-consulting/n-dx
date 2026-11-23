@@ -24,7 +24,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks"
 import type { PRDItemData, PRDDocumentData, ItemStatus, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
 import type { ClaimEntry } from "../../hooks/index.js";
 import { useCliName } from "../../hooks/index.js";
-import { computeBranchStats, completionRatio, formatTimestamp } from "./compute.js";
+import { computeBranchStats, completionRatio } from "./compute.js";
 import { canAddChildType, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { defaultStatusFilter } from "../../views/status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
@@ -37,8 +37,7 @@ import { useTreeEventDelegation } from "./tree-event-delegate.js";
 import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex } from "./virtual-scroll.js";
 import type { FlatNode } from "./virtual-scroll.js";
 import { highlightSearchText, buildBranchVisibleSet } from "./tree-search.js";
-import { getTaskDuration } from "./durations.js";
-import { formatTokensExact, formatDuration, formatUsd, newTokens, EMPTY_DASH } from "./format-usage.js";
+import { formatTokensExact, formatUsd, newTokens, EMPTY_DASH } from "./format-usage.js";
 import { useLiveTick } from "./use-live-tick.js";
 import type { PRDGhostRow } from "./ghost-rows.js";
 import { ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../impact-tags.js";
@@ -157,21 +156,6 @@ function TagList({ tags }: { tags: string[] }) {
   );
 }
 
-
-function TimestampSuffix({ item }: { item: PRDItemData }) {
-  if (item.status === "completed" && item.completedAt) {
-    const ts = formatTimestamp(item.completedAt);
-    if (ts) return h("span", { class: "prd-timestamp" }, `done ${ts}`);
-  }
-  if (item.status === "in_progress" && item.startedAt) {
-    const ts = formatTimestamp(item.startedAt);
-    if (ts) return h("span", { class: "prd-timestamp" }, `started ${ts}`);
-  }
-  if (item.status === "failing" && item.failureReason) {
-    return h("span", { class: "prd-timestamp prd-failure-reason" }, item.failureReason);
-  }
-  return null;
-}
 
 // ── Usage & duration cells ──────────────────────────────────────────
 //
@@ -299,61 +283,6 @@ function renderUsageCell(args: UsageCellArgs) {
   );
 }
 
-interface DurationCellArgs {
-  item: PRDItemData;
-  usageRollup?: ItemUsageRollup;
-  hasChildren: boolean;
-  tickMs: number | null;
-}
-
-function renderDurationCell(args: DurationCellArgs) {
-  const { item, usageRollup, hasChildren, tickMs } = args;
-  const nowMs = tickMs ?? Date.now();
-
-  // Leaf items compute duration locally so in-progress rows tick every
-  // frame (the client has the full interval log). Parent rows (epics /
-  // features) don't have descendant intervals on the client — they fall
-  // back to the server rollup's `totalMs`, refreshed on each poll.
-  // `duration` may be absent on older server payloads; fall through to
-  // local computation in that case.
-  let elapsedMs: number;
-  let isRunning: boolean;
-  let hasRecord: boolean;
-  if (hasChildren && usageRollup && usageRollup.duration) {
-    elapsedMs = usageRollup.duration.totalMs;
-    isRunning = usageRollup.duration.isRunning;
-    hasRecord = elapsedMs > 0 || isRunning;
-  } else {
-    const self = getTaskDuration(item, nowMs);
-    elapsedMs = self.elapsedMs;
-    isRunning = self.isRunning;
-    hasRecord = self.hasRecord;
-  }
-
-  if (!hasRecord) {
-    return h(
-      "span",
-      {
-        class: "prd-duration-cell prd-duration-cell-empty",
-        title: "Task has not started",
-        "aria-label": "Task has not started",
-      },
-      EMPTY_DASH,
-    );
-  }
-
-  const formatted = formatDuration(elapsedMs);
-  const cls = `prd-duration-cell${isRunning ? " prd-duration-cell-running" : ""}`;
-  return h(
-    "span",
-    {
-      class: cls,
-      title: isRunning ? "Running — updates each second" : "Final duration",
-      "aria-live": isRunning ? "polite" : undefined,
-    },
-    formatted,
-  );
-}
 
 // ── Single tree node ────────────────────────────────────────────────
 //
@@ -507,7 +436,7 @@ class NodeRow extends Component<NodeRowProps> {
   }
 
   render() {
-    const { item, claim, impact, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel, inInbox } = this.props;
+    const { item, claim, impact, taskUsage, usageRollup, weeklyBudget, showTokenBudget, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel, inInbox } = this.props;
     const children = item.children ?? [];
     const stats = hasChildren ? computeBranchStats(children) : null;
     const ratio = stats ? completionRatio(stats) : 0;

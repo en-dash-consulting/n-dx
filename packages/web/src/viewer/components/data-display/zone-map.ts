@@ -48,16 +48,6 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
     return metrics;
   }, [zones, crossings]);
 
-  // Group crossings by zone pairs for connection rendering
-  const connectionCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const c of crossings) {
-      const key = [c.fromZone, c.toZone].sort().join(":");
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-    return counts;
-  }, [crossings]);
-
   // Get unique zone pairs with connections
   const connections = useMemo(() => {
     const pairs: Array<{ from: string; to: string; count: number; bidirectional: boolean }> = [];
@@ -68,7 +58,6 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const reverseKey = `${c.toZone}:${c.fromZone}`;
       const forwardCount = crossings.filter(x => x.fromZone === c.fromZone && x.toZone === c.toZone).length;
       const reverseCount = crossings.filter(x => x.fromZone === c.toZone && x.toZone === c.fromZone).length;
 
@@ -85,7 +74,6 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
 
   // Calculate grid layout
   const cols = Math.ceil(Math.sqrt(zones.length));
-  const rows = Math.ceil(zones.length / cols);
 
   const maxFiles = Math.max(...zones.map(z => z.files.length), 1);
 

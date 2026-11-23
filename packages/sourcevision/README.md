@@ -49,7 +49,8 @@ sourcevision mcp [dir]         Start MCP server for AI tool integration
 | `--port=N` | Server port for serve (default: 3117) |
 | `--phase=N` | Run only phase N (1=inventory, 2=imports, 3=zones, 4=components) |
 | `--only=MODULE` | Run only named module (inventory, imports, zones, components) |
-| `--fast` | Skip AI zone-name enrichment (use algorithmic names) |
+| `--fast` | Static only: no model or network calls (algorithmic names, no judgment) |
+| `--include-minified` | Map minified bundles in `callgraph.json` too (left out by default) |
 
 ## Output Files
 
@@ -62,6 +63,7 @@ All output is written to `.sourcevision/`:
 | `imports.json` | Import graph edges, externals, circulars |
 | `zones.json` | Architectural zones with metrics and findings |
 | `components.json` | Component definitions, usage graph, route modules |
+| `callgraph.json` | JavaScript and TypeScript functions and call edges; no PHP or other pack call facts yet. Generated files, assets and minified bundles are left out |
 | `pr-markdown.md` | Regenerated PR-ready markdown based on git diff |
 | `llms.txt` | Structured Markdown summary for LLM consumption |
 | `CONTEXT.md` | Dense summary with XML markers for Claude parsing |

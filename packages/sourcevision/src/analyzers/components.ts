@@ -31,6 +31,7 @@ import {
   findRoutesDir,
 } from "./route-detection.js";
 import { detectServerRoutes } from "./server-route-detection.js";
+import { UNMAPPED_ROLES } from "./minified.js";
 import { withPackRouteGroups, type PackFrameworkFacts } from "./pack-framework-facts.js";
 import { parseJsTsSource } from "./ts-source.js";
 import { isVerbose, verbose } from "@n-dx/llm-client";
@@ -659,7 +660,7 @@ export async function analyzeComponents(
   if (canIncremental) {
     // Files pruned from the inventory in an earlier run are not deletions this
     // run, so they must be filtered out explicitly (#744).
-    const inventoried = new Set(inventory.files.map((f) => f.path));
+    const inventoried = new Set(inventory.files.filter((f) => !UNMAPPED_ROLES.has(f.role)).map((f) => f.path));
     const unchanged = (f: string) => !changedFiles.has(f) && inventoried.has(f);
     for (const def of prev.components) {
       if (unchanged(def.file)) {
@@ -681,10 +682,10 @@ export async function analyzeComponents(
     }
   }
 
-  // Parse files (all in full mode, only changed in incremental mode)
+  // Parse files (all in full mode, only changed in incremental mode); bundles and assets are never mapped
   const parseableFiles = inventory.files.filter((f) => {
     const ext = extname(f.path).toLowerCase();
-    if (!ALL_PARSEABLE.has(ext)) return false;
+    if (!ALL_PARSEABLE.has(ext) || UNMAPPED_ROLES.has(f.role)) return false;
     if (canIncremental) return changedFiles.has(f.path);
     return true;
   });

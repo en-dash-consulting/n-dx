@@ -64,33 +64,38 @@ Python file with routes (and `totalServerRoutes`), and
 outbound.json a dependency per Python outbound call; no sourcevision code
 is Python-specific.
 
+### PHP
+
+`@n-dx/lang-php` is an opt-in `KNOWN_PACKS` entry with no fallback parser.
+Installed and running, its `use` imports, class references and computable
+includes reach imports.json through `buildPackImportGraph` as edges
+(Composer autoload, PHP's include search order) and
+`php:<namespace>` externals, other languages' entries unchanged, and it joins
+`analysedLanguages`; missing and unlisted, it is only suggested and every
+artifact is unchanged (`tests/integration/php-pack-imports.test.ts`). Over
+the pinned corpus (`php-corpus.json`, `php5` marking the PHP 5 era
+repositories), `scripts/php-corpus-report.mjs` measures the clean-parse rate
+(the PHP 5 repositories against decision D4's 99.5% bar) and
+`scripts/php-resolve-report.mjs` the resolver; each script's header says
+what it prints.
+
 ### The Terraform model in infrastructure.json
 
-The Terraform pack produces `resources` facts, not imports.
-`enrichTerraformInfrastructure` (called by `analyze` after
-`computeInfrastructure`) adds optional `module`, `provider` (`{ name,
-version? }`), `references` (`infra:<type>.<name>` ids of listed resources in the
-same module directory) and `attributes` (`engine`, `engineVersion`, `runtime`,
-`image`, `clusterVersion`) to each resource it lists from a `.tf` file whose file
-and `<type>.<name>` match a fact. Values are as written, never normalised; a
-field appears only when the pack supplied it. When the pack resolved a
-module's attributes per instance (several facts at one declaration), an
-attribute is stored resolved only when every instance gives the same value,
-else as the expression written. It never adds or removes a
-resource, link or seam or changes an existing field, so resources only the
-model finds stay out. `analyzers/infrastructure.ts` and `IAC_KINDS` are not
-involved, so the iso-map bundle does not change. Without the pack the file is
-byte-identical. The field names await Sterling H's review (decision 3).
+`enrichTerraformInfrastructure` (after `computeInfrastructure`) only adds
+optional fields to resources already listed, as written; it never adds or
+removes a resource, link or seam, and without the pack the file is
+byte-identical. Fields and rules:
+[Terraform pack facts](../../docs/packages/sourcevision.md#terraform-pack-facts).
 
 ### Pack routes and outbound calls
 
 A pack producing `routes` or `outboundCalls` (Java, through its Spring Boot
 rules; Python, `routes` through its FastAPI, Flask and Django rules and
-`outboundCalls` through its python-clients rules) is asked for them in the imports phase's one `analyzeProject` call
+`outboundCalls` through its python-clients rules; PHP, `routes` from docroots and
+`.htaccess`, each `source` kept in `ServerRoute.source`, and `outboundCalls`) is asked for them in the imports phase's one `analyzeProject` call
 (`PackImportsOptions.framework`), so no file is parsed twice; the facts ride
 on `AnalyzeContext.packFacts`. A run without the imports phase (`--phase`,
-`sv narrate`) reads them once with `readImportsPackFrameworkFacts`, which asks
-the same packs for the same files. `src/analyzers/pack-framework-facts.ts`
+`sv narrate`) reads them with `readImportsPackFrameworkFacts`. `src/analyzers/pack-framework-facts.ts`
 merges them: `withPackRouteGroups` (the one call in `analyzeComponents`) adds
 one `ServerRouteGroup` per file to `serverRoutes`, a method-less route recorded
 as `GET`; `withPackOutbound` (in `analyze`'s output step) adds an
@@ -99,20 +104,28 @@ reuse the detectors' role sets (`ROUTE_SKIP_ROLES`, outbound's `SKIP_ROLES`),
 prefix rule and order, and return their input itself when nothing is added.
 Pack `notices` go to the same `warn` as degrade notices.
 
+`entryPoints` facts (PHP's CLI and cron scripts) ride the same call and
+`packFacts`; `packEntryPointSignals` turns each into an `entrypoint` signal
+that `analyzeClassifications` scores (weight 1), recorded as evidence with
+`signalKind` `pack` and a detail such as `cron entry point: 0 3 * * *
+(crontab:4)`; the schedule lives only in that detail. A file with pack signals, or pack evidence last run, is always
+reclassified. Without facts classifications.json is unchanged.
+
+`configReads` and `flagChecks` become config.json, `versionFloor`,
+`legacyConstructs` and `dynamicCode` sdlc-profile.json's `ecosystem` (`pack-ecosystem.ts`):
+config facts, legacy constructs and dynamic code only when present, the version-floor
+histogram whenever the pack was asked for floors (`PackFrameworkFact.asked`),
+even with none found. The same facts, per file, become legacy.json
+(`pack-legacy-files.ts`, ecosystem's own/third-party split), only when present.
+
 ### Terraform as a database-engine source
 
-`language/database-engines.ts` takes the Terraform pack's resource facts as
-`DatabaseEngineInput.terraformFacts`, supplied by the caller (today only
-`scripts/database-corpus-report.mjs`); it imports no pack, is not wired into
-`analyze` and writes nothing. A database resource yields a `terraform`-signal
-candidate: a mapped `engine` (Cloud SQL: `database_version`) is strong, an
-engine implied by the type alone (Azure servers) is weak, and a resource that
-gives neither (a reusable module's `var.engine` no call resolves) adds a
-notice. A reusable module yields one candidate per engine its module calls
-pass; the evidence text names where the value is written, and a
-`conditional` value (`cond ? null : var.engine`) is weak. Engine strings
-and resource types live in `TERRAFORM_ENGINE_TABLE` and
-`TERRAFORM_RESOURCE_TABLE`, each entry with its provider page.
+`language/database-engines.ts` takes the Terraform pack's resource facts from
+its caller (today only `scripts/database-corpus-report.mjs`); it imports no
+pack, is not wired into `analyze` and writes nothing. Engine strings and
+resource types live in `TERRAFORM_ENGINE_TABLE` and `TERRAFORM_RESOURCE_TABLE`,
+each entry with its provider page. Signal strengths:
+[Terraform pack facts](../../docs/packages/sourcevision.md#terraform-pack-facts).
 
 ### How packs are installed
 

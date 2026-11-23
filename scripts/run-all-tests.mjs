@@ -36,6 +36,10 @@
  *   node scripts/run-all-tests.mjs affected <baseRef>   # only suites the change touches
  *   add --list to print the selection and exit without running anything
  *   add --no-slot to run without the host validation slot (a deliberate parallel run)
+ *   add --coverage to run each package suite as its `test:coverage` script, which
+ *     writes <package>/coverage/ and fails below the package's coverage floors
+ *     (tests/vitest-coverage.mjs). Root suites run unchanged: they exercise the
+ *     built CLIs in child processes, which V8 coverage of the runner cannot see.
  *
  * Selection rules live in scripts/lib/select-suites.mjs. Besides the human
  * summary, the run prints `test-gate: …` lines (selected, reasons, failed) for
@@ -168,7 +172,7 @@ function runSuite(label, binary, args) {
 }
 
 /** The runnable suite for a canonical short label. */
-function suiteFor(label, manifests) {
+function suiteFor(label, manifests, coverage = false) {
   if (label === ROOT_LABEL) {
     // The root-level tests/** suites, which live outside any package.
     return {
@@ -196,7 +200,7 @@ function suiteFor(label, manifests) {
     // (web and sourcevision wrap vitest in the bind-aware runner). pnpm is a
     // .cmd shim on Windows, hence spawnCli rather than a raw spawn.
     binary: "pnpm",
-    args: ["--filter", name, "run", "test"],
+    args: ["--filter", name, "run", coverage ? "test:coverage" : "test"],
   };
 }
 
@@ -325,7 +329,8 @@ const manifests = readWorkspaceManifests(ROOT);
 const args = process.argv.slice(2);
 const listOnly = args.includes("--list");
 const noSlot = args.includes("--no-slot");
-const positional = args.filter((a) => a !== "--list" && a !== "--no-slot");
+const coverage = args.includes("--coverage");
+const positional = args.filter((a) => a !== "--list" && a !== "--no-slot" && a !== "--coverage");
 /** The affected gate's changed files, rebuilt for once the slot is held. */
 let changedForRebuild = null;
 
@@ -361,7 +366,7 @@ if (positional[0] === "affected") {
       `Unknown suite "${resolved.unknown.join('", "')}". ` +
       `Valid: all | packages | ${resolved.valid.join(" | ")} ` +
       `(comma- or space-separated; @n-dx/<name> also accepted), or: affected <baseRef>. ` +
-      `Options: --list (print the selection, run nothing), --no-slot (skip the host validation slot)`,
+      `Options: --list (print the selection, run nothing), --no-slot (skip the host validation slot), --coverage (package suites with coverage)`,
     );
     process.exit(2);
   }
@@ -385,7 +390,7 @@ for (const label of labels) {
 
 if (listOnly) process.exit(0);
 
-const suites = labels.map((label) => suiteFor(label, manifests));
+const suites = labels.map((label) => suiteFor(label, manifests, coverage));
 if (suites.length === 0) console.log("No suites affected by this change — nothing to run.");
 
 mkdirSync(LOG_DIR, { recursive: true });

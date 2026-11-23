@@ -26,6 +26,8 @@ import type {
   DeclaredContract,
   OutboundData,
 } from "../schema/index.js";
+import { toCanonicalJSON as canonicalJSON } from "@n-dx/llm-client";
+import { redactLiteralsDeep } from "./redact-literals.js";
 
 /**
  * Codepoint string order — the one comparator every canonical sort uses.
@@ -276,5 +278,12 @@ export function sortOutbound(data: OutboundData): OutboundData {
   };
 }
 
-// Re-export from the shared foundation to eliminate duplication.
-export { toCanonicalJSON } from "@n-dx/llm-client";
+/**
+ * Canonical JSON for a sourcevision artifact: llm-client's key-sorted form,
+ * after URL userinfo and secret-shaped parameter values are removed from
+ * every string (`redact-literals.ts`). Every `.sourcevision/*.json` artifact
+ * is written through here, so no literal credential from source reaches one.
+ */
+export function toCanonicalJSON(value: unknown): string {
+  return canonicalJSON(redactLiteralsDeep(value));
+}

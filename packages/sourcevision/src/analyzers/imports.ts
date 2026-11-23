@@ -22,10 +22,11 @@ import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
+import type { PackFrameworkFact } from "./pack-framework-facts.js";
 import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
 import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
-import { type FileFacts, type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
+import { type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
 import { isTerraformSource } from "./terraform-infrastructure.js";
 import { parseJsTsSource } from "./ts-source.js";
 
@@ -375,7 +376,7 @@ export async function readImportsPackFrameworkFacts(
   targetDir: string,
   inventory: Inventory,
   options?: Pick<ImportsOptions, "language" | "packs">,
-): Promise<FileFacts[]> {
+): Promise<PackFrameworkFact[]> {
   const packs = packsFor(await parseableExtensionsFor(targetDir, options), options?.packs?.packs);
   const packFiles = inventory.files.filter((f) => isPackFile(f.path, packs));
   return readPackFrameworkFacts(packFiles, targetDir, { ...options?.packs, packs });
@@ -784,9 +785,12 @@ export async function analyzeImports(
     if (inventory.files.some((f) => isTerraformSource(f.path))) withFiles.add(terraformConfig.id);
     await noticeListedPacks(listedPacks, withFiles, { loader: options?.packs?.loader, warn: options?.packs?.warn });
   }
+  let parseIssues: ImportsSummary["parseIssues"];
   if (packFiles.length > 0) {
     const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS, listed: listedPacks ?? [] });
     mergeGraph(graph, edgeMap, externalMap);
+    // Packs re-run on every analysis, so this is never stale; absent when every file parsed cleanly.
+    if (Object.keys(graph.parseIssues).length > 0) parseIssues = graph.parseIssues;
     // Go must never drop to inventory-only: a degraded Go pack hands every Go
     // file (all of them are in the changed set) to the regex parser, and a
     // pack that ran hands it the files it could not parse (generated files
@@ -808,5 +812,6 @@ export async function analyzeImports(
 
   const edges = Array.from(edgeMap.values());
   const external = Array.from(externalMap.values());
-  return sortImports({ edges, external, summary: buildImportSummary(edges, external) });
+  const summary = buildImportSummary(edges, external);
+  return sortImports({ edges, external, summary: parseIssues ? { ...summary, parseIssues } : summary });
 }

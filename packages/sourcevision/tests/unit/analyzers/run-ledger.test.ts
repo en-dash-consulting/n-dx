@@ -69,6 +69,19 @@ describe("run ledger", () => {
     expect(byTaskClass["zone.enrich-scan"]).toMatchObject({ calls: 1, inputTokens: 0, outputTokens: 0, durationMs: 9000, vendor: "claude" });
   });
 
+  it("keeps cache tokens per bucket, omitted when zero, and shows them in the line", () => {
+    recordLLMCall({ taskClass: "zone.enrich-scan", vendor: "claude", model: "claude-haiku-4-5", tokenUsage: { input: 3000, output: 22, cacheCreationInput: 40_000, cacheReadInput: 8000 }, durationMs: 2000 });
+    recordLLMCall({ taskClass: "code.classify", vendor: "typesafe", model: "jev-1.13.0", tokenUsage: { input: 10, output: 1, cacheCreationInput: 0 }, durationMs: 1 });
+
+    const run = snapshotRunLedger();
+    expect(run.llm.byTaskClass["zone.enrich-scan"]).toMatchObject({ cacheCreationTokens: 40_000, cacheReadTokens: 8000 });
+    expect(run.llm.byTaskClass["code.classify"]).not.toHaveProperty("cacheCreationTokens");
+    expect(run.llm.byTaskClass["code.classify"]).not.toHaveProperty("cacheReadTokens");
+    expect(formatRunLedger(run)[1]).toBe(
+      "  zone.enrich-scan: 1 call, 3,022 tokens + 48,000 cached, 2.0s (claude claude-haiku-4-5)",
+    );
+  });
+
   it("keeps a class served by two vendors in one bucket per vendor", () => {
     recordLLMCall({ taskClass: "code.classify", vendor: "typesafe", model: "jev-1.13.0", tokenUsage: { input: 1000, output: 10 }, durationMs: 100 });
     recordLLMCall({ taskClass: "code.classify", vendor: "claude", model: "claude-haiku-4-5", durationMs: 9000 });
@@ -163,6 +176,42 @@ describe("priceRunLedger", () => {
     expect(priceRunLedger(snapshotRunLedger())).toBeUndefined();
   });
 
+  it("prices cache tokens at the model's cache rates", () => {
+    recordLLMCall({ taskClass: "a", vendor: "claude", model: "claude-haiku-4-5", tokenUsage: { input: 1000, output: 100 }, durationMs: 1 });
+    const plain = priceRunLedger(snapshotRunLedger())!;
+
+    startRunLedger("fast");
+    recordLLMCall({
+      taskClass: "a", vendor: "claude", model: "claude-haiku-4-5",
+      tokenUsage: { input: 1000, output: 100, cacheCreationInput: 88_000, cacheReadInput: 245_000 },
+      durationMs: 1,
+    });
+    expect(priceRunLedger(snapshotRunLedger())!).toBeGreaterThan(plain);
+  });
+
+  it("prices a call that reported only cache tokens", () => {
+    recordLLMCall({ taskClass: "a", vendor: "claude", model: "claude-haiku-4-5", tokenUsage: { input: 0, output: 0, cacheReadInput: 5000 }, durationMs: 1 });
+    expect(priceRunLedger(snapshotRunLedger())).toBeGreaterThan(0);
+  });
+
+  it.each(["legacy", "both"])("reads %s per-class cache fields without double counting", (shape) => {
+    recordLLMCall({ taskClass: "a", vendor: "claude", model: "claude-haiku-4-5",
+      tokenUsage: { input: 10, output: 2, cacheCreationInput: 1000, cacheReadInput: 5000 }, durationMs: 1 });
+    const canonical = snapshotRunLedger();
+    expect(canonical.llm.byTaskClass.a).not.toHaveProperty("cacheReadInputTokens");
+    const historical = structuredClone(canonical);
+    const bucket = historical.llm.byTaskClass.a;
+    bucket.cacheCreationInputTokens = shape === "legacy" ? 1000 : 9000;
+    bucket.cacheReadInputTokens = shape === "legacy" ? 5000 : 9000;
+    if (shape === "legacy") {
+      delete bucket.cacheCreationTokens;
+      delete bucket.cacheReadTokens;
+    }
+    expect(ManifestSchema.shape.lastAnalysis.parse(historical)).toEqual(historical);
+    expect(priceRunLedger(historical)).toBe(priceRunLedger(canonical));
+    expect(formatRunLedger(historical)).toEqual(formatRunLedger(canonical));
+  });
+
   it("prices a dated model id, which is what the clients actually report", () => {
     // The regression this pins end to end: sourcevision's scan class runs on
     // haiku and reports the dated id, which used to miss the table entirely.
@@ -176,7 +225,7 @@ describe("priceRunLedger", () => {
    recordLLMCall({ taskClass: "test", vendor: "codex", model: "gpt-5.4", durationMs: 1,
      tokenUsage: { input: 0, output: 0, cacheReadInput: 1000000 }, usageStatus: "measured" });
    const cached = snapshotRunLedger();
-   expect(cached.llm.byTaskClass.test.cacheReadInputTokens).toBe(1000000);
+   expect(cached.llm.byTaskClass.test.cacheReadTokens).toBe(1000000);
    expect(ManifestSchema.shape.lastAnalysis.parse(cached)).toEqual(cached);
    expect(cached.llm.costUsd).toBeGreaterThan(0);
    startRunLedger();

@@ -1,0 +1,4 @@
+{
+    "name": "acme/billing",
+    "autoload": { "psr-4": { "Acme\\Billing\\": "src/" } }
+}

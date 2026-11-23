@@ -1,0 +1,2 @@
+<?php
+$name = $input ?: 'guest';

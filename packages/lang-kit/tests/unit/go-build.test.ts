@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -104,6 +104,18 @@ describe("go.mod build model", () => {
     } finally {
       await chmod(join(dir, "locked"), 0o755);
     }
+  });
+
+  // File symlinks need a privilege on Windows.
+  it.skipIf(process.platform === "win32")("reads no go.mod through a symlink", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "go-build-"));
+    const outside = await mkdtemp(join(tmpdir(), "go-build-outside-"));
+    cleanups.push(dir, outside);
+    await writeFile(join(outside, "go.mod"), "module example.com/outside\n");
+    await writeFile(join(dir, "go.mod"), "module example.com/app\n");
+    await mkdir(join(dir, "linked"));
+    await symlink(join(outside, "go.mod"), join(dir, "linked", "go.mod"));
+    expect((await readGoBuildModels(dir)).map((m) => m.module)).toEqual(["example.com/app"]);
   });
 
   it("reads every module of a workspace", async () => {

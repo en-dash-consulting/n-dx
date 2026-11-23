@@ -48,18 +48,4 @@ export function truncateFilename(name: string, maxLen: number = 18): string {
 
 // ── Backward-compatible re-exports from visualization layer ─────────
 // New code should import from `visualization/` directly.
-export {
-  getZoneColorByIndex,
-  getZoneColor,
-  buildZoneColorMap,
-} from "./visualization/colors.js";
-
-export { meterClass } from "./visualization/metrics.js";
-
-export {
-  buildFileToZoneMap,
-  buildFlowEdges,
-  buildCallFlowEdges,
-  buildExternalImportEdges,
-  buildFlowNodes,
-} from "./visualization/flow.js";
+export { getZoneColorByIndex } from "./visualization/colors.js";

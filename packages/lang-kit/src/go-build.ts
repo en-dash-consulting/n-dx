@@ -398,7 +398,8 @@ async function findDirsWith(projectDir: string, filename: string): Promise<{ dir
       if (e.isDirectory()) {
         if (e.name.startsWith(".") || e.name === "node_modules" || goConfig.skipDirectories.has(e.name)) continue;
         await walk(posix.join(rel, e.name));
-      } else if (e.name === filename) {
+      } else if (e.isFile() && e.name === filename) {
+        // A symlinked go.mod is not read: its target may be outside the project.
         dirs.push(rel);
       }
     }

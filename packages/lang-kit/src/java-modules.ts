@@ -309,7 +309,8 @@ async function packageDeclarationRoots(projectDir: string, notices: string[]): P
         const place = { path: toPosix(relative(projectDir, sub)), parentHolds: (file: string) => fileNames.has(file) };
         if (skipsDirectory(javaConfig, e.name, (file) => existsSync(join(sub, file)), place)) continue;
         await walk(sub);
-      } else if (e.name.endsWith(".java")) {
+      } else if (e.isFile() && e.name.endsWith(".java")) {
+        // A symlinked source is not read: its target may be outside the project.
         const root = await rootFromPackage(projectDir, join(dir, e.name), notices);
         if (root !== null) roots.add(root);
       }

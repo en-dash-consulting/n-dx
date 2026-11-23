@@ -1,0 +1,7 @@
+{
+    "name": "acme/a",
+    "autoload": {
+        "psr-4": { "App\\": "src/" },
+        "classmap": ["classes/"]
+    }
+}

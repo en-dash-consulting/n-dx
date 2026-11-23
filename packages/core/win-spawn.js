@@ -190,7 +190,9 @@ export function assertNoWindowsEnvExpansion(tokens, env) {
  *
  * @param {string} binary    Binary name or absolute path.
  * @param {string[]} args    Argument list.
- * @param {object} options   execFileSync options (encoding, timeout, stdio, …).
+ * @param {object} options   execFileSync options (encoding, timeout, stdio, …),
+ *                           plus `logInvocation: false` to keep a call to a tool
+ *                           that is not a vendor CLI out of `claude_commands.log`.
  */
 export function execFileSyncCli(binary, args, options) {
   const [file, argv, opts] = syncInvocation(binary, args, options, "execFileSyncCli");
@@ -216,11 +218,12 @@ export function spawnSyncCli(binary, args, options) {
  * The `[file, args, options]` a synchronous spawn runs, logged; cmd.exe on
  * Windows. The caller adds `windowsHide`, where the policy test can see it.
  */
-function syncInvocation(binary, args, options, via) {
+function syncInvocation(binary, args, withLogOption, via) {
+  const { logInvocation = true, ...options } = withLogOption ?? {};
   if (process.platform === "win32") {
-    assertNoWindowsEnvExpansion([binary, ...args], options?.env ?? process.env);
+    assertNoWindowsEnvExpansion([binary, ...args], options.env ?? process.env);
     const cmdLine = buildWindowsCliCommandLine(binary, args);
-    logCliInvocation({ binary, args, cwd: options?.cwd, via, commandLine: cmdLine });
+    if (logInvocation) logCliInvocation({ binary, args, cwd: options.cwd, via, commandLine: cmdLine });
     // Outer quote pair: cmd.exe /s strips only the outermost quotes, keeping
     // per-token inner quotes (spaced paths) intact.
     return ["cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
@@ -228,7 +231,7 @@ function syncInvocation(binary, args, options, via) {
       windowsVerbatimArguments: true,
     }];
   }
-  logCliInvocation({ binary, args, cwd: options?.cwd, via });
+  if (logInvocation) logCliInvocation({ binary, args, cwd: options.cwd, via });
   return [binary, args, options];
 }
 

@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "756e1986-dfc7-4b55-8391-be5a8c734a22":
+    status: "completed"
+    startedAt: "2026-11-19T03:39:19.815Z"
+    completedAt: "2026-11-19T03:41:14.086Z"
+    endedAt: "2026-11-19T03:41:14.086Z"
+    activeIntervals: [{"end":"2026-11-19T03:41:14.086Z","start":"2026-11-19T03:39:19.815Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ported the connectionKeyValues linear scan from 87292366a into php-outbound.ts and the connectionKeyValues test block (58add3923 form); both match restack/pr11 except pr11's later configSubscript hunks."
+    lastModified: "2026-11-19T03:41:14.086Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "aa01d3bd-60e5-44ba-b955-7e498bb8e540":
+    status: "completed"
+    startedAt: "2026-11-19T03:41:14.086Z"
+    completedAt: "2026-11-19T03:41:14.086Z"
+    endedAt: "2026-11-19T03:41:14.086Z"
+    activeIntervals: [{"end":"2026-11-19T03:41:14.086Z","start":"2026-11-19T03:41:14.086Z"}]
+    appliedAt: "2026-11-19T03:41:14.086Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-19T03:38:35.473Z"
+    lastModified: "2026-11-19T03:41:14.086Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
