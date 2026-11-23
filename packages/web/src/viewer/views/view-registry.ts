@@ -63,6 +63,7 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { RunningNow, UpNext } from "./work-now.js";
+import { RunQueuePanel } from "./run-queue.js";
 import { AgentSettingsPanel } from "./agent-settings.js";
 import { ChangesGlance } from "./changes-glance.js";
 import { ChangesSummaryProvider } from "./changes-summary-context.js";
@@ -227,6 +228,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "outcomes": return h(OutcomesPanel, null);
     case "running": return h(RunningNow, { navigateTo: ctx.navigateTo });
     case "up-next": return h(UpNext, { navigateTo: ctx.navigateTo });
+    case "run-queue": return h(RunQueuePanel, { navigateTo: ctx.navigateTo });
     case "agent-settings": return h(AgentSettingsPanel, { navigateTo: ctx.navigateTo });
     case "plan-glance": return h(PlanGlance, { navigateTo: ctx.navigateTo });
     // Full-screen and "Open" show the whole Product page.

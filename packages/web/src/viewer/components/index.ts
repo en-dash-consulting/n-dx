@@ -23,7 +23,7 @@ export type { PrepareTaskModalProps } from "./prepare-task-modal.js";
 export { ReadyToRun } from "./ready-to-run.js";
 export { ImpactFlags, ImpactTags, displayTitle, titleTooltip, sizeCell, useItemImpacts } from "./impact-tags.js";
 export type { ItemImpact, ImpactMap } from "./impact-tags.js";
-export type { ReadyToRunProps, ReadyTask, ReadySplit, ReadyGroups } from "./ready-to-run.js";
+export type { ReadyToRunProps, ReadyTask, ReadySplit, ReadyGroups, ReadyQueue } from "./ready-to-run.js";
 export { AssigneeFilter, AssigneeFilterPending, AssigneePicker, saveAssignee, useAssigneeFilter, usePeople } from "./assignee.js";
 export type { AssigneeFilterState, AssigneePickerProps } from "./assignee.js";
 export { isMine, pickerChoices, personLabel } from "./assignee-model.js";

@@ -122,7 +122,9 @@ describe("stages.ts", () => {
   });
 
   it("opens Work on what is running, what is next and the PRD's numbers; its old sections moved", () => {
-    expect(STAGES.work.modes?.[0]?.tiles.map((t) => t.panel)).toEqual(["running", "up-next", "work-stats"]);
+    // Running now beside the run queue; Ready to run moved to the top of Tune.
+    expect(STAGES.work.modes?.[0]?.tiles.map((t) => t.panel)).toEqual(["running", "run-queue", "work-stats"]);
+    expect(STAGES.work.modes?.[1]?.tiles[0]?.panel).toBe("up-next");
     // The dashboard's numbers are the Statistics tile; the audit is a Tune tile.
     expect(STAGES.work.modes![0]!.tiles.find((t) => t.panel === "work-stats")?.view).toBe("rex-dashboard");
     expect(STAGES.work.modes![1]!.tiles.some((t) => t.view === "hench-audit")).toBe(true);
@@ -638,14 +640,14 @@ describe("StagePage", () => {
     expect(sectionViews()).toEqual([]);
     expect(modeTabs().map((t) => t.querySelector(".stage-mode-label")?.textContent)).toEqual(["Now", "Tune"]);
     expect(modeTabs()[0]!.getAttribute("aria-selected")).toBe("true");
-    expect(tileKeys()).toEqual(["running", "up-next", "work-stats"]);
+    expect(tileKeys()).toEqual(["running", "run-queue", "work-stats"]);
   });
 
   it("opens Work on Tune from the tune route, and the toggle navigates between the two", async () => {
     const navigateTo = vi.fn();
     await mount(h(StagePage, { stage: "work", view: "tune", validViews: ALL, navigateTo, renderView }));
     expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
-    expect(tileKeys()).toEqual(["agent-settings", "hench-runs", "token-usage", "hench-audit", "hench-optimization", "merge-graph", "outcomes"]);
+    expect(tileKeys()).toEqual(["up-next", "agent-settings", "hench-runs", "token-usage", "hench-audit", "hench-optimization", "merge-graph", "outcomes"]);
     act(() => { modeTabs()[0]!.click(); });
     expect(navigateTo).toHaveBeenCalledWith("work");
   });

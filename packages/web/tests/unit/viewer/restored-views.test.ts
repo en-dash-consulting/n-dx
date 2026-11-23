@@ -120,9 +120,12 @@ describe("views on Work's Tune mode", () => {
     for (const view of MOVED) expect(placed).not.toContain(view);
   });
 
-  it("Tune's tiles are Agent settings, Runs (Execution Log tab), Spend, Audit, Suggestions (Adaptive), Shipped and Outcomes by tier", () => {
-    const tiles = tune().tiles;
-    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Agent settings", "Runs", "Spend", "Audit", "Suggestions", "Shipped", "Outcomes by tier"]);
+  it("Tune's tiles are Ready to run, Agent settings, Runs (Execution Log tab), Spend, Audit, Suggestions (Adaptive), Shipped and Outcomes by tier", () => {
+    const all = tune().tiles;
+    expect(all.map((t) => tileTitle(t, "v1"))).toEqual(["Ready to run", "Agent settings", "Runs", "Spend", "Audit", "Suggestions", "Shipped", "Outcomes by tier"]);
+    // Ready to run leads Tune, moved from Now.
+    expect(all[0]).toMatchObject({ view: "hench-runs", panel: "up-next", cols: 12 });
+    const tiles = all.slice(1);
     expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([[], ["activity"], [], [], ["hench-adaptive"], [], []]);
     // Agent settings edits Settings' own endpoints, so it needs a server; a settings page cannot be a stage view.
     expect(tiles[0]).toMatchObject({ view: "hench-optimization", panel: "agent-settings", cols: 12, requiresServer: true });

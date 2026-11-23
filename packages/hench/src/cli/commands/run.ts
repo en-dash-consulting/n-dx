@@ -44,6 +44,8 @@ import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failur
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
+import { takeFromRunQueue } from "../../queue/run-queue.js";
+import { TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { section, detail, formatDuration } from "../../types/output.js";
@@ -1556,6 +1558,36 @@ async function runOne(
   // Its "No actionable tasks" error is the sentinel `--loop` reads as "done",
   // and is deliberately left to propagate exactly as it did from the brief.
   const selectionTree = await loadV2Tree(store);
+  // The planned run queue (the dashboard's Queue panel) steers plain
+  // autoselection: its first item that can run goes next, before rex's own
+  // pick. A filter the person asked for (--task, --epic, --tags, --mine) wins
+  // over it. Each item is taken as an explicit --task would be, so a blocked,
+  // finished or missing one is refused and dropped, and one another worktree
+  // holds is passed over and kept.
+  if (!taskId && !epicId && !tags?.length && !assignee) {
+    const queued = await takeFromRunQueue(
+      henchDir,
+      async (id) => selectTaskEntry((await store.loadDocument()).items, {
+        ...(selectionTree ? { tree: selectionTree } : {}),
+        taskId: id,
+        requireUnblocked: true,
+        ...(wouldResetIds ? { wouldResetIds } : {}),
+        claims,
+      }),
+      {
+        dryRun,
+        keep: (_id, err) => err instanceof TaskClaimedElsewhereError,
+        ...(excludeTaskIds ? { skip: excludeTaskIds } : {}),
+      },
+    );
+    for (const skip of queued.skipped) {
+      info(`Run queue: passed over ${skip.taskId} (${skip.reason})${skip.dropped ? " and took it off the queue" : ""}.`);
+    }
+    if (queued.picked) {
+      info(`Run queue: running ${queued.picked.taskId}, next in the queue.`);
+      taskId = queued.picked.value.item.id;
+    }
+  }
   const selected = await selectTaskEntry((await store.loadDocument()).items, {
     ...(selectionTree ? { tree: selectionTree } : {}),
     ...(taskId ? { taskId } : {}),

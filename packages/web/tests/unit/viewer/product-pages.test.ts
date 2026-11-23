@@ -92,7 +92,9 @@ describe("routing", () => {
     ]);
     const prepare = STAGES.plan.modes![1]!.tiles.filter((t) => !t.band);
     expect(prepare).toEqual([
-      { view: "changes", title: "Assign and schedule", cols: 12, rows: 3, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+      { view: "changes", title: "Assign and schedule", cols: 8, rows: 3, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+      // The run queue beside it, the same one Work › Now shows.
+      { view: "prd", panel: "run-queue", title: "Run queue", cols: 4, rows: 3, requiresServer: true },
     ]);
     expect(buildValidViews("rex").has("product")).toBe(true);
     expect(buildValidViews("rex").has("changes")).toBe(true);

@@ -33,6 +33,7 @@ import {
 } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import type { ProductMap } from "./product-model.js";
+import { addToRunQueue, useRunQueue } from "./run-queue.js";
 
 /** The agent running a run, as one phrase: "claude · sonnet-4". */
 export function agentLabel(run: Pick<LiveRunFull, "vendor" | "model">): string {
@@ -161,10 +162,13 @@ export function v1Section(task: ReadyTask): string | null {
 type ReadyListProps = { navigateTo: NavigateTo; estimates: RunEstimates | null; me: string | null };
 
 function ReadyList({ navigateTo, estimates, me, areaOf }: ReadyListProps & { areaOf: (task: ReadyTask) => string | null }) {
+  // Each card can be lined up in the planned run queue (Work › Now's Queue panel).
+  const queued = new Set((useRunQueue().items ?? []).map((i) => i.taskId));
   return h(ReadyToRun, {
     heading: false,
     estimates,
     split: { me, areaOf },
+    queue: { has: (id) => queued.has(id), add: (id) => void addToRunQueue(id) },
     onPrepare: (taskId: string) => navigateTo("work", { taskId }),
     onOpenLive: (taskId: string) => navigateTo("live-task", { taskId }),
     onOpenPrd: () => navigateTo("prd"),

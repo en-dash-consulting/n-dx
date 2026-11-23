@@ -125,6 +125,16 @@ export interface ReadyToRunProps {
    * sit anywhere in it.
    */
   split?: ReadySplit;
+  /**
+   * The planned run queue: each card's menu offers "Add to run queue", and a
+   * card already on it says "Queued". Absent, the list has no queue actions.
+   */
+  queue?: ReadyQueue;
+}
+
+export interface ReadyQueue {
+  has: (taskId: string) => boolean;
+  add: (taskId: string) => void;
 }
 
 export interface ReadySplit {
@@ -169,7 +179,7 @@ const STATUS_ICON: Record<string, { icon: string; label: string }> = {
   in_progress: { icon: "◐", label: "In progress" },
 };
 
-export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null, heading = true, split }: ReadyToRunProps) {
+export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null, heading = true, split, queue }: ReadyToRunProps) {
   const [tasks, setTasks] = useState<ReadyTask[] | null>(null);
   const [dir, setDir] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -378,6 +388,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null,
                 h("span", { class: "ready-criteria" }, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
                 h(EstimateChip, { estimates, tier: task.tier, ownTier: true, class: "ready-estimate" }),
                 task.resume ? h("span", { class: "ready-resume" }, "in progress · no live run") : null,
+                queue?.has(task.id) ? h("span", { class: "ready-queued" }, "Queued") : null,
               ),
               h("div", { class: "ready-split" },
                 h("button", {
@@ -399,6 +410,14 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null,
                   ? h("div", { class: "ready-menu", id: menuId, role: "menu" },
                       h("button", { type: "button", role: "menuitem", onClick: () => void startNow(task) }, "Start now"),
                       h("button", { type: "button", role: "menuitem", onClick: () => void copyCommand(task) }, "Copy terminal command"),
+                      queue
+                        ? h("button", {
+                            type: "button",
+                            role: "menuitem",
+                            disabled: queue.has(task.id),
+                            onClick: () => { setMenuFor(null); queue.add(task.id); },
+                          }, queue.has(task.id) ? "In the run queue" : "Add to run queue")
+                        : null,
                     )
                   : null,
               ),

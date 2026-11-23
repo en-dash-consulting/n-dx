@@ -98,7 +98,7 @@ export type StageSectionBadge = "inbox";
  */
 export type StagePanelId =
   | "capture" | "map" | "glance" | "recommendations" | "changes-glance" | "plan-health" | "spec-gaps"
-  | "outcomes" | "running" | "up-next" | "agent-settings"
+  | "outcomes" | "running" | "up-next" | "run-queue" | "agent-settings"
   | "plan-glance" | "plan-areas" | "inbox" | "work-stats" | "prd-tools";
 
 /**
@@ -359,11 +359,16 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
           // The full list: each open change with its assignee picker, release
           // and priority, under the assignee filter.
           // The Tasks tree is its Tree tab, now Create's Open changes tile is a side panel.
-          { view: "changes", title: "Assign and schedule", cols: 12, rows: 3, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+          { view: "changes", title: "Assign and schedule", cols: 8, rows: 3, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
+          // The planned run queue, the same one Work › Now shows: who does
+          // what and when includes what the agent runs next. Its view is the
+          // Tasks tree, Plan's own, since a view sits in one stage only (Work's
+          // queue tile opens Runs).
+          { view: "prd", panel: "run-queue", title: "Run queue", cols: 4, rows: 3, requiresServer: true },
         ],
         // A v1 tree assigns and prioritises in the task tree's detail panel.
         v1Tiles: [
-          { view: "prd", title: "Assign and schedule", cols: 12, rows: 3 },
+          { view: "prd", title: "Assign and schedule", cols: 8, rows: 3 },
         ],
       },
     ],
@@ -389,28 +394,32 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     modes: [
       {
         // What is happening and what happens next: the runs going now and who
-        // they are for, the queue `ndx work` picks from (yours first, then the
-        // unassigned by product area), and the PRD's numbers in one section.
+        // they are for beside the planned run queue (what `ndx work` takes
+        // next, before its own pick), then the PRD's numbers in one section.
+        // The full Ready to run list is Tune's first tile.
         id: "now",
         label: "Now",
         focus: "Who is working on what, and what is next",
         view: "work",
         tiles: [
-          { view: "hench-runs", panel: "running", title: "Running now", cols: 12, grow: true, requiresServer: true },
-          { view: "hench-runs", panel: "up-next", title: "Ready to run", cols: 12, rows: 3, grow: true, requiresServer: true },
+          { view: "hench-runs", panel: "running", title: "Running now", cols: 8, rows: 2, grow: true, requiresServer: true },
+          { view: "hench-runs", panel: "run-queue", title: "Run queue", cols: 4, rows: 2, grow: true, requiresServer: true },
           // Totals, status, priority and structure health, from the Rex
           // dashboard. No change progress: that is Plan's to show.
           { view: "rex-dashboard", panel: "work-stats", title: "Statistics", embedsView: true, cols: 12, rows: 2, grow: true },
         ],
       },
       {
-        // How the agent runs: the settings that steer it, then what its runs
-        // produced and cost. Reached at `/tune`.
+        // How the agent runs: the queue `ndx work` picks from (yours first,
+        // then the unassigned by product area, each card addable to the run
+        // queue), the settings that steer it, then what its runs produced and
+        // cost. Reached at `/tune`.
         id: "tune",
         label: "Tune",
         focus: "How the agent runs",
         view: "tune",
         tiles: [
+          { view: "hench-runs", panel: "up-next", title: "Ready to run", cols: 12, rows: 3, grow: true, requiresServer: true },
           // Editable here and in Settings: the same endpoints, each section
           // linking to the Settings page that holds the rest.
           { view: "hench-optimization", panel: "agent-settings", title: "Agent settings", cols: 12, rows: 3, grow: true, requiresServer: true },
