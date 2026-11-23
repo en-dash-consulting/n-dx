@@ -216,6 +216,19 @@
 .ready-row:not(.ready-row--lead) .rex-dash-next-link { font-size: var(--font-base); }
 .ready-resume { color: var(--accent); }
 .ready-empty { color: var(--text-muted); margin: 0; }
+/* Split (Work's Up next): yours, then the unassigned by product area. */
+.ready-groups { display: flex; flex-direction: column; gap: var(--space-5); }
+.ready-group { display: flex; flex-direction: column; gap: var(--space-2-5); }
+.ready-group-title, .ready-area-title {
+  display: flex; align-items: baseline; gap: var(--space-2); margin: 0;
+  color: var(--text);
+}
+.ready-group-title { font-size: var(--font-lg); font-weight: 650; }
+.ready-area { display: flex; flex-direction: column; gap: var(--space-2); }
+.ready-area + .ready-area { margin-top: var(--space-2); }
+.ready-area-title { font-size: var(--font-md); font-weight: 600; color: var(--text-dim); }
+.ready-group-count { font-family: var(--font-mono); font-size: var(--font-sm); font-weight: 500; color: var(--text-dim); }
+.ready-others { margin: 0; color: var(--text-dim); font-size: var(--font-sm); }
 .ready-more {
   all: unset; cursor: pointer; margin-top: var(--space-2);
   color: var(--accent); font-size: var(--font-sm);

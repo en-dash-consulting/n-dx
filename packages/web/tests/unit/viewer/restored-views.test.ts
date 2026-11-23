@@ -96,8 +96,9 @@ describe("restored views: navigation entries", () => {
     expect(viewLabel("zones")).toBe("Zones");
   });
 
-  it("analysis is a tile of the Plan stage", () => {
-    expect(stageTiles("plan").map((t) => t.view)).toContain("analysis");
+  it("analysis is Plan's New change side panel, and the stage owns its route", () => {
+    expect(STAGES.plan.sidePanels?.find((p) => p.id === "new-change")).toMatchObject({ view: "analysis", panel: "capture" });
+    expect(stageForView("analysis")).toBe("plan");
   });
 });
 
@@ -119,15 +120,18 @@ describe("views on Work's Tune mode", () => {
     for (const view of MOVED) expect(placed).not.toContain(view);
   });
 
-  it("Tune's tiles are Agent settings, Runs (Execution Log tab), Spend, Suggestions (Adaptive), Shipped and Outcomes by tier", () => {
+  it("Tune's tiles are Agent settings, Runs (Execution Log tab), Spend, Audit, Suggestions (Adaptive), Shipped and Outcomes by tier", () => {
     const tiles = tune().tiles;
-    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Agent settings", "Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier"]);
-    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([[], ["activity"], [], ["hench-adaptive"], [], []]);
+    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Agent settings", "Runs", "Spend", "Audit", "Suggestions", "Shipped", "Outcomes by tier"]);
+    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([[], ["activity"], [], [], ["hench-adaptive"], [], []]);
     // Agent settings edits Settings' own endpoints, so it needs a server; a settings page cannot be a stage view.
     expect(tiles[0]).toMatchObject({ view: "hench-optimization", panel: "agent-settings", cols: 12, requiresServer: true });
     expect(tiles[1]).toMatchObject({ cols: 8, rows: 2 });
+    // The audit moved here from Work's old page, beside the runs it reads.
+    expect(tiles[3]).toMatchObject({ view: "hench-audit", cols: 8, rows: 2 });
+    expect(stageForView("hench-audit")).toBe("work");
     // Outcomes is a 4×2 panel tile whose "Open" goes to the Runs view.
-    expect(tiles[5]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
-    expect(tiles[5].cols ?? 4).toBe(4);
+    expect(tiles[6]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
+    expect(tiles[6].cols ?? 4).toBe(4);
   });
 });

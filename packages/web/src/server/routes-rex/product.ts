@@ -187,6 +187,9 @@ export interface GlanceChangeWire {
   priority?: string;
   prioritized?: boolean;
   plannedRelease?: string;
+  /** As on `ChangeRowWire`: who the change is for, and who holds its open tasks. Plan's glance cards read them. */
+  assignee?: string;
+  taskAssignees?: string[];
   taskCount: number;
   completedTaskCount: number;
   /** As on `ChangeRowWire`: the glance's gap chips read these two. */
@@ -610,6 +613,7 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
     stages[stage]++;
     if (isInboxChange(change)) inboxInStage++;
     const tasks = tasksOf(change);
+    const taskAssignees = openTaskAssignees(change);
     open.push({
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
@@ -620,6 +624,8 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       ...(change.priority ? { priority: change.priority } : {}),
       ...(change.prioritized ? { prioritized: true } : {}),
       ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
+      ...(change.assignee ? { assignee: change.assignee } : {}),
+      ...(taskAssignees.length ? { taskAssignees } : {}),
       taskCount: tasks.length,
       completedTaskCount: tasks.filter((t) => t.status === "completed").length,
       ...gapOf(index, change, tasks),

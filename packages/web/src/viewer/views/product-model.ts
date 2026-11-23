@@ -280,6 +280,10 @@ export interface GlanceChange {
   priority?: string;
   prioritized?: boolean;
   plannedRelease?: string;
+  /** Who the change is for. Absent from an older server, and when nobody is. */
+  assignee?: string;
+  /** Distinct assignees of its open tasks. Absent from an older server, and when none has one. */
+  taskAssignees?: string[];
   taskCount: number;
   completedTaskCount: number;
   criteriaGap: boolean;

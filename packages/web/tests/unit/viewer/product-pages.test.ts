@@ -85,11 +85,14 @@ afterEach(() => {
 });
 
 describe("routing", () => {
-  it("places Changes on the Plan stage, with Product as its tab and no area map tile", () => {
-    const plan = STAGES.plan.modes![0]!.tiles.filter((t) => !t.band && (t.view === "product" || t.view === "changes"));
-    expect(plan).toEqual([
-      { view: "changes", panel: "changes-glance", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
-      { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 4, v2Only: true, requiresServer: true },
+  it("places Product as Create's product areas tile, and Changes on Preparation with the Tree as its tab", () => {
+    const create = STAGES.plan.modes![0]!.tiles.filter((t) => !t.band && (t.view === "product" || t.view === "changes"));
+    expect(create).toEqual([
+      { view: "product", panel: "plan-areas", title: "Product areas", embedsView: true, cols: 12, rows: 3, grow: true, v2Only: true, requiresServer: true },
+    ]);
+    const prepare = STAGES.plan.modes![1]!.tiles.filter((t) => !t.band);
+    expect(prepare).toEqual([
+      { view: "changes", title: "Assign and schedule", cols: 12, rows: 3, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
     ]);
     expect(buildValidViews("rex").has("product")).toBe(true);
     expect(buildValidViews("rex").has("changes")).toBe(true);

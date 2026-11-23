@@ -96,7 +96,47 @@ export type StageSectionBadge = "inbox";
  * renders through the registry (`renderPanel`): the Analyze tiles' visuals
  * and recommended fixes, Plan's strips and glances.
  */
-export type StagePanelId = "capture" | "map" | "glance" | "recommendations" | "flow" | "changes-glance" | "plan-health" | "spec-gaps" | "outcomes" | "running" | "up-next" | "agent-settings";
+export type StagePanelId =
+  | "capture" | "map" | "glance" | "recommendations" | "flow" | "changes-glance" | "plan-health" | "spec-gaps"
+  | "outcomes" | "running" | "up-next" | "agent-settings"
+  | "plan-glance" | "plan-areas" | "inbox" | "work-stats" | "prd-tools";
+
+/**
+ * A panel behind a vertical tab at the page's right edge: pressing the tab
+ * slides the panel in over the page (Plan's New change, From analysis and
+ * Inbox). It renders `panel` through the registry, or `view` itself, opened.
+ */
+export interface StageSidePanel {
+  /** Unique within the stage; the head action names a panel by it. */
+  id: string;
+  /** The tab's text. */
+  label: string;
+  /** The panel's heading. */
+  title: string;
+  /** One line under the heading: what the panel is for. */
+  blurb: string;
+  /** Where the panel's "Open" goes; also what is rendered when `panel` is unset. */
+  view: ViewId;
+  panel?: StagePanelId;
+  /** A live count on the tab, read from project status like a tile's. */
+  badge?: StageSectionBadge;
+  /** Hidden on a v1 project, which has no Inbox or changes. */
+  v2Only?: boolean;
+  requiresServer?: boolean;
+  /**
+   * A part of the page the redesign has no place for yet, kept here rather
+   * than removed (Plan's Open changes, Plan health, Specs to tighten). Grouped
+   * after the panels the layout names, under a divider.
+   */
+  transitional?: boolean;
+}
+
+/** A button at the right of the stage's head that opens one of its side panels. */
+export interface StageSideAction {
+  label: string;
+  /** A `StageSidePanel.id` of the same stage. */
+  panel: string;
+}
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -218,6 +258,15 @@ export interface StageDef {
    * which the Analyze dashboard dropped in favour of the codebase map).
    */
   alsoOwns?: readonly ViewId[];
+  /**
+   * Panels behind tabs at the page's right edge, the same in every mode. A
+   * side panel places no view: a view it shows belongs to the stage through a
+   * tile or `alsoOwns`, or to another stage (From analysis shows Analysis's
+   * recommended fixes).
+   */
+  sidePanels?: readonly StageSidePanel[];
+  /** A head button that opens one of the side panels (Plan's "Add to the plan"). */
+  sideAction?: StageSideAction;
 }
 
 /**
@@ -284,22 +333,15 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
         id: "create",
         label: "Create",
         focus: "How, why and what",
+        // What you are doing, what matters most and what is next; how work
+        // moves; then the product areas it lands in. Adding work, the
+        // analysis findings and the Inbox are side panels (`sidePanels`).
         tiles: [
-          // One input row. Its More, like the tile's header, opens the whole Add
-          // Items view as the tile's modal. A static export cannot add anything.
-          { view: "analysis", panel: "capture", embedsView: true, cols: 4, grow: true, requiresServer: true },
-          // Open changes comes before the Inbox so dense packing puts it beside
-          // the capture tile, and the Inbox in the column beneath capture. The
-          // Product page is a tab of Open changes, and its routes still open it.
-          // The full Changes list is placed by Preparation's tile; this glance
-          // links to it.
-          { view: "changes", panel: "changes-glance", title: "Open changes", cols: 8, rows: 2, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }, { view: "product", label: "Product" }], v2Only: true, requiresServer: true },
-          // Its rows' Place buttons and "Place best guesses" work in the tile; the header opens the Inbox page.
-          { view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true },
-          // The last check as lights; full-screen and "Open" show the whole Validation view.
-          { view: "validation", panel: "plan-health", title: "Plan health", embedsView: true, cols: 4, rows: 2 },
-          // Gaps in the open changes, each a link to the filtered list. Open changes is placed by its own tile.
-          { view: "changes", panel: "spec-gaps", title: "Specs to tighten", cols: 4, v2Only: true, requiresServer: true },
+          { view: "changes", panel: "plan-glance", title: "At a glance", band: true, v2Only: true, requiresServer: true },
+          { view: "changes", panel: "flow", title: "How work moves", band: true, requiresServer: true },
+          // The Product page's areas, each with the open changes moving it.
+          // Full-screen and "Open" show the whole Product page.
+          { view: "product", panel: "plan-areas", title: "Product areas", embedsView: true, cols: 12, rows: 3, grow: true, v2Only: true, requiresServer: true },
         ],
         // A v1 tree has no Inbox, changes or product map: Tasks stands in for them.
         // Product stays, because its tablist is how a v1 project reaches Requirements.
@@ -318,7 +360,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
           { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
           // The full list: each open change with its assignee picker, release
           // and priority, under the assignee filter.
-          { view: "changes", title: "Assign and schedule", cols: 12, rows: 3, v2Only: true, requiresServer: true },
+          // The Tasks tree is its Tree tab, now Create's Open changes tile is a side panel.
+          { view: "changes", title: "Assign and schedule", cols: 12, rows: 3, tabLabel: "List", tabs: [{ view: "prd", label: "Tree" }], v2Only: true, requiresServer: true },
         ],
         // A v1 tree assigns and prioritises in the task tree's detail panel.
         v1Tiles: [
@@ -326,9 +369,21 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
         ],
       },
     ],
-    // A tab of the Product page; its route still opens that tab. Tasks (`prd`)
-    // keeps its route and breadcrumb under Plan as a tab of Open changes.
-    alsoOwns: ["requirements"],
+    // Requirements is a tab of the Product page; its route still opens that
+    // tab. The capture view, the Inbox and Validation now show in side panels,
+    // which place no view, so they are owned here.
+    alsoOwns: ["requirements", "analysis", "inbox", "validation"],
+    sidePanels: [
+      { id: "new-change", label: "New change", title: "Add to the plan", blurb: "Describe it, and n-dx suggests where it goes.", view: "analysis", panel: "capture", requiresServer: true },
+      // The Analysis page's recommended fixes; "Open" goes to its Suggestions.
+      { id: "from-analysis", label: "From analysis", title: "From analysis", blurb: "Findings from the last run, ready to plan.", view: "suggestions", panel: "recommendations" },
+      { id: "inbox", label: "Inbox", title: "Inbox", blurb: "Waiting to be placed on the map.", view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true },
+      // Create's tiles the new layout does not place yet, kept rather than removed.
+      { id: "open-changes", label: "Open changes", title: "Open changes", blurb: "Placed open changes by stage, with their gaps.", view: "changes", panel: "changes-glance", v2Only: true, requiresServer: true, transitional: true },
+      { id: "plan-health", label: "Plan health", title: "Plan health", blurb: "The last validation of the PRD, as lights.", view: "validation", panel: "plan-health", transitional: true },
+      { id: "spec-gaps", label: "Specs to tighten", title: "Specs to tighten", blurb: "Open changes missing criteria or blocked.", view: "changes", panel: "spec-gaps", v2Only: true, requiresServer: true, transitional: true },
+    ],
+    sideAction: { label: "Add to the plan", panel: "new-change" },
   },
   work: {
     id: "work",
@@ -336,15 +391,18 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     modes: [
       {
         // What is happening and what happens next: the runs going now and who
-        // they are for, the queue `ndx work` picks from, and what a run
-        // typically takes. Counts and health live on Live and Plan, not here.
+        // they are for, the queue `ndx work` picks from (yours first, then the
+        // unassigned by product area), and the PRD's numbers in one section.
         id: "now",
         label: "Now",
         focus: "Who is working on what, and what is next",
         view: "work",
         tiles: [
           { view: "hench-runs", panel: "running", title: "Running now", cols: 12, grow: true, requiresServer: true },
-          { view: "hench-runs", panel: "up-next", title: "Up next", cols: 12, rows: 3, grow: true, requiresServer: true },
+          { view: "hench-runs", panel: "up-next", title: "Ready to run", cols: 12, rows: 3, grow: true, requiresServer: true },
+          // Totals, status, priority and structure health, from the Rex
+          // dashboard. No change progress: that is Plan's to show.
+          { view: "rex-dashboard", panel: "work-stats", title: "Statistics", embedsView: true, cols: 12, rows: 2, grow: true },
         ],
       },
       {
@@ -362,6 +420,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
           // label and labels are unique.
           { view: "hench-runs", cols: 8, rows: 2, tabs: [{ view: "activity" }] },
           { view: "token-usage", title: "Spend" },
+          // The audit of what runs did to each task, beside the runs it reads.
+          { view: "hench-audit", cols: 8, rows: 2 },
           { view: "hench-optimization", title: "Suggestions", tabs: [{ view: "hench-adaptive" }] },
           { view: "merge-graph", title: "Shipped" },
           // Panel tile: "Open" goes to the Runs view, whose records it summarises.
@@ -369,9 +429,12 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
         ],
       },
     ],
-    // Their numbers are on Live (runs, machine, worktrees) and Plan (the PRD's
-    // counts and health); their routes still open them under Work.
-    alsoOwns: ["rex-dashboard", "hench-audit", "workspaces"],
+    // Workspaces moved to Settings; the Rex dashboard's numbers are the
+    // Statistics tile and the audit is a Tune tile, so nothing is left here.
+    sidePanels: [
+      // The dashboard's quick actions, kept rather than removed.
+      { id: "prd-tools", label: "PRD tools", title: "PRD tools", blurb: "Browse, validate, reorganize or restore the PRD.", view: "prd", panel: "prd-tools", transitional: true },
+    ],
   },
 };
 
@@ -396,11 +459,16 @@ export interface SettingsEntry {
   tabs?: readonly ViewId[];
 }
 
-/** Robot Wrangler → Project → Workflow, then Commands (which moves to the Commands sheet in #464). */
+/**
+ * Robot Wrangler → Project → Workflow → Workspaces, then Commands (which moves
+ * to the Commands sheet in #464). Workspaces shows as a dropdown that expands
+ * to the worktree list.
+ */
 export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   { view: "robot-wrangler" },
   { view: "project" },
   { view: "workflow" },
+  { view: "workspaces" },
   { view: "commands", tabs: ["command-reference"] },
 ];
 

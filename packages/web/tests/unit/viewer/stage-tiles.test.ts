@@ -277,18 +277,19 @@ describe("a growing tile (Plan's capture)", () => {
     vi.unstubAllGlobals();
   });
 
-  const capture = STAGES.plan.modes![0]!.tiles.find((t) => t.panel === "capture")!;
-  const span = () => tile("capture").style.gridRow;
+  // Plan's product areas: as many boxes as the product has areas.
+  const areas = STAGES.plan.modes![0]!.tiles.find((t) => t.panel === "plan-areas")!;
+  const span = () => tile("plan-areas").style.gridRow;
 
   it("spans past its configured row to fit its content", () => {
-    mount({ stage: "plan", tiles: [capture], renderPanel: () => h("div", { class: "tall" }) });
+    mount({ stage: "plan", tiles: [areas], renderPanel: () => h("div", { class: "tall" }) });
     // 50px chrome + 1,000px content + the tile gap, in 4px tracks.
     expect(span()).toBe(`span ${Math.ceil((50 + 1000 + TILE_GAP_PX) / TILE_UNIT_PX)}`);
-    expect(Math.ceil((50 + 1000 + TILE_GAP_PX) / TILE_UNIT_PX)).toBeGreaterThan(TRACKS_PER_ROW * (capture.rows ?? 1));
+    expect(Math.ceil((50 + 1000 + TILE_GAP_PX) / TILE_UNIT_PX)).toBeGreaterThan(TRACKS_PER_ROW * (areas.rows ?? 1));
   });
 
   it("would keep its configured size without the flag", () => {
-    mount({ stage: "plan", tiles: [{ ...capture, grow: undefined }], renderPanel: () => h("div", { class: "tall" }) });
+    mount({ stage: "plan", tiles: [{ ...areas, grow: undefined }], renderPanel: () => h("div", { class: "tall" }) });
     expect(span()).toBe("");
   });
 });

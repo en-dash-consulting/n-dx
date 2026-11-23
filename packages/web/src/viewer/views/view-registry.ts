@@ -70,11 +70,15 @@ import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
 import { SpecGapsPanel } from "./spec-gaps.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
-import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
+import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageSidePanel, type StageTile } from "./stages.js";
 import { GlancePanel } from "./glance.js";
 import { RecommendationsPanel } from "./recommendations-panel.js";
 import { AnalyzeActionsProvider } from "./analyze-actions-context.js";
 import { SpendSummary } from "./spend-summary.js";
+import { PlanGlance } from "./plan-glance.js";
+import { PlanAreas } from "./plan-areas.js";
+import { PrdTools, WorkStats } from "./work-stats.js";
+import { SettingsDisclosure } from "./settings-disclosure.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 import { areaCapabilityOfTab, areaSlugOfTab, placeChangeOfTab } from "../route-state.js";
@@ -181,6 +185,12 @@ function stage(id: StageId, route: ViewId = id): ViewRenderer {
       : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
     renderSummary: id === "work" ? workTileSummary : undefined,
+    // A side panel shows its panel opened, or its view; the capture panel's
+    // More would open a tile, and a side panel has none, so it gets a grid
+    // that opens nothing.
+    renderSidePanel: (side: StageSidePanel) => side.panel
+      ? renderPanel(side.panel, true, NO_GRID, ctx)
+      : renderActiveView(side.view, { ...ctx, inSection: true }),
     detailOpen: ctx.detailOpen ?? false,
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
     headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
@@ -194,6 +204,9 @@ function stage(id: StageId, route: ViewId = id): ViewRenderer {
       ? (ctx) => h(AnalyzeActionsProvider, { data: ctx.data }, page(ctx))
       : page;
 }
+
+/** A tile grid that opens nothing: what a side panel's content is given. */
+const NO_GRID: TileGridApi = { openTile: () => {}, focus: null };
 
 /** The parts of a stage page that are not views of their own. */
 function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ctx: ViewRenderContext): ComponentChild {
@@ -213,6 +226,16 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "running": return h(RunningNow, { navigateTo: ctx.navigateTo });
     case "up-next": return h(UpNext, { navigateTo: ctx.navigateTo });
     case "agent-settings": return h(AgentSettingsPanel, { navigateTo: ctx.navigateTo });
+    case "plan-glance": return h(PlanGlance, { navigateTo: ctx.navigateTo });
+    // Full-screen and "Open" show the whole Product page.
+    case "plan-areas": return opened
+      ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo })
+      : h(PlanAreas, { navigateTo: ctx.navigateTo });
+    // The whole Inbox, not the section's first rows: the side panel scrolls.
+    case "inbox": return h(InboxPage, { navigateTo: ctx.navigateTo });
+    // Full-screen and "Open" show the whole Rex dashboard.
+    case "work-stats": return opened ? h(RexDashboard, { navigateTo: ctx.navigateTo }) : h(WorkStats, null);
+    case "prd-tools": return h(PrdTools, { navigateTo: ctx.navigateTo });
   }
 }
 
@@ -238,8 +261,15 @@ const REGISTRY: Record<string, ViewRenderer> = {
       : null,
   ),
 
+  // A Settings page: the worktree list behind a dropdown that expands it.
   "workspaces": ({ attachWorktree, attachedWorktree }) =>
-    h(WorkspacesView, { onAttachSidecar: attachWorktree, attachedWorktree: attachedWorktree ?? null }),
+    h(SettingsDisclosure, {
+      id: "workspaces",
+      title: "Workspaces",
+      blurb: "Every worktree of this repository, its branch, and what is uncommitted or unmerged.",
+    },
+      h(WorkspacesView, { onAttachSidecar: attachWorktree, attachedWorktree: attachedWorktree ?? null }),
+    ),
 
   "live": ({ data, navigateTo, jobs }) =>
     h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),

@@ -971,3 +971,27 @@ describe("buildChangeSummary: Inbox changes also counted in a stage", () => {
     expect(staged(summary)).toBe(0);
   });
 });
+
+describe("buildChangeSummary: who an open change is for", () => {
+  it("carries the change's assignee and its open tasks' distinct assignees, and neither when nobody is", () => {
+    const summary = buildChangeSummary({
+      product: [],
+      changes: [
+        {
+          id: "a", type: "change", title: "a", slug: "a", assignee: "Ann <ann@x.io>",
+          children: [
+            { id: "t1", type: "task", title: "t1", slug: "t1", status: "pending", assignee: "Bo <bo@x.io>" },
+            { id: "t2", type: "task", title: "t2", slug: "t2", status: "pending", assignee: "Bo <bo@x.io>" },
+            // Done work holds nobody.
+            { id: "t3", type: "task", title: "t3", slug: "t3", status: "completed", assignee: "Cy <cy@x.io>" },
+          ],
+        } as RuleNode,
+        { id: "b", type: "change", title: "b", slug: "b" },
+      ],
+    });
+    const byId = Object.fromEntries(summary.open.map((c) => [c.id, c]));
+    expect(byId["a"]).toMatchObject({ assignee: "Ann <ann@x.io>", taskAssignees: ["Bo <bo@x.io>"] });
+    expect(byId["b"]).not.toHaveProperty("assignee");
+    expect(byId["b"]).not.toHaveProperty("taskAssignees");
+  });
+});

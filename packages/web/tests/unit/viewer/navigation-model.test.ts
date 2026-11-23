@@ -407,7 +407,8 @@ describe("rendered surfaces take their labels from the model", () => {
       act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
     }
     expect(opened).toEqual(views);
-    expect(opened).toEqual(expect.arrayContaining(["changes", "validation"]));
+    // Create's grid is the product areas; the rest of Plan is bands and side panels.
+    expect(opened).toEqual(["product"]);
   });
 
   it("Tune shows the Agent settings tile on a server and omits it from a static export", async () => {
@@ -558,17 +559,18 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("marks the server-built views so static exports hide them", () => {
     // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Changes, Inbox
-    // and Workspaces by `requiresServer` (Changes and Inbox read rex's v2 model
-    // per request; Product, a tab of Open changes, goes with its tile), and
-    // Plan's capture tile (Add Items), since an export cannot add. A panel
-    // that only links to its view (the lifecycle strip) is not that view's
-    // placement.
+    // and Product by `requiresServer` (they read rex's v2 model per request;
+    // Product is Plan's product areas tile), and Plan's capture panel (Add
+    // Items), since an export cannot add. A panel that only links to its view
+    // (the lifecycle strip) is not that view's placement.
+    // Plan's capture and Inbox are side panels now, which an export hides the same way.
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
       ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
       ...stageTiles(stage).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
+      ...(STAGES[stage].sidePanels ?? []).filter((p) => p.requiresServer).map((p) => p.view),
     ]);
-    // Workspaces left Work's page (Live shows every worktree); its route stays.
-    expect([...new Set(serverBuilt)].sort()).toEqual(["analysis", "ask", "changes", "inbox"]);
+    // Workspaces is a Settings page now; its route opens it there.
+    expect([...new Set(serverBuilt)].sort()).toEqual(["analysis", "ask", "changes", "inbox", "product"]);
   });
 });
 

@@ -47,9 +47,9 @@ describe("healthLights", () => {
   });
 });
 
-it("is the Validation tile of Plan's Create mode, which still opens the Validation view", () => {
-  const tile = STAGES.plan.modes![0]!.tiles.find((t) => t.panel === "plan-health")!;
-  expect(tile.view).toBe("validation");
+it("is a transitional side panel on Plan, which still opens the Validation view", () => {
+  const panel = STAGES.plan.sidePanels!.find((p) => p.panel === "plan-health")!;
+  expect(panel).toMatchObject({ view: "validation", transitional: true });
 });
 
 describe("PlanHealth", () => {

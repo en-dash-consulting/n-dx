@@ -38,6 +38,7 @@ import { useFeatureToggle, useCliName, useStatusLayout, resolveCliLabel } from "
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
 import { TileGrid, tileKey, titleVariesByLayout, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
+import { StageSidePanels, type RenderSidePanel } from "./stage-side-panels.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -192,6 +193,8 @@ export interface StagePageProps {
   headStatus?: ComponentChild;
   /** Controls at the right of the stage's head (Analysis: the analyze control). */
   headActions?: ComponentChild;
+  /** The stage's side panels (`StageDef.sidePanels`); none are drawn without it. */
+  renderSidePanel?: RenderSidePanel;
 }
 
 const NO_PANEL: RenderPanel = () => null;
@@ -261,7 +264,7 @@ function ModeToggle({ stage, modes, active, onPick }: {
   );
 }
 
-export function StagePage({ stage, view, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null }: StagePageProps) {
+export function StagePage({ stage, view, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null, renderSidePanel }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
   const cliName = useCliName();
@@ -307,7 +310,27 @@ export function StagePage({ stage, view, validViews, navigateTo, renderView, ren
   const tabsOf = (tile: StageTile): StageTab[] =>
     [{ view: tile.view, label: tile.tabLabel }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
 
-  return h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage },
+  // Side panels this viewer can show; the panel component drops v2-only ones on v1.
+  const sidePanels = renderSidePanel
+    ? (def.sidePanels ?? []).filter((p) => validViews.has(p.view) && !(p.requiresServer && deployed))
+    : [];
+  const [openSide, setOpenSide] = useState<string | null>(null);
+  const sideAction = def.sideAction && sidePanels.some((p) => p.id === def.sideAction!.panel) ? def.sideAction : null;
+  const actions = [
+    headActions,
+    sideAction
+      ? h("button", {
+          key: "side-action",
+          type: "button",
+          class: "stage-side-action",
+          "aria-controls": openSide === sideAction.panel ? `stage-side-panel-${stage}` : undefined,
+          "aria-expanded": String(openSide === sideAction.panel),
+          onClick: () => setOpenSide(openSide === sideAction.panel ? null : sideAction.panel),
+        }, h("span", { "aria-hidden": "true" }, "+"), " ", sideAction.label)
+      : null,
+  ].filter(Boolean);
+
+  return h("div", { class: `stage-page stage-page-${product}${sidePanels.length > 0 ? " stage-page--side" : ""}`, "data-stage": stage },
     h("div", { class: "stage-page-head" },
       h(ProductLogoPng, { product, size: 36, class: "stage-page-logo" }),
       h("div", { class: "stage-page-heading" },
@@ -317,7 +340,7 @@ export function StagePage({ stage, view, validViews, navigateTo, renderView, ren
         ),
         headStatus,
       ),
-      headActions ? h("div", { class: "stage-page-actions" }, headActions) : null,
+      actions.length > 0 ? h("div", { class: "stage-page-actions" }, actions) : null,
     ),
     mode && shownModes.length > 1
       ? h(ModeToggle, { stage, modes: shownModes, active: mode.id, onPick: pickMode })
@@ -344,6 +367,9 @@ export function StagePage({ stage, view, validViews, navigateTo, renderView, ren
               })
             : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo }),
         )
+      : null,
+    renderSidePanel && sidePanels.length > 0
+      ? h(StageSidePanels, { stage, panels: sidePanels, openId: openSide, onToggle: setOpenSide, renderPanel: renderSidePanel, navigateTo })
       : null,
   );
 }

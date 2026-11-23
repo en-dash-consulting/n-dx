@@ -297,9 +297,11 @@ export const VIEW_META = {
     product: "global",
     blurb: "Tokens and estimated cost by period and package.",
   },
+  // A Settings page: the worktree list, behind a dropdown.
   workspaces: {
     label: "Workspaces",
     glyph: "⌗",
+    pixelIcon: "workspaces",
     product: "global",
     blurb: "Every worktree of this repository and what each is running.",
   },

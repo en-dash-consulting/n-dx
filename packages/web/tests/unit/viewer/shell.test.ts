@@ -117,17 +117,19 @@ describe("stages.ts", () => {
     }
     expect(isKnownViewPath("home")).toBe(true);
     expect(SETTINGS_ENTRIES.map((e) => e.view)).toEqual([
-      "robot-wrangler", "project", "workflow", "commands",
+      "robot-wrangler", "project", "workflow", "workspaces", "commands",
     ]);
   });
 
-  it("opens Work on what is running and what is next; its old sections keep their routes under Work", () => {
-    expect(STAGES.work.modes?.[0]?.tiles.map((t) => t.panel)).toEqual(["running", "up-next"]);
-    // Their numbers are on Live and Plan; the pages still open, lit as Work's.
-    for (const view of ["rex-dashboard", "hench-audit", "workspaces"] as const) {
-      expect(stageForView(view), view).toBe("work");
-      expect(STAGES.work.modes!.flatMap((m) => m.tiles).some((t) => t.view === view), view).toBe(false);
-    }
+  it("opens Work on what is running, what is next and the PRD's numbers; its old sections moved", () => {
+    expect(STAGES.work.modes?.[0]?.tiles.map((t) => t.panel)).toEqual(["running", "up-next", "work-stats"]);
+    // The dashboard's numbers are the Statistics tile; the audit is a Tune tile.
+    expect(STAGES.work.modes![0]!.tiles.find((t) => t.panel === "work-stats")?.view).toBe("rex-dashboard");
+    expect(STAGES.work.modes![1]!.tiles.some((t) => t.view === "hench-audit")).toBe(true);
+    for (const view of ["rex-dashboard", "hench-audit"] as const) expect(stageForView(view), view).toBe("work");
+    // Workspaces is a Settings page, in no stage.
+    expect(stageForView("workspaces")).toBeNull();
+    expect(isSettingsView("workspaces")).toBe(true);
     expect(STAGES.analyze.sections.map((s) => s.view)).not.toContain("rex-dashboard");
   });
 
@@ -550,36 +552,75 @@ describe("StagePage", () => {
 
   const planTiles = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
 
-  it("renders Plan as tiles, capture first, with no lead section across the top", async () => {
+  const bands = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-band")).map((el) => el.dataset.tile);
+  const sideTabs = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-side-tab")).map((el) => el.querySelector(".stage-side-tab-label")?.textContent);
+
+  it("renders Create as the glance cards, how work moves and the product areas, with the rest in side panels", async () => {
     stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v2" } });
-    await mount(page("plan"));
+    await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo: vi.fn(), renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
     expect(sectionViews()).toEqual([]);
-    expect(planTiles()).toEqual(["capture", "changes-glance", "inbox", "plan-health", "spec-gaps"]);
-    const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
-    expect(spans).toEqual(["stage-tile--c4 stage-tile--r1", "stage-tile--c8 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c4 stage-tile--r1"]);
-    expect(root.querySelector('.stage-tile[data-tile="capture"] .stage-tile-title')?.textContent).toBe("Describe a change");
-    expect(root.querySelector('.stage-tile[data-tile="changes-glance"] .stage-tile-title')?.textContent).toBe("Open changes");
+    expect(bands()).toEqual(["plan-glance", "flow"]);
+    expect(planTiles()).toEqual(["plan-areas"]);
+    expect(root.querySelector('.stage-tile[data-tile="plan-areas"]')?.className).toContain("stage-tile--c12 stage-tile--r3");
+    expect(root.querySelector('.stage-tile[data-tile="plan-areas"] .stage-tile-title')?.textContent).toBe("Product areas");
+    // The design's panels lead; the tiles Create no longer places follow a divider.
+    expect(sideTabs()).toEqual(["New change", "From analysis", "Inbox", "Open changes", "Plan health", "Specs to tighten"]);
+    expect(root.querySelectorAll(".stage-side-divider")).toHaveLength(1);
+    // "Add to the plan" in the head opens New change.
+    const add = root.querySelector<HTMLButtonElement>(".stage-side-action")!;
+    expect(add.textContent).toContain("Add to the plan");
+    act(() => { add.click(); });
+    expect(root.querySelector(".stage-side-panel .stage-side-title")?.textContent).toBe("Add to the plan");
+    expect(root.querySelector('.stage-side-panel [data-side="new-change"]')).not.toBeNull();
+    expect(add.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("opens Open changes full-screen with List, Tree and Product tabs", async () => {
+  it("closes a side panel on Escape and on its close button, returning focus to the tab", async () => {
+    stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v2" } });
+    const navigateTo = vi.fn();
+    await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo, renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
+    const tab = root.querySelector<HTMLButtonElement>('.stage-side-tab[data-panel="plan-health"]')!;
+    tab.focus();
+    act(() => { tab.click(); });
+    expect(document.activeElement?.classList.contains("stage-side-title")).toBe(true);
+    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(root.querySelector(".stage-side-panel")).toBeNull();
+    expect(document.activeElement).toBe(tab);
+
+    act(() => { tab.click(); });
+    act(() => { root.querySelector<HTMLButtonElement>(".stage-side-close")!.click(); });
+    expect(root.querySelector(".stage-side-panel")).toBeNull();
+    expect(document.activeElement).toBe(tab);
+
+    // "Open ↗" closes the panel and goes to the view it belongs to.
+    act(() => { tab.click(); });
+    act(() => { root.querySelector<HTMLButtonElement>(".stage-side-open")!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("validation");
+    expect(root.querySelector(".stage-side-panel")).toBeNull();
+  });
+
+  it("opens Preparation's Assign and schedule full-screen with List and Tree tabs", async () => {
+    localStorage.setItem("ndx.stage-mode", JSON.stringify({ plan: "prepare" }));
     await mount(page("plan"));
-    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes-glance"] .stage-tile-head')!.click(); });
+    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes"] .stage-tile-head')!.click(); });
     const full = root.querySelector(".stage-tile-fullscreen")!;
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree", "Product"]);
+    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree"]);
     act(() => { tabs[1]!.click(); });
     // Directly inside the tab panel: stage-tiles.css bounds the tree through `.stage-tile-content > div > .prd-view`.
     expect(full.querySelector('.stage-tile-content > div > [data-rendered="prd"]')).not.toBeNull();
   });
 
-  it("a v1 project shows Tasks and Product tiles in place of the Inbox and Open changes tiles", async () => {
+  it("a v1 project shows Tasks and Product tiles in place of the product areas, and no v2-only side panel", async () => {
     stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v1" } });
-    await mount(page("plan"));
-    expect(planTiles()).toEqual(["capture", "prd", "product", "plan-health"]);
-    expect(root.querySelector('.stage-tile[data-tile="capture"] .stage-tile-title')?.textContent).toBe("Add Items");
+    await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo: vi.fn(), renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
+    expect(planTiles()).toEqual(["prd", "product"]);
+    expect(bands()).toEqual(["flow"]);
     const tasks = root.querySelector<HTMLElement>('.stage-tile[data-tile="prd"]')!;
     expect(tasks.className).toContain("stage-tile--c8 stage-tile--r2");
     expect(tasks.querySelector(".stage-tile-title")?.textContent).toBe("Tasks");
+    // No Inbox, Open changes or spec gaps on a v1 tree.
+    expect(sideTabs()).toEqual(["New change", "From analysis", "Plan health"]);
   });
 
   it("keeps Tasks under Plan though Plan lists it only as a tab", () => {
@@ -594,14 +635,14 @@ describe("StagePage", () => {
     expect(sectionViews()).toEqual([]);
     expect(modeTabs().map((t) => t.querySelector(".stage-mode-label")?.textContent)).toEqual(["Now", "Tune"]);
     expect(modeTabs()[0]!.getAttribute("aria-selected")).toBe("true");
-    expect(tileKeys()).toEqual(["running", "up-next"]);
+    expect(tileKeys()).toEqual(["running", "up-next", "work-stats"]);
   });
 
   it("opens Work on Tune from the tune route, and the toggle navigates between the two", async () => {
     const navigateTo = vi.fn();
     await mount(h(StagePage, { stage: "work", view: "tune", validViews: ALL, navigateTo, renderView }));
     expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
-    expect(tileKeys()).toEqual(["agent-settings", "hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes"]);
+    expect(tileKeys()).toEqual(["agent-settings", "hench-runs", "token-usage", "hench-audit", "hench-optimization", "merge-graph", "outcomes"]);
     act(() => { modeTabs()[0]!.click(); });
     expect(navigateTo).toHaveBeenCalledWith("work");
   });
@@ -839,7 +880,7 @@ describe("SettingsOverlay", () => {
     const dialog = root.querySelector(".settings-overlay")!;
     expect(dialog.getAttribute("role")).toBe("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
+    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Workspaces", "Commands"]);
     expect(root.querySelector(".fake-settings")).not.toBeNull();
     expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("Robot Wrangler");
   });
@@ -847,7 +888,7 @@ describe("SettingsOverlay", () => {
   it("draws each page's pixel glyph, and the gear in the header", async () => {
     await mount(overlay("robot-wrangler"));
     const spans = root.querySelectorAll(".settings-overlay-item-glyph");
-    expect(spans).toHaveLength(4);
+    expect(spans).toHaveLength(5);
     for (const span of spans) {
       const svg = span.querySelector("svg");
       expect(svg?.getAttribute("shape-rendering")).toBe("crispEdges");
@@ -863,7 +904,7 @@ describe("SettingsOverlay", () => {
   it("lists the same pages whatever the feature toggles are — no toggle adds or removes a settings page", async () => {
     stubApi(["sourcevision.ask", "rex.placementDraft"]);
     await mount(overlay("robot-wrangler"));
-    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
+    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Workspaces", "Commands"]);
   });
 
   it("switches pages and closes with the ✕ or Escape", async () => {

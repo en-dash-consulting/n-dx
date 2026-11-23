@@ -103,4 +103,4 @@ export type DetailItem = FileDetail | ZoneDetail | GenericDetail | PRDDetail;
  * Here so the navigation model (views/view-meta.ts) names one without
  * importing a component.
  */
-export type PixelIconName = "robot-wrangler" | "project" | "workflow" | "commands" | "settings";
+export type PixelIconName = "robot-wrangler" | "project" | "workflow" | "workspaces" | "commands" | "settings";

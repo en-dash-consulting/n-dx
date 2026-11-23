@@ -115,30 +115,37 @@ afterEach(() => {
 
 // ── Placement on Plan ────────────────────────────────────────────────
 
-describe("the Plan tile", () => {
-  it("sits beneath the capture tile and beside Open changes, server-backed, with the Inbox badge", () => {
-    // On Plan's Create mode. Open changes is listed before the Inbox so dense
-    // packing puts the Inbox beneath capture.
-    expect(STAGES.plan.modes![0]!.tiles.filter((t) => !t.band).map((t) => t.view)).toEqual(["analysis", "changes", "inbox", "validation", "changes"]);
-    expect(STAGES.plan.modes![0]!.tiles.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true });
+describe("the Plan side panel", () => {
+  it("is the third of Plan's side panels, after New change and From analysis, server-backed, with the Inbox badge", () => {
+    expect(STAGES.plan.sidePanels!.filter((p) => !p.transitional).map((p) => p.id)).toEqual(["new-change", "from-analysis", "inbox"]);
+    expect(STAGES.plan.sidePanels!.find((p) => p.id === "inbox")).toEqual({
+      id: "inbox", label: "Inbox", title: "Inbox", blurb: "Waiting to be placed on the map.",
+      view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true,
+    });
+    // It places no view: the route stays Plan's through `alsoOwns`.
+    expect(STAGES.plan.alsoOwns).toContain("inbox");
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
     expect(viewBlurb("inbox")).toBe("Changes with no place on the product map yet. {cli} work skips their tasks until each is placed.");
   });
 
-  it("shows the open Inbox count and its blurb, with the CLI name, in the tile header", async () => {
+  it("shows the open Inbox count on its tab, and opens the panel from it", async () => {
     serveInbox([], [], { open: 19, appliedUnplaced: 156 });
-    routes["/api/project"] = { cliName: "ndx" };
     await mount(h(StagePage, {
       stage: "plan", validViews: buildValidViews(null), navigateTo: vi.fn(),
       renderView: (view) => h("div", { "data-rendered": view }),
+      renderSidePanel: (panel) => h("div", { "data-side": panel.id }),
     }));
-    const tile = root.querySelector<HTMLElement>('.stage-tile[data-tile="inbox"]')!;
-    expect(tile.classList.contains("stage-tile--c4")).toBe(true);
-    expect(tile.classList.contains("stage-tile--r2")).toBe(true);
-    expect(tile.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
-    expect(tile.querySelector(".stage-tile-blurb")?.textContent).toBe("Changes with no place on the product map yet. ndx work skips their tasks until each is placed.");
-    expect(tile.previousElementSibling?.getAttribute("data-tile")).toBe("changes-glance");
+    const tab = root.querySelector<HTMLButtonElement>('.stage-side-tab[data-panel="inbox"]')!;
+    expect(tab.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
+    expect(tab.getAttribute("aria-selected")).toBe("false");
+    await act(async () => { tab.click(); });
+    await settle();
+    const panel = root.querySelector<HTMLElement>(".stage-side-panel")!;
+    expect(panel.querySelector(".stage-side-title")?.textContent).toBe("Inbox");
+    expect(panel.querySelector(".stage-side-blurb")?.textContent).toBe("Waiting to be placed on the map.");
+    expect(panel.querySelector('[data-side="inbox"]')).not.toBeNull();
+    expect(tab.getAttribute("aria-selected")).toBe("true");
   });
 });
 

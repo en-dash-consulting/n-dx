@@ -53,28 +53,29 @@ afterEach(() => {
 });
 
 describe("Plan tiles before the first status", () => {
-  // Tiles are keyed by panel when they have one (Open changes glance).
-  const V2_ONLY = ["inbox", "changes-glance"];
+  // Tiles are keyed by panel when they have one: Create's glance band and product areas.
+  const V2_ONLY = ["plan-glance", "plan-areas"];
 
   it("mounts no v2-only tile with null status, only its placeholder, then a v1 status", () => {
     status = null;
     mount();
-    // Validation sits on Plan as the Plan health panel tile.
-    expect(live()).toContain("plan-health");
+    // The lifecycle band reads either layout, so it draws at once.
+    expect(live()).toContain("flow");
     for (const v of V2_ONLY) {
       expect(live()).not.toContain(v);
-      // The placeholder holds the slot and renders nothing that reads.
-      const slot = root.querySelector(`[data-tile="${v}"][data-pending]`);
-      expect(slot?.querySelector("[role=status]")?.textContent).toBe("Loading...");
+      expect(root.querySelector(`[data-tile="${v}"][data-pending]`)).not.toBeNull();
     }
-    expect(root.querySelector(".view-inbox, .view-changes")).toBeNull();
+    // The tile's placeholder says it is loading; a band's holds its slot empty.
+    expect(root.querySelector('[data-tile="plan-areas"][data-pending] [role=status]')?.textContent).toBe("Loading...");
+    expect(root.querySelector('[data-tile="plan-glance"][data-pending]')?.textContent).toBe("");
+    expect(root.querySelector(".view-product, .view-changes")).toBeNull();
 
     status = withLayout("v1");
     mount();
     expect(tiles()).toContain("prd");
-    // v1 keeps a Product tile (its tabs lead to Requirements), not the v2 Inbox or changes.
+    // v1 keeps a Product tile (its tabs lead to Requirements), not the v2 glance or areas.
     expect(tiles()).toContain("product");
-    for (const v of ["inbox", "changes"]) expect(tiles()).not.toContain(v);
+    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
   });
 
   it("brings the v2 tiles in once status says v2", () => {
@@ -86,19 +87,16 @@ describe("Plan tiles before the first status", () => {
     expect(root.querySelector("[data-pending]")).toBeNull();
   });
 
-  it("names the capture tile neither Add Items nor Describe a change until the layout is known", () => {
+  it("holds the product areas slot under its own title until the layout is known", () => {
     status = null;
     mount();
-    const capture = root.querySelector('[data-tile="capture"]')!;
-    expect(capture.hasAttribute("data-pending")).toBe(true);
-    expect(capture.querySelector(".stage-tile-title")?.textContent).toBe("Loading...");
-    expect(root.textContent).not.toMatch(/Add Items|Generate/);
+    const areas = root.querySelector('[data-tile="plan-areas"]')!;
+    expect(areas.hasAttribute("data-pending")).toBe(true);
+    expect(areas.querySelector(".stage-tile-title")?.textContent).toBe("Product areas");
 
-    // The real tile takes over once status lands. (Its title reads the status cache,
-    // which this harness's mocked useProjectStatus does not fill.)
     status = withLayout("v2");
     mount();
-    expect(root.querySelector('[data-tile="capture"]')?.hasAttribute("data-pending")).toBe(false);
+    expect(root.querySelector('[data-tile="plan-areas"]')?.hasAttribute("data-pending")).toBe(false);
   });
 
   it("draws the tiles in their v2 order while the layout loads, so nothing moves when it lands", () => {
@@ -108,8 +106,9 @@ describe("Plan tiles before the first status", () => {
     status = withLayout("v2");
     mount();
     expect(loading).toEqual(tiles());
-    expect(loading.indexOf("capture")).toBeLessThan(loading.indexOf("changes-glance"));
-    expect(loading.indexOf("changes-glance")).toBeLessThan(loading.indexOf("inbox"));
+    // The glance, then how work moves, then the product areas.
+    expect(loading.indexOf("plan-glance")).toBeLessThan(loading.indexOf("flow"));
+    expect(loading.indexOf("flow")).toBeLessThan(loading.indexOf("plan-areas"));
   });
 
   it("shows Tasks, and no tile that says to migrate, when status arrives with no PRD", () => {
@@ -168,7 +167,7 @@ describe("Plan tiles across a failed status poll", () => {
     mount();
     const v1 = tiles();
     expect(v1).toContain("prd");
-    expect(v1).not.toContain("inbox");
+    expect(v1).not.toContain("plan-areas");
 
     status = null;
     mount();
@@ -179,7 +178,7 @@ describe("Plan tiles across a failed status poll", () => {
     status = withLayout("v2");
     mount();
     const v2 = tiles();
-    expect(v2).toContain("inbox");
+    expect(v2).toContain("plan-areas");
 
     status = null;
     mount();

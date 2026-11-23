@@ -7,15 +7,15 @@
  * it, the worktree, and how far it is against a typical run. Up next is the
  * queue `ndx work` picks from (`ReadyToRun`): the typical run stated once above
  * it, each row with its assignee and, when its tier has a figure of its own,
- * that estimate. Counts, machine health and the PRD's totals are left to Live and
- * Plan, so nothing here repeats them.
+ * that estimate — split into the tasks assigned to you and the unassigned ones
+ * by product area. The PRD's numbers are Work's Statistics tile (`work-stats.ts`).
  *
  * @module viewer/views/work-now
  */
 
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { asLiveSnapshot, countsAsLive, useLive, type LiveRunFull } from "../hooks/index.js";
+import { asLiveSnapshot, countsAsLive, useLive, useProductRead, useStatusLayout, type LiveRunFull } from "../hooks/index.js";
 import {
   ElapsedTime,
   elapsedUntilNow,
@@ -26,10 +26,13 @@ import {
   formatDuration,
   formatTokenCount as formatTokens,
   personLabel,
+  usePeople,
   useRunEstimates,
+  type ReadyTask,
   type RunEstimates,
 } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
+import type { ProductMap } from "./product-model.js";
 
 /** The agent running a run, as one phrase: "claude · sonnet-4". */
 export function agentLabel(run: Pick<LiveRunFull, "vendor" | "model">): string {
@@ -138,17 +141,58 @@ export function RunningNow({ navigateTo }: { navigateTo: NavigateTo }) {
   );
 }
 
-/** The Up next panel: the queue `ndx work` picks from, with assignees and estimates. */
+/**
+ * The area each open change counts toward, by change id: the first area of the
+ * product map whose `openChangeIds` lists it.
+ */
+export function areaByChange(map: ProductMap): Map<string, string> {
+  const byChange = new Map<string, string>();
+  for (const area of map.areas) {
+    for (const id of area.openChangeIds) if (!byChange.has(id)) byChange.set(id, area.title);
+  }
+  return byChange;
+}
+
+/** A v1 task's section: the top of its chain (its epic), or nothing for a top-level task. */
+export function v1Section(task: ReadyTask): string | null {
+  return task.parentChain[0] ?? null;
+}
+
+type ReadyListProps = { navigateTo: NavigateTo; estimates: RunEstimates | null; me: string | null };
+
+function ReadyList({ navigateTo, estimates, me, areaOf }: ReadyListProps & { areaOf: (task: ReadyTask) => string | null }) {
+  return h(ReadyToRun, {
+    heading: false,
+    estimates,
+    split: { me, areaOf },
+    onPrepare: (taskId: string) => navigateTo("work", { taskId }),
+    onOpenLive: (taskId: string) => navigateTo("live-task", { taskId }),
+    onOpenPrd: () => navigateTo("prd"),
+  });
+}
+
+/** On v2: group by the product area of each task's change, read from the product map. */
+function ReadyByArea(props: ReadyListProps) {
+  const product = useProductRead("/api/rex/product", (body) => body.map as ProductMap);
+  const areas = product.state === "ready" ? areaByChange(product.data) : null;
+  return h(ReadyList, { ...props, areaOf: (task) => (task.change && areas?.get(task.change.id)) || null });
+}
+
+/**
+ * The Up next panel: the queue `ndx work` picks from, with assignees and
+ * estimates — the tasks assigned to you, then the unassigned ones by product
+ * area (by top-level section on a v1 tree, which has no product map).
+ */
 export function UpNext({ navigateTo }: { navigateTo: NavigateTo }) {
   const estimates = useRunEstimates();
+  const people = usePeople();
+  // The shared status cache, not a poll of its own.
+  const v2 = useStatusLayout() === "v2";
+  const me = people?.me ?? null;
   return h("div", { class: "wn-up-next" },
     h(TypicalRun, { estimates, class: "wn-typical" }),
-    h(ReadyToRun, {
-      heading: false,
-      estimates,
-      onPrepare: (taskId: string) => navigateTo("work", { taskId }),
-      onOpenLive: (taskId: string) => navigateTo("live-task", { taskId }),
-      onOpenPrd: () => navigateTo("prd"),
-    }),
+    v2
+      ? h(ReadyByArea, { navigateTo, estimates, me })
+      : h(ReadyList, { navigateTo, estimates, me, areaOf: v1Section }),
   );
 }
