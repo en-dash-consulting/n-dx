@@ -16,6 +16,8 @@
  * detail panel when one is open, so the two sit side by side. A panel may open
  * its tile at a focus (`TileFocus`: an area of Plan's product map); the trail
  * then reads "← Stage / Tile / Focus", and the tile step drops the focus.
+ * A working tile (`opensPage`, Plan's Inbox) is neither: its body takes
+ * clicks, and its header goes to its view's own page.
  * A chromeless tile (the codebase map) is its panel alone: the panel
  * brings its own header, controls and full-screen.
  *
@@ -346,8 +348,9 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
       type: "button",
       class: "stage-tile-head",
       onClick: (e: Event) => onOpen(e.currentTarget as HTMLElement),
-      "aria-haspopup": "dialog",
-      "aria-label": `Open ${title}`,
+      // A working tile goes to its view's page; any other opens full-screen.
+      "aria-haspopup": tile.opensPage ? undefined : "dialog",
+      "aria-label": tile.opensPage ? `Open ${title} on its own page` : `Open ${title}`,
       // aria-label replaces the button's content, so the count is named here.
       "aria-describedby": tile.badge ? `${idBase}-badge` : undefined,
     },
@@ -357,7 +360,8 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
       tile.panel ? null : h("span", { class: "stage-tile-blurb" }, resolveCliLabel(viewBlurbFor(tile.view, layout), cliName)),
       h("span", { class: "stage-tile-open", "aria-hidden": "true" }, h(ActionIcon, { name: "expand" })),
     ),
-    h("div", { class: `stage-tile-body${summary === null && !tile.panel ? " stage-tile-body--view" : ""}`, ref: bodyRef },
+    // A view's preview takes no clicks until opened; a working tile's body does.
+    h("div", { class: `stage-tile-body${summary === null && !tile.panel && !tile.opensPage ? " stage-tile-body--view" : ""}`, ref: bodyRef },
       summary !== null
         ? summary
         // A preview: the tile's own view only; its tabs are for full-screen.
@@ -422,7 +426,9 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
       grid,
       stage,
       tile,
-      onOpen: (opener: HTMLElement) => { openerRef.current = opener; setFullScreen({ key, focus: null }); },
+      onOpen: tile.opensPage && navigateTo
+        ? () => navigateTo(tile.view)
+        : (opener: HTMLElement) => { openerRef.current = opener; setFullScreen({ key, focus: null }); },
       renderView,
       renderPanel,
       renderSummary,
