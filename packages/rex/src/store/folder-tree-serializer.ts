@@ -949,9 +949,6 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
  * `false`, so a quoted `"true"` would round-trip back as the *string*
  * `"true"` rather than the boolean — silently corrupting any boolean field
  * that took the generic string-encoding path (e.g. `ready`).
- *
- * @public — used by core/compact-single-children to re-emit prefixed parent
- * fields with the same encoding rules as the rest of the serializer.
  */
 export function emitYamlField(lines: string[], key: string, value: unknown): void {
   if (Array.isArray(value)) {

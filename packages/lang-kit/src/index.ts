@@ -12,6 +12,7 @@ export * from "./typescript.js";
 export * from "./go.js";
 export * from "./swift.js";
 export * from "./python.js";
+export * from "./php.js";
 export * from "./csharp.js";
 export * from "./java.js";
 export * from "./terraform.js";
@@ -30,6 +31,7 @@ export * from "./gradle-catalog.js";
 export * from "./python-build.js";
 export * from "./python-requirements.js";
 export * from "./python-setup-py.js";
+export * from "./php-composer.js";
 
 // IaC resource kinds
 export * from "./iac-kinds.js";
@@ -47,3 +49,9 @@ export * from "./toml-lite.js";
 export * from "./ini-lite.js";
 export * from "./xml-lite.js";
 export * from "./yaml-subset.js";
+
+// Linear trims of a repeated character
+export * from "./text-trim.js";
+
+// URL userinfo removal (sourcevision's redaction and the packs' URL targets)
+export * from "./url-userinfo.js";

@@ -99,6 +99,27 @@ describe("Ready to run", () => {
     expect(rows()[1].querySelector(".prd-status-in_progress")).not.toBeNull();
   });
 
+  it("draws each task as an Up next card: badges and run button, title, place, description, tags", async () => {
+    await mount([
+      { ...TASKS[0], itemType: "change", priority: "critical", description: "Two tests fail on CI.", tags: ["ci", "flaky"] },
+      { ...TASKS[1], itemType: "task" },
+    ]);
+    const cards = rows();
+    expect(cards[0].classList.contains("rex-dash-next-card")).toBe(true);
+    expect(cards[0].classList.contains("rex-dash-next-critical")).toBe(true);
+    expect(cards[0].classList.contains("ready-row--lead")).toBe(true);
+    expect(cards[1].classList.contains("ready-row--lead")).toBe(false);
+    expect(cards[0].querySelector(".prd-level-badge")?.textContent).toBe("Change");
+    expect(cards[0].querySelector(".rex-dash-next-top .ready-primary")).not.toBeNull();
+    expect(cards[0].querySelector(".ready-chain")?.textContent).toBe("Epic › Feature");
+    expect(cards[0].querySelector(".ready-desc")?.textContent).toBe("Two tests fail on CI.");
+    expect([...cards[0].querySelectorAll(".rex-dash-next-tags .prd-tag")].map((t) => t.textContent)).toEqual(["ci", "flaky"]);
+    // A task with no description draws no empty paragraph.
+    expect(cards[1].querySelector(".ready-desc")).toBeNull();
+    // The panel says how many are ready and in what order.
+    expect(document.querySelector(".ready-to-run .rex-dash-section-meta")?.textContent).toBe("2 ready · in the order the agent picks them");
+  });
+
   it("marks a row whose task carries saved run settings, with a label not just a dot", async () => {
     // The dot says the task will not run on the project defaults; a screen
     // reader needs the words, so the label carries the meaning.
@@ -269,11 +290,11 @@ describe("Ready to run: every task, search and filters", () => {
     expect(controlledId).toBeTruthy();
     const list = document.getElementById(controlledId!);
     expect(list).toBe(document.querySelector(".ready-list"));
-    expect(list!.querySelectorAll(".ready-row")).toHaveLength(10);
-    expect(rows()).toHaveLength(10);
+    expect(list!.querySelectorAll(".ready-row")).toHaveLength(3);
+    expect(rows()).toHaveLength(3);
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(toggle.textContent).toBe("Show top 10");
+    expect(toggle.textContent).toBe("Show top 3");
     expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBe(list);
     expect(list!.querySelectorAll(".ready-row")).toHaveLength(120);
     expect(rows()).toHaveLength(120);
@@ -288,8 +309,8 @@ describe("Ready to run: every task, search and filters", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(toggle.textContent).toBe("Show all 120");
     expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBe(list);
-    expect(list!.querySelectorAll(".ready-row")).toHaveLength(10);
-    expect(rows()).toHaveLength(10);
+    expect(list!.querySelectorAll(".ready-row")).toHaveLength(3);
+    expect(rows()).toHaveLength(3);
   });
 
   it("a live refresh while expanded issues one ready request", async () => {
@@ -308,8 +329,8 @@ describe("Ready to run: every task, search and filters", () => {
     fetchReady.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     await click(byText("Show all 120"));
     expect(rows()).toHaveLength(50);
-    await click(byText("Show top 10"));
-    expect(rows()).toHaveLength(10);
+    await click(byText("Show top 3"));
+    expect(rows()).toHaveLength(3);
     expect(fetchReady.mock.calls.filter(([url]) => String(url).startsWith("/api/hench/ready"))).toHaveLength(2);
     await click(byText("Show all 120"));
     expect(rows()).toHaveLength(120);
@@ -322,7 +343,7 @@ describe("Ready to run: every task, search and filters", () => {
     await type(document.querySelector<HTMLInputElement>(".ready-search")!, "number 119");
     expect(titles()).toEqual(["Task number 119"]);
     await click(byText("Clear"));
-    await click(byText("Show top 10"));
+    await click(byText("Show top 3"));
     await click(byText("Show all 120"));
     expect(rows()).toHaveLength(120);
     expect(readyUrls()).toHaveLength(3);
@@ -416,7 +437,7 @@ describe("Ready to run: every task, search and filters", () => {
     expect(rows()).toHaveLength(18);
     expect(document.querySelector(".ready-count")!.textContent).toBe("18 of 120 match");
     await click(byText("Clear"));
-    expect(rows()).toHaveLength(10);
+    expect(rows()).toHaveLength(3);
   });
 
   it("Start now on a row past the top rows starts that task", async () => {
@@ -434,7 +455,7 @@ describe("Ready to run: every task, search and filters", () => {
       t119: { basis: "expected", files: ["config/.env", "core.ts"], fileCount: 2, size: "small", kinds: { config: 1, code: 1 }, security: ["config/.env"], essential: ["core.ts"] },
     };
     const props = await mount(tasks, undefined, impact);
-    expect(rows()).toHaveLength(10);
+    expect(rows()).toHaveLength(3);
     expect(rows()[0].querySelector<HTMLButtonElement>(".ready-title")!.title).toBe("Task number 0");
     await type(document.querySelector<HTMLInputElement>(".ready-search")!, "Readable work t119");
     expect(titles()).toEqual(["Readable work t119"]);
@@ -469,16 +490,16 @@ describe("Ready to run: every task, search and filters", () => {
       "/api/hench/ready?limit=50&offset=0", "/api/hench/ready?all=1",
     ]);
     expect(calls.filter((c) => c.url === "/api/rex/impact")).toHaveLength(1);
-    await click(byText("Show top 10"));
+    await click(byText("Show top 3"));
     // A run removes a task from the queue; refresh must replace the cached rows.
     tasks.splice(0, 1);
     const before = calls.length;
     await act(async () => { live.refresh!(); });
     await flush();
     expect(calls.slice(before).map((c) => c.url)).toEqual(["/api/hench/ready?all=1"]);
-    expect(rows()).toHaveLength(10);
+    expect(rows()).toHaveLength(3);
     expect(rows()[0].dataset.taskId).toBe("t1");
-    expect(document.querySelector(".ready-count")!.textContent).toBe("10 of 119");
+    expect(document.querySelector(".ready-count")!.textContent).toBe("3 of 119");
     await click(byText("Show all 119"));
     expect(rows().map((r) => r.dataset.taskId)).toEqual(tasks.map((t) => t.id));
     expect(rows()[118].querySelector(".impact-essential")).not.toBeNull();

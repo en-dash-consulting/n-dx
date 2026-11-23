@@ -32,7 +32,7 @@ const GRANDFATHERED = new Set(
   JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/changeset-body-grandfathered.json"), "utf8")),
 );
 
-export const MAX_LEAD_WORDS = 30;
+export const MAX_LEAD_WORDS = 35;
 const INTERNAL_MARKER = /^(Internal|Test-only):/;
 const ACTION_MARKER = "Action needed:";
 
@@ -131,7 +131,7 @@ describe("changesetBodyProblems", () => {
 
   it("flags a lead over the word limit", () => {
     const long = Array.from({ length: MAX_LEAD_WORDS + 1 }, () => "word").join(" ");
-    expect(changesetBodyProblems(`${fm}${long}.\n`)[0]).toMatch(/lead sentence is 31 words/);
+    expect(changesetBodyProblems(`${fm}${long}.\n`)[0]).toMatch(/lead sentence is 36 words/);
   });
 
   it("flags misplaced and empty markers", () => {

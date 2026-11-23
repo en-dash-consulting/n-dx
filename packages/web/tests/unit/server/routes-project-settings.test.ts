@@ -48,7 +48,7 @@ function put(body: Record<string, unknown>): Promise<Response> {
 const readJson = async (file: string) => JSON.parse(await readFile(file, "utf-8")) as Record<string, Record<string, unknown>>;
 
 describe("project language", () => {
-  it.each(["swift", "python", "csharp", "java", "go", "auto"])("accepts %s", async (language) => {
+  it.each(["swift", "python", "csharp", "java", "php", "go", "auto"])("accepts %s", async (language) => {
     const res = await put({ language });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { settings: { language: string } }).settings.language).toBe(language);

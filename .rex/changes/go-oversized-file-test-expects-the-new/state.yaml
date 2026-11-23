@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "8c849649-b8bf-4533-8a45-840c2e5c2ecf":
+    status: "completed"
+    startedAt: "2026-11-19T02:48:10.278Z"
+    completedAt: "2026-11-19T02:49:32.874Z"
+    endedAt: "2026-11-19T02:49:32.874Z"
+    activeIntervals: [{"end":"2026-11-19T02:49:32.874Z","start":"2026-11-19T02:48:10.278Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Go oversized-file test now expects the [go-parse] line and asserts summary.parseIssues.go.oversized."
+    lastModified: "2026-11-19T02:49:32.874Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b38671c4-3f94-4a2c-9014-d51c5af76e00":
+    status: "completed"
+    startedAt: "2026-11-19T02:49:32.874Z"
+    completedAt: "2026-11-19T02:49:32.874Z"
+    endedAt: "2026-11-19T02:49:32.874Z"
+    activeIntervals: [{"end":"2026-11-19T02:49:32.874Z","start":"2026-11-19T02:49:32.874Z"}]
+    appliedAt: "2026-11-19T02:49:32.874Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-19T02:47:14.160Z"
+    lastModified: "2026-11-19T02:49:32.874Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -250,14 +250,6 @@ export interface PreviewPlacementCandidateWire {
   area: string;
 }
 
-/** A preview change's placement, with `tied` as the detail panel's shortlist carries it. */
-export interface PreviewPlacementWire {
-  relation: PlacementRelationWire;
-  /** The top two candidates score the same, so the rules name no single leader. */
-  tied: boolean;
-  shortlist: PreviewPlacementCandidateWire[];
-}
-
 /**
  * Complete the placement `rex add` previewed for one change. Rex's rows carry
  * score and reasons, and strength when rex is current; strength comes from
