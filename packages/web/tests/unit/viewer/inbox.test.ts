@@ -138,14 +138,14 @@ describe("the Plan side panel", () => {
     }));
     const tab = root.querySelector<HTMLButtonElement>('.stage-side-tab[data-panel="inbox"]')!;
     expect(tab.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
-    expect(tab.getAttribute("aria-selected")).toBe("false");
+    expect(tab.getAttribute("aria-expanded")).toBe("false");
     await act(async () => { tab.click(); });
     await settle();
     const panel = root.querySelector<HTMLElement>(".stage-side-panel")!;
     expect(panel.querySelector(".stage-side-title")?.textContent).toBe("Inbox");
     expect(panel.querySelector(".stage-side-blurb")?.textContent).toBe("Waiting to be placed on the map.");
     expect(panel.querySelector('[data-side="inbox"]')).not.toBeNull();
-    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect(tab.getAttribute("aria-expanded")).toBe("true");
   });
 });
 

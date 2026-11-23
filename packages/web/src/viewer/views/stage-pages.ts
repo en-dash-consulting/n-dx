@@ -330,8 +330,8 @@ export function StagePage({ stage, view, validViews, navigateTo, renderView, ren
       : null,
   ].filter(Boolean);
 
-  return h("div", { class: `stage-page stage-page-${product}${sidePanels.length > 0 ? " stage-page--side" : ""}`, "data-stage": stage },
-    h("div", { class: "stage-page-head" },
+  const page = [
+    h("div", { key: "head", class: "stage-page-head" },
       h(ProductLogoPng, { product, size: 36, class: "stage-page-logo" }),
       h("div", { class: "stage-page-heading" },
         h("div", { class: "stage-page-titles" },
@@ -343,9 +343,9 @@ export function StagePage({ stage, view, validViews, navigateTo, renderView, ren
       actions.length > 0 ? h("div", { class: "stage-page-actions" }, actions) : null,
     ),
     mode && shownModes.length > 1
-      ? h(ModeToggle, { stage, modes: shownModes, active: mode.id, onPick: pickMode })
+      ? h(ModeToggle, { key: "modes", stage, modes: shownModes, active: mode.id, onPick: pickMode })
       : null,
-    sections.map((s) => {
+    ...sections.map((s) => {
       if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
       // A tiled stage keeps only its plain lead section; the tiles replace the rest.
       if (part.tiles) return null;
@@ -368,10 +368,16 @@ export function StagePage({ stage, view, validViews, navigateTo, renderView, ren
             : h(TileGrid, { stage, tiles: tilesFor("v2"), tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen, navigateTo }),
         )
       : null,
-    renderSidePanel && sidePanels.length > 0
-      ? h(StageSidePanels, { stage, panels: sidePanels, openId: openSide, onToggle: setOpenSide, renderPanel: renderSidePanel, navigateTo })
-      : null,
-  );
+  ];
+
+  // Side panels: the page in one column and the tabs beside it, inside the
+  // main column, so they clear the stage links and narrow with the Sidecar.
+  return renderSidePanel && sidePanels.length > 0
+    ? h("div", { class: `stage-page stage-page-${product} stage-page--side`, "data-stage": stage },
+        h("div", { class: "stage-page-main" }, page),
+        h(StageSidePanels, { stage, panels: sidePanels, openId: openSide, onToggle: setOpenSide, renderPanel: renderSidePanel, navigateTo }),
+      )
+    : h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage }, page);
 }
 
 type LayoutTileGridProps = TileGridProps & { v1Tiles: readonly StageTile[]; deployed: boolean };

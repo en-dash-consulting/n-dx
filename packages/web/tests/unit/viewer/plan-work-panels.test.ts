@@ -7,10 +7,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { isMyChange, planGlanceModel } from "../../../src/viewer/views/plan-glance.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { isMyChange, planGlanceModel, PlanGlance } from "../../../src/viewer/views/plan-glance.js";
 import { areaBoxes } from "../../../src/viewer/views/plan-areas.js";
 import { WorkStats } from "../../../src/viewer/views/work-stats.js";
+import { RexDashboard } from "../../../src/viewer/views/rex-dashboard.js";
 import { SettingsDisclosure } from "../../../src/viewer/views/settings-disclosure.js";
+import { StagePage } from "../../../src/viewer/views/stage-pages.js";
+import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
+import { ReadyToRun, type ReadyTask } from "../../../src/viewer/components/ready-to-run.js";
+import { _primePeopleForTests, _resetPeopleForTests } from "../../../src/viewer/components/assignee.js";
+import { getRegisteredPollers, resetPollingManager } from "../../../src/viewer/polling/polling-manager.js";
+import { buildValidViews } from "../../../src/shared/index.js";
 import type { ChangeSummary, GlanceChange, ProductMap } from "../../../src/viewer/views/product-model.js";
 
 const change = (id: string, extra: Partial<GlanceChange> = {}): GlanceChange => ({
@@ -138,6 +147,183 @@ describe("Work's Statistics", () => {
     // Change progress is Plan's to show, not Work's.
     expect(root.textContent).not.toContain("Change one");
     expect(root.querySelector(".rex-dash-epics, .rex-dash-epic")).toBeNull();
+  });
+});
+
+// ── Fixes from the adversarial review ────────────────────────────────
+
+async function flush(n = 6) {
+  for (let i = 0; i < n; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+}
+
+describe("side panel layout (F1)", () => {
+  const css = readFileSync(resolve(__dirname, "../../../src/viewer/styles/stage-tiles.css"), "utf-8");
+  const rule = (selector: string) => {
+    const m = new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{([^}]*)\\}`).exec(css);
+    return m?.[2] ?? "";
+  };
+
+  it("keeps the tab column in the page's flow, sticky, never fixed to the viewport", () => {
+    expect(rule(".stage-side-tabs")).toMatch(/position: sticky/);
+    expect(rule(".stage-side-tabs")).not.toMatch(/position: fixed/);
+    expect(rule(".stage-side-tab")).not.toMatch(/position: fixed/);
+    // The page is two columns: the page, then the tabs beside it.
+    expect(rule(".stage-page--side")).toMatch(/grid-template-columns: minmax\(0, 1fr\) auto/);
+  });
+
+  it("renders the tabs as the page's second column, beside its content", async () => {
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as Response));
+    await act(async () => {
+      render(h(StagePage, { stage: "work", validViews: buildValidViews(null), navigateTo: vi.fn(), renderView: () => null, renderSidePanel: () => null }), root);
+    });
+    const page = root.querySelector<HTMLElement>(".stage-page--side")!;
+    expect([...page.children].map((c) => c.className)).toEqual(["stage-page-main", "stage-side-tabs"]);
+    act(() => { render(null, root); });
+    root.remove();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("side panel keyboard and focus (F3)", () => {
+  let root: HTMLDivElement;
+  beforeEach(() => {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as Response));
+  });
+  afterEach(() => {
+    act(() => { render(null, root); });
+    root.remove();
+    vi.unstubAllGlobals();
+  });
+
+  const mount = () => act(() => {
+    render(h("div", null,
+      h("button", { type: "button", class: "outside" }, "Behind the scrim"),
+      h(StagePage, {
+        stage: "plan", validViews: buildValidViews(null), navigateTo: vi.fn(), renderView: () => null,
+        renderSidePanel: () => h("div", null, h("button", { type: "button", class: "first-in-body" }, "A"), h("button", { type: "button", class: "last-in-body" }, "B")),
+      }),
+    ), root);
+  });
+  const tab = () => root.querySelector<HTMLButtonElement>('.stage-side-tab[data-panel="plan-health"]')!;
+  const panel = () => root.querySelector<HTMLElement>(".stage-side-panel");
+
+  it("uses disclosure buttons, not tab roles, and opens an aria-modal dialog", () => {
+    mount();
+    expect(root.querySelector('[role="tablist"].stage-side-tabs, .stage-side-tab[role="tab"]')).toBeNull();
+    expect(tab().getAttribute("aria-expanded")).toBe("false");
+    act(() => { tab().click(); });
+    expect(tab().getAttribute("aria-expanded")).toBe("true");
+    expect(panel()?.getAttribute("role")).toBe("dialog");
+    expect(panel()?.getAttribute("aria-modal")).toBe("true");
+  });
+
+  it("closes on a scrim click and returns focus to the tab", () => {
+    mount();
+    tab().focus();
+    act(() => { tab().click(); });
+    act(() => { root.querySelector<HTMLElement>(".stage-side-scrim")!.click(); });
+    expect(panel()).toBeNull();
+    expect(document.activeElement).toBe(tab());
+  });
+
+  it("keeps focus inside: Tab wraps at the ends, and focus that lands behind the scrim comes back", () => {
+    mount();
+    act(() => { tab().click(); });
+    const last = root.querySelector<HTMLButtonElement>(".last-in-body")!;
+    last.focus();
+    act(() => { panel()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })); });
+    expect(document.activeElement).toBe(root.querySelector(".stage-side-open"));
+    act(() => { panel()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true })); });
+    expect(document.activeElement).toBe(last);
+    act(() => { root.querySelector<HTMLButtonElement>(".outside")!.focus(); });
+    expect(document.activeElement?.classList.contains("stage-side-title")).toBe(true);
+  });
+});
+
+describe("Work's Statistics polling (F2)", () => {
+  let a: HTMLDivElement;
+  let b: HTMLDivElement;
+  beforeEach(() => {
+    resetPollingManager();
+    a = document.createElement("div");
+    b = document.createElement("div");
+    document.body.append(a, b);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ title: "PRD", stats: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0 }, percentComplete: 0, epics: [], nextTask: null, priorities: { critical: 0, high: 0, medium: 0, low: 0, unset: 0 } }) }) as Response));
+  });
+  afterEach(() => {
+    act(() => { render(null, a); render(null, b); });
+    a.remove();
+    b.remove();
+    resetPollingManager();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the tile's poll when the full-screen dashboard beside it unmounts", async () => {
+    const dashboardKeys = () => getRegisteredPollers().map((p) => p.key).filter((k) => k.startsWith("rex-dashboard"));
+    await act(async () => { render(h(WorkStats, null), a); });
+    await act(async () => { render(h(RexDashboard, null), b); });
+    await flush(2);
+    const both = dashboardKeys();
+    expect(both).toHaveLength(2);
+    act(() => { render(null, b); });
+    expect(dashboardKeys()).toEqual([both[0]]);
+  });
+});
+
+describe("Ready to run's counts when split (F4)", () => {
+  let root: HTMLDivElement;
+  const t = (id: string, assignee: string | null): ReadyTask =>
+    ({ id, title: `Task ${id}`, status: "pending", priority: null, parentChain: [], criteriaCount: 0, resume: false, assignee, tier: null });
+  beforeEach(() => {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    const tasks = [t("m1", "Ann <ann@x.io>"), t("m2", "Ann <ann@x.io>"), t("m3", "Ann <ann@x.io>"), t("m4", "Ann <ann@x.io>"), t("u1", null), t("o1", "Bo <bo@x.io>"), t("o2", "Bo <bo@x.io>")];
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ dir: "/repo", total: tasks.length, tasks }) }) as Response));
+  });
+  afterEach(() => {
+    act(() => { render(null, root); });
+    root.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it("counts and offers only the rows it can list: yours and the unassigned", async () => {
+    await act(async () => {
+      render(h(ReadyToRun, { heading: false, split: { me: "Ann <ann@x.io>", areaOf: () => null }, onPrepare: vi.fn(), onOpenLive: vi.fn(), onOpenPrd: vi.fn() }), root);
+    });
+    await flush();
+    // Three of the four yours, and the one unassigned, are on screen; Bo's two never are.
+    expect(root.querySelectorAll(".ready-row")).toHaveLength(4);
+    expect(root.querySelector(".ready-count")?.textContent).toBe("4 of 5");
+    expect(root.querySelector(".ready-more")?.textContent).toBe("Show all 5");
+  });
+});
+
+describe("the Highest priority card (F5)", () => {
+  let root: HTMLDivElement;
+  beforeEach(() => {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    _primePeopleForTests({ me: null, people: [] });
+    const body = { layout: "v2", summary: summary([change("top", { priority: "critical", assignee: "Ann Lee <ann@x.io>" })]) };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => body }) as Response));
+  });
+  afterEach(() => {
+    act(() => { render(null, root); });
+    root.remove();
+    _resetPeopleForTests();
+    vi.unstubAllGlobals();
+  });
+
+  it("names the assignee as the dashboard does elsewhere, not by the stored identity", async () => {
+    await act(async () => { render(h(ChangesSummaryProvider, null, h(PlanGlance, { navigateTo: vi.fn() })), root); });
+    await flush();
+    const card = root.querySelector(".plan-glance-card--top")!;
+    expect(card.textContent).toContain("Assigned to Ann Lee.");
+    expect(card.textContent).not.toContain("ann@x.io");
   });
 });
 

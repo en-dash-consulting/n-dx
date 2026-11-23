@@ -1821,10 +1821,19 @@ button.wn-run-title:focus-visible { outline: 2px solid var(--accent); outline-of
 }
 
 /* ── Side panels (stage-side-panels.ts) ──────────────────────────
-   Vertical tabs at the page's right edge; pressing one slides its panel
-   in over the page. The page keeps room for the tabs on its right. */
+   Vertical tabs down the page's right edge; pressing one slides its panel
+   in over the page. The tabs are a sticky column in the page's own flow,
+   never position: fixed, so they stay inside the main column: clear of the
+   stage links in its reserved padding, and of the Sidecar drawer, which
+   narrows it. */
 
-.stage-page--side { padding-right: 44px; }
+.stage-page--side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+  align-items: start;
+}
+.stage-page-main { min-width: 0; }
 .stage-side-action {
   display: inline-flex; align-items: center; gap: var(--space-1-5);
   min-height: 36px; padding: 0 var(--space-4);
@@ -1836,38 +1845,30 @@ button.wn-run-title:focus-visible { outline: 2px solid var(--accent); outline-of
 .stage-side-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .stage-page-actions { display: flex; align-items: center; gap: var(--space-3); }
 
-.stage-side {
-  position: fixed; top: 0; right: 0; bottom: 0;
-  display: flex; align-items: flex-start;
-  z-index: var(--z-slideout);
-  /* Only the tabs and the panel take the pointer; the rest of the strip is the page. */
-  pointer-events: none;
-}
-.stage-side > * { pointer-events: auto; }
 .stage-side-scrim { position: fixed; inset: 0; z-index: var(--z-slideout-backdrop); background: rgba(0, 0, 0, .4); }
 .stage-side-tabs {
-  display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1-5);
-  max-height: 100dvh; overflow-y: auto; padding: 96px 0 var(--space-4);
+  position: sticky; top: var(--space-4);
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1-5);
+  max-height: calc(100dvh - var(--space-8)); overflow-y: auto;
 }
 .stage-side-tab {
   writing-mode: vertical-rl; transform: rotate(180deg);
   display: inline-flex; align-items: center; gap: var(--space-1-5);
-  min-width: 40px; padding: var(--space-3-5) var(--space-2-5);
-  /* Rotated half a turn, so this is the edge that meets the panel. */
-  border: 1px solid var(--border); border-right: 0;
-  border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+  min-width: 36px; padding: var(--space-3) var(--space-2);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
   background: var(--bg-surface); color: var(--text-dim);
   font: inherit; font-size: var(--font-base); font-weight: 600; cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
 }
 .stage-side-tab:hover { color: var(--text); background: color-mix(in srgb, var(--text) 7%, var(--bg-surface)); }
 .stage-side-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .stage-side-tab--active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface)); }
 .stage-side-tab .stage-section-badge { margin: 0; }
-.stage-side-divider { width: 24px; height: 1px; margin: var(--space-1) var(--space-2) var(--space-1) 0; background: var(--border-strong); }
+.stage-side-divider { width: 24px; height: 1px; margin: var(--space-1) 0; background: var(--border-strong); }
+/* The open panel is a modal sheet over the scrim, like the other slide-outs. */
 .stage-side-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: var(--z-slideout);
   display: flex; flex-direction: column;
-  width: min(560px, calc(100vw - 48px)); height: 100vh; height: 100dvh;
+  width: min(560px, 100vw); height: 100vh; height: 100dvh;
   border-left: 1px solid var(--border);
   background: var(--bg-surface);
   box-shadow: -12px 0 32px rgba(0, 0, 0, .25);
@@ -1895,9 +1896,8 @@ button.wn-run-title:focus-visible { outline: 2px solid var(--accent); outline-of
 .stage-side-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .stage-side-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5) var(--space-6); }
 @media (max-width: 640px) {
-  .stage-page--side { padding-right: 36px; }
-  .stage-side-tabs { padding-top: 72px; }
-  .stage-side-tab { min-width: 32px; padding: var(--space-2-5) var(--space-1-5); font-size: var(--font-sm); }
+  .stage-page--side { column-gap: var(--space-2); }
+  .stage-side-tab { min-width: 30px; padding: var(--space-2-5) var(--space-1-5); font-size: var(--font-sm); }
   .stage-side-head, .stage-side-body { padding-inline: var(--space-4); }
 }
 

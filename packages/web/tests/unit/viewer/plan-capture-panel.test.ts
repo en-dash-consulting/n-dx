@@ -167,7 +167,7 @@ describe("Plan's New change side panel", () => {
     expect(p.querySelector(".stage-side-blurb")?.textContent).toBe("Describe it, and n-dx suggests where it goes.");
     expect(p.querySelector(".smart-add-header .smart-add-title")?.textContent).toBe("Add to Inbox");
     expect(Array.from(p.querySelectorAll(".rex-analysis-tab")).map((t) => t.textContent)).toEqual(["Add to Inbox", "Batch Import", "Project Scan"]);
-    expect(root.querySelector<HTMLElement>('.stage-side-tab[data-panel="new-change"]')?.getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector<HTMLElement>('.stage-side-tab[data-panel="new-change"]')?.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("closes on Escape and returns focus to Add to the plan", async () => {

@@ -12,7 +12,7 @@
 
 import { h } from "preact";
 import type { NavigateTo } from "../types.js";
-import { displayTitle, isMine, titleTooltip, usePeople } from "../components/index.js";
+import { displayTitle, isMine, personLabel, titleTooltip, usePeople } from "../components/index.js";
 import { useChangesSummary } from "./changes-summary-context.js";
 import {
   CHANGE_STAGE_LABELS,
@@ -106,7 +106,7 @@ export function PlanGlance({ navigateTo }: { navigateTo: NavigateTo }) {
               model.top.prioritized
                 ? "Marked prioritized, so it leads the queue."
                 : model.top.assignee
-                  ? `Sorted to the top by priority. Assigned to ${model.top.assignee}.`
+                  ? `Sorted to the top by priority. Assigned to ${personLabel(model.top.assignee)}.`
                   : "Sorted to the top by priority. Nobody is assigned yet."),
           ]
         : h("p", { class: "plan-glance-note" }, "No open changes."),

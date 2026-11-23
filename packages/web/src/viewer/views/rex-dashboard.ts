@@ -7,7 +7,7 @@
  */
 
 import { h } from "preact";
-import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { RexTaskLink } from "../components/index.js";
@@ -560,11 +560,19 @@ function EpicProgress({ epics, rootLabel, rootPlural, navigateTo }: EpicProgress
 
 // ── Component ────────────────────────────────────────────────────────
 
+/** Numbers each dashboard reader's polling key: two may be mounted at once. */
+let readerSeq = 0;
+
 /**
  * The dashboard's reads: `/api/rex/dashboard` (polled) and `/api/rex/health`.
- * Shared by the dashboard and Work's Statistics section.
+ * Shared by the dashboard and Work's Statistics section, which are mounted
+ * together while the Statistics tile is open full-screen. Pollers are keyed
+ * by name and unregistering removes the key, so each reader polls under its
+ * own key: closing the full-screen dashboard must not stop the tile's poll.
  */
 export function useDashboardData() {
+  const pollKey = useRef<string | null>(null);
+  pollKey.current ??= `rex-dashboard:${++readerSeq}`;
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -605,7 +613,7 @@ export function useDashboardData() {
   }, [fetchDashboard, fetchHealth]);
 
   // Visibility-aware polling via polling manager
-  usePolling("rex-dashboard", fetchDashboard, 10_000);
+  usePolling(pollKey.current, fetchDashboard, 10_000);
 
   return { data, loading, error, health, fetchDashboard, fetchHealth };
 }

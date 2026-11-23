@@ -293,6 +293,19 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null,
   const loaded = tasks ?? [];
   const matches = filtering ? filterReady(loaded, filters) : loaded;
   const shown = filtering || expanded ? matches : matches.slice(0, READY_TOP_ROWS);
+  const cap = (rows: ReadyTask[]) => (filtering || expanded ? rows : rows.slice(0, READY_TOP_ROWS));
+  const groups = split ? splitReady(matches, split.me, split.areaOf) : null;
+  const listedIn = (g: ReadyGroups) => g.mine.length + g.unassigned.reduce((n, a) => n + a.tasks.length, 0);
+  // Split, the list never shows someone else's task, so its counts leave them out.
+  const listable = split ? listedIn(splitReady(loaded, split.me, split.areaOf)) : total;
+  const matchCount = groups ? listedIn(groups) : matches.length;
+  const shownCount = groups
+    ? cap(groups.mine).length + groups.unassigned.reduce((n, a) => n + cap(a.tasks).length, 0)
+    : shown.length;
+  /** Some group holds more than it shows, so "Show all" has something to show. */
+  const truncated = groups
+    ? groups.mine.length > READY_TOP_ROWS || groups.unassigned.some((g) => g.tasks.length > READY_TOP_ROWS)
+    : total > READY_TOP_ROWS;
   const engage = () => {
     // Engagement stays latched for refreshes; an incomplete snapshot still needs
     // another attempt when a control is used after a transient load failure.
@@ -319,7 +332,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null,
       onChange: (e: Event) => setFilter({ [key]: (e.target as HTMLSelectElement).value }),
     }, h("option", { value: "" }, label), options.map(([v, text]) => h("option", { value: v, key: v }, text)));
 
-  const controls = total > READY_TOP_ROWS || filtering
+  const controls = listable > READY_TOP_ROWS || filtering
     ? h("div", { class: "ready-controls" },
         h("input", {
           type: "search",
@@ -338,7 +351,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null,
           ? h("button", { type: "button", class: "ready-clear", onClick: () => setFilters(NO_FILTERS) }, "Clear")
           : null,
         h("span", { class: "ready-count", role: "status" },
-          filtering ? `${matches.length} of ${total} match` : `${shown.length} of ${total}`),
+          filtering ? `${matchCount} of ${listable} match` : `${shownCount} of ${listable}`),
       )
     : null;
 
@@ -422,13 +435,6 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null,
           );
   };
 
-  const cap = (rows: ReadyTask[]) => (filtering || expanded ? rows : rows.slice(0, READY_TOP_ROWS));
-  const groups = split ? splitReady(matches, split.me, split.areaOf) : null;
-  /** Some group holds more than it shows, so "Show all" has something to show. */
-  const truncated = groups
-    ? groups.mine.length > READY_TOP_ROWS || groups.unassigned.some((g) => g.tasks.length > READY_TOP_ROWS)
-    : total > READY_TOP_ROWS;
-
   const splitBody = (g: ReadyGroups) => h("div", { class: "ready-groups", id: "ready-to-run-list" },
     h("section", { class: "ready-group", "aria-labelledby": "ready-group-mine" },
       h("h3", { class: "ready-group-title", id: "ready-group-mine" },
@@ -460,7 +466,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null,
         "aria-controls": "ready-to-run-list",
         onClick: () => { if (!expanded) engage(); setExpanded(!expanded); },
       },
-        expanded ? `Show top ${READY_TOP_ROWS}${groups ? " of each" : ""}` : `Show all ${total}`)
+        expanded ? `Show top ${READY_TOP_ROWS}${groups ? " of each" : ""}` : `Show all ${listable}`)
     : null;
 
   const body = tasks === null
