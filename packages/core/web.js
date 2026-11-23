@@ -2910,7 +2910,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex${headerFlag}`);
   log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision${headerFlag}`);
   if (token) {
-    log(`  Token:   ${tokenFile} (for MCP and scripts; the dashboard URL above is a one-time sign-in link valid for about a minute — run 'ndx start' again for a fresh one; disable with --no-auth or web.auth=false in .n-dx.local.json)`);
+    log(`  Token:   ${tokenFile} (for MCP and scripts; the dashboard URL above is a one-time sign-in link valid for 30 minutes — run 'ndx start' again for a fresh one; disable with --no-auth or web.auth=false in .n-dx.local.json)`);
   }
   log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   log("");

@@ -59,8 +59,8 @@ export const AUTH_ROUTES = {
   wsTicket: "/api/auth/ws-ticket",
 } as const;
 
-/** How long a landing nonce may wait to be exchanged. */
-export const NONCE_TTL_MS = 60_000;
+/** How long a landing nonce may wait to be exchanged: long enough to open the printed link after stepping away, and still single-use. */
+export const NONCE_TTL_MS = 30 * 60_000;
 /** How long a WebSocket ticket may wait to be used. */
 export const TICKET_TTL_MS = 30_000;
 /** A session ends after this long without a request… */

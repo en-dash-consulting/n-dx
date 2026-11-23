@@ -64,7 +64,7 @@ export const BROWSER_SESSION_SCRIPT = `
     var html = '<main style="font:15px/1.5 system-ui,sans-serif;max-width:36rem;margin:4rem auto;padding:0 1rem">'
       + '<h1>Sign-in needed</h1><p>' + lead + '</p>'
       + '<p>Run <code>ndx start</code> in the project again and open the URL it prints. '
-      + 'The link works once, for about a minute; the tab it opens stays signed in, and so do tabs opened from it while it is open.</p></main>';
+      + 'The link works once, for 30 minutes; the tab it opens stays signed in, and so do tabs opened from it while it is open.</p></main>';
     function paint() { document.body.innerHTML = html; }
     if (document.body) paint(); else document.addEventListener("DOMContentLoaded", paint);
   }
