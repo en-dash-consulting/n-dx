@@ -1,7 +1,8 @@
 /**
  * Language packs' framework facts in the artifacts sourcevision already
  * writes: `routes` facts become `serverRoutes` groups in components.json,
- * `outboundCalls` facts become `outbound.json` dependencies.
+ * `outboundCalls` facts become `outbound.json` dependencies, `entryPoints`
+ * facts become `entrypoint` evidence in classifications.json.
  *
  * The imports phase collects these facts in the same pack call that reads
  * imports (`PackImportsOptions.framework`), so no file is parsed twice; a
@@ -13,15 +14,36 @@
  * @module sourcevision/analyzers/pack-framework-facts
  */
 
-import type { FileFacts, OutboundCallFact } from "@n-dx/lang-kit";
+import type { FactKind, FileFacts, OutboundCallFact } from "@n-dx/lang-kit";
 import type { HttpMethod, Inventory, OutboundData, OutboundDependency, ServerRoute, ServerRouteGroup } from "../schema/index.js";
 import { sortOutbound } from "../util/sort.js";
+import type { PackSignal } from "./classify.js";
 import { inferPrefix } from "./go-route-detection.js";
 import { SKIP_ROLES } from "./outbound-detection.js";
 import { ROUTE_SKIP_ROLES } from "./server-route-detection.js";
 
-/** The routes and outbound-call facts packs returned for one analysis. */
-export type PackFrameworkFacts = readonly Pick<FileFacts, "path" | "routes" | "outboundCalls">[];
+/**
+ * The routes, outbound-call, entry-point, config-read, flag-check,
+ * version-floor, legacy-construct and dynamic-code facts packs returned for
+ * one analysis. Config reads and flag checks become config.json
+ * (`pack-config-facts.ts`); version floors, legacy constructs and dynamic
+ * code become the SDLC profile's `ecosystem`
+ * (`pack-ecosystem.ts`).
+ */
+export type PackFrameworkFacts = readonly PackFrameworkFact[];
+
+/** One file's framework facts, as its pack returned them (`packFrameworkFactsOf` in `pack-imports.ts`). */
+export type PackFrameworkFact = Pick<
+  FileFacts,
+  "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor" | "legacyConstructs" | "dynamicCode"
+> & {
+  /**
+   * The framework fact kinds the file's pack was asked for, which tells a
+   * kind it found nothing of from one it was never asked for: a pack asked
+   * for `versionFloor` gets the histogram even when no file has a floor.
+   */
+  readonly asked?: readonly FactKind[];
+};
 
 const HTTP_METHODS: ReadonlySet<string> = new Set<HttpMethod>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 
@@ -39,10 +61,12 @@ function rolesOf(inventory: Inventory): Map<string, string> {
  */
 export function packRouteGroups(facts: PackFrameworkFacts, inventory: Inventory): ServerRouteGroup[] {
   const roles = rolesOf(inventory);
+  // A mirror copy's routes are its source file's, already listed (mirrors.ts).
+  const mirrored = new Set(inventory.files.filter((f) => f.mirrorOf !== undefined).map((f) => f.path));
   const groups: ServerRouteGroup[] = [];
   for (const { path: file, routes: found } of facts) {
     const role = roles.get(file);
-    if (!found?.length || role === undefined || ROUTE_SKIP_ROLES.has(role)) continue;
+    if (!found?.length || role === undefined || ROUTE_SKIP_ROLES.has(role) || mirrored.has(file)) continue;
     const routes: ServerRoute[] = [];
     const seen = new Set<string>();
     for (const fact of found) {
@@ -51,7 +75,13 @@ export function packRouteGroups(facts: PackFrameworkFacts, inventory: Inventory)
       const key = `${method} ${fact.path}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      routes.push({ file, method: method as HttpMethod, path: fact.path, ...(fact.handler === undefined ? {} : { handler: fact.handler }) });
+      routes.push({
+        file,
+        method: method as HttpMethod,
+        path: fact.path,
+        ...(fact.handler === undefined ? {} : { handler: fact.handler }),
+        ...(typeof fact.source === "string" ? { source: fact.source } : {}),
+      });
     }
     if (routes.length === 0) continue;
     routes.sort((a, b) => a.method.localeCompare(b.method) || a.path.localeCompare(b.path));
@@ -112,6 +142,33 @@ export function packOutboundDependencies(facts: PackFrameworkFacts, inventory: I
     }
   }
   return dependencies;
+}
+
+/** A pack's entry-point fact is decisive on its own: the pack read the file's content, not its name. */
+const ENTRY_POINT_WEIGHT = 1;
+
+/**
+ * The packs' entry-point facts as classification signals for the
+ * `entrypoint` archetype, by file: `cli entry point: shebang (line 1)`,
+ * `cron entry point: 0 3 * * * (crontab:4)`. No artifact has a field for a
+ * cron schedule, so it is kept only in this evidence text.
+ */
+export function packEntryPointSignals(facts: PackFrameworkFacts | undefined): Map<string, PackSignal[]> {
+  const signals = new Map<string, PackSignal[]>();
+  for (const { path, entryPoints } of facts ?? []) {
+    if (!entryPoints?.length) continue;
+    signals.set(
+      path,
+      entryPoints.map((e) => ({
+        archetypeId: "entrypoint",
+        detail: e.kind === "cron" && e.schedule !== undefined
+          ? `cron entry point: ${e.schedule} (${e.source})`
+          : `${e.kind} entry point: ${e.source} (line ${e.position.line})`,
+        weight: ENTRY_POINT_WEIGHT,
+      })),
+    );
+  }
+  return signals;
 }
 
 /** `data` with the packs' outbound calls added and sorted canonically. Without any, `data` itself. */

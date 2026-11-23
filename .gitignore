@@ -83,3 +83,5 @@ claude_commands.log*
 # Per-suite output retained by scripts/run-all-tests.mjs, so an intermittent
 # failure is diagnosable after the terminal is gone.
 .test-logs/
+# Coverage reports from `pnpm test:coverage` / a package's `test:coverage` (tests/vitest-coverage.mjs).
+coverage/

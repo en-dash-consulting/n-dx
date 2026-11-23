@@ -14,7 +14,7 @@ import { cmdAnalyze } from "../../src/cli/commands/analyze.js";
 vi.mock("../../src/language/pack-loader.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../src/language/pack-loader.js")>();
   const missing = <P extends { id: string; packageName: string }>(pack: P): P =>
-    ["java", "terraform", "python"].includes(pack.id)
+    ["java", "terraform", "python", "php"].includes(pack.id)
       ? {
           ...pack,
           importByResolution: () =>
@@ -40,6 +40,12 @@ const JAVA: Record<string, string> = {
   "src/main/java/app/App.java": "package app;\n\npublic class App {}\n",
 };
 
+const PHP: Record<string, string> = {
+  "composer.json": '{"name": "acme/shop"}\n',
+  "index.php": "<html><body><?php include 'lib/db.php'; ?></body></html>\n",
+  "lib/db.php": "<?php\nfunction db() { return null; }\n",
+};
+
 describe("analyze with opt-in packs missing", () => {
   let dir: string | null = null;
   afterEach(() => {
@@ -60,7 +66,7 @@ describe("analyze with opt-in packs missing", () => {
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => void logs.push(args.join(" ")));
     await cmdAnalyze(dir, ["--fast"]);
     return {
-      warnings: warnings.filter((w) => /java|terraform|python|pack/i.test(w)),
+      warnings: warnings.filter((w) => /java|terraform|python|php|pack/i.test(w)),
       optional: logs.filter((l) => l.includes("Optional packs")),
     };
   }
@@ -75,6 +81,12 @@ describe("analyze with opt-in packs missing", () => {
     const { warnings, optional } = await analyze(JAVA);
     expect(warnings).toEqual([]);
     expect(optional).toEqual(["Optional packs for this repo: java — ndx sv pack add <id>"]);
+  }, 60_000);
+
+  it("suggests the PHP pack for a PHP repository that does not list it", async () => {
+    const { warnings, optional } = await analyze(PHP);
+    expect(warnings).toEqual([]);
+    expect(optional).toEqual(["Optional packs for this repo: php — ndx sv pack add <id>"]);
   }, 60_000);
 
   it("warns about a listed missing pack and suggests only the unlisted ones", async () => {

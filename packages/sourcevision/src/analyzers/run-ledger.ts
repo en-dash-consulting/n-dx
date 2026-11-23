@@ -113,14 +113,12 @@ export function recordLLMCall(rec: LLMCallRecord): void {
   } else {
     bucket.measuredCalls = (bucket.measuredCalls ?? 0) + 1;
   }
-  if (rec.tokenUsage?.cacheReadInput) {
-    bucket.cacheReadInputTokens = (bucket.cacheReadInputTokens ?? 0) + rec.tokenUsage.cacheReadInput;
-  }
-  if (rec.tokenUsage?.cacheCreationInput) {
-    bucket.cacheCreationInputTokens = (bucket.cacheCreationInputTokens ?? 0) + rec.tokenUsage.cacheCreationInput;
-  }
   bucket.inputTokens += rec.tokenUsage?.input ?? 0;
   bucket.outputTokens += rec.tokenUsage?.output ?? 0;
+  const cacheCreation = rec.tokenUsage?.cacheCreationInput ?? 0;
+  const cacheRead = rec.tokenUsage?.cacheReadInput ?? 0;
+  if (cacheCreation > 0) bucket.cacheCreationTokens = (bucket.cacheCreationTokens ?? 0) + cacheCreation;
+  if (cacheRead > 0) bucket.cacheReadTokens = (bucket.cacheReadTokens ?? 0) + cacheRead;
   bucket.durationMs += rec.durationMs;
   // Within a vendor the last model to answer names the bucket (a mid-run
   // model failover is the only way it changes).
@@ -189,7 +187,9 @@ export function snapshotRunLedger(): AnalysisRun {
  * "not recorded", which sends an operator to look where "$0.00" closes the
  * question.
  *
- * Cache reads and writes are priced separately from fresh input.
+ * Cache tokens are priced at the model's cache rates. The Claude CLI caches its
+ * own system prompt on every call, so a CLI-served class carries them even
+ * though no sourcevision call site asks for caching.
  */
 export function priceRunLedger(run: AnalysisRun): number | undefined {
   const buckets = Object.values(run.llm.byTaskClass);
@@ -199,15 +199,22 @@ export function priceRunLedger(run: AnalysisRun): number | undefined {
   for (const bucket of buckets) {
     const { pricing, known } = resolveModelPricing(bucket.model);
     if (!known) return undefined;
+    const cacheCreationTokens = bucket.cacheCreationTokens ?? bucket.cacheCreationInputTokens ?? 0;
+    const cacheReadTokens = bucket.cacheReadTokens ?? bucket.cacheReadInputTokens ?? 0;
     if (bucket.unmeasuredCalls) return undefined;
-    if (bucket.measuredCalls === undefined && bucket.calls > 0 && bucket.inputTokens + bucket.outputTokens === 0) return undefined;
+    if (
+      bucket.measuredCalls === undefined && bucket.calls > 0 &&
+      bucket.inputTokens + bucket.outputTokens + cacheCreationTokens + cacheReadTokens === 0
+    ) {
+      return undefined;
+    }
 
     total += priceTokens(
       {
         inputTokens: bucket.inputTokens,
         outputTokens: bucket.outputTokens,
-        cacheCreationTokens: bucket.cacheCreationInputTokens ?? 0,
-        cacheReadTokens: bucket.cacheReadInputTokens ?? 0,
+        cacheCreationTokens,
+        cacheReadTokens,
       },
       pricing,
     ).totalRaw;
@@ -220,9 +227,11 @@ export function formatRunLedger(run: AnalysisRun): string[] {
   const lines: string[] = [];
   const classes = Object.entries(run.llm.byTaskClass).sort(([a], [b]) => a.localeCompare(b));
   for (const [cls, u] of classes) {
-    const tokens = u.inputTokens + u.outputTokens + (u.cacheCreationInputTokens ?? 0) + (u.cacheReadInputTokens ?? 0);
+    const tokens = u.inputTokens + u.outputTokens;
+    const cached = (u.cacheCreationTokens ?? u.cacheCreationInputTokens ?? 0) + (u.cacheReadTokens ?? u.cacheReadInputTokens ?? 0);
+    const cachedPart = cached > 0 ? ` + ${cached.toLocaleString()} cached` : "";
     lines.push(
-      `  ${cls}: ${u.calls} call${u.calls === 1 ? "" : "s"}, ${tokens.toLocaleString()} tokens, ` +
+      `  ${cls}: ${u.calls} call${u.calls === 1 ? "" : "s"}, ${tokens.toLocaleString()} tokens${cachedPart}, ` +
         `${(u.durationMs / 1000).toFixed(1)}s (${u.vendor} ${u.model})`,
     );
   }

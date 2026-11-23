@@ -14,6 +14,7 @@ import type {
 import { buildClassificationMap } from "./classify.js";
 import { deriveNextSteps } from "./next-steps.js";
 import { computeZoneAggregates, RISK_THRESHOLDS } from "./risk-scoring.js";
+import { redactLiterals } from "../util/redact-literals.js";
 
 /**
  * Maximum rows in the file-inventory table.
@@ -44,7 +45,7 @@ export function generateLlmsTxt(
     ...buildFileInventory(inventory, zones, classifications),
   ];
 
-  return lines.join("\n");
+  return redactLiterals(lines.join("\n"));
 }
 
 // ── Section builders ──────────────────────────────────────────────────────

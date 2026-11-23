@@ -19,6 +19,7 @@ import type {
   ProjectSurface,
 } from "../schema/v1.js";
 import { detectRouteConventions } from "./route-convention.js";
+import { isOutsideStructure } from "./third-party.js";
 
 const SCHEMA_VERSION = "1.0.0";
 
@@ -67,9 +68,15 @@ export function stripProjectProfileForDisk(p: ProjectProfile): Omit<ProjectProfi
 
 // ── Languages ────────────────────────────────────────────────────────────────
 
+/**
+ * Languages by first-party file count, most first. Third-party and mirror-copy
+ * files (third-party.ts) do not vote: a copied-in JS framework must not make a
+ * PHP application "javascript". They count only when nothing else is left.
+ */
 function collectLanguages(inventory: Inventory): string[] {
+  const firstParty = inventory.files.filter((f) => !isOutsideStructure(f));
   const counts = new Map<string, number>();
-  for (const file of inventory.files) {
+  for (const file of firstParty.length > 0 ? firstParty : inventory.files) {
     const lang = (file.language ?? "").toLowerCase();
     if (!lang || lang === "unknown") continue;
     counts.set(lang, (counts.get(lang) ?? 0) + 1);

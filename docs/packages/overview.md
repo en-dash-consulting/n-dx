@@ -70,7 +70,7 @@ All packages are published under the `@n-dx/` scope. The root package `@n-dx/cor
 | `@n-dx/web` | — | Dashboard + MCP server |
 | `@n-dx/lang-kit` | — | Language facts and the pack contract (library only) |
 | `@n-dx/lang-runtime` | — | Tree-sitter runtime the packs share (library only) |
-| `@n-dx/lang-go`, `@n-dx/lang-java`, `@n-dx/lang-python`, `@n-dx/lang-sql`, `@n-dx/lang-terraform` | — | Language packs; install with `ndx sv pack add <lang>` |
+| `@n-dx/lang-go`, `@n-dx/lang-java`, `@n-dx/lang-python`, `@n-dx/lang-php`, `@n-dx/lang-sql`, `@n-dx/lang-terraform` | — | Language packs; install with `ndx sv pack add <lang>` |
 | `@n-dx/graview` | `ndx-graview` (run as `ndx graview`) | Graview projection |
 | `@n-dx/graview-face` | `ndx-graview-face` (run as `ndx graview serve`) | Graview product face |
 

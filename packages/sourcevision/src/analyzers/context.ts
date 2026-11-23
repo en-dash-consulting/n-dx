@@ -14,6 +14,7 @@ import type {
 import { buildClassificationMap } from "./classify.js";
 import { deriveNextSteps } from "./next-steps.js";
 import { computeZoneAggregates, RISK_THRESHOLDS } from "./risk-scoring.js";
+import { redactLiterals } from "../util/redact-literals.js";
 
 /**
  * Caps on the routes section, matching the 15-item caps already applied to
@@ -256,7 +257,7 @@ export function generateContext(
     lines.push("");
   }
 
-  return lines.join("\n");
+  return redactLiterals(lines.join("\n"));
 }
 
 function printTree(
