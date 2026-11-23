@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { execSync, execFileSync } from "node:child_process";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleGitRoute, parsePorcelainStatus, toGitignorePattern, makeOriginClassifier, scopeOf } from "../../../src/server/routes-git.js";
+import { handleGitRoute, literalPathspec, parsePorcelainStatus, toGitignorePattern, makeOriginClassifier, scopeOf } from "../../../src/server/routes-git.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function initGitRepo(dir: string): void {
@@ -245,6 +245,31 @@ describe("/api/git routes", () => {
       const files = execFileSync("git", ["show", "--name-only", "--pretty=", "HEAD"], { cwd: tmpDir, encoding: "utf-8" });
       expect(files).toContain(".rex/prd_tree/index.md");
       expect(files).not.toContain("src.ts");
+    });
+
+    it("commits a batch whose paths together overrun a command line: they go to git on stdin", async () => {
+      // A best-guess placement of the whole Inbox moves hundreds of change folders.
+      // As arguments, 600 paths of ~90 characters (54K) overran Windows' 32K limit
+      // and git never started ("git add failed: unknown error").
+      initGitRepo(tmpDir);
+      const dir = join(tmpDir, ".rex", "changes", "inbox");
+      await mkdir(dir, { recursive: true });
+      const names = Array.from({ length: 600 }, (_, i) => `change-${String(i).padStart(4, "0")}-a-fairly-long-slug-for-a-change-title.md`);
+      for (const name of names) await writeFile(join(dir, name), "x\n");
+      commitAll(tmpDir, "init");
+      // Tracked and modified, so status lists each one (an untracked folder collapses to one line).
+      for (const name of names) await writeFile(join(dir, name), "y\n");
+
+      const res = await commitScope("prd");
+      expect(res.status).toBe(200);
+      const files = execFileSync("git", ["show", "--name-only", "--pretty=", "HEAD"], { cwd: tmpDir, encoding: "utf-8" })
+        .trim().split("\n");
+      expect(files).toHaveLength(600);
+      expect(execFileSync("git", ["status", "--porcelain"], { cwd: tmpDir, encoding: "utf-8" }).trim()).toBe("");
+    });
+
+    it("writes one literal pathspec a line, so a name with glob characters matches only itself", () => {
+      expect(literalPathspec([".rex/a.md", ".rex/[b]*.md"])).toBe(":(literal).rex/a.md\n:(literal).rex/[b]*.md\n");
     });
 
     it("refuses a mixed tree rather than committing the user's work along with it", async () => {

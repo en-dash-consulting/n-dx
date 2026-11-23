@@ -521,21 +521,55 @@ describe("placing", () => {
     release();
     await settle();
     expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
+    // The new target's criteria are read but unedited: an amendment of nothing waits for an edit.
+    expect(button("Place")?.disabled).toBe(true);
+    await click(button("+ criterion"));
+    await type($(".cp-amends .task-criterion-add-input"), "Refund in store credit");
+    await click($(".cp-amends .task-criterion-add-confirm"));
     expect(button("Place")?.disabled).toBe(false);
     await click(button("Place"));
-    expect(posts[0].body).toEqual({ target: "cap-refund", relation: "amends" });
+    const body = posts[0].body as { target: string; relation: string; criteria: { add: Array<{ text: string }> } };
+    expect(body).toMatchObject({ target: "cap-refund", relation: "amends" });
+    // Only this target's edit: the previous target's criterion never travels.
+    expect(body.criteria.add.map((c) => c.text)).toEqual(["Refund in store credit"]);
   });
 
-  it("Amends with neither statement nor criteria is refused inline in rex's words, pointing at the criteria", async () => {
+  it("opens on Touches even when rex's rules say Amends", async () => {
+    serve([change("a")], [{ ...placement("a", [candidate("cap-1")]), relation: "amends" }]);
+    await mountSection("a");
+    expect($<HTMLInputElement>('.cp-relation input[value="touches"]')?.checked).toBe(true);
+    await pick("cap-1");
+    await click(button("Place"));
+    expect(posts[0].body).toEqual({ target: "cap-1", relation: "touches" });
+  });
+
+  it("holds Place on Amends with neither statement nor criteria edited, and says what it waits for", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", { criteria: [{ id: "c1", text: "x" }] })])]);
+    await mountSection("a");
+    await pick("cap-1");
+    await click($('.cp-relation input[value="amends"]'));
+    expect(button("Place")?.disabled).toBe(true);
+    expect($(".cp-amends-hint")?.textContent).toContain("choose Touches");
+    await click(button("Place"));
+    expect(posts).toEqual([]);
+    // An edit is enough to place.
+    await type($(".cp-amends textarea"), "A sharper statement");
+    expect($(".cp-amends-hint")).toBeNull();
+    expect(button("Place")?.disabled).toBe(false);
+  });
+
+  it("an amendment rex finds empty is refused inline in rex's words, pointing at the criteria", async () => {
     serve([change("a")], [placement("a", [candidate("cap-1", { criteria: [{ id: "c1", text: "x" }] })])]);
     await mountSection("a");
     const message = "Cannot place change a: amendment of \"Home cap-1\" has nothing to modify";
     answer("a", "place", 422, { error: message, kind: "nothing-to-modify" });
     await pick("cap-1");
     await click($('.cp-relation input[value="amends"]'));
+    // Any edit gets past the viewer's hold; rex alone judges whether it modifies anything.
+    await type($(".cp-amends textarea"), "   x");
     await click(button("Place"));
 
-    expect(posts[0].body).toEqual({ target: "cap-1", relation: "amends" });
+    expect(posts[0].body).toEqual({ target: "cap-1", relation: "amends", proposed: "x" });
     expect($('.cp-refusal[role="alert"] .cp-refusal-message')?.textContent).toBe(message);
     expect($(".cp-refusal-hint")?.textContent).toBe(REFUSAL_HINTS["nothing-to-modify"]);
     expect($(".cp-amends .task-acceptance-criteria")?.classList.contains("is-invalid")).toBe(true);

@@ -581,10 +581,15 @@ export interface PendingCriteria {
   delta: number;
 }
 
-/** The relation the form opens on: rex's, except that the wide panel takes it only from a strong, untied pick (WF4). */
-function initialRelation(placement: ChangePlacement | null, wide: boolean): PlacementRelation | null {
-  if (!wide) return placement?.relation ?? "touches";
-  return placement && strongUntiedPick(placement) ? placement.relation : null;
+/**
+ * The relation the form opens on. Never Amends: an amendment with no edits is
+ * refused, so it is a choice the person makes, not a default they must undo.
+ * The compact form opens on Touches; the wide panel takes Touches only from a
+ * strong, untied pick (WF4) and otherwise asks.
+ */
+export function initialRelation(placement: ChangePlacement | null, wide: boolean): PlacementRelation | null {
+  if (!wide) return "touches";
+  return placement && strongUntiedPick(placement) && placement.relation === "touches" ? "touches" : null;
 }
 
 function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone, draftEnabled, onDraftProposal, wide = false, selection, onChoose, onPendingCriteria, homes = [], onRemoveHome }: PlaceFormProps) {
@@ -749,8 +754,10 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
 
   const invalidCriteria = refusal?.kind === "nothing-to-modify";
   const criteriaId = `cp-criteria-${changeId}`;
+  // Amends with nothing edited would only be refused: Place waits for an edit.
+  const amendsEmpty = body?.relation === "amends" && !criteriaLoading && !body.proposed && !body.criteria;
   // An amendment in the wide card waits for rex to accept its dry run.
-  const cannotPlace = !body || busy || (effectiveRelation === "amends" && criteriaLoading) || (amending && !dryRun?.ok);
+  const cannotPlace = !body || busy || (effectiveRelation === "amends" && criteriaLoading) || amendsEmpty || (amending && !dryRun?.ok);
   const relationName = `cp-relation-${changeId}`;
   const relationChoice = (target?: PlacementTarget) => another || touchesOnly
     ? null
@@ -787,6 +794,10 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
             onInput: (e: Event) => setProposed((e.target as HTMLTextAreaElement).value),
           }),
         ),
+        amendsEmpty
+          ? h("p", { class: "cp-amends-hint", role: "note" },
+              "To amend, edit the criteria or write a replacement statement. To place the change without changing the spec, choose Touches.")
+          : null,
       )
     : null;
 

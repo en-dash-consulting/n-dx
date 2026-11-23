@@ -631,7 +631,8 @@ describe("PlacementMode", () => {
       await settle();
       expect(dryRun()?.dataset.check).toBe("ok");
       expect(dryRun()?.textContent).toBe("Applies cleanly: amends Refunds (cap-refund @ spec abcd).");
-      expect(place().disabled).toBe(false);
+      // Nothing edited yet: an amendment of nothing waits for an edit, whatever the dry run says.
+      expect(place().disabled).toBe(true);
 
       // Editing the statement checks again, and Place waits for it.
       const statement = $<HTMLTextAreaElement>(".cp-card.is-checked .cp-amends textarea")!;
