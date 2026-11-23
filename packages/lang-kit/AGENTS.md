@@ -21,8 +21,19 @@ the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
 which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
 facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
 pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources,
-routes, outbound calls) and `DECLARED_FACT_KINDS` (components, typed but not
-yet produced). `OutboundCallFact.confidence` means what sourcevision's
+routes, outbound calls, entry points, config reads, flag checks, version floor, legacy constructs, dynamic code) and `DECLARED_FACT_KINDS` (components, typed but not
+yet produced). `VersionFloorFact` is one per file: the oldest language
+version its syntax needs, the rule and construct that set it and the
+language's own page (migration guide or changelog); versions compare with `compareLanguageVersions`.
+`LegacyConstructFact` is one use of a construct a later version removed or
+deprecated (`LEGACY_STATUSES`; `notice` is never a removal), each version a
+`LanguageBoundary` with its page. `DynamicCodeFact` is one place code runs a
+string as code or chooses what to run from a value (`DYNAMIC_CODE_KINDS`),
+with the expression as written and never a value; its optional `database`
+names the tables, `table.column`s and query calls a database-driven site
+reads. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
+never carry a value; a flag's `normalized` name comes from
+`normalizeFlagName`, so every pack spells one flag alike. `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`
 and `attributes` are filled by the Terraform pack; attribute values are kept
 as written, never normalised, except that an optional `instance` marks a fact
@@ -31,14 +42,24 @@ resolution, each attribute's `written` expression kept in `instance.resolved`). 
 `FileReference.typeOnly` (a target reached only under `if TYPE_CHECKING:`,
 recorded by sourcevision as a `type` edge), `FileReferences.written` (imports as written, each with an `ImportGuard` when
 it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
-(`__all__`), and the `variable` symbol kind. The contract names no parser type; `@n-dx/lang-runtime`'s
+(`__all__`), and the `variable` symbol kind. The PHP pack fills the `trait`,
+`namespace` and `constant` symbol kinds (a trait contains its members, a
+namespace does not), the `conditional` `ImportGuard`, `WrittenImport.form`
+(`IMPORT_FORMS`) and `alias`, `WrittenImport.candidates` (a dynamic
+include's possible files, held in memory, never import edges),
+`CallFact.construct` (`new`) and `RouteFact.source` (a docroot or
+`.htaccess` line, for a route not declared in its handler's code), and
+`EntryPointFact` (`cli` or `cron`, with its `source` and a cron job's
+`schedule` as written). The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports
 as `pack`: `LanguagePackEntry` carries the package name and version, the
 language id and config, `produces`, and `analyzeProject({ projectDir, files,
 kinds })`, which returns `FileFacts` per file read, the files it could not
-read, optional `notices` for what it read but skipped, and a `degraded` notice
+read, optional `notices` for what it read but skipped, an optional `parse`
+report (`PackParseReport`: files with syntax errors, oversized, unreadable or
+not UTF-8; absent when all parsed cleanly), and a `degraded` notice
 (reason, remedy) when it could not run at all.
 It is per project because resolution needs the whole project. Its doc comment
 says what each field means for a pack that is not tree-sitter based (a TS/JS
@@ -55,12 +76,29 @@ against the `files` inventory, not the disk. Dependencies reuse
 `BuildDependency` (`group` empty, `artifact` PEP 503-normalised, specifier as
 written) with file and line. `parseTomlLocated` gives each value's line.
 
+The Composer reader (`src/php-composer.ts`, `readComposerProjects(projectDir,
+files)`) gives one model per `composer.json` in the inventory, skipping one
+inside another project's vendor directory: requirements as written (a name
+with no `vendor/` part is `platform`), autoload blocks with repository-relative
+paths, repositories, `vendorDir`, and the beside-it `composer.lock`'s packages
+(`version` in memory only; autoload paths relative to the package root).
+Malformed JSON is a notice and an empty model. `composer.lock` is capped at
+`MAX_COMPOSER_LOCK_BYTES` (16 MiB); every other file at the build file cap.
+
 A config's `skipUnlessContains` names directories skipped unless they directly
 hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`).
 `skipBesideMarker` names directories skipped only as build output: under the
 project root or a directory holding a marker, never below `src/` (Java's
 `target`, `build`, `out` and `generated` beside `pom.xml` or `build.gradle*`,
-so `src/main/java/…/target/` stays a package). `skipsDirectory` applies both
+so `src/main/java/…/target/` stays a package). `skipOnlyBeside` names
+directories skipped only when their parent holds a marker (PHP's `vendor`
+beside `composer.json`); sourcevision's always-skipped vendored set yields to
+it. A `*.ext` marker means any file with that extension (`markerMatches`;
+PHP's `cache`, `tmp`, `.phpunit.cache` without a `.php` file).
+`.inc`, `.module` and `.install` (`PHP_REPOSITORY_ONLY_EXTENSIONS`) are PHP
+only in a repository detected as PHP, where the PHP pack parses them;
+detection never counts them.
+`skipsDirectory` applies these rules
 and `skipDirectories`, the caller doing the I/O and passing the directory's
 place; a name both conditional rules list is kept if either keeps it.
 
@@ -73,21 +111,29 @@ and stops at `MAX_PROPERTY_EXPANSION` (4096 characters) or
 unresolved. A property's value, or its reason for failing, does not depend on
 which reference reached it first; the exception is a cycle, whose reason names
 the member that closed it. Scans of repository content must stay linear: use
-`indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex. Test a
+`indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex, and
+`trimTrailing`/`trimLeading`/`trimChar` (`src/text-trim.ts`) for a repeated
+character at either end, not `/x+$/`. Test a
 scan's pathological input through `tests/helpers/call-within-budget.ts`, which
 runs the call in a worker and terminates it past a budget, so a regression
 fails the test by name instead of hanging the suite.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
-so the Java and Go packs share it without depending on each other.
+so the Java, Go and PHP packs share it without depending on each other.
+`withoutUrlUserinfo` (`src/url-userinfo.ts`) is the one URL userinfo rule,
+for sourcevision's output redaction and the packs' URL targets alike.
 
 Detection takes the config override and the
 project file search as arguments (`detectLanguage(rootDir, { override,
 searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
-the search being the inventory's own walk. A markerless repository is
-Terraform alone only when that walk finds Terraform files and no
-`isFallbackSourceFile` file (JS/TS, or a language with no config); counts
-are not weighed. Before deciding Terraform alone it searches again with no
+the search being the inventory's own walk. With no other marker at the root,
+a `composer.json` or `index.php` in a direct child directory (`phpBB/`,
+`catalog/`) marks PHP; markers are never read deeper (C#'s aside). A
+repository with no marker is the language with the most source files when
+that is not TypeScript and the walk's Terraform count is lower; otherwise it
+is Terraform alone only when that walk finds Terraform files and no
+`isFallbackSourceFile` file (JS/TS, a language with no config, or PHP with
+no weak PHP marker); those counts are not weighed. Before deciding Terraform alone it searches again with no
 other config, so source only the fallback skips (`dist/`) keeps the fallback
 and the result's inventory never lists source detection did not count.
 Resolvers, the parser runner, queries and grammars live in the runtime and the

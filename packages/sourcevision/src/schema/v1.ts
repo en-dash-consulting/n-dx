@@ -20,6 +20,10 @@ export interface LLMClassUsage {
   calls: number;
   inputTokens: number;
   outputTokens: number;
+  /** Prompt-cache write tokens; present only when greater than 0. */
+  cacheCreationTokens?: number;
+  /** Prompt-cache read tokens; present only when greater than 0. */
+  cacheReadTokens?: number;
   durationMs: number;
   vendor: string;
   model: string;
@@ -285,6 +289,32 @@ export interface FileEntry {
   category: string;
   /** File mtime in epoch ms — used for incremental analysis caching */
   lastModified?: number;
+  /**
+   * Why this file is third-party code copied into the repository (not
+   * installed by a package manager): `library <Name>` for a built-in
+   * fingerprint, `config <glob>` or `cli <glob>` for a configured glob. Such a
+   * file stays in the inventory and its import edges still resolve, but it is
+   * left out of zones, classification, primary-language detection, readiness
+   * evidence, the call graph and the migration totals. Absent for
+   * first-party files.
+   */
+  thirdParty?: string;
+  /**
+   * The identical file this one copies, when its folder is a near-identical
+   * copy of another folder in the same repository (`edit/x.php` →
+   * `app/x.php`): counted once, in the source, and left out of the same
+   * phases as third-party code. Set only on files identical to their
+   * counterpart; the files where the copy diverged stay first-party.
+   */
+  mirrorOf?: string;
+}
+
+/** Third-party and mirrored files, counted apart from first-party code. */
+export interface InventoryExcludedSummary {
+  /** Files marked third-party. */
+  files: number;
+  /** Files per reason: {@link FileEntry.thirdParty}, or `<copy>/ mirrors <source>/`. */
+  byReason: Record<string, number>;
 }
 
 export interface InventorySummary {
@@ -309,6 +339,10 @@ export interface InventorySummary {
    * inventories written before this field existed.
    */
   analysedLanguages?: string[];
+  /** Third-party files ({@link FileEntry.thirdParty}). Absent when there are none. */
+  thirdParty?: InventoryExcludedSummary;
+  /** Mirrored files ({@link FileEntry.mirrorOf}). Absent when there are none. */
+  mirrored?: InventoryExcludedSummary;
 }
 
 export interface Inventory {
@@ -352,7 +386,47 @@ export interface ImportsSummary {
   circulars: CircularDependency[];
   mostImported: Array<{ path: string; count: number }>;
   avgImportsPerFile: number;
+  /**
+   * Pack id → the files of that language that did not parse cleanly. Absent
+   * when every pack-parsed file parsed cleanly.
+   */
+  parseIssues?: Record<string, PackParseIssues>;
 }
+
+/** One kind of parse problem: how many files, and the first paths in sort order. */
+export interface ParseIssueSample {
+  count: number;
+  /** At most {@link MAX_PARSE_ISSUE_EXAMPLES} paths, sorted. */
+  examples: string[];
+}
+
+/** How one language pack's files parsed. `notUtf8` overlaps `syntaxErrors`; the other kinds are exclusive. */
+export interface PackParseIssues {
+  /** Files of the language handed to the pack. */
+  files: number;
+  /** Files with none of the problems below. */
+  clean: number;
+  /** The parser's size limit in bytes. */
+  sizeLimitBytes: number;
+  /** Parsed with syntax errors; facts were still read from the partial tree. */
+  syntaxErrors: ParseIssueSample;
+  /** Over the size limit, so not parsed. */
+  oversized: ParseIssueSample;
+  /** Could not be read. */
+  unreadable: ParseIssueSample;
+  /** Not valid UTF-8; decoded with replacement characters and parsed. */
+  notUtf8: ParseIssueSample;
+  /**
+   * Valid in an older version of the language but not in the grammar (PHP 5's
+   * `$s{0}`): rewritten in place and parsed cleanly, so their facts are whole.
+   * Never counted under `syntaxErrors`. `constructs` totals the rewrites by
+   * construct. Absent when there are none.
+   */
+  legacySyntax?: ParseIssueSample & { constructs: Record<string, number> };
+}
+
+/** How many example paths {@link ParseIssueSample} keeps. */
+export const MAX_PARSE_ISSUE_EXAMPLES = 50;
 
 export interface Imports {
   edges: ImportEdge[];
@@ -767,6 +841,11 @@ export interface ServerRoute {
   path: string;
   /** Handler function name, if identifiable */
   handler?: string;
+  /**
+   * Where a language pack found the route when not in the handler file's
+   * code: a convention (`docroot public`) or a config line (`public/.htaccess:3`)
+   */
+  source?: string;
 }
 
 export interface ServerRouteGroup {
@@ -892,7 +971,8 @@ export interface ArchetypeDefinition {
 
 export interface ClassificationEvidence {
   archetypeId: string;
-  signalKind: ArchetypeSignal["kind"];
+  /** `pack`: a language pack read it from the file's content (a PHP script a crontab runs), `detail` saying what. */
+  signalKind: ArchetypeSignal["kind"] | "pack";
   detail: string;
   weight: number;
 }
@@ -1507,6 +1587,161 @@ export interface SdlcIac extends SdlcDetection {
 }
 
 /**
+ * A language's files by observed-syntax version floor (lang-kit's
+ * `VersionFloorFact`): the oldest version whose syntax covers each file.
+ */
+export interface SdlcVersionFloors {
+  /** Files the language pack read. The section is written whenever the pack was asked for floors, so a repository no rule dates has `floors` `{}` and `none` equal to `files`. */
+  files: number;
+  /** `major.minor` → files whose floor it is, oldest version first. */
+  floors: Record<string, number>;
+  /** Files no syntax rule dated. */
+  none: number;
+  /** The highest floor: the version the repository's syntax needs. Absent when no file has a floor. */
+  highest?: string;
+}
+
+/** A language version and the language's own page naming it, a migration guide or release changelog (lang-kit's `LanguageBoundary`). */
+export interface SdlcLanguageBoundary {
+  version: string;
+  source: string;
+}
+
+/** One legacy-construct rule's uses across a repository. */
+export interface SdlcLegacyRuleCount {
+  status: "removed" | "deprecated" | "notice";
+  uses: number;
+  /** Files with at least one use. */
+  files: number;
+  deprecated?: SdlcLanguageBoundary;
+  removed?: SdlcLanguageBoundary;
+  changed?: SdlcLanguageBoundary;
+  /** The page behind `status`. */
+  source: string;
+  /** The rule sees only likely cases. */
+  likely?: true;
+}
+
+/**
+ * A language's uses of constructs later versions removed or deprecated
+ * (lang-kit's `LegacyConstructFact`), counted per repository. Notices
+ * (configuration-dependent or changed meaning) are counted apart and never in
+ * `uses`, `removedIn` or `deprecatedIn`.
+ */
+export interface SdlcLegacyConstructs {
+  /** Files with at least one use or notice. */
+  files: number;
+  /** Uses of removed or deprecated constructs. */
+  uses: number;
+  /** Review notices. */
+  notices: number;
+  /** By rule id, sorted. */
+  rules: Record<string, SdlcLegacyRuleCount>;
+  /** `major.minor` → uses of constructs that version removed, oldest first. */
+  removedIn: Record<string, number>;
+  /** `major.minor` → uses of constructs deprecated there and not yet removed, oldest first. */
+  deprecatedIn: Record<string, number>;
+}
+
+/**
+ * A language's dynamic-code sites (lang-kit's `DynamicCodeFact`), counted per
+ * repository: where code runs a string as code (`exec`), chooses what to run
+ * from a value (`dispatch`) or includes a file whose path is built at run
+ * time (`include`). Counts only; each site's location is in the pack's notices.
+ */
+export interface SdlcDynamicCode {
+  /** Files with at least one site. */
+  files: number;
+  /** Every site. */
+  sites: number;
+  /** Sites by kind; a kind with none is 0. */
+  kinds: { exec: number; dispatch: number; include: number };
+  /** `exec` sites whose code is written as literals alone. */
+  literal: number;
+  /** Sites by construct (`eval`, `variable-function`, `dynamic-include`, …), sorted. */
+  constructs: Record<string, number>;
+  /** `exec` and `dispatch` sites fed by database query results; absent when there are none. */
+  database?: SdlcDatabaseDrivenCode;
+}
+
+/** Database-driven dynamic-code sites (lang-kit's `DynamicCodeFact.database`), counted. Names only, never row data. */
+export interface SdlcDatabaseDrivenCode {
+  /** Every database-driven site. */
+  sites: number;
+  /** Sites by kind; a kind with none is 0. */
+  kinds: { exec: number; dispatch: number };
+  /** Sites by table their queries name, sorted. */
+  tables: Record<string, number>;
+  /** Sites by `table.column` their queries' literal SELECT lists name, sorted. */
+  columns: Record<string, number>;
+}
+
+/** What a language pack reports about a repository's code, beyond the SDLC sections. */
+export interface SdlcLanguageEcosystem {
+  versionFloors?: SdlcVersionFloors;
+  legacyConstructs?: SdlcLegacyConstructs;
+  dynamicCode?: SdlcDynamicCode;
+  /**
+   * The same counts over third-party files (inventory `thirdParty`), kept
+   * apart so the sections above describe the application alone. Mirror copies
+   * (`mirrorOf`) are counted once, in their source. Absent when third-party
+   * files have none.
+   */
+  thirdParty?: { legacyConstructs?: SdlcLegacyConstructs; dynamicCode?: SdlcDynamicCode };
+}
+
+// ── Legacy constructs per file ──────────────────────────────────────────────
+// The per-file facts behind `SdlcLanguageEcosystem`'s `versionFloors` and
+// `legacyConstructs`, written to `legacy.json` only when a pack produced a
+// floor or a construct use. Versions and positions only: each rule's pages
+// live once in sdlc-profile.json, and no code is copied.
+
+/** One legacy-construct use in a file (lang-kit's `LegacyConstructFact`, versions without pages). */
+export interface LegacyConstructUse {
+  rule: string;
+  construct: string;
+  status: "removed" | "deprecated" | "notice";
+  /** 1-indexed. */
+  line: number;
+  /** 0-indexed, in UTF-16 code units. */
+  column: number;
+  deprecated?: string;
+  removed?: string;
+  changed?: string;
+  likely?: true;
+}
+
+/** One file's version floor and legacy-construct uses. */
+export interface LegacyFileEntry {
+  path: string;
+  /** The oldest version whose syntax covers the file, the rule that dated it and the line of its first use. */
+  floor?: { version: string; rule: string; line: number };
+  /** Uses of removed or deprecated constructs. */
+  uses: number;
+  /** Review notices, never in `uses`. */
+  notices: number;
+  /** `major.minor` → this file's uses of constructs that version removed, oldest first. */
+  removedIn: Record<string, number>;
+  /** `major.minor` → this file's uses of constructs deprecated there and not yet removed, oldest first. */
+  deprecatedIn: Record<string, number>;
+  /** Sorted by line, then column. */
+  constructs: LegacyConstructUse[];
+}
+
+/** One language's files; the split is `SdlcLanguageEcosystem`'s, mirror copies left out. */
+export interface LegacyLanguageFiles {
+  /** The application's own files with a floor or a construct use, sorted by path. */
+  files: LegacyFileEntry[];
+  /** Third-party files likewise; absent when there are none. */
+  thirdParty?: LegacyFileEntry[];
+}
+
+/** `legacy.json` — per language (the inventory's, lower-cased), each file's floor and legacy-construct uses. */
+export interface LegacyData {
+  languages: Record<string, LegacyLanguageFiles>;
+}
+
+/**
  * Evidence-based CI/CD maturity for one repository.
  *
  * Every section is present on a written profile, empty where nothing was
@@ -1545,6 +1780,12 @@ export interface SdlcProfile {
    * `SdlcParseFailure`.
    */
   parseFailures: SdlcParseFailure[];
+  /**
+   * Language facts from language packs, keyed by the inventory's language,
+   * lower-cased (`php`). Present only when a pack produced one, so a
+   * repository without such a pack writes the profile it always did.
+   */
+  ecosystem?: Record<string, SdlcLanguageEcosystem>;
 }
 
 // ── Outbound dependencies ───────────────────────────────────────────────────
@@ -1567,7 +1808,9 @@ export interface OutboundDependency {
   /**
    * Where the call points — a URL or address when `targetSource` is
    * `literal`, the environment variable's name when it is `env`, the config
-   * key when it is `config`, and the empty string when it is `unknown`.
+   * key when it is `config`, and for `unknown` the expression as written when
+   * a pack keeps it (PHP: `$this->host . '/soap.php'`, credentials dropped),
+   * else the empty string.
    */
   target: string;
   /**
@@ -1588,6 +1831,12 @@ export interface OutboundDependency {
    * lower would state the same fact in two fields that can then disagree.
    */
   confidence: Confidence;
+  /**
+   * Set when the call is in copied-in third-party code (the file's inventory
+   * `thirdParty` reason): still this repository's integration, but counted
+   * apart from the application's own calls. Absent for first-party calls.
+   */
+  thirdParty?: string;
 }
 
 /**
@@ -1610,4 +1859,96 @@ export interface DeclaredContract {
 export interface OutboundData {
   dependencies: OutboundDependency[];
   contracts: DeclaredContract[];
+}
+
+// ── Config reads and flag checks ────────────────────────────────────────────
+// Where code reads configuration and where it checks feature flags, from
+// language packs' `configReads` and `flagChecks` facts (lang-kit's
+// `ConfigReadFact` and `FlagCheckFact`). Names, keys, files and positions
+// only: never a value.
+//
+// Written to `config.json` only when some pack produced either kind; every
+// other analysis writes no such file.
+
+/** Where a configuration value is read from; lang-kit's `ConfigSource`. */
+export type ConfigSource = "file" | "env" | "ini" | "yaml" | "xml" | "json" | "define" | "unknown";
+
+/** How a flag is checked; lang-kit's `FlagMechanism`. */
+export type FlagMechanism = "constant" | "config" | "function" | "sdk" | "env";
+
+/** One configuration read. */
+export interface ConfigRead {
+  /** The key as written, nested access dotted (`db.host`); an environment variable's name. */
+  key: string;
+  source: ConfigSource;
+  /** Project-relative file the value comes from, when the pack knows it. */
+  sourceFile?: string;
+  /** 1-indexed line of the read. */
+  line: number;
+  /** 0-indexed column, in UTF-16 code units. */
+  column: number;
+}
+
+/** Lines a flag check controls, 1-indexed and inclusive. */
+export interface GatedLines {
+  start: number;
+  end: number;
+}
+
+/** One feature-flag check. */
+export interface FlagCheck {
+  /** The flag as written. */
+  name: string;
+  /** Lower-case, separators unified, `feature_`/`features_`/`ff_` prefix dropped (lang-kit's `normalizeFlagName`). */
+  normalized: string;
+  mechanism: FlagMechanism;
+  /** The SDK or helper that checks it, when there is one. */
+  client?: string;
+  line: number;
+  column: number;
+  /** The lines the check controls, when it is a branch condition. */
+  gated?: GatedLines;
+}
+
+/** One file's reads and checks, each sorted by position. */
+export interface ConfigFileEntry {
+  file: string;
+  configReads: ConfigRead[];
+  flagChecks: FlagCheck[];
+}
+
+/** One flag across the project, keyed by its normalized name. */
+export interface ConfigFlagEntry {
+  normalized: string;
+  /** Every spelling seen, sorted. */
+  names: string[];
+  /** Sorted. */
+  mechanisms: FlagMechanism[];
+  /** Files that check it, sorted. */
+  files: string[];
+  /** Number of checks. */
+  checks: number;
+  /** Distinct lines its checks gate, summed over files (nested checks count a line once). */
+  gatedLines: number;
+}
+
+/** One configuration key across the project. */
+export interface ConfigKeyEntry {
+  key: string;
+  /** Sorted. */
+  sources: ConfigSource[];
+  /** Files the value comes from, when known; sorted. */
+  sourceFiles: string[];
+  /** Files that read it (its consumers), sorted. */
+  files: string[];
+}
+
+/** `config.json` — config reads and flag checks for one analysis. */
+export interface ConfigData {
+  /** Files with at least one read or check, sorted by path. */
+  files: ConfigFileEntry[];
+  /** Sorted by `normalized`. */
+  flags: ConfigFlagEntry[];
+  /** Sorted by `key`. */
+  keys: ConfigKeyEntry[];
 }

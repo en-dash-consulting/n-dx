@@ -1,0 +1,53 @@
+schema: "rex/v2"
+items:
+  "140e0c03-294f-4e8d-9870-83cd3761ae04":
+    status: "completed"
+    startedAt: "2026-11-18T03:47:49.783Z"
+    completedAt: "2026-11-18T03:47:49.783Z"
+    endedAt: "2026-11-18T03:47:49.783Z"
+    activeIntervals: [{"end":"2026-11-18T03:47:49.783Z","start":"2026-11-18T03:47:49.783Z"}]
+    appliedAt: "2026-11-18T03:47:49.783Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-18T00:51:59.684Z"
+    lastModified: "2026-11-18T03:47:49.783Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1e1b26d9-6e14-41b1-9232-3d32869355d1":
+    status: "completed"
+    startedAt: "2026-11-18T03:37:31.636Z"
+    completedAt: "2026-11-18T03:47:49.783Z"
+    endedAt: "2026-11-18T03:47:49.783Z"
+    activeIntervals: [{"end":"2026-11-18T03:47:49.783Z","start":"2026-11-18T03:37:31.636Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "packBySize + JEV_REQUEST_BYTE_CEILING (128 KiB, sourcevision.jev.requestByteCeiling) in jev-split.ts; typed-findings and classify pack by bytes and count; lone refused typed finding retried at trim levels 1-4; trimmedLevels + summary-line count; debug request-size log; tests, docs, changeset."
+    lastModified: "2026-11-18T03:47:49.783Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6fc82dbd-405e-4b0c-b80e-2c16b37a8707":
+    status: "completed"
+    startedAt: "2026-11-18T01:07:57.650Z"
+    completedAt: "2026-11-18T01:13:13.960Z"
+    endedAt: "2026-11-18T01:13:13.960Z"
+    activeIntervals: [{"end":"2026-11-18T01:13:13.960Z","start":"2026-11-18T01:07:57.650Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "jev-split.ts halves too-large Jev requests; typed-findings and classify use it; summary counts judged only; tests and changeset added (18553ccf6)."
+    lastModified: "2026-11-18T01:13:13.960Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a913d67e-2106-45d8-9bef-76991a30c1f7":
+    status: "completed"
+    startedAt: "2026-11-18T03:35:43.331Z"
+    completedAt: "2026-11-18T03:37:22.371Z"
+    endedAt: "2026-11-18T03:37:22.371Z"
+    activeIntervals: [{"end":"2026-11-18T03:37:22.371Z","start":"2026-11-18T03:35:43.331Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added classify.test.ts case: split batch, later slice rate-limit; earlier slices kept, one warning. Commit f05e19fda."
+    lastModified: "2026-11-18T03:37:22.371Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d842839a-6478-4367-97bc-962252fffa99":
+    status: "completed"
+    startedAt: "2026-11-18T01:05:38.077Z"
+    completedAt: "2026-11-18T01:05:38.077Z"
+    endedAt: "2026-11-18T01:05:38.077Z"
+    activeIntervals: [{"end":"2026-11-18T01:05:38.077Z","start":"2026-11-18T01:05:38.077Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Code from hench run b10eee03 (claude-sonnet-5-5, review claude-opus-5-5: 1 low finding, not worth fixing). The run could not commit or run tests because ~/.claude-max had not trusted the checkout. The operator verified the targeted tests (sourcevision run-ledger and token-usage, 30 passing; llm-client cli-provider, 17 passing) and the sourcevision typecheck, then committed the run's paths."
+    lastModified: "2026-11-18T01:05:38.077Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

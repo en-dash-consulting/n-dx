@@ -1,0 +1,10 @@
+{
+    "_readme": ["A trimmed lock file for the resolver fixture; versions are placeholders."],
+    "packages": [
+        {
+            "name": "vendor/lib",
+            "version": "0.0.0-fixture",
+            "autoload": { "psr-4": { "Lib\\": "src/" } }
+        }
+    ]
+}

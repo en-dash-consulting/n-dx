@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "2e742c9b-d521-43ee-992a-6adb3423eed7":
+    status: "completed"
+    startedAt: "2026-11-16T16:53:56.680Z"
+    completedAt: "2026-11-16T17:09:04.110Z"
+    endedAt: "2026-11-16T17:09:04.110Z"
+    activeIntervals: [{"end":"2026-11-16T17:09:04.110Z","start":"2026-11-16T16:53:56.680Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-outbound framework in @n-dx/lang-php: curl, http stream functions, fsockopen, SoapClient, Guzzle and getenv/$_ENV/$_SERVER env reads as outboundCalls, written to outbound.json by sourcevision."
+    lastModified: "2026-11-16T17:09:04.110Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "38abed61-45be-4181-a45c-5652878ad43c":
+    status: "completed"
+    startedAt: "2026-11-16T17:43:49.824Z"
+    completedAt: "2026-11-16T17:43:49.824Z"
+    endedAt: "2026-11-16T17:43:49.824Z"
+    activeIntervals: [{"end":"2026-11-16T17:43:49.824Z","start":"2026-11-16T17:43:49.824Z"}]
+    appliedAt: "2026-11-16T17:43:49.824Z"
+    appliedAmendsHash: "eb2e859b939ada0fcb18b781446f164974f8c7cd6e8302550cca1fbd6f247aec"
+    createdAt: "2026-11-14T05:17:58.815Z"
+    lastModified: "2026-11-16T17:43:49.824Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5f583e76-168b-40b6-b8a0-d42faa7e1fa3":
+    status: "completed"
+    startedAt: "2026-11-16T17:10:21.078Z"
+    completedAt: "2026-11-16T17:43:49.824Z"
+    endedAt: "2026-11-16T17:43:49.824Z"
+    activeIntervals: [{"end":"2026-11-16T17:43:49.824Z","start":"2026-11-16T17:10:21.078Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PHP database/cache outbound calls and embedded SQL table reader (extractPhpEmbeddedSql) in @n-dx/lang-php, with fixtures and tests."
+    lastModified: "2026-11-16T17:43:49.824Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

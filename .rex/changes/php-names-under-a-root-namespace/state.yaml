@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "0facb205-d46c-46dc-b2d7-1701a6c69597":
+    status: "completed"
+    startedAt: "2026-11-14T08:00:39.549Z"
+    completedAt: "2026-11-14T08:00:39.549Z"
+    endedAt: "2026-11-14T08:00:39.549Z"
+    activeIntervals: [{"end":"2026-11-14T08:00:39.549Z","start":"2026-11-14T08:00:39.549Z"}]
+    appliedAt: "2026-11-14T08:00:39.549Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-14T07:53:44.939Z"
+    lastModified: "2026-11-14T08:00:39.549Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f4768c25-e822-4d07-b38e-19b5f8897d9f":
+    status: "completed"
+    startedAt: "2026-11-14T07:55:15.084Z"
+    completedAt: "2026-11-14T08:00:39.549Z"
+    endedAt: "2026-11-14T08:00:39.549Z"
+    activeIntervals: [{"end":"2026-11-14T08:00:39.549Z","start":"2026-11-14T07:55:15.084Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Index.isOwn now checks the whole namespace, a project PSR-4/PSR-0 prefix, or a declared namespace (or a leading part of one). Un-namespaced names keep the PSR-0 head rule. New php-shared-root fixture test."
+    lastModified: "2026-11-14T08:00:39.549Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

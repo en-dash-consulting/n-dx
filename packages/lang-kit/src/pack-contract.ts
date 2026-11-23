@@ -15,6 +15,8 @@
  * @module lang-kit/pack-contract
  */
 
+import { trimChar, trimLeading } from "./text-trim.js";
+
 // ── Positions ───────────────────────────────────────────────────────────────
 
 /** A position in a file. */
@@ -70,23 +72,60 @@ export interface ExternalReference {
 }
 
 /**
- * Why an import might not run when its module loads. `type-checking`: under
- * `if TYPE_CHECKING:` (Python), seen by type checkers only. `optional`: inside
- * a `try:` whose handler catches the import's failure (Python's `ImportError`
- * or `ModuleNotFoundError`).
+ * Why an import might not run when its module loads.
+ *
+ * - `type-checking`: under `if TYPE_CHECKING:` (Python), seen by type checkers only.
+ * - `optional`: inside a `try:` whose handler catches the import's failure
+ *   (Python's `ImportError` or `ModuleNotFoundError`).
+ * - `conditional`: runs only under a condition. PHP `include`/`require` inside
+ *   `if`/`else`/`switch` or a loop, inside a function or method body, or
+ *   behind a `function_exists`/`class_exists`/`defined` check.
  */
-export type ImportGuard = "type-checking" | "optional";
+export const IMPORT_GUARDS = ["type-checking", "optional", "conditional"] as const;
+
+export type ImportGuard = (typeof IMPORT_GUARDS)[number];
+
+/**
+ * Which PHP statement wrote an import: one of the four include forms, or a
+ * `use` of a class or namespace, a function or a constant.
+ */
+export const IMPORT_FORMS = ["include", "include_once", "require", "require_once", "use", "use function", "use const"] as const;
+
+export type ImportForm = (typeof IMPORT_FORMS)[number];
 
 /** One import as the file writes it, before resolution. */
 export interface WrittenImport {
-  /** The module as written; a relative import keeps its leading dots (`..pkg`, `.`). */
+  /**
+   * The module as written; a relative import keeps its leading dots (`..pkg`, `.`).
+   * A PHP include gives its path expression's source text, quotes included
+   * (`'lib/db.php'`, `dirname(__FILE__) . '/x.php'`, `$file`); a PHP `use`
+   * gives the qualified name, a group use's prefix joined to each entry
+   * (`use A\{B}` gives `A\B`).
+   */
   readonly specifier: string;
+  /** Set by a pack whose language has several import statements (PHP); absent otherwise. */
+  readonly form?: ImportForm;
+  /** The local name the import binds when the file renames it (PHP `use A\B as C` gives `C`). */
+  readonly alias?: string;
   /** Names imported from the module, as written, in order; `*` for a wildcard; empty when the module itself is imported. */
   readonly names: readonly string[];
   /** Where the specifier starts. */
   readonly position: SourcePosition;
   /** Absent for an import that always runs. */
   readonly guard?: ImportGuard;
+  /**
+   * For an include whose path is built at run time but starts or ends with
+   * literal text (PHP `"config/" . $_SERVER['HTTP_HOST'] . ".php"`): the
+   * project files it could load (here, files under `config/` ending in
+   * `.php`). Sorted, distinct, project-relative; a pack may cap the list.
+   * Absent when the path is fully literal, its literal text matches no file,
+   * or that text does not narrow the files down.
+   *
+   * Candidates are evidence, not edges: consumers must never turn them into
+   * import edges. Held in memory only; no persisted artifact has a field for
+   * them.
+   */
+  readonly candidates?: readonly string[];
 }
 
 /** Everything one file refers to. Both lists are sorted and deduplicated. */
@@ -114,6 +153,13 @@ export interface FileReferences {
  *   its receiver's base type; a Java method's is its enclosing type.
  * - `table`: a SQL table created by `CREATE TABLE`.
  * - `variable`: a name assigned at module level (Python).
+ * - `trait`: a PHP `trait T {}`. Not reported as a `class` or `interface`; its
+ *   methods take it as their container.
+ * - `namespace`: a PHP `namespace A\B;` (or braced `namespace A\B {…}`), named
+ *   as written. It is not a container: a class inside keeps no container.
+ * - `constant`: a PHP `const X = 1;` at namespace level, a class constant
+ *   (container: its class, interface, trait or enum), or `define('X', …)`
+ *   whose name is a literal.
  *
  * Python uses `class`, `function` (sync or async) and `method` (a function
  * defined directly in a class body).
@@ -131,6 +177,9 @@ export const SYMBOL_KINDS = [
   "constructor",
   "table",
   "variable",
+  "trait",
+  "namespace",
+  "constant",
 ] as const;
 
 export type SymbolKind = (typeof SYMBOL_KINDS)[number];
@@ -178,8 +227,17 @@ export interface StringArgument {
 export interface CallFact {
   /** Called method or function; absent when the callee is not a name (`f()()`). */
   readonly callee?: string;
-  /** Receiver as written (`jdbcTemplate`, `s.db`); absent for an unqualified call. */
+  /**
+   * Receiver as written (`jdbcTemplate`, `s.db`, PHP's `$this->db` or the
+   * static scope `Foo`, `self`, `parent`); absent for an unqualified call.
+   */
   readonly receiver?: string;
+  /**
+   * Set for an object creation (PHP `new Foo\Bar(…)`, or `new Foo` with no
+   * argument list): `callee` is the class as written, absent for an
+   * anonymous class or a class that is not a name (`new $class`).
+   */
+  readonly construct?: true;
   /**
    * String literals passed directly to this call, in order. A literal inside a
    * nested call belongs to that call: `f(g("x"))` gives `"x"` to `g`.
@@ -197,6 +255,26 @@ export interface RouteFact {
   readonly path: string;
   /** Name of the function or method that handles it, when known. */
   readonly handler?: string;
+  /**
+   * Where the route is declared when not in the handler file's own code: a
+   * convention (`docroot public`) or a configuration line (`public/.htaccess:3`).
+   */
+  readonly source?: string;
+  readonly position: SourcePosition;
+}
+
+// ── Entry points (produced) ─────────────────────────────────────────────────
+
+/**
+ * A way into the program other than a request route: a script run from the
+ * command line (a PHP file with a `#!/usr/bin/env php` shebang) or by cron.
+ */
+export interface EntryPointFact {
+  readonly kind: "cli" | "cron";
+  /** Why the pack calls it one: the rule (`shebang`), or the line that runs it (`crontab:3`). */
+  readonly source: string;
+  /** For `cron`: the schedule as written (`*\/5 * * * *`, `@daily`). */
+  readonly schedule?: string;
   readonly position: SourcePosition;
 }
 
@@ -231,6 +309,223 @@ export interface OutboundCallFact {
    * weaker evidence. Absent when the pack does not grade.
    */
   readonly confidence?: "certain" | "likely" | "inferred";
+  readonly position: SourcePosition;
+}
+
+// ── Config reads and flag checks (produced) ─────────────────────────────────
+//
+// Language-neutral: any pack may fill them. Neither records a value — only
+// names, keys, files and positions — so no secret or setting is ever copied
+// out of the code.
+
+/**
+ * Where a configuration value is read from.
+ *
+ * - `file`: a code file of the project that holds settings (`config.php`'s array).
+ * - `env`: an environment variable.
+ * - `ini`, `yaml`, `xml`, `json`: a settings file in that format.
+ * - `define`: a constant defined from configuration (PHP `define('DB_HOST', …)`).
+ * - `unknown`: the pack sees a read but not its source.
+ */
+export const CONFIG_SOURCES = ["file", "env", "ini", "yaml", "xml", "json", "define", "unknown"] as const;
+
+export type ConfigSource = (typeof CONFIG_SOURCES)[number];
+
+/** One place a file reads a configuration value. No value is recorded. */
+export interface ConfigReadFact {
+  /**
+   * The key as written; nested access is dotted (`$config['db']['host']`
+   * gives `db.host`), an environment variable is its name.
+   */
+  readonly key: string;
+  readonly source: ConfigSource;
+  /** Project-relative, forward-slash file the value comes from, when the pack knows it. */
+  readonly sourceFile?: string;
+  /** Where the read starts. */
+  readonly position: SourcePosition;
+}
+
+/**
+ * How a flag is checked.
+ *
+ * - `constant`: a constant (`if (FEATURE_NEW_CHECKOUT)`).
+ * - `config`: a configuration value (`$config['features']['new_checkout']`).
+ * - `function`: a project helper (`feature_enabled('new_checkout')`).
+ * - `sdk`: a feature-flag SDK call (`$ld->variation('new-checkout', …)`).
+ * - `env`: an environment variable (`getenv('FF_NEW_CHECKOUT')`).
+ */
+export const FLAG_MECHANISMS = ["constant", "config", "function", "sdk", "env"] as const;
+
+export type FlagMechanism = (typeof FLAG_MECHANISMS)[number];
+
+/** A range of whole lines, one-based and inclusive at both ends. */
+export interface LineRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+/** One place a file checks a feature flag. No value is recorded. */
+export interface FlagCheckFact {
+  /** The flag as written: the constant, key, helper argument or SDK key. */
+  readonly name: string;
+  /** `name` through {@link normalizeFlagName}, so one flag checked several ways meets itself. */
+  readonly normalized: string;
+  readonly mechanism: FlagMechanism;
+  /** The SDK or helper that checks it (`LaunchDarkly`, `feature_enabled`); absent for a bare constant or key. */
+  readonly client?: string;
+  /** Where the check starts. */
+  readonly position: SourcePosition;
+  /**
+   * The lines the check controls when it is the condition of an `if`,
+   * ternary or `match` (the branch bodies, `else` included). Absent when the
+   * check gates no code the pack can see (its result is stored or returned).
+   */
+  readonly gated?: LineRange;
+}
+
+/** Prefixes that mark a name as a flag rather than naming it, after separators are unified. */
+const FLAG_PREFIXES = ["features_", "feature_", "ff_"] as const;
+
+/**
+ * A flag name in the form two spellings of one flag share: lower-case, runs of
+ * `.`, `-`, `/`, `:` and white space unified to `_`, one leading `features_`,
+ * `feature_` or `ff_` dropped, outer `_` trimmed. `FEATURE_NEW_CHECKOUT`,
+ * `features.new_checkout` and `ff-new-checkout` all give `new_checkout`. A name
+ * that is only a prefix keeps it (`feature` stays `feature`).
+ */
+export function normalizeFlagName(name: string): string {
+  const unified = trimChar(name.toLowerCase().replace(/[\s./:\-_]+/g, "_"), "_");
+  const prefix = FLAG_PREFIXES.find((p) => unified.startsWith(p) && unified.length > p.length);
+  return prefix === undefined ? unified : trimLeading(unified.slice(prefix.length), "_");
+}
+
+// ── Version floor (produced) ────────────────────────────────────────────────
+
+/**
+ * The oldest language version a file's syntax needs: the highest version any
+ * of the pack's syntax rules sets for a construct the file uses, with the
+ * construct that set it. Observed syntax only — what the file calls
+ * (functions, classes) and how the runtime is configured play no part, so the
+ * file may need a newer version than this, never an older one.
+ */
+export interface VersionFloorFact {
+  /** Language version as `major.minor`, e.g. `7.4`. */
+  readonly version: string;
+  /** The rule that set it, a stable id (`arrow-functions`). */
+  readonly rule: string;
+  /** The construct in words (`arrow function`). */
+  readonly construct: string;
+  /** URL of the language's own page that dates the construct (a migration guide or release changelog). */
+  readonly source: string;
+  /** The construct's first use in the file. */
+  readonly position: SourcePosition;
+}
+
+/**
+ * `major.minor` versions compared numerically: negative when `a` is older, 0
+ * when equal, positive when newer. `7.10` is newer than `7.4`.
+ */
+export function compareLanguageVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+// ── Legacy constructs (produced) ────────────────────────────────────────────
+
+/** A language version and the language's own page that names it (a migration guide or release changelog). */
+export interface LanguageBoundary {
+  /** `major.minor`, e.g. `7.0`. */
+  readonly version: string;
+  /** URL of the page. */
+  readonly source: string;
+}
+
+/**
+ * What a later language version did to a construct: `removed` (some version
+ * removed it, or stopped reading it as before), `deprecated` (deprecated, not
+ * yet removed), `notice` (worth a review — it depends on configuration, or
+ * its meaning changed — never a removal).
+ */
+export const LEGACY_STATUSES = ["removed", "deprecated", "notice"] as const;
+export type LegacyStatus = (typeof LEGACY_STATUSES)[number];
+
+/**
+ * One use of a construct a later language version removed or deprecated, or
+ * changed the meaning of. Every version it names comes with its guide page.
+ */
+export interface LegacyConstructFact {
+  /** The rule that matched, a stable id (`mysql-functions`). */
+  readonly rule: string;
+  /** The construct in words, the use's own name where it has one (`mysql_query()`). */
+  readonly construct: string;
+  readonly status: LegacyStatus;
+  /** Where it was deprecated. */
+  readonly deprecated?: LanguageBoundary;
+  /** Where it was removed, or stopped being read as before. */
+  readonly removed?: LanguageBoundary;
+  /** Where a `notice`'s meaning changed. */
+  readonly changed?: LanguageBoundary;
+  /** The page behind `status`: `removed`'s, else `deprecated`'s, else `changed`'s, else the page describing the notice. */
+  readonly source: string;
+  /** Set when the rule sees only a likely case (it cannot see the whole program). */
+  readonly likely?: true;
+  readonly position: SourcePosition;
+}
+
+// ── Dynamic code (produced) ─────────────────────────────────────────────────
+
+/**
+ * What a dynamic-code site does: `exec` runs a string as code (`eval`),
+ * `dispatch` picks the function, method or class to run from a value
+ * (`$f()`, `new $class`), `include` loads a file whose path is built at run
+ * time.
+ */
+export const DYNAMIC_CODE_KINDS = ["exec", "dispatch", "include"] as const;
+export type DynamicCodeKind = (typeof DYNAMIC_CODE_KINDS)[number];
+
+/**
+ * One place code runs a string as code or chooses what to run from a value:
+ * what reading the files alone cannot explain. Locations and the expression
+ * as written only, never a value.
+ */
+export interface DynamicCodeFact {
+  readonly kind: DynamicCodeKind;
+  /** What matched, a stable id: the function's name (`eval`, `call_user_func`) or the syntax (`variable-function`). */
+  readonly construct: string;
+  /** The expression as written: the call, `new` or include path. */
+  readonly expression: string;
+  /** The enclosing function, `Class::method` or closure; absent at a file's top level. */
+  readonly scope?: string;
+  /** Set when the code an `exec` site runs is written as literals alone (`eval('return 1;')`). */
+  readonly literal?: true;
+  /** Set on an `exec` or `dispatch` site fed by a database query result: what feeds it. */
+  readonly database?: DynamicCodeDatabase;
+  readonly position: SourcePosition;
+}
+
+/**
+ * The database data an `exec` or `dispatch` site runs or dispatches on: the
+ * tables and columns its queries read, and where each value comes from.
+ * Names and locations only, never row data.
+ */
+export interface DynamicCodeDatabase {
+  /** Tables the feeding queries name, sorted; empty when no feeding query's SQL is literal. */
+  readonly tables: readonly string[];
+  /** `table.column` from the feeding queries' literal SELECT lists, sorted; empty for `SELECT *`. */
+  readonly columns: readonly string[];
+  /** Each query or fetch call the value comes from, by file and position, sorted. */
+  readonly sources: readonly DynamicCodeSource[];
+}
+
+/** Where a database-derived value comes from: a query or fetch call. */
+export interface DynamicCodeSource {
+  /** Project-relative path of the file holding the call. */
+  readonly path: string;
   readonly position: SourcePosition;
 }
 
@@ -347,10 +642,34 @@ export interface FileFacts {
   readonly components?: readonly ComponentFact[];
   readonly outboundCalls?: readonly OutboundCallFact[];
   readonly resources?: readonly ResourceFact[];
+  readonly entryPoints?: readonly EntryPointFact[];
+  /** In document order. */
+  readonly configReads?: readonly ConfigReadFact[];
+  /** In document order. */
+  readonly flagChecks?: readonly FlagCheckFact[];
+  /** Absent when no syntax rule matched: the file uses nothing a rule dates. */
+  readonly versionFloor?: VersionFloorFact;
+  /** In document order. */
+  readonly legacyConstructs?: readonly LegacyConstructFact[];
+  /** In document order. */
+  readonly dynamicCode?: readonly DynamicCodeFact[];
 }
 
 /** Fact kinds a pack produces today. */
-export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources", "routes", "outboundCalls"] as const;
+export const PRODUCED_FACT_KINDS = [
+  "imports",
+  "symbols",
+  "calls",
+  "resources",
+  "routes",
+  "outboundCalls",
+  "entryPoints",
+  "configReads",
+  "flagChecks",
+  "versionFloor",
+  "legacyConstructs",
+  "dynamicCode",
+] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */
 export const DECLARED_FACT_KINDS = ["components"] as const;

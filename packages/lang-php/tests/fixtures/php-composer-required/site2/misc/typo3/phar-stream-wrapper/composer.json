@@ -1,0 +1,5 @@
+{
+    "name": "typo3/phar-stream-wrapper",
+    "require": { "php": ">=5.3", "Brumann/Polyfill-Unserialize": "^1.0" },
+    "autoload": { "psr-4": { "TYPO3\\PharStreamWrapper\\": "src/" } }
+}

@@ -1,0 +1,2 @@
+<?php
+$gone = (unset) $value;

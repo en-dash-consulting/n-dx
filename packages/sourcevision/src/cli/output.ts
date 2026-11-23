@@ -9,8 +9,8 @@
 export {
   setQuiet, isQuiet,
   setVerbose, isVerbose,
-  setDebug, isDebug,
-  info, result, verbose, debug,
+  setDebug,
+  info, result, verbose,
 } from "@n-dx/llm-client";
 
 import {

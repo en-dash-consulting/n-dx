@@ -1,0 +1,22 @@
+{
+    "content-hash": "0000",
+    "packages": [
+        {
+            "name": "monolog/monolog",
+            "version": "3.5.0",
+            "autoload": { "psr-4": { "Monolog\\": "src/Monolog" } }
+        },
+        {
+            "name": "acme/billing",
+            "version": "dev-main",
+            "autoload": { "psr-4": { "Acme\\Billing\\": "src/" } }
+        }
+    ],
+    "packages-dev": [
+        {
+            "name": "phpunit/phpunit",
+            "version": "10.5.0",
+            "autoload": { "classmap": ["src/"], "files": ["src/Framework/Assert/Functions.php"] }
+        }
+    ]
+}

@@ -33,6 +33,7 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "node ../../scripts/run-vitest-bind-aware.mjs sourcevision",
+    "test:coverage": "node ../../scripts/run-vitest-bind-aware.mjs sourcevision --coverage",
     "test:watch": "vitest",
     "test:update-goldens": "node scripts/update-pack-goldens.mjs",
     "validate": "tsc --noEmit && vitest run",
@@ -52,12 +53,14 @@
   },
   "devDependencies": {
     "@n-dx/lang-java": "workspace:*",
+    "@n-dx/lang-php": "workspace:*",
     "@n-dx/lang-python": "workspace:*",
     "@n-dx/lang-runtime": "workspace:*",
     "@n-dx/lang-sql": "workspace:*",
     "@n-dx/lang-terraform": "workspace:*",
     "@types/node": "^26.6.5",
     "@types/pdfkit": "^0.17.6",
+    "@vitest/coverage-v8": "^5.0.5",
     "jsdom": "^30.1.3",
     "vitest": "^5.0.5"
   }

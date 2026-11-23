@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveLayout } from "@n-dx/llm-client";
-import { loadRiskJustifications, loadZoneTypes } from "../../src/cli/commands/analyze.js";
+import { loadJevRequestByteCeiling, loadRiskJustifications, loadZoneTypes } from "../../src/cli/commands/analyze.js";
 import { loadInventoryConfig, detectLanguage } from "../../src/language/detect.js";
 import { setArchetypeOverride } from "../../src/util/archetype-overrides.js";
 import { loadWorkspaceConfig, saveWorkspaceConfig } from "../../src/analyzers/workspace-aggregate.js";
@@ -47,6 +47,7 @@ const CONFIG = {
     extraExtensions: [".mdx"],
     riskJustifications: [{ zoneId: "web-server", reason: "composition root" }],
     zones: { types: { "web-server": "entrypoint" } },
+    jev: { requestByteCeiling: 65536 },
     isoMap: {
       injectionSeams: [{ from: "start.ts", to: "register-scheduler.ts" }],
       infrastructure: [{ id: "queue", name: "Job queue" }],
@@ -88,6 +89,19 @@ describe.each(LAYOUTS)("sourcevision project config on the $name layout", ({ con
     expect(loadZoneTypes(resolveLayout(projectDir).configFile)).toEqual(
       CONFIG.sourcevision.zones.types,
     );
+  });
+
+  it("reads the Jev request byte ceiling", () => {
+    expect(loadJevRequestByteCeiling(resolveLayout(projectDir).configFile)).toBe(
+      CONFIG.sourcevision.jev.requestByteCeiling,
+    );
+  });
+
+  it("ignores a Jev request byte ceiling that is not a positive integer", () => {
+    for (const bad of [0, -1, 1.5, "65536"]) {
+      writeFileSync(configPath, JSON.stringify({ sourcevision: { jev: { requestByteCeiling: bad } } }), "utf-8");
+      expect(loadJevRequestByteCeiling(resolveLayout(projectDir).configFile)).toBeUndefined();
+    }
   });
 
   it("reads inventory overrides", async () => {
@@ -150,6 +164,10 @@ describe("a .ndx project ignores a stray legacy config", () => {
 
   it("reports no zone types", () => {
     expect(loadZoneTypes(resolveLayout(projectDir).configFile)).toBeUndefined();
+  });
+
+  it("reports no Jev request byte ceiling", () => {
+    expect(loadJevRequestByteCeiling(resolveLayout(projectDir).configFile)).toBeUndefined();
   });
 
   it("reports no inventory overrides", async () => {

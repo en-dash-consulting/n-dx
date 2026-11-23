@@ -17,8 +17,9 @@ SourceVision runs a 4-phase analysis pipeline:
 
 ```sh
 sourcevision analyze .                    # full analysis
-sourcevision analyze --fast .             # skip AI enrichment
+sourcevision analyze --fast .             # static only: no model or network calls
 sourcevision analyze --phase zones .      # run specific phase
+sourcevision analyze --third-party='lib/Sheet/**' .  # treat a copied-in library as third-party
 sourcevision serve .                      # interactive browser viewer
 sourcevision validate .                   # validate analysis output
 sourcevision readiness .                  # SDLC readiness scorecard
@@ -91,7 +92,8 @@ the listed packs.
 
 `sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
 the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
-python, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today). npm
+python, php, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today, and
+php reports its imports as written but resolves none into edges yet). npm
 never runs lifecycle scripts: no pack needs one (grammars are prebuilt WASM),
 and a script anywhere in the dependency tree would otherwise run with the
 user's privileges.
@@ -146,6 +148,64 @@ paths. `bundle` never follows a symbolic link in the installed prefix; it
 leaves each one out and names it. Reading refuses links, bad checksums, truncation and any path that is
 absolute or contains `..`.
 
+### PHP pack rules
+
+Detail for `@n-dx/lang-php`'s include, resolution and framework rules;
+`packages/lang-php/AGENTS.md` keeps the summary.
+
+- **Includes** (`src/php-includes.ts`): a path built only from literals, `.`, `__DIR__`, `__FILE__`, `dirname(x[, n])`, `DIRECTORY_SEPARATOR` and constants the repository defines once (`define()`, file-level `const` outside a namespace; two different values is not computable) resolves to a pack file, symbol `*`; anything else gives no edge. Search: `__DIR__`/constant-anchored paths as named; `./` and `../` against the working directory; other relative paths under each include-path root, then the including file's directory. Working directory, tried in order: the including file's directory, its ancestors holding an `index.php` (entry scripts) nearest first, then the docroot (`src/php-docroots.ts`'s `primaryDocroot`: first `PHP_DOCROOT_DIRECTORIES` entry holding `index.php`, else the root). Roots: literal `set_include_path()`/`ini_set('include_path', …)`, `.user.ini`/`.htaccess` (`php_value`) at or above the file nearest first, then any `php.ini`; default `.`; relative roots against the working directory; roots outside the repository are ignored with a notice. `preparePhpImports(...).includes(path)` gives each include's outcome. Fixture: `tests/fixtures/php-legacy-includes/`.
+
+- **Dynamic includes** (a path not computable): no edge; counted with `file:line` in a `[php-dynamic-include]` notice, or `[php-host-include]` when the path reads `$_SERVER['HTTP_HOST']`/`['SERVER_NAME']`, itself or through a variable whose last assignment before the include, in its scope (`@guard.function` bodies, else the file; `src/php-assignments.ts`), reads it (`src/php-include-notices.ts`; `ResolvedPhpInclude.host`). The computable leading and trailing `.` operands (and an interpolated string's literal ends) give a prefix and suffix; pack files matching both, the prefix looked up as an include would be, fill `WrittenImport.candidates`, sorted, at most `MAX_INCLUDE_CANDIDATES` (50; the outcome keeps `total`). No prefix needs a suffix holding `/`; a leading `/` also matches at the repository root (`'/includes/x.inc'` → `includes/x.inc`). Candidates are never edges (`packages/sourcevision/tests/integration/php-pack-imports.test.ts`). Fixture: `tests/fixtures/php-dynamic-includes/`.
+
+- **Resolution** (`src/php-resolver.ts`, class names from `queries/php/references.scm`): `use` imports and class references (`extends`, `implements`, trait `use`, `new`, `X::`, parameter/return/property/`catch` types, `instanceof`) are qualified as PHP does (per-namespace-block `use` aliases; `use function`/`use const` kept apart; `self`/`static`/`parent` dropped) and resolved through the owning Composer project's and its required in-repo packages' `autoload`/`autoload-dev` (lang-kit's `readComposerProjects`): PSR-4 longest prefix first, PSR-0, classmap (less `exclude-from-classmap`), then legacy loading, then a class declared in exactly one repository file (two or more and no pattern: `ambiguous`). Legacy loading (`src/php-autoloaders.ts`): the file an `__autoload` function or an `spl_autoload_register` closure, function or method callback would include, when an include in its body is computable from the class name (the parameter, body variables, `str_replace`/`strtr`/`strtolower`/`ltrim`…), then the PSR-0 path (`A_B_C` → `A/B/C.php`) under the referring file's include-path roots or the repository root; the file must declare the class, or be unparsed while nothing declares it. Any other autoloader or registration is a notice with its line. Fixture: `tests/fixtures/php-legacy-autoload/`. Unresolved, per D5: PHP's own and common PECL extensions' classes (`src/php-builtins.ts`, by manual book or PECL page), scalar type keywords in any case, and global functions and constants are nothing; a name a `composer.lock` package's autoload prefix covers is external with that package as `module`; a name that is the project's is unresolved — a namespaced name whose namespace (all but its last segment) the project declares or that a project PSR-4/PSR-0 prefix covers, an un-namespaced one whose PSR-0 prefix is the project's (`Zend_`), never a library merely sharing the root namespace (`Acme\Shared` beside `Acme\Billing`); any other is `php:<first namespace segment>` (`php:Zend` for `Zend_Db_Table`). Symbols are qualified names. `preparePhpImports(...).outcomes(path)` says what each reference resolved to, for `packages/sourcevision/scripts/php-resolve-report.mjs`. Fixture: `tests/fixtures/php-composer/`.
+
+- **Linear scans**: repository text (`.htaccess` words and `include_path`, ini `include_path`, DSN `key=value` pairs, `PHP_SAPI` comparisons) is read by index scans, never by a regex that can backtrack, and trailing-character trims use lang-kit's `trimTrailing`. A `.htaccess`, `php.ini` or `.user.ini` line longer than 64 KiB (`MAX_CONFIG_LINE_LENGTH`, `src/php-line-cap.ts`) is skipped and counted in a notice. Pathological-input tests: `tests/unit/php-linear-scans.test.ts`.
+
+- **Version sources** (`src/php-version-sources.ts`): every version a version-floor (`src/php-compat.ts`) or legacy-construct rule gives cites a php.net page. From 5.6 on that is the version's migration guide page, `https://www.php.net/manual/en/migrationXY.<section>.php`. php.net no longer hosts the 5.3, 5.4 and 5.5 guides, so those versions cite the release's anchor in the PHP 5 changelog, `https://www.php.net/ChangeLog-5.php#5.X.0`. No rule names an older version; a unit test accepts only these two forms, with the cited version equal to the rule's.
+
+- **Version floor** (`src/php-compat.ts`, `queries/php-compat/compat.scm`): per file, the highest version of any syntax rule it matches, with the first use that set it. Two exceptions date nothing. Parse recovery: where the grammar cannot parse the source (a PHP 5 `$s{0}` offset), a node inside an ERROR node, or one recovery built beside or around an ERROR or MISSING node (such as `catch (Exception $e)` read as a call with a named argument), is not the source's syntax; a hit elsewhere in the file still counts. One-line attributes: an attribute group alone on its line, with only whitespace, a comment or another group after it, is a `#` line comment before PHP 8.0, so neither it nor anything inside it dates the file (Drupal 7's `#[\ReturnTypeWillChange]`); a group spanning lines, or followed on its line by code, is 8.0 `attributes`. Fixtures: `tests/fixtures/php-compat/` (one file per rule under `<version>/`, the exceptions under `exceptions/`).
+
+- **Entry points** (`src/php-entry-points.ts`): `cli` for a `#!…php` shebang anywhere, or, under a `bin/`, `cli/`, `cron/`, `scripts/` or `jobs/` directory, a `PHP_SAPI`/`php_sapi_name()` comparison with `'cli'` or a `$argv`/`$_SERVER['argv']` read (`source` `shebang`, `PHP_SAPI check`, `$argv`). `cron` for each script a crontab-like file runs (`src/php-cron.ts`: `crontab`, `*.cron`, `cron.d/*`, found beside the PHP files and up to two directories below the root, a `cron.d/` one more; `php` options skipped, `-f` honoured; the script is the longest trailing part of its path that is a pack file), `source` `<crontab>:<line>`, `schedule` as written; a script that is no pack file is a notice. Crontab text joins `.htaccess` in the resolver's `configFiles`. Fixture: `tests/fixtures/php-entry-points/`.
+- **Outbound calls** (`src/php-outbound.ts`, rules in its module comment), all `certain`: `http` from curl, `file_get_contents()`/`fopen()`/`file()`/`get_headers()` on an `http(s)://` value, `fsockopen()`, `SoapClient` and Guzzle (methods only on a receiver bound to a client in its scope); `database`/`cache` from database and cache clients; `env` from `$_ENV`, and `getenv`/`$_SERVER` less request keys (`isRequestKey`), writes excluded. Targets: computable `literal` (a database host never partly), env reads `env`, `$config['a']` `config`. Fixtures: `tests/fixtures/php-outbound/`, `php-data-access/`.
+- **Legacy constructs** (`src/php-legacy.ts`, `queries/php-legacy/legacy.scm`): each use of a construct a later PHP version removed or deprecated, as `legacyConstructs` facts with the php.net page (see version sources) of every version a rule names (`deprecated`, `removed`, `changed`). Removed: call-time pass-by-reference and the `session_register` family (5.4), `import_request_variables()` (5.4), the long arrays `$HTTP_*_VARS` and `$HTTP_POST_FILES` (5.4), `$HTTP_RAW_POST_DATA` (7.0; each read or write, in `global` and strings too, never a property, parameter or array key of that name), `set_magic_quotes_runtime()` (7.0), `mysql_*`, `ereg*`/`split`/`spliti`/`sql_regcase`, ASP and `<script language="php">` tags (7.0), `mcrypt_*` (7.2), PHP 4 constructors, `create_function`, `each`, `(unset)`, `__autoload`, `$s{0}` and `get_magic_quotes_*` (8.0). Deprecated: `${}` interpolation, dynamic properties (`likely`: a class that extends nothing, uses no trait, has no `__set` or `#[AllowDynamicProperties]`, assigning `$this->x` it does not declare) and `utf8_encode`/`utf8_decode` (8.2). Notices, never removals: `<?` (depends on `short_open_tag`) and `==`/`!=`/`<>` between a non-numeric string literal and a number (8.0 changed the result). A call of a function the repository declares itself (a polyfill) or a namespaced call is not PHP's. The grammar cannot parse ASP tags or `$s{0}`: the tags are read from inline HTML, an offset from a statement ending in a MISSING token right before `{` or from an ERROR node's text (strings and comments blanked). ASP tags count only outside script elements: a `<%` or `<%=` inside any `<script>` other than `<script language="php">`, whatever its `type`, is a JavaScript template (Underscore, EJS), tracked across inline-HTML segments a PHP block splits; one in a PHP string is not inline HTML. The count assumes `asp_tags` could have been on (it was off by default). `scripts/php-corpus-report.mjs` counts a file whose only parse errors are such offsets as clean and `legacy`, so it is not counted twice. Fixtures: `tests/fixtures/php-legacy/` (one file per rule under `rules/`), `php-legacy-polyfill/`.
+- **Dynamic code** (`src/php-dynamic-code.ts`, `queries/php-dynamic/dynamic.scm`): each place code runs a string as code or chooses what to run from a value, as `dynamicCode` facts with the kind, construct, the expression as written, the enclosing function, `Class::method` or `{closure:…}`, and the position; never a value. `exec`: `eval`, `assert` with a string argument, `preg_replace` with a literal pattern carrying the `e` modifier, `create_function`; marked `literal` when the code is written as literals alone (`eval('return 1;')`). `dispatch`: `call_user_func`, `call_user_func_array`, `forward_static_call(_array)` and callback built-ins (`array_map`, `array_filter`, `usort`, `preg_replace_callback`, …) whose callable is not static, a callee that is not a name (`$f()`), `new $class`, `$o->$m()`, `$o->{$expr}()`, `$c::$m()` and `$c::{$expr}()`, and a static call on a class that is a value (`$c::run()`, construct `variable-static-class`; never `self`, `static`, `parent` or `$this`). A static callable is a string without interpolation, a closure, a name or `X::class`, `f(...)`, or an array of those and `$this` (`[$this, 'save']`; `[$this, $name]` is dynamic). `include`: an include whose path is not computable, `host-include` when it reads the request's host name, else `dynamic-include`; the resolver's `[php-dynamic-include]` and `[php-host-include]` notices already list them, so they are counted only. A named rule applies to the global name alone, never a namespaced call or a function the repository declares. Notices `[php-dynamic-exec]` and `[php-dynamic-dispatch]` list each kind's locations. Fixtures: `tests/fixtures/php-dynamic-code/` (one file per kind under `exec/`, `dispatch/`, `include/`; files with none under `lib/`).
+- **Database-driven dynamic code** (`src/php-database-flow.ts`): an `exec` site whose code, or a `dispatch` site whose callable, callee, method name or class, is read from a database query result carries `database`: the tables its queries name, `table.column` for each plain column of a literal SELECT list (`SELECT *` gives the table alone; with several tables an unqualified column is left out), and the query or fetch calls the value comes from. Sources are a query call's result (`mysql_query`, `db_query_range` and the other embedded-SQL functions; a method or static call whose argument is SQL; `query()`, `prepare()` and wpdb's `get_var()`, `get_row()`, `get_col()`, `get_results()` on a database client: a variable assigned `new PDO`, `new mysqli`, `new wpdb`, `mysqli_connect()` or `mysqli_init()`, or `$wpdb`); a fetch (`mysql_fetch_*`, `mysql_result`, `mysqli_fetch_*`, `pg_fetch_*`, `oci_fetch_*`, `sqlsrv_fetch_*`, `odbc_fetch_*`, mysqli_result's `fetch_assoc` and kin on any receiver, and `fetch…` or CodeIgniter's `result()`/`row()` on a database-derived receiver); and a call of a repository function or method whose return value is database-derived (functions by namespace-qualified name, `$this->m()`, `self::m()`, `static::m()`, `Name::m()`, and `$obj->m()` when one repository class alone declares `m`), summarised across the repository to a fixed point within 10 rounds. Within one function, method, closure or top level, a forward pass carries a value through `=` and `= &` (in an `if` condition too), `.=`, element and property assignment (kept per `$a['k']`, `$a[0]` or `$o->p`, one level deep: a write replaces that path's value, a literal clearing it; a write by any other key or deeper adds and never clears; a literal path never assigned reads the variable's own value, never a sibling's), `list()`/`[…]` destructuring, `foreach`, `$row['x']`, `$row->x`, `.` and interpolation; any other call or operator, a parameter, a property of `$this`, and a value merged across branches or loop iterations is not a source, so an undecidable flow is missed rather than guessed. Notices `[php-db-exec]` and `[php-db-dispatch]` list the database-driven sites and the tables they read. Fixtures: `tests/fixtures/php-database-flow/` (a WordPress-like app and Drupal 7's menu router shape).
+
+### Terraform pack facts
+
+Detail for how `@n-dx/lang-terraform`'s facts are used;
+`packages/sourcevision/AGENTS.md` keeps the summary.
+
+**The Terraform model in infrastructure.json.** The Terraform pack produces
+`resources` facts, not imports. `enrichTerraformInfrastructure` (called by
+`analyze` after `computeInfrastructure`) adds optional `module`, `provider`
+(`{ name, version? }`), `references` (`infra:<type>.<name>` ids of listed
+resources in the same module directory) and `attributes` (`engine`,
+`engineVersion`, `runtime`, `image`, `clusterVersion`) to each resource it
+lists from a `.tf` file whose file and `<type>.<name>` match a fact. Values
+are as written, never normalised; a field appears only when the pack supplied
+it. When the pack resolved a module's attributes per instance (several facts
+at one declaration), an attribute is stored resolved only when every instance
+gives the same value, else as the expression written. It never adds or
+removes a resource, link or seam or changes an existing field, so resources
+only the model finds stay out. `analyzers/infrastructure.ts` and `IAC_KINDS`
+are not involved, so the iso-map bundle does not change. Without the pack the
+file is byte-identical. The field names await Sterling H's review (decision 3).
+
+**Terraform as a database-engine source.** `language/database-engines.ts`
+takes the Terraform pack's resource facts as
+`DatabaseEngineInput.terraformFacts`, supplied by the caller (today only
+`scripts/database-corpus-report.mjs`); it imports no pack, is not wired into
+`analyze` and writes nothing. A database resource yields a `terraform`-signal
+candidate: a mapped `engine` (Cloud SQL: `database_version`) is strong, an
+engine implied by the type alone (Azure servers) is weak, and a resource that
+gives neither (a reusable module's `var.engine` no call resolves) adds a
+notice. A reusable module yields one candidate per engine its module calls
+pass; the evidence text names where the value is written, and a
+`conditional` value (`cond ? null : var.engine`) is weak. Engine strings and
+resource types live in `TERRAFORM_ENGINE_TABLE` and
+`TERRAFORM_RESOURCE_TABLE`, each entry with its provider page.
+
 ## Output Files
 
 All output is written to `.sourcevision/`:
@@ -154,14 +214,28 @@ All output is written to `.sourcevision/`:
 |------|----------|
 | `manifest.json` | Analysis metadata, version, timestamps |
 | `inventory.json` | File listing with classifications |
-| `imports.json` | Dependency graph (edges + metadata) |
+| `imports.json` | Dependency graph (edges + metadata). **New:** `summary.parseIssues`, keyed by pack id, written only when a language pack's file did not parse cleanly: `files`, `clean`, `sizeLimitBytes`, and for `syntaxErrors` (parsed with error recovery; facts still read), `oversized` (over the size limit, not parsed), `unreadable` and `notUtf8` (parsed with replacement characters; may overlap `syntaxErrors`) a `count` and up to 50 sorted `examples`; `legacySyntax` (PHP 5's `$s{0}` offsets, rewritten to `$s[0]` in place and parsed cleanly, so facts are whole and positions are the source's; never under `syntaxErrors`) adds `constructs`, rewrites by construct. A `[<pack>-parse]` notice line sums it up. Field names are under review |
 | `zones.json` | Architectural zone map with cohesion/coupling metrics |
 | `components.json` | React component catalog |
-| `sdlc-profile.json` | SDLC practices detected, each claim tied to the file proving it |
-| `readiness.json` | Readiness score computed from that profile |
+| `sdlc-profile.json` | SDLC practices detected, each claim tied to the file proving it. With the PHP pack, an optional `ecosystem.php`: `versionFloors`, written whenever the pack read PHP files, the files it read (`files`) counted by the oldest PHP version whose syntax covers them (`floors`), files no rule dates (`none`) and the `highest` floor, absent when no file has one (a PHP 5.2-era repository gets `floors` `{}` and `none` equal to `files`); and `legacyConstructs`, written when a file has a use, uses of constructs later PHP versions removed or deprecated, by rule (`rules`, each with its php.net pages), by the version that removed them (`removedIn`) or deprecated them (`deprecatedIn`), with review `notices` counted apart; and `dynamicCode`, written when a file has a site, the repository's dynamic-code sites (`sites`, in `files` files) by kind (`kinds`: `exec`, `dispatch`, `include`), by construct (`constructs`), with `literal` counting `exec` sites whose code is literals alone, and `database`, written when a site is fed by a database query result, those sites (`sites`) by kind (`kinds`: `exec`, `dispatch`), by table (`tables`) and by `table.column` (`columns`) (see [PHP pack rules](#php-pack-rules)). Field names are under review |
+| `readiness.json` | Readiness score computed from that profile, with the profile's `ecosystem` carried through unscored |
+| `config.json` | **New.** Where code reads configuration and checks feature flags, per file, with indexes of flags (by normalized name, with the lines each gates) and config keys (with their consumer files). Names, keys and positions only, never values. Written only when a language pack produces config reads or flag checks (the PHP pack does); otherwise absent. Field names are under review. |
+| `legacy.json` | **New.** The files behind `ecosystem`'s `versionFloors` and `legacyConstructs`, per language: each file's floor and every legacy-construct use (see [Legacy constructs per file](#legacy-constructs-per-file)). Written only when a language pack finds a floor or a use (the PHP pack does); otherwise absent. |
 | `llms.txt` | AI-readable codebase summary |
 | `CONTEXT.md` | Detailed AI context document |
 | `zones/{zone-id}/` | Per-zone context and summary files |
+
+**No credential from source.** Strings copied out of the code (outbound
+targets, config keys, expressions as written, findings) are redacted before
+any of these files is written, for every language
+(`src/util/redact-literals.ts`):
+
+- **URLs lose their userinfo:** `https://u:pw@host/v1` becomes `https://host/v1`, and a password holding `/`, `?`, `#` or `@` goes whole (`mysql://app:pa/ss@db/app` becomes `mysql://db/app`). A value of `=` padding alone (`abcKey==`) is kept.
+- **Secret values are replaced:** a secret-shaped query parameter or
+  key=value connection-string entry (`password`, `pwd`, `pass`, `secret`,
+  `token`, `api_key`, `access_key`, `auth`, `key`, `sig`, `signature`,
+  `credentials`, in any case, with `_`/`-` variants) keeps its name and gets
+  the value `REDACTED`.
 
 ## Findings
 
@@ -290,6 +364,52 @@ ndx start .             # includes viewer in dashboard
 ```
 
 The viewer provides 8 views: Overview, Imports, Zones, Files, Routes, Architecture, Problems, and Suggestions.
+
+## Copied-in third-party code
+
+A library copied into the repository by hand (a spreadsheet library in `lib/`, an old JS framework in `js/`) is not under `vendor/` and no manifest installs it, so analysis used to read it as the application. Inventory now marks such files `thirdParty` with the reason, and `summary.thirdParty` counts them; analyze prints one line with the count per reason. A file is third-party when no deny glob matches it and one of these does:
+
+- a glob in `sourcevision.thirdParty` (project config), reason `config <glob>`;
+- a glob passed as `--third-party=<glob>` or listed in `--third-party-file=<path>` (one per line, or a JSON array), reason `cli <glob>`; a caller with its own library catalogue passes it this way;
+- a built-in fingerprint, reason `library <Name>`: a library's own header in the file's first 2 KiB (a `@package PHPExcel` docblock, a version banner where the library puts it, such as `/*! jQuery v3.6.0 |`; a comment like `// requires jQuery v1.7 or later` is not one), a directory named as a well-known library that also holds that library's evidence, or a directory where at least 80% of the files carry one library's header.
+
+A folder named as a library (EditArea in edit_area, TinyMCE in tinymce, CKEditor in ckeditor, PHPExcel in PHPExcel) counts only when a file under it carries that library's header, or the library's entry file (`ckeditor.js`, `tinymce.min.js`, `PHPExcel.php`, …; `LIBRARY_ENTRY_FILES` in `third-party.ts`) sits under it (or beside it, for PHPExcel, HTML Purifier and SimplePie, which ship it that way: `Classes/PHPExcel.php` next to `Classes/PHPExcel/`). An application's own `src/ckeditor/plugins/` stays first-party. No library name marks a folder on its own.
+
+Globs use `**`, `*` and `?`; a trailing `/` means the whole directory, and a name without `/` matches at any depth. A glob starting with `!` denies, overriding every rule, so a wrong fingerprint is undone with `"!lib/our-tinymce-plugin/**"`.
+
+After the count line, analyze prints one `[third-party]` line per marked folder with the library and the reason: `directory+banner`, `directory+entry`, `header`, `config` or `flag` (a library's header marks spread over more than five folders share one line). A built-in mark's line names its deny glob, e.g. `[third-party] js/ckeditor/: CKEditor (directory+entry), 212 files; undo with "!js/ckeditor/**" in sourcevision.thirdParty or --third-party`. `vendor/` and other package-manager folders are skipped before marking, so they get no line.
+
+A third-party file stays in the inventory, and imports to it still resolve. It is left out of zones (so never a zone entry point), classification and the model escalation pass, primary-language detection, readiness evidence and the call graph (`--include-third-party` maps it). Pack totals in `sdlc-profile.json` `ecosystem.<language>` count it apart, under `thirdParty`. An `outbound.json` call in it is kept, since a copied-in SDK's calls are still the repository's integrations, and marked `thirdParty`.
+
+## Mirrored folders
+
+A folder that is a near-copy of another (a legacy `edit/` kept beside `app/`) would double every count. Inventory finds such pairs from content hashes: identical files with the same name give candidate root pairs, and a pair counts when at least 10 files of one root, and at least half of its files, are identical to the file at the same relative path in the other. That root is the copy (for an exact copy, the smaller, then the later in path order). Each identical file of the copy gets `mirrorOf`, its counterpart's path, and `summary.mirrored` counts them; analyze prints one `[mirror]` line per pair. Files where the copy diverged stay first-party.
+
+A mirror copy is left out of the same phases as third-party code, and its pack totals and outbound calls are dropped, since its source's are already counted. `sourcevision.mirrors` sets a pair (`{ "edit/": "app/" }`) or denies one (`{ "edit/": false }`).
+
+## Legacy constructs per file
+
+`legacy.json` lists, per language (the inventory's, lower-cased), each file with a version floor or a legacy-construct use, so an upgrade can be planned and split file by file. It is built from the same pack facts as `sdlc-profile.json`'s `ecosystem` in the same run (`src/analyzers/pack-legacy-files.ts`), with the same split: the application's own files under `files`, third-party files under `thirdParty` (absent when none), mirror copies left out.
+
+```json
+{ "languages": { "php": { "files": [
+  { "path": "lib/db.php", "floor": { "version": "5.3", "rule": "closures", "line": 4 },
+    "uses": 2, "notices": 0, "removedIn": { "7.0": 2 }, "deprecatedIn": {},
+    "constructs": [ { "rule": "mysql-functions", "construct": "mysql_query()", "status": "removed",
+                      "line": 7, "column": 2, "deprecated": "5.5", "removed": "7.0" } ] } ] } } }
+```
+
+Files are sorted by path, uses by line then column. `uses` counts removed and deprecated uses and `notices` the review notices; `removedIn` and `deprecatedIn` count a file's uses as `legacyConstructs` does. Summed over `files`, they equal the profile's `legacyConstructs` (files with a use, uses, notices, per-rule uses and files, `removedIn`, `deprecatedIn`) and the floors equal `versionFloors.floors`; summed over `thirdParty`, they equal `thirdParty.legacyConstructs`. Versions and positions only: each rule's php.net pages are in the profile, and no code is copied. Without a floor or a use no file is written, and one an earlier run left is removed.
+
+## Jev request size
+
+Typed-finding judgment and Jev file classification send their items to TypeSafe in batches of at most 20 findings or 30 files, packed so each request's JSON also stays under a byte ceiling: 128 KiB by default (`JEV_REQUEST_BYTE_CEILING` in `src/analyzers/jev-split.ts`, which says how it was chosen). A zone's evidence shared by several findings counts once per request. Set `sourcevision.jev.requestByteCeiling` (a positive integer, in bytes) in the project config to change it:
+
+```json
+{ "sourcevision": { "jev": { "requestByteCeiling": 65536 } } }
+```
+
+A request TypeSafe still refuses as too large (`max_tokens_exceeded`) is sent again as two halves, until each fits. A typed finding refused on its own is asked again on less evidence, one level at a time: 1 drops the zone's file headers, 2 also its declarations and exported symbols, 3 cuts its file sample to 10, 4 cuts the finding's edges to 4. The cuts are fixed, never a model summary, so the judgment cache still hits on the next run. The judgment summary line counts findings judged on trimmed evidence (`, N on trimmed evidence`), and the too-large warning counts only those refused at every level, which keep their derived severity. With `--debug`, each request's size in bytes and whether it was refused is logged.
 
 ## Zone Detection
 

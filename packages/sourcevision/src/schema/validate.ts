@@ -17,6 +17,8 @@ const LLMClassUsageSchema = z.object({
   calls: z.number().int().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
+  cacheCreationTokens: z.number().int().nonnegative().optional(),
+  cacheReadTokens: z.number().int().nonnegative().optional(),
   durationMs: z.number().nonnegative(),
   vendor: z.string(),
   model: z.string(),
@@ -131,6 +133,13 @@ const FileEntrySchema = z.object({
   role: FileRoleSchema,
   category: z.string(),
   lastModified: z.number().int().nonnegative().optional(),
+  thirdParty: z.string().optional(),
+  mirrorOf: z.string().optional(),
+});
+
+const InventoryExcludedSummarySchema = z.object({
+  files: z.number().int().nonnegative(),
+  byReason: z.record(z.string(), z.number().int().nonnegative()),
 });
 
 const InventorySummarySchema = z.object({
@@ -141,6 +150,8 @@ const InventorySummarySchema = z.object({
   byCategory: z.record(z.string(), z.number().int().nonnegative()),
   skippedExtensions: z.record(z.string(), z.number().int().nonnegative()).optional(),
   analysedLanguages: z.array(z.string()).optional(),
+  thirdParty: InventoryExcludedSummarySchema.optional(),
+  mirrored: InventoryExcludedSummarySchema.optional(),
 });
 
 export const InventorySchema = z.object({
@@ -175,6 +186,22 @@ const CircularDependencySchema = z.object({
   cycle: z.array(z.string()),
 });
 
+const ParseIssueSampleSchema = z.object({
+  count: z.number().int().nonnegative(),
+  examples: z.array(z.string()),
+});
+
+const PackParseIssuesSchema = z.object({
+  files: z.number().int().nonnegative(),
+  clean: z.number().int().nonnegative(),
+  sizeLimitBytes: z.number().int().nonnegative(),
+  syntaxErrors: ParseIssueSampleSchema,
+  oversized: ParseIssueSampleSchema,
+  unreadable: ParseIssueSampleSchema,
+  notUtf8: ParseIssueSampleSchema,
+  legacySyntax: ParseIssueSampleSchema.extend({ constructs: z.record(z.string(), z.number().int().nonnegative()) }).optional(),
+});
+
 const ImportsSummarySchema = z.object({
   totalEdges: z.number().int().nonnegative(),
   totalExternal: z.number().int().nonnegative(),
@@ -187,6 +214,7 @@ const ImportsSummarySchema = z.object({
     })
   ),
   avgImportsPerFile: z.number().nonnegative(),
+  parseIssues: z.record(z.string(), PackParseIssuesSchema).optional(),
 });
 
 export const ImportsSchema = z.object({
@@ -214,7 +242,7 @@ const ArchetypeDefinitionSchema = z.object({
 
 const ClassificationEvidenceSchema = z.object({
   archetypeId: z.string(),
-  signalKind: z.enum(["path", "import", "export", "filename", "directory"]),
+  signalKind: z.enum(["path", "import", "export", "filename", "directory", "pack"]),
   detail: z.string(),
   weight: z.number().min(0).max(1),
 });
@@ -374,6 +402,7 @@ const ServerRouteSchema = z.object({
   method: HttpMethodSchema,
   path: z.string(),
   handler: z.string().optional(),
+  source: z.string().optional(),
 });
 
 const ServerRouteGroupSchema = z.object({
@@ -653,6 +682,101 @@ const SdlcIacSchema = z.object({
   remoteState: z.boolean().optional(),
 });
 
+const SdlcVersionFloorsSchema = z.object({
+  files: z.number().int().nonnegative(),
+  floors: z.record(z.string().regex(/^\d+\.\d+$/), z.number().int().positive()),
+  none: z.number().int().nonnegative(),
+  highest: z.string().regex(/^\d+\.\d+$/).optional(),
+});
+
+const LANGUAGE_VERSION = /^\d+\.\d+$/;
+const GUIDE_PAGE = z.string().regex(/^https:\/\/\S+$/);
+
+const SdlcLanguageBoundarySchema = z.object({
+  version: z.string().regex(LANGUAGE_VERSION),
+  source: GUIDE_PAGE,
+});
+
+const SdlcLegacyRuleCountSchema = z.object({
+  status: z.enum(["removed", "deprecated", "notice"]),
+  uses: z.number().int().positive(),
+  files: z.number().int().positive(),
+  deprecated: SdlcLanguageBoundarySchema.optional(),
+  removed: SdlcLanguageBoundarySchema.optional(),
+  changed: SdlcLanguageBoundarySchema.optional(),
+  source: GUIDE_PAGE,
+  likely: z.literal(true).optional(),
+});
+
+const SdlcLegacyConstructsSchema = z.object({
+  files: z.number().int().nonnegative(),
+  uses: z.number().int().nonnegative(),
+  notices: z.number().int().nonnegative(),
+  rules: z.record(z.string().min(1), SdlcLegacyRuleCountSchema),
+  removedIn: z.record(z.string().regex(LANGUAGE_VERSION), z.number().int().positive()),
+  deprecatedIn: z.record(z.string().regex(LANGUAGE_VERSION), z.number().int().positive()),
+});
+
+const COUNT = z.number().int().nonnegative();
+
+const SdlcDynamicCodeSchema = z.object({
+  files: z.number().int().positive(),
+  sites: z.number().int().positive(),
+  kinds: z.object({ exec: COUNT, dispatch: COUNT, include: COUNT }),
+  literal: COUNT,
+  constructs: z.record(z.string().min(1), z.number().int().positive()),
+  database: z
+    .object({
+      sites: z.number().int().positive(),
+      kinds: z.object({ exec: COUNT, dispatch: COUNT }),
+      tables: z.record(z.string().min(1), z.number().int().positive()),
+      columns: z.record(z.string().min(1), z.number().int().positive()),
+    })
+    .optional(),
+});
+
+const SdlcLanguageEcosystemSchema = z.object({
+  versionFloors: SdlcVersionFloorsSchema.optional(),
+  legacyConstructs: SdlcLegacyConstructsSchema.optional(),
+  dynamicCode: SdlcDynamicCodeSchema.optional(),
+  thirdParty: z
+    .object({ legacyConstructs: SdlcLegacyConstructsSchema.optional(), dynamicCode: SdlcDynamicCodeSchema.optional() })
+    .optional(),
+});
+
+// ── Legacy constructs per file ──────────────────────────────────────────────
+
+const VersionCountsSchema = z.record(z.string().regex(LANGUAGE_VERSION), z.number().int().positive());
+
+const LegacyFileEntrySchema = z.object({
+  path: z.string().min(1),
+  floor: z
+    .object({ version: z.string().regex(LANGUAGE_VERSION), rule: z.string().min(1), line: z.number().int().positive() })
+    .optional(),
+  uses: COUNT,
+  notices: COUNT,
+  removedIn: VersionCountsSchema,
+  deprecatedIn: VersionCountsSchema,
+  constructs: z.array(z.object({
+    rule: z.string().min(1),
+    construct: z.string().min(1),
+    status: z.enum(["removed", "deprecated", "notice"]),
+    line: z.number().int().positive(),
+    column: COUNT,
+    deprecated: z.string().regex(LANGUAGE_VERSION).optional(),
+    removed: z.string().regex(LANGUAGE_VERSION).optional(),
+    changed: z.string().regex(LANGUAGE_VERSION).optional(),
+    likely: z.literal(true).optional(),
+  })),
+}).refine((f) => f.floor !== undefined || f.constructs.length > 0, { message: "a file needs a floor or a construct use" });
+
+export const LegacySchema = z.object({
+  languages: z.record(z.string().min(1), z.object({
+    files: z.array(LegacyFileEntrySchema),
+    thirdParty: z.array(LegacyFileEntrySchema).min(1).optional(),
+  })),
+});
+
 export const SdlcProfileSchema = z.object({
   schemaVersion: z.string(),
   projectDir: z.string().optional(),
@@ -672,6 +796,7 @@ export const SdlcProfileSchema = z.object({
   containers: z.array(SdlcContainerSchema),
   iac: z.array(SdlcIacSchema),
   parseFailures: z.array(SdlcParseFailureSchema),
+  ecosystem: z.record(z.string().min(1), SdlcLanguageEcosystemSchema).optional(),
 });
 
 // ── Outbound dependencies ───────────────────────────────────────────────────
@@ -687,6 +812,7 @@ const OutboundDependencySchema = z.object({
   targetSource: z.enum(["literal", "env", "config", "unknown"]),
   client: z.string().min(1),
   confidence: ConfidenceSchema,
+  thirdParty: z.string().optional(),
 });
 
 const DeclaredContractSchema = z.object({
@@ -697,6 +823,55 @@ const DeclaredContractSchema = z.object({
 export const OutboundSchema = z.object({
   dependencies: z.array(OutboundDependencySchema),
   contracts: z.array(DeclaredContractSchema),
+});
+
+// ── Config reads and flag checks ────────────────────────────────────────────
+
+const ConfigSourceSchema = z.enum(["file", "env", "ini", "yaml", "xml", "json", "define", "unknown"]);
+const FlagMechanismSchema = z.enum(["constant", "config", "function", "sdk", "env"]);
+const LineSchema = z.number().int().positive();
+const ColumnSchema = z.number().int().nonnegative();
+
+const ConfigReadSchema = z.object({
+  key: z.string().min(1),
+  source: ConfigSourceSchema,
+  sourceFile: z.string().min(1).optional(),
+  line: LineSchema,
+  column: ColumnSchema,
+});
+
+const FlagCheckSchema = z.object({
+  name: z.string().min(1),
+  normalized: z.string().min(1),
+  mechanism: FlagMechanismSchema,
+  client: z.string().min(1).optional(),
+  line: LineSchema,
+  column: ColumnSchema,
+  gated: z.object({ start: LineSchema, end: LineSchema })
+    .refine((g) => g.end >= g.start, { message: "gated.end must not precede gated.start" })
+    .optional(),
+});
+
+export const ConfigSchema = z.object({
+  files: z.array(z.object({
+    file: z.string().min(1),
+    configReads: z.array(ConfigReadSchema),
+    flagChecks: z.array(FlagCheckSchema),
+  })),
+  flags: z.array(z.object({
+    normalized: z.string().min(1),
+    names: z.array(z.string().min(1)).min(1),
+    mechanisms: z.array(FlagMechanismSchema).min(1),
+    files: z.array(z.string().min(1)).min(1),
+    checks: z.number().int().positive(),
+    gatedLines: z.number().int().nonnegative(),
+  })),
+  keys: z.array(z.object({
+    key: z.string().min(1),
+    sources: z.array(ConfigSourceSchema).min(1),
+    sourceFiles: z.array(z.string().min(1)),
+    files: z.array(z.string().min(1)).min(1),
+  })),
 });
 
 // ── Validation helpers ──────────────────────────────────────────────────────
@@ -740,6 +915,10 @@ export function validateModule(
       return validate(SdlcProfileSchema, data);
     case "outbound":
       return validate(OutboundSchema, data);
+    case "config":
+      return validate(ConfigSchema, data);
+    case "legacy":
+      return validate(LegacySchema, data);
     default:
       return {
         ok: false,
