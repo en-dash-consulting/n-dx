@@ -281,6 +281,27 @@ describe("readiness score: empty repo", () => {
   });
 });
 
+// ── A PHP repository's Composer flag SDK ────────────────────────────────────
+
+describe("readiness score: Composer flag SDK", () => {
+  it("scores the feature-flags dimension with composer.json evidence", async () => {
+    const root = project("composer-flags", {
+      "composer.json": JSON.stringify({ require: { "unleash/client": "^2" } }),
+    });
+    const dimension = (await score(root)).dimensions.featureFlags;
+
+    expect(dimension.score).toBe(70);
+    expect(dimension.evidence.map((e) => e.path)).toEqual(["composer.json"]);
+  });
+
+  it("does not score a composer.json without one", async () => {
+    const root = project("composer-no-flags", {
+      "composer.json": JSON.stringify({ require: { "monolog/monolog": "^3" } }),
+    });
+    expect((await score(root)).dimensions.featureFlags.score).toBe(0);
+  });
+});
+
 // ── Invariants that hold for every repository ───────────────────────────────
 
 describe("readiness score invariants", () => {

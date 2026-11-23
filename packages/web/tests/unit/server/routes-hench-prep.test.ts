@@ -47,6 +47,7 @@ import {
   PREP_MAX_IN_FLIGHT,
   PREP_PREVIEW_TIMEOUT_MS,
   PREP_RESOLVE_TIMEOUT_MS,
+  READY_DESCRIPTION_MAX,
   diagnoseTaskRun,
   previewTaskRun,
   resolveTaskRun,
@@ -710,6 +711,23 @@ describe("hench prep routes", () => {
         saved: false,
       });
       expect(tasks[1]).toMatchObject({ criteriaCount: 0, tags: [] });
+    });
+
+    it("carries the start of each description, collapsed and cut short, for the card under the title", async () => {
+      await writeTasks(ctx, [
+        task("short", { priority: "critical", description: "Two tests\n\n  fail   on CI." }),
+        task("long", { priority: "high", description: "word ".repeat(100) }),
+        task("none", { priority: "medium" }),
+      ]);
+      const port = await open(ctx);
+      const { tasks } = await ready(port);
+      const byId = Object.fromEntries(tasks.map((t) => [t.id, t]));
+
+      expect(byId["short"]!.description).toBe("Two tests fail on CI.");
+      const long = byId["long"]!.description as string;
+      expect(long.length).toBeLessThanOrEqual(READY_DESCRIPTION_MAX);
+      expect(long.endsWith("…")).toBe(true);
+      expect(byId["none"]).not.toHaveProperty("description");
     });
 
     it("marks the rows whose task carries its own run settings", async () => {

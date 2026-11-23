@@ -212,6 +212,8 @@ export const COMMAND_EFFECTS = {
     ],
     llm: [{ phase: "auth probe", purpose: "check the chosen vendor answers", calls: "0-1" }],
     network: [LLM_PROVIDER],
+    // `ndx init --no-llm` skips the auth probe and spawns no vendor CLI.
+    noLlmFlags: ["--no-llm"],
     duration: "under a minute",
     next: "ndx plan",
   },

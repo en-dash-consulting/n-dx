@@ -1,0 +1,4 @@
+{
+  "name": "acme/app",
+  "autoload": { "psr-4": { "Acme\\": "src/" } }
+}

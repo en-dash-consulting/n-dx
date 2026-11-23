@@ -7,7 +7,7 @@
  * caller-callee relationships.
  */
 
-import { readFile } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import ts from "typescript";
 import type {
@@ -16,12 +16,15 @@ import type {
   CallType,
   CallGraph,
   CallGraphSummary,
+  FileEntry,
   Inventory,
   Imports,
   ImportEdge,
 } from "../schema/index.js";
 import { sortCallGraph } from "../util/sort.js";
+import { isMinifiedFile, isMinifiedName, MINIFIED_HEAD_BYTES, UNMAPPED_ROLES } from "./minified.js";
 import { parseJsTsSource } from "./ts-source.js";
+import { isOutsideStructure } from "./third-party.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -474,6 +477,68 @@ export interface CallGraphOptions {
   previousCallGraph?: CallGraph;
   changedFiles?: Set<string>;
   fileSetChanged?: boolean;
+  /** `--include-minified`: map minified bundles too. Forces a full parse. */
+  includeMinified?: boolean;
+  /** Told how many minified files were left out, when any were. */
+  onMinifiedLeftOut?: (count: number) => void;
+  /** `--include-third-party`: map third-party and mirror-copy files too. Forces a full parse. */
+  includeThirdParty?: boolean;
+  /** Told how many third-party and mirror-copy files were left out, when any were. */
+  onThirdPartyLeftOut?: (count: number) => void;
+}
+
+/** True when the file at `path` is minified, by name or by its first bytes. */
+async function isMinifiedOnDisk(targetDir: string, path: string): Promise<boolean> {
+  if (isMinifiedName(path)) return true;
+  let handle;
+  try {
+    handle = await open(join(targetDir, path), "r");
+    const buf = Buffer.alloc(MINIFIED_HEAD_BYTES);
+    const { bytesRead } = await handle.read(buf, 0, MINIFIED_HEAD_BYTES, 0);
+    return isMinifiedFile(path, buf.subarray(0, bytesRead));
+  } catch {
+    return false; // unreadable: not counted; the parse loop skips unreadable files too
+  } finally {
+    await handle?.close();
+  }
+}
+
+/**
+ * JS/TS files the call graph maps: each whose role is not in
+ * {@link UNMAPPED_ROLES}, plus minified ones under `includeMinified`.
+ * A minified file under a test directory keeps role `test` in the
+ * inventory (a vendored `tests/js/jquery.min.js`), so test files are
+ * checked here too. `minifiedLeftOut` counts the minified files it left out.
+ */
+export async function selectCallGraphFiles(
+  targetDir: string,
+  files: readonly FileEntry[],
+  includeMinified = false,
+  includeThirdParty = false,
+): Promise<{ files: FileEntry[]; minifiedLeftOut: number; thirdPartyLeftOut: number }> {
+  const selected: FileEntry[] = [];
+  let minifiedLeftOut = 0;
+  let thirdPartyLeftOut = 0;
+  for (const f of files) {
+    if (!JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase())) continue;
+    // Third-party and mirror-copy files (third-party.ts) are not the application's calls.
+    if (!includeThirdParty && isOutsideStructure(f)) {
+      thirdPartyLeftOut++;
+      continue;
+    }
+    const unmapped = UNMAPPED_ROLES.has(f.role);
+    if (!unmapped && f.role !== "test") {
+      selected.push(f);
+      continue;
+    }
+    if (!(await isMinifiedOnDisk(targetDir, f.path))) {
+      if (!unmapped) selected.push(f); // an ordinary test file
+      continue;
+    }
+    if (includeMinified) selected.push(f);
+    else minifiedLeftOut++;
+  }
+  return { files: selected, minifiedLeftOut, thirdPartyLeftOut };
 }
 
 // ── Main analyzer ─────────────────────────────────────────────────────────
@@ -488,7 +553,12 @@ export async function analyzeCallGraph(
   const changedFiles = options?.changedFiles;
   const fileSetChanged = options?.fileSetChanged ?? true;
 
-  const canIncremental = prev && changedFiles && !fileSetChanged;
+  // A minified file left out last run has nothing to reuse, so including them parses everything.
+  const canIncremental = prev && changedFiles && !fileSetChanged && !options?.includeMinified && !options?.includeThirdParty;
+
+  const mapped = await selectCallGraphFiles(targetDir, inventory.files, options?.includeMinified, options?.includeThirdParty);
+  if (mapped.minifiedLeftOut > 0) options?.onMinifiedLeftOut?.(mapped.minifiedLeftOut);
+  if (mapped.thirdPartyLeftOut > 0) options?.onThirdPartyLeftOut?.(mapped.thirdPartyLeftOut);
 
   // Build import symbol resolution map
   const importSymbolMap = buildImportSymbolMap(imports.edges);
@@ -498,17 +568,19 @@ export async function analyzeCallGraph(
   const allCalls: CallEdge[] = [];
 
   if (canIncremental) {
-    // Keep functions and edges from unchanged files that are still inventoried.
-    // fileSetChanged compares against the previous inventory, not the previous
-    // call graph, so files pruned in an earlier run can still be in prev (#744).
+    // Keep functions and edges from unchanged files that are still inventoried
+    // and mapped. fileSetChanged compares against the previous inventory, not
+    // the previous call graph, so files pruned in an earlier run can still be
+    // in prev (#744), as can minified files an --include-minified run mapped.
     const inventoried = new Set(inventory.files.map((f) => f.path));
+    const kept = new Set(mapped.files.map((f) => f.path));
     for (const fn of prev.functions) {
-      if (!changedFiles.has(fn.file) && inventoried.has(fn.file)) {
+      if (!changedFiles.has(fn.file) && kept.has(fn.file)) {
         allFunctions.push(fn);
       }
     }
     for (const edge of prev.edges) {
-      if (!changedFiles.has(edge.callerFile) && inventoried.has(edge.callerFile)) {
+      if (!changedFiles.has(edge.callerFile) && kept.has(edge.callerFile)) {
         // A full run cannot resolve a call into a file outside the inventory.
         const calleeFile = edge.calleeFile && inventoried.has(edge.calleeFile) ? edge.calleeFile : null;
         allCalls.push(calleeFile === edge.calleeFile ? edge : { ...edge, calleeFile });
@@ -517,12 +589,7 @@ export async function analyzeCallGraph(
   }
 
   // Determine which files to parse
-  const parseable = inventory.files.filter((f) => {
-    const ext = extname(f.path).toLowerCase();
-    if (!JS_TS_EXTENSIONS.has(ext)) return false;
-    if (canIncremental) return changedFiles.has(f.path);
-    return true;
-  });
+  const parseable = canIncremental ? mapped.files.filter((f) => changedFiles.has(f.path)) : mapped.files;
 
   for (const file of parseable) {
     const fullPath = join(targetDir, file.path);
@@ -682,25 +749,36 @@ function detectCallCycles(edges: CallEdge[]): number {
   const inStack = new Set<string>();
   let cycleCount = 0;
 
-  function dfs(node: string) {
-    if (inStack.has(node)) {
-      cycleCount++;
-      return;
+  // Iterative DFS: a call chain thousands of functions deep (a mapped bundle)
+  // must not overflow the stack. Each back edge counts once, as before.
+  const visit = (start: string) => {
+    if (visited.has(start)) return;
+    visited.add(start);
+    inStack.add(start);
+    const frames: { node: string; next: Iterator<string> }[] = [
+      { node: start, next: (adj.get(start) ?? new Set<string>()).values() },
+    ];
+    while (frames.length > 0) {
+      const frame = frames[frames.length - 1];
+      const step = frame.next.next();
+      if (step.done) {
+        inStack.delete(frame.node);
+        frames.pop();
+        continue;
+      }
+      const child = step.value;
+      if (inStack.has(child)) {
+        cycleCount++;
+      } else if (!visited.has(child)) {
+        visited.add(child);
+        inStack.add(child);
+        frames.push({ node: child, next: (adj.get(child) ?? new Set<string>()).values() });
+      }
     }
-    if (visited.has(node)) return;
-
-    visited.add(node);
-    inStack.add(node);
-
-    for (const next of adj.get(node) ?? []) {
-      dfs(next);
-    }
-
-    inStack.delete(node);
-  }
+  };
 
   for (const node of adj.keys()) {
-    dfs(node);
+    visit(node);
   }
 
   return cycleCount;

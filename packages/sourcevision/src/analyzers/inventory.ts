@@ -3,7 +3,7 @@
  * Replaces the Claude-based phase 1 with pure TypeScript.
  */
 
-import { readFile, stat } from "node:fs/promises";
+import { open, readFile, stat } from "node:fs/promises";
 import { join, extname, basename } from "node:path";
 import { createHash } from "node:crypto";
 import { isVerbose, verbose } from "@n-dx/llm-client";
@@ -13,7 +13,27 @@ import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { sourcevisionVersion } from "../language/package-paths.js";
-import { csharpConfig, javaConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
+import {
+  checksMinifiedContent,
+  isMinifiedByContent,
+  isMinifiedFile,
+  isMinifiedName,
+  MINIFIED_HEAD_BYTES,
+  MINIFIED_RULES,
+} from "./minified.js";
+import { markThirdParty, type ThirdPartyMark } from "./third-party.js";
+import { markMirrors, type MirrorPair } from "./mirrors.js";
+import {
+  csharpConfig,
+  javaConfig,
+  phpConfig,
+  PHP_REPOSITORY_ONLY_EXTENSIONS,
+  pythonConfig,
+  typescriptConfig,
+  terraformConfig,
+  isTerraformFile,
+  type LanguageConfig,
+} from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -49,6 +69,10 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".asmx": "ASP.NET",
   ".master": "ASP.NET",
   ".php": "PHP",
+  ".phtml": "PHP",
+  ".php3": "PHP",
+  ".php4": "PHP",
+  ".php5": "PHP",
   ".lua": "Lua",
   ".r": "R",
   ".R": "R",
@@ -109,14 +133,15 @@ function languageNames(extensions: Iterable<string>): Set<string> {
 
 /**
  * Languages parsed only through an opt-in pack with no fallback parser
- * (Java: `@n-dx/lang-java`; Python: `@n-dx/lang-python`). `javaSecondaryConfig`
+ * (Java: `@n-dx/lang-java`; Python: `@n-dx/lang-python`; PHP: `@n-dx/lang-php`,
+ * which produces no imports yet, so PHP is never listed). `javaSecondaryConfig`
  * shares `javaConfig`'s id and extensions, so a Java secondary is covered too.
  * The inventory phase runs before anything loads the pack, so it leaves them
  * out of `analysedLanguages`; listing them would claim analysis the pack may
  * not do. The imports phase sets them with {@link withPackAnalysedLanguages}
  * from the packs that ran.
  */
-const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [javaConfig, pythonConfig];
+const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [javaConfig, pythonConfig, phpConfig];
 
 const packOnlyLanguages = (configs: readonly LanguageConfig[]): Set<string> =>
   languageNames(configs.flatMap((c) => [...c.parseableExtensions]));
@@ -138,7 +163,13 @@ export function withPackAnalysedLanguages(summary: Inventory["summary"], packIds
   return { ...summary, analysedLanguages: [...kept, ...added].sort() };
 }
 
-export function detectLanguage(filePath: string): string {
+/**
+ * Inventory language of `filePath`. `config` is the project's language
+ * config: an extension other ecosystems share (`.inc`, `.module`,
+ * `.install`) is PHP only when `config` lists it, which it does only in a
+ * repository detected as PHP; without `config` it is never PHP.
+ */
+export function detectLanguage(filePath: string, config?: Pick<LanguageConfig, "extensions">): string {
   const name = basename(filePath);
   const ext = extname(filePath).toLowerCase();
 
@@ -153,6 +184,7 @@ export function detectLanguage(filePath: string): string {
 
   // Extension-based detection
   if (ext && EXT_TO_LANGUAGE[ext]) return EXT_TO_LANGUAGE[ext];
+  if (PHP_REPOSITORY_ONLY_EXTENSIONS.has(ext) && config?.extensions.has(ext)) return "PHP";
 
   return "Other";
 }
@@ -271,8 +303,16 @@ function hasGeneratedHeader(filePath: string, head: string, config: LanguageConf
 /**
  * @param head leading text of the file; lets language header rules
  *   (`LanguageConfig.generatedHeaders`) mark generated files path patterns miss.
+ * @param minified whether the file is a minified bundle ({@link isMinifiedFile});
+ *   defaults to the name rules alone.
  */
-export function classifyRole(filePath: string, language: string, langConfig?: LanguageConfig, head?: string): FileRole {
+export function classifyRole(
+  filePath: string,
+  language: string,
+  langConfig?: LanguageConfig,
+  head?: string,
+  minified: boolean = isMinifiedName(filePath),
+): FileRole {
   const name = basename(filePath);
   const lower = filePath.toLowerCase();
   const ext = extname(filePath).toLowerCase();
@@ -300,9 +340,10 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
     return "test";
   }
 
-  // 2. Generated — universal checks + language-specific patterns
+  // 2. Generated — universal checks (lockfiles, minified bundles) + language-specific patterns
   if (
     LOCKFILE_NAMES.has(name) ||
+    minified ||
     lower.includes("generated") ||
     config.generatedFilePatterns.some((pat) => pat.test(filePath)) ||
     (head !== undefined && hasGeneratedHeader(filePath, head, config))
@@ -432,6 +473,11 @@ export interface InventoryOptions {
   extraExtensions?: string[];
   /** Extra directory names to skip during the walk (in addition to base + language skips). */
   extraSkipDirs?: string[];
+  /**
+   * Third-party globs from the command line (`--third-party`, `--third-party-file`),
+   * applied after `sourcevision.thirdParty` from the project config (third-party.ts).
+   */
+  thirdPartyGlobs?: string[];
 }
 
 export interface InventoryStats {
@@ -446,6 +492,35 @@ export interface InventoryStats {
 export interface InventoryResult extends Inventory {
   stats?: InventoryStats;
   changedFiles?: Set<string>;
+  /** Paths whose role `generated` came from the minified-content rule alone, in inventory order; set only when there are some. */
+  minifiedByContent?: string[];
+  /** Mirrored folder pairs found this run (mirrors.ts), for the analyze log; never written. */
+  mirrors?: MirrorPair[];
+  /** Third-party marks per folder and reason (third-party.ts), for the analyze log; never written. */
+  thirdPartyMarks?: ThirdPartyMark[];
+}
+
+/**
+ * True when `role` is `generated` only because the content rule found the file
+ * minified: without that rule (name, path and header rules alone) it would not be.
+ */
+function generatedByContentOnly(
+  relPath: string, language: string, langConfig: LanguageConfig, head: Buffer, role: FileRole,
+): boolean {
+  return role === "generated" && isMinifiedByContent(relPath, head)
+    && classifyRole(relPath, language, langConfig, readHeaderText(relPath, head, langConfig), false) !== "generated";
+}
+
+/** First {@link MINIFIED_HEAD_BYTES} of a file. */
+async function readHead(fullPath: string): Promise<Buffer> {
+  const handle = await open(fullPath, "r");
+  try {
+    const buf = Buffer.alloc(MINIFIED_HEAD_BYTES);
+    const { bytesRead } = await handle.read(buf, 0, MINIFIED_HEAD_BYTES, 0);
+    return buf.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -482,7 +557,7 @@ export async function analyzeInventory(
   // is false (legacy: inventory every file).
   const acceptFile = (relPath: string): boolean => {
     if (!codeOnly) return true;
-    if (PROGRAMMING_LANGUAGES.has(detectLanguage(relPath))) return true;
+    if (PROGRAMMING_LANGUAGES.has(detectLanguage(relPath, langConfig))) return true;
     const ext = extname(relPath).toLowerCase();
     if (extraExtensions.has(ext)) return true;
     if (ext) skippedExtensions.set(ext, (skippedExtensions.get(ext) ?? 0) + 1);
@@ -505,6 +580,7 @@ export async function analyzeInventory(
   }
 
   const files: FileEntry[] = [];
+  const byContent: string[] = [];
   const changedFiles = new Set<string>();
   let cached = 0;
   let changed = 0;
@@ -530,14 +606,23 @@ export async function analyzeInventory(
     if (prevEntry && prevEntry.lastModified === mtime && prevEntry.size === st.size) {
       files.push(prevEntry);
       cached++;
+      // The cache does not record why a file is generated; re-read the head of
+      // the few that could be minified by content, so the log line is stable.
+      if (prevEntry.role === "generated" && !isMinifiedName(relPath) && checksMinifiedContent(relPath)
+        && classifyRole(relPath, prevEntry.language, langConfig, undefined, false) !== "generated"
+        && generatedByContentOnly(relPath, prevEntry.language, langConfig, await readHead(fullPath), prevEntry.role)) {
+        byContent.push(relPath);
+      }
       continue;
     }
 
     // Cache miss: read and process the file
     const buf = await readFile(fullPath);
     const hash = createHash("sha256").update(buf).digest("hex");
-    const language = detectLanguage(relPath);
-    const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig));
+    const language = detectLanguage(relPath, langConfig);
+    const minified = isMinifiedFile(relPath, buf);
+    const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig), minified);
+    if (minified && generatedByContentOnly(relPath, language, langConfig, buf, role)) byContent.push(relPath);
     const category = deriveCategory(relPath);
 
     let lineCount = 0;
@@ -573,6 +658,26 @@ export async function analyzeInventory(
       changedFiles.add(relPath);
       added++;
     }
+  }
+
+  // Third-party marks are recomputed every run (a cached entry may carry an old one). A file whose
+  // mark changed is changed for downstream phases: it joins or leaves zones, classification and the call graph.
+  const { files: marked, marks: thirdPartyMarks } = await markThirdParty(absDir, files, {
+    globs: [
+      ...(inventoryConfig.thirdParty ?? []).map((glob) => ({ glob, source: "config" as const })),
+      ...(options?.thirdPartyGlobs ?? []).map((glob) => ({ glob, source: "cli" as const })),
+    ],
+  });
+  // Mirror copies (mirrors.ts) are found from the hashes, over every file.
+  const mirrored = markMirrors(marked, inventoryConfig.mirrors);
+  for (let i = 0; i < mirrored.files.length; i++) {
+    const now = mirrored.files[i];
+    const before = prevMap.get(now.path);
+    if (before && (before.thirdParty !== now.thirdParty || before.mirrorOf !== now.mirrorOf) && !changedFiles.has(now.path)) {
+      changedFiles.add(now.path);
+      changed++;
+    }
+    files[i] = now;
   }
 
   // Detect deleted files
@@ -617,6 +722,9 @@ export async function analyzeInventory(
     result.stats = { cached, changed, added, deleted, touched };
     result.changedFiles = changedFiles;
   }
+  if (byContent.length > 0) result.minifiedByContent = byContent.sort();
+  if (mirrored.pairs.length > 0) result.mirrors = mirrored.pairs;
+  if (thirdPartyMarks.length > 0) result.thirdPartyMarks = thirdPartyMarks;
 
   return result;
 }
@@ -638,11 +746,11 @@ function canonicalConfigValue(_key: string, value: unknown): unknown {
  * Fingerprint of everything that decides a cached {@link FileEntry}: the
  * sourcevision version (the classifier's code) and the language config's
  * rules (test, generated, config and entry patterns, header rules, skip
- * rules). A previous inventory is reusable only under the same fingerprint;
- * the caller stores it outside inventory.json.
+ * rules), plus the minified-bundle rules. A previous inventory is reusable
+ * only under the same fingerprint; the caller stores it outside inventory.json.
  */
 export function inventoryFingerprint(langConfig: LanguageConfig, version: string = sourcevisionVersion()): string {
   return createHash("sha256")
-    .update(JSON.stringify({ version, config: langConfig }, canonicalConfigValue))
+    .update(JSON.stringify({ version, config: langConfig, minified: MINIFIED_RULES }, canonicalConfigValue))
     .digest("hex");
 }

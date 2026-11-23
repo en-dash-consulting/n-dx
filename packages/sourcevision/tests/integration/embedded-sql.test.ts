@@ -1,7 +1,7 @@
 /**
  * Table names from sqlc query files found the way the migration detector
- * finds them. SQL embedded in Java and Go sources is tested in the
- * `@n-dx/lang-java` and `@n-dx/lang-go` packs.
+ * finds them. SQL embedded in Java, Go and PHP sources is tested in the
+ * `@n-dx/lang-java`, `@n-dx/lang-go` and `@n-dx/lang-php` packs.
  */
 
 import { describe, expect, it } from "vitest";

@@ -84,6 +84,15 @@ describe("guardBaselineForLanguage", () => {
     expect(guardBaselineForLanguage("go").allowedCommands).not.toContain("npm");
     expect(guardBaselineForLanguage("swift").allowedCommands).not.toContain("go");
   });
+
+  // PHP's tools are admitted for PHP checkouts only.
+  it("admits php, composer and phpunit for PHP alone", () => {
+    expect(guardBaselineForLanguage("php").allowedCommands).toEqual(["php", "composer", "phpunit", "git"]);
+    for (const lang of ["typescript", "javascript", "go", "swift", undefined, "cobol"]) {
+      const { allowedCommands } = guardBaselineForLanguage(lang);
+      for (const c of ["php", "composer", "phpunit"]) expect(allowedCommands, lang ?? "default").not.toContain(c);
+    }
+  });
 });
 
 describe("untrusted clamp and marker files", () => {
@@ -115,6 +124,7 @@ describe("untrusted clamp and marker files", () => {
     ["typescript", null, ["node_modules/**"]],
     ["go", "go.mod", ["vendor/**"]],
     ["swift", "Package.swift", [".build/**", "DerivedData/**", "Pods/**", "Carthage/**"]],
+    ["php", "composer.json", ["vendor/**"]],
   ])("still reads a %s project's pre-upgrade init defaults as baseline", (language, marker, deps) => {
     if (marker) writeFileSync(join(repo, marker), "");
     const current = guardBaselineForLanguage(language);
@@ -397,6 +407,7 @@ describe("assessRepoExecutionConfig", () => {
     ["swift", "Package.swift", false],
     ["swift", "App.xcodeproj", true],
     ["swift", "App.xcworkspace", true],
+    ["php", "composer.json", false],
   ])("raises no mismatch for a %s checkout (%s) declaring its own language", (language, marker, isDir) => {
     if (isDir) mkdirSync(join(repo, marker));
     else writeFileSync(join(repo, marker), "");
@@ -414,6 +425,83 @@ describe("assessRepoExecutionConfig", () => {
       const codes = assessRepoExecutionConfig(collectRepoExecutionConfig(repo)).map((f) => f.code);
       expect(codes, language).not.toContain("language-mismatch");
     }
+  });
+
+  it("keeps the PHP tools out of a JS/TS checkout that declares php", () => {
+    writeJson(".hench/config.json", { language: "php", guard: guardBaselineForLanguage("php") });
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.detectedLanguage).toBe("typescript");
+    const byCode = Object.fromEntries(assessRepoExecutionConfig(config).map((f) => [f.code, f]));
+    expect(byCode["language-mismatch"]).toBeDefined();
+    expect(byCode["commands-added"].values).toEqual(["php", "composer", "phpunit"]);
+  });
+
+  it("does not count a directory named composer.json as a php marker", () => {
+    mkdirSync(join(repo, "composer.json"));
+    expect(collectRepoExecutionConfig(repo).detectedLanguage).toBe("typescript");
+  });
+
+  describe("composer.json beside package.json: source count decides", () => {
+    function touch(...rels: string[]): void {
+      for (const rel of rels) {
+        mkdirSync(join(repo, rel, ".."), { recursive: true });
+        writeFileSync(join(repo, rel), "");
+      }
+    }
+    const detected = () => collectRepoExecutionConfig(repo).detectedLanguage;
+
+    it("is php with composer.json and no package.json", () => {
+      touch("composer.json", "src/a.js", "src/b.ts");
+      expect(detected()).toBe("php");
+    });
+
+    it("is typescript when JS/TS source outnumbers PHP", () => {
+      touch("composer.json", "package.json", "src/a.js", "src/b.tsx", "src/c.mjs", "api/index.php");
+      expect(detected()).toBe("typescript");
+    });
+
+    it("is typescript on a tie", () => {
+      touch("composer.json", "package.json", "src/a.ts", "api/index.php");
+      expect(detected()).toBe("typescript");
+    });
+
+    it("is php for a Laravel-shaped checkout", () => {
+      touch(
+        "composer.json", "package.json", "artisan",
+        "app/Models/User.php", "app/Http/Controllers/Controller.php", "routes/web.php",
+        "resources/views/home.phtml", "resources/js/app.js",
+      );
+      expect(detected()).toBe("php");
+    });
+
+    it("counts nothing under vendor/, node_modules/ or dot-directories", () => {
+      touch(
+        "composer.json", "package.json", "src/a.ts", "src/b.ts", "app/x.php",
+        "vendor/pkg/a.php", "vendor/pkg/b.php", "vendor/pkg/c.php",
+        "node_modules/x/a.js", "build/a.js", ".cache/a.js",
+      );
+      expect(detected()).toBe("typescript");
+      touch(
+        "app/y.php", "app/z.php",
+        "node_modules/x/b.js", "node_modules/x/c.js", "node_modules/x/d.js", "dist/a.js", ".git/a.js",
+      );
+      expect(detected()).toBe("php");
+    });
+
+    it("does not count minified JavaScript", () => {
+      touch("composer.json", "package.json", "plugin.php", "assets/jquery.min.js", "assets/select2.min.js");
+      expect(detected()).toBe("php");
+    });
+
+    it("stops at a bounded depth", () => {
+      touch("composer.json", "package.json", "app/a.php", "a/b/c/d/e/x.js", "a/b/c/d/e/y.js");
+      expect(detected()).toBe("php");
+    });
+
+    it("still gives go.mod precedence", () => {
+      touch("go.mod", "composer.json", "package.json", "app/a.php", "app/b.php");
+      expect(detected()).toBe("go");
+    });
   });
 
   it("does not count a file named like an Xcode project as a swift marker", () => {

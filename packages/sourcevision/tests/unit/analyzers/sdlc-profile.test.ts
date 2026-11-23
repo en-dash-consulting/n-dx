@@ -592,6 +592,33 @@ describe("feature flags", () => {
     expect(profile.featureFlags.find((f) => f.provider === "statsig")?.evidence[0].line).toBe(4);
   });
 
+  it("detects flag SDKs from composer.json require and require-dev, case-insensitively", async () => {
+    const root = project("flags-composer", {
+      "composer.json": JSON.stringify({
+        name: "acme/app",
+        require: { php: ">=8.1", "LaunchDarkly/server-sdk": "^6", "monolog/monolog": "^3" },
+        "require-dev": { "laravel/pennant": "^1" },
+      }, null, 2),
+      "plugins/billing/composer.json": JSON.stringify({ require: { "unleash/client": "^2" } }),
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.featureFlags.map((f) => f.provider)).toEqual(["launchdarkly", "pennant", "unleash"]);
+    const launchdarkly = profile.featureFlags.find((f) => f.provider === "launchdarkly")!.evidence[0];
+    expect(launchdarkly).toMatchObject({ path: "composer.json", line: 5, confidence: "certain" });
+    expect(launchdarkly.excerpt).toContain("LaunchDarkly/server-sdk");
+    expect(profile.featureFlags.find((f) => f.provider === "unleash")?.evidence[0].path).toBe("plugins/billing/composer.json");
+  });
+
+  it("finds no flag SDK in a composer.json without one, and none in a vendored package", async () => {
+    const root = project("flags-composer-none", {
+      "composer.json": JSON.stringify({ require: { "monolog/monolog": "^3", "guzzlehttp/guzzle": "^7" } }),
+      "vendor/acme/flags/composer.json": JSON.stringify({ require: { "unleash/client": "^2" } }),
+    });
+    const profile = await buildSdlcProfile(root);
+    expect(profile.featureFlags).toEqual([]);
+  });
+
   it("reads FEATURE_* and FF_* keys from dotenv files as an in-house convention", async () => {
     const root = project("flags-env", {
       ".env.example": "DATABASE_URL=postgres://x\nFEATURE_NEW_CHECKOUT=true\nexport FF_DARK_MODE=0\nFEATURE_NEW_CHECKOUT=false\n",

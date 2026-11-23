@@ -122,7 +122,10 @@ ndx init --assistants=claude .   # equivalent to --claude-only
 ndx init --no-codex .            # skip Codex provisioning
 ndx init --git .                 # also create a git repository (answers the preflight prompt)
 ndx init --no-git .              # never create one
+ndx init --no-llm .              # static-only: no model, vendor CLI or network call
 ```
+
+`--no-llm` is for batch initialization: init spawns no vendor CLI (no auth check, no `claude` lookup for MCP registration), skips the update check and never prompts for a provider or model (pass `--git` or `--no-git` too, so a run on a TTY is not asked about git). The vendor is recorded only from `--provider` or existing config, unchecked; the summary says model features were not checked.
 
 Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`, holding an empty v2 PRD; an existing v1 PRD keeps its layout until `ndx migrate`), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
 
@@ -145,6 +148,7 @@ Generated assistant artifacts:
 ndx analyze .                # standard analysis
 ndx analyze --deep .         # full multi-pass analysis
 ndx analyze --lite .         # fast single-pass (skips LLM enrichment)
+ndx analyze --fast .         # static only: no model or network call, no update check
 ```
 
 Scans the codebase: file inventory, import graph, zone detection (Louvain community detection), component catalog. Results drive recommendations and planning.

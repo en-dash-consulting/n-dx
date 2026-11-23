@@ -86,6 +86,18 @@ export interface PackSourceFile {
   readonly path: string;
   /** Captures per query name, in document order. */
   readonly captures: Readonly<Record<string, readonly Capture[]>>;
+  /**
+   * Legacy constructs the entry's `legacySyntax` rewrote before this parse
+   * (`TreeSitterEntryOptions.legacySyntax`). The captures come from the
+   * rewritten text, so a rule that counts such a construct reads it here.
+   */
+  readonly rewrites?: readonly SourceRewrite[];
+}
+
+/** One construct rewritten in place before parsing; `position` is the same in the source and the rewrite. */
+export interface SourceRewrite {
+  readonly construct: string;
+  readonly position: SourcePosition;
 }
 
 /** What a resolver returns is lang-kit's imports fact. */
@@ -106,6 +118,12 @@ export interface PackResolver {
    * resolver can find build files beside them without walking the project.
    */
   forProject?(projectDir: string, files: readonly string[]): Promise<PackResolver>;
+  /**
+   * Text of the configuration files {@link forProject} read beside the
+   * sources (PHP's `.htaccess`), by project-relative path, for frameworks
+   * that read configuration rather than code. Absent when it reads none.
+   */
+  configFiles?(): ReadonlyMap<string, string>;
   /**
    * Index every file of the project; call once per analysis. `unparsed` lists
    * the pack's files that produced no captures (over the size limit, unreadable):
@@ -131,9 +149,10 @@ export interface PreparedResolver {
 
 /**
  * What a framework may follow across files: the pack's resolver, prepared
- * over the whole project. Given only when the pack has a resolver.
+ * over the whole project, and the configuration files it read. Given only
+ * when the pack has a resolver.
  */
-export type FrameworkContext = Pick<PreparedResolver, "resolve" | "module">;
+export type FrameworkContext = Pick<PreparedResolver, "resolve" | "module"> & Pick<PackResolver, "configFiles">;
 
 /** What a framework reads from a project: facts per file path, and what it skipped. */
 export interface FrameworkFacts {

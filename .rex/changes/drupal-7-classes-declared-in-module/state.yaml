@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "f7febe6f-fa48-4a0e-b7b4-f24da7f33539":
+    status: "completed"
+    startedAt: "2026-11-16T22:20:31.872Z"
+    completedAt: "2026-11-16T22:26:05.543Z"
+    endedAt: "2026-11-16T22:26:05.543Z"
+    activeIntervals: [{"end":"2026-11-16T22:26:05.543Z","start":"2026-11-16T22:20:31.872Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "phpConfig.parseableExtensions now includes PHP_REPOSITORY_ONLY_EXTENSIONS (.inc, .module, .install); lang-php fixture php-drupal-module and sourcevision integration tests cover exec sites, class resolution and the non-PHP repository case."
+    lastModified: "2026-11-16T22:26:05.543Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f852a948-02c6-4077-a64f-db20075436cb":
+    status: "completed"
+    startedAt: "2026-11-16T22:26:05.543Z"
+    completedAt: "2026-11-16T22:26:05.543Z"
+    endedAt: "2026-11-16T22:26:05.543Z"
+    activeIntervals: [{"end":"2026-11-16T22:26:05.543Z","start":"2026-11-16T22:26:05.543Z"}]
+    appliedAt: "2026-11-16T22:26:05.543Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-14T08:02:57.884Z"
+    lastModified: "2026-11-16T22:26:05.543Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

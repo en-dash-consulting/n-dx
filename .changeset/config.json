@@ -21,6 +21,7 @@
       "@n-dx/lang-sql",
       "@n-dx/lang-terraform",
       "@n-dx/lang-python",
+      "@n-dx/lang-php",
       "@n-dx/web",
       "@n-dx/graview",
       "@n-dx/graview-face"

@@ -70,11 +70,11 @@ export function getSupportedAssistants() {
  * @param {Record<string, boolean>} [enabled]
  *   Map of vendor names to enabled flags.  Vendors not present default
  *   to `true` (enabled).  Pass `{ claude: false }` to skip Claude, etc.
- * @param {{ mcpScope?: "local" }} [opts]
+ * @param {{ mcpScope?: "local", noVendorCli?: boolean }} [opts]
  *   Vendor-neutral setup options. Currently only consumed by the Claude
  *   integration: `{ mcpScope: "local" }` registers MCP servers via
  *   `claude mcp add --scope local` instead of relying on the tracked
- *   `.mcp.json` (the default).
+ *   `.mcp.json` (the default); `{ noVendorCli: true }` spawns no vendor CLI.
  * @returns {Record<string, { summary: string, detail?: object }>}
  *   Per-vendor result keyed by vendor name.
  */

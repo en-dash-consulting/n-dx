@@ -1,0 +1,6 @@
+{
+    "name": "acme/root",
+    "require": { "acme/x": "*" },
+    "repositories": [{ "type": "path", "url": "packages/*" }],
+    "autoload": { "psr-4": { "Root\\": "src/" } }
+}

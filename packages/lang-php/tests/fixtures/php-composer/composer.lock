@@ -1,0 +1,24 @@
+{
+    "_readme": ["A trimmed lock file for the resolver fixture; versions are placeholders."],
+    "content-hash": "00000000000000000000000000000000",
+    "packages": [
+        {
+            "name": "monolog/monolog",
+            "version": "0.0.0-fixture",
+            "autoload": {
+                "psr-4": {
+                    "Monolog\\": "src/Monolog"
+                }
+            }
+        }
+    ],
+    "packages-dev": [
+        {
+            "name": "phpunit/phpunit",
+            "version": "0.0.0-fixture",
+            "autoload": {
+                "classmap": ["src/"]
+            }
+        }
+    ]
+}
