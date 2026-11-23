@@ -1,14 +1,14 @@
 /**
- * Work's Now mode: what is being worked on, by whom, what is up next, and what
- * a run typically takes.
+ * Work's Now mode: what is being worked on, by whom, and what runs next.
  *
  * Running now lists the task runs going in every worktree (`GET /api/live`,
  * the same feed as Live): the task, who it is assigned to, the agent running
- * it, the worktree, and how far it is against a typical run. Up next is the
- * queue `ndx work` picks from (`ReadyToRun`): the typical run stated once above
- * it, each row with its assignee and, when its tier has a figure of its own,
- * that estimate — split into the tasks assigned to you and the unassigned ones
- * by product area. The PRD's numbers are Work's Statistics tile (`work-stats.ts`).
+ * it, the worktree, and how far it is against a typical run.
+ * Beside it is the planned Run queue (`run-queue.ts`). `UpNext` below is the
+ * Ready to run panel Work › Tune opens on (`ReadyToRun`): the typical run stated
+ * once above it, each row with its assignee and, when its tier has a figure of
+ * its own, that estimate — split into the tasks assigned to you and the
+ * unassigned ones by product area. The PRD's numbers are Work's Statistics tile (`work-stats.ts`).
  *
  * @module viewer/views/work-now
  */
@@ -128,7 +128,7 @@ export function RunningNow({ navigateTo }: { navigateTo: NavigateTo }) {
   const runs = live.runs.filter(countsAsLive);
   const starting = live.queue.starting;
   if (runs.length === 0 && starting.length === 0) {
-    return h("p", { class: "wn-empty" }, "Nothing is running. Start the next task in Up next.");
+    return h("p", { class: "wn-empty" }, "Nothing is running. Queue a task beside this, or start one from Ready to run on Tune.");
   }
   return h("ul", { class: "wn-runs", "aria-label": "Running now" },
     runs.map((run) => h(RunningRow, { key: run.runId, run, estimates, now, navigateTo })),

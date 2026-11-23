@@ -44,6 +44,7 @@ import { relative as relativePath } from "node:path";
 import { realpath } from "node:fs/promises";
 import { execStdout } from "../process/exec.js";
 import { CLI_LOG_FILENAME } from "../prd/llm-gateway.js";
+import { RUN_QUEUE_FILE } from "../queue/run-queue.js";
 import {
   AGENT_MCP_DIRNAME,
   LOCKS_DIRNAME,
@@ -72,6 +73,9 @@ const RUNTIME_ENTRIES_IN_HENCH_DIR: readonly string[] = [
   `${RECOVERY_DIRNAME}/`,
   `${AGENT_MCP_DIRNAME}/`,
   "session-cache.json",
+  // The planned run queue (queue/run-queue.ts): the dashboard writes it, and
+  // a run takes its picked item off, so it changes under the gates mid-run.
+  RUN_QUEUE_FILE,
 ];
 
 /**
