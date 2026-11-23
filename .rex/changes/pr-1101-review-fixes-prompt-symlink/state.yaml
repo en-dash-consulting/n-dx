@@ -1,0 +1,73 @@
+schema: "rex/v2"
+items:
+  "3ba18674-382b-41b1-b682-a1a652a273e2":
+    status: "completed"
+    startedAt: "2026-11-23T22:31:33.038Z"
+    completedAt: "2026-11-23T22:31:33.038Z"
+    endedAt: "2026-11-23T22:31:33.038Z"
+    activeIntervals: [{"end":"2026-11-23T22:31:33.038Z","start":"2026-11-23T22:31:33.038Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "realExisting follows a dangling symlink to its target (lstat/readlink, 40-hop guard); staysInside treats an unresolvable path as escaping. Tests: default and configured path, relative link, loop, inside link; 3 fail on the old code."
+    lastModified: "2026-11-23T22:31:33.038Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "448c2715-7251-4a80-8a00-a82b9079868f":
+    status: "completed"
+    startedAt: "2026-11-23T22:31:56.768Z"
+    completedAt: "2026-11-23T22:31:56.768Z"
+    endedAt: "2026-11-23T22:31:56.768Z"
+    activeIntervals: [{"end":"2026-11-23T22:31:56.768Z","start":"2026-11-23T22:31:56.768Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "RunningRow uses PeekLink(runTarget(run)): in place for this worktree, /w/<key>/ slot otherwise; tests for both."
+    lastModified: "2026-11-23T22:31:56.768Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "644b513a-6008-4f31-aebc-fc9420fab6f7":
+    status: "completed"
+    startedAt: "2026-11-23T22:31:48.974Z"
+    completedAt: "2026-11-23T22:31:48.974Z"
+    endedAt: "2026-11-23T22:31:48.974Z"
+    activeIntervals: [{"end":"2026-11-23T22:31:48.974Z","start":"2026-11-23T22:31:48.974Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "run-queue.json.lock (exclusive create, 30s stale break, 5s wait) held around the read-modify-write in hench (withRunQueueLock) and the web PUT (withQueueLock, 503 on timeout); a lock timeout in ndx work warns instead of failing; lock file git-ignored in all three lists. Interleaving test fails without the lock."
+    lastModified: "2026-11-23T22:31:48.974Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "813bb882-4d3d-46b0-b304-45648fd38992":
+    status: "completed"
+    startedAt: "2026-11-23T22:31:40.942Z"
+    completedAt: "2026-11-23T22:31:40.942Z"
+    endedAt: "2026-11-23T22:31:40.942Z"
+    activeIntervals: [{"end":"2026-11-23T22:31:40.942Z","start":"2026-11-23T22:31:40.942Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "final only for TaskNotActionableError with status completed/cancelled/deleted, or TaskNotFoundError; integration test with blocked and deferred statuses fails on the old code."
+    lastModified: "2026-11-23T22:31:40.942Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "c7b2dc2d-3273-4b5f-b917-9f80bac0308d":
+    status: "completed"
+    startedAt: "2026-11-23T22:32:12.739Z"
+    completedAt: "2026-11-23T22:32:12.739Z"
+    endedAt: "2026-11-23T22:32:12.739Z"
+    activeIntervals: [{"end":"2026-11-23T22:32:12.739Z","start":"2026-11-23T22:32:12.739Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "button-modifier-classes regex escaped properly (it was matching any char before the class), which exposed btn-primary with no rule: rule added. marks.test strips tags until stable."
+    lastModified: "2026-11-23T22:32:12.739Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "cd58e1fb-2ef3-4e10-afdb-65d656cde237":
+    status: "completed"
+    startedAt: "2026-11-23T22:32:12.739Z"
+    completedAt: "2026-11-23T22:32:12.739Z"
+    endedAt: "2026-11-23T22:32:12.739Z"
+    activeIntervals: [{"end":"2026-11-23T22:32:12.739Z","start":"2026-11-23T22:32:12.739Z"}]
+    appliedAt: "2026-11-23T22:32:12.739Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-23T22:14:03.432Z"
+    lastModified: "2026-11-23T22:32:12.739Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "e63a26bc-dcad-4624-9189-43da3e1e7184":
+    status: "completed"
+    startedAt: "2026-11-23T22:32:04.904Z"
+    completedAt: "2026-11-23T22:32:04.904Z"
+    endedAt: "2026-11-23T22:32:04.904Z"
+    activeIntervals: [{"end":"2026-11-23T22:32:04.904Z","start":"2026-11-23T22:32:04.904Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Build checkout uses the release tag on workflow_dispatch with release-tag; a step checks the tag names the packaged @n-dx/core version; the attach job refuses archives of another version. YAML parsed and checks exercised locally."
+    lastModified: "2026-11-23T22:32:04.904Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

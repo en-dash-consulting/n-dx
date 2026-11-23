@@ -20,7 +20,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -66,6 +66,50 @@ export function readQueueFile(path: string): QueueFileItem[] {
   }
 }
 
+/** How long a save waits for the queue's lock; a real hold lasts milliseconds. */
+export const QUEUE_LOCK_WAIT_MS = 5_000;
+/** A lock older than this was left by a writer that died: it is broken. */
+export const QUEUE_LOCK_STALE_MS = 30_000;
+
+/** The lock was still held when the wait ran out. */
+export class QueueLockedError extends Error {}
+
+/**
+ * Run `fn` holding the queue's lock: `run-queue.json.lock`, created exclusively
+ * beside the queue. `ndx work` takes the same lock the same way (hench
+ * `queue/run-queue.ts`, `withRunQueueLock`); the two share this file contract,
+ * not code. Without it a save could overwrite the item `ndx work` just took
+ * off, or `ndx work` could overwrite the save.
+ */
+export async function withQueueLock<T>(file: string, fn: () => Promise<T>, { lockWaitMs = QUEUE_LOCK_WAIT_MS }: { lockWaitMs?: number } = {}): Promise<T> {
+  mkdirSync(join(file, ".."), { recursive: true });
+  const lock = `${file}.lock`;
+  const deadline = Date.now() + lockWaitMs;
+  for (;;) {
+    try {
+      writeFileSync(lock, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }), { encoding: "utf-8", flag: "wx" });
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > QUEUE_LOCK_STALE_MS) {
+          rmSync(lock, { force: true });
+          continue;
+        }
+      } catch {
+        continue; // released between the create and the stat
+      }
+      if (Date.now() > deadline) throw new QueueLockedError("The run queue is being changed by another writer.");
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    rmSync(lock, { force: true });
+  }
+}
+
 function writeQueueFile(path: string, items: readonly QueueFileItem[]): void {
   mkdirSync(join(path, ".."), { recursive: true });
   const temp = `${path}.${process.pid}.${Date.now()}.tmp`;
@@ -105,7 +149,12 @@ function describe(ctx: ServerContext, items: readonly QueueFileItem[]): QueueIte
 }
 
 /** Handle the run queue's routes. Resolves true when the request was one of them. */
-export async function handleHenchQueueRoute(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+export async function handleHenchQueueRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  options: { lockWaitMs?: number } = {},
+): Promise<boolean> {
   const path = (req.url || "/").split("?")[0];
   if (path !== QUEUE_PATH) return false;
   const method = req.method || "GET";
@@ -134,24 +183,31 @@ export async function handleHenchQueueRoute(req: IncomingMessage, res: ServerRes
       errorResponse(res, 400, "Expected base to be a list of task ids");
       return true;
     }
-    const current = readQueueFile(file);
-    if (base && JSON.stringify(current.map((item) => item.taskId)) !== JSON.stringify(base)) {
-      jsonResponse(res, 409, {
-        error: "The run queue changed since it was read",
-        items: describe(ctx, current),
-      });
-      return true;
-    }
-    const added = new Map(current.map((item) => [item.taskId, item.addedAt]));
-    const now = new Date().toISOString();
-    const items = order.map((taskId) => ({ taskId, addedAt: added.get(taskId) || now }));
+    // The read, the base check and the write happen under the queue's lock,
+    // which `ndx work` takes around its own read-modify-write.
+    type Outcome = { stale: QueueFileItem[] } | { saved: QueueFileItem[] };
+    let outcome: Outcome;
     try {
-      writeQueueFile(file, items);
+      outcome = await withQueueLock(file, async () => {
+        const current = readQueueFile(file);
+        if (base && JSON.stringify(current.map((item) => item.taskId)) !== JSON.stringify(base)) return { stale: current };
+        const added = new Map(current.map((item) => [item.taskId, item.addedAt]));
+        const now = new Date().toISOString();
+        const items = order.map((taskId) => ({ taskId, addedAt: added.get(taskId) || now }));
+        writeQueueFile(file, items);
+        return { saved: items };
+      }, options);
     } catch (err) {
-      errorResponse(res, 500, `Could not save the run queue: ${err instanceof Error ? err.message : String(err)}`);
+      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof QueueLockedError) errorResponse(res, 503, `${message} Try again.`);
+      else errorResponse(res, 500, `Could not save the run queue: ${message}`);
       return true;
     }
-    jsonResponse(res, 200, { items: describe(ctx, items) });
+    if ("stale" in outcome) {
+      jsonResponse(res, 409, { error: "The run queue changed since it was read", items: describe(ctx, outcome.stale) });
+      return true;
+    }
+    jsonResponse(res, 200, { items: describe(ctx, outcome.saved) });
     return true;
   }
 

@@ -79,12 +79,15 @@ describe("the needs-work mark", () => {
  * flat spans the marks and badges are.
  */
 function accessibleName(markup: string): string {
-  return markup
+  let text = markup
     .replace(/<span[^>]*aria-hidden="true"[^>]*>[^<]*<\/span>/g, "")
-    .replace(/<span[^>]*aria-label="([^"]*)"[^>]*>[^<]*<\/span>/g, " $1 ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/<span[^>]*aria-label="([^"]*)"[^>]*>[^<]*<\/span>/g, " $1 ");
+  // Strip tags until none is left: one pass can join fragments into a new tag.
+  for (let previous = ""; previous !== text; ) {
+    previous = text;
+    text = text.replace(/<[^>]+>/g, "");
+  }
+  return text.replace(/\s+/g, " ").trim();
 }
 
 describe("the mark inside a badge", () => {

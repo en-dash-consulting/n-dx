@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile, utimes } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   readRunQueue, writeRunQueue, removeFromRunQueue, takeFromRunQueue, runQueuePath,
+  runQueueLockPath, withRunQueueLock, RUN_QUEUE_LOCK_STALE_MS,
 } from "../../../src/queue/run-queue.js";
 
 let dir: string;
@@ -79,4 +81,47 @@ describe("taking from the queue", () => {
   it("picks nothing from an empty queue, so rex's own pick runs", async () => {
     expect(await takeFromRunQueue(dir, async () => "x")).toEqual({ picked: null, skipped: [] });
   });
+});
+
+describe("the queue's write lock", () => {
+  const ids = async () => (await readRunQueue(dir)).map((i) => i.taskId);
+  const later = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it("a removal waits for a writer holding the lock, then reads what it saved", async () => {
+    await writeRunQueue(dir, [item("a"), item("b")]);
+    // The dashboard's save holds the lock: it reads [a, b] and saves [a, b, c].
+    let release!: () => void;
+    const held = withRunQueueLock(dir, () => new Promise<void>((r) => { release = r; }));
+    await later(30);
+    const removal = removeFromRunQueue(dir, ["a"]);
+    await later(60);
+    await writeRunQueue(dir, [item("a"), item("b"), item("c")]);
+    release();
+    await held;
+    await removal;
+    // ndx work's removal ran after the save, so `c` survives.
+    expect(await ids()).toEqual(["b", "c"]);
+    expect(existsSync(runQueueLockPath(dir))).toBe(false);
+  });
+
+  it("breaks a lock left behind by a writer that died", async () => {
+    await writeRunQueue(dir, [item("a"), item("b")]);
+    await writeFile(runQueueLockPath(dir), "{}");
+    const old = new Date(Date.now() - RUN_QUEUE_LOCK_STALE_MS - 1_000);
+    await utimes(runQueueLockPath(dir), old, old);
+    await removeFromRunQueue(dir, ["a"]);
+    expect(await ids()).toEqual(["b"]);
+  });
+
+  it("a run reports, rather than fails, when the lock stays held", async () => {
+    await writeRunQueue(dir, [item("go")]);
+    await writeFile(runQueueLockPath(dir), "{}");
+    const result = await takeFromRunQueue(dir, async (id) => id, { lockWaitMs: 50 });
+    expect(result.picked?.taskId).toBe("go");
+    expect(result.removalError).toMatch(/locked by another writer/);
+    // Nothing was taken off, and the other writer's lock is left alone.
+    expect(await ids()).toEqual(["go"]);
+    expect(existsSync(runQueueLockPath(dir))).toBe(true);
+  });
+
 });

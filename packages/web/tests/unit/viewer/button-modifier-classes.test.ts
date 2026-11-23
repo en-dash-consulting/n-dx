@@ -36,7 +36,9 @@ function modifiersInMarkup(): Map<string, string[]> {
 }
 
 const css = files(STYLES, ".css").map((f) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")).join("\n");
-const hasRule = (cls: string) => new RegExp(`\.${cls}(?![\w-])[^{}]*\{`).test(css);
+// Escaped for the template string: `\\.` reaches the regex as `\.` (a dot), where a
+// bare `\.` would arrive as `.` and match any character before the class name.
+const hasRule = (cls: string) => new RegExp(`\\.${cls}(?![\\w-])[^{}]*\\{`).test(css);
 
 describe("button modifier classes", () => {
   const used = modifiersInMarkup();

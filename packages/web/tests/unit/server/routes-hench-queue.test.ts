@@ -4,12 +4,12 @@
  * `queue/run-queue.ts`). The format is the contract between the two.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm, readFile } from "node:fs/promises";
-import { realpathSync } from "node:fs";
+import { mkdtemp, mkdir, writeFile, rm, readFile, utimes } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
-import { handleHenchQueueRoute, parseQueueOrder, readQueueFile, RUN_QUEUE_MAX } from "../../../src/server/routes-hench-queue.js";
+import { handleHenchQueueRoute, parseQueueOrder, readQueueFile, RUN_QUEUE_MAX, QUEUE_LOCK_STALE_MS } from "../../../src/server/routes-hench-queue.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -45,7 +45,7 @@ beforeEach(async () => {
     }],
   }));
   ctx = { projectDir: dir, svDir: join(dir, ".sourcevision"), rexDir, dev: false };
-  const started = await startRouteTestServer((req, res) => handleHenchQueueRoute(req, res, ctx));
+  const started = await startRouteTestServer((req, res) => handleHenchQueueRoute(req, res, ctx, { lockWaitMs: 300 }));
   server = started.server;
   port = started.port;
 });
@@ -103,6 +103,35 @@ describe("the run queue routes", () => {
     expect(fresh.status).toBe(200);
     expect(readQueueFile(queueFile()).map((i) => i.taskId)).toEqual(["t2", "t1"]);
     expect((await call("PUT", { taskIds: [], base: "t2" })).status).toBe(400);
+  });
+
+  it("waits for ndx work's lock, then judges the base against what it left", async () => {
+    await call("PUT", { taskIds: ["t1", "t2"] });
+    const lock = `${queueFile()}.lock`;
+    // ndx work holds the lock and takes t1 off.
+    await writeFile(lock, "{}");
+    const pending = call("PUT", { taskIds: ["t1", "t2", "t3"], base: ["t1", "t2"] });
+    await new Promise((r) => setTimeout(r, 60));
+    await writeFile(queueFile(), JSON.stringify({ version: 1, items: [{ taskId: "t2", addedAt: "x" }] }));
+    await rm(lock);
+    // The save read the queue only once it had the lock: its base is stale, and t1 is not put back.
+    const answer = await pending;
+    expect(answer.status).toBe(409);
+    expect(readQueueFile(queueFile()).map((i) => i.taskId)).toEqual(["t2"]);
+    expect(existsSync(lock)).toBe(false);
+  });
+
+  it("answers 503 and writes nothing while the lock stays held, and breaks a stale one", async () => {
+    await call("PUT", { taskIds: ["t1"] });
+    const lock = `${queueFile()}.lock`;
+    await writeFile(lock, "{}");
+    expect((await call("PUT", { taskIds: ["t2"], base: ["t1"] })).status).toBe(503);
+    expect(readQueueFile(queueFile()).map((i) => i.taskId)).toEqual(["t1"]);
+    // A lock left by a writer that died is broken.
+    const old = new Date(Date.now() - QUEUE_LOCK_STALE_MS - 1_000);
+    await utimes(lock, old, old);
+    expect((await call("PUT", { taskIds: ["t2"], base: ["t1"] })).status).toBe(200);
+    expect(readQueueFile(queueFile()).map((i) => i.taskId)).toEqual(["t2"]);
   });
 
   it("parses an order by trimming, dropping blanks and keeping the first of each id", () => {

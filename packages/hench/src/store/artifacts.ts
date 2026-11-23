@@ -76,6 +76,8 @@ const RUNTIME_ENTRIES_IN_HENCH_DIR: readonly string[] = [
   // The planned run queue (queue/run-queue.ts): the dashboard writes it, and
   // a run takes its picked item off, so it changes under the gates mid-run.
   RUN_QUEUE_FILE,
+  // The queue's write lock, held for milliseconds by either writer.
+  `${RUN_QUEUE_FILE}.lock`,
 ];
 
 /**

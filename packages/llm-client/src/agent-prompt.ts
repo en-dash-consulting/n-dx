@@ -34,7 +34,7 @@
  * @module agent-prompt
  */
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import { relativeToRoot, resolveLayout } from "./layout.js";
@@ -87,13 +87,31 @@ function isInside(root: string, child: string): boolean {
   return !isAbsolute(rel) && rel !== ".." && !rel.startsWith(".." + sep);
 }
 
-/** The nearest existing ancestor of `path` (itself included), resolved through symlinks. */
-function realExisting(path: string): string {
+/** More links than any real layout chains; past it, the path is treated as escaping. */
+const MAX_LINK_HOPS = 40;
+
+/**
+ * Where a write to `path` would land, as far as the disk can say: `path`
+ * resolved through symlinks when it exists, else its nearest existing
+ * ancestor so resolved. A symlink that exists but resolves to nothing (a
+ * dangling link) is followed to its target, which a write would create, and
+ * that target is checked in turn — never the link's own parent, which would
+ * pass a link pointing out of the project. Throws on a link loop.
+ */
+function realExisting(path: string, hops = 0): string {
+  if (hops > MAX_LINK_HOPS) throw new Error(`Too many symbolic links resolving ${path}`);
   let current = path;
   for (;;) {
     try {
       return realpathSync(current);
     } catch {
+      let link: string | null = null;
+      try {
+        if (lstatSync(current).isSymbolicLink()) link = readlinkSync(current);
+      } catch {
+        // Not there at all: its parent decides.
+      }
+      if (link !== null) return realExisting(resolve(dirname(current), link), hops + 1);
       const parent = dirname(current);
       if (parent === current) return current;
       current = parent;
@@ -104,12 +122,18 @@ function realExisting(path: string): string {
 /**
  * Whether `path` stays inside `root` once symlinks are followed. The nearest
  * existing ancestor is checked when the file does not exist yet, so a
- * symlinked directory cannot carry a write outside the project either.
+ * symlinked directory cannot carry a write outside the project either, and a
+ * dangling link is judged by where it points. A path that cannot be resolved
+ * (a link loop) does not stay inside.
  */
 function staysInside(root: string, path: string): boolean {
   if (!isInside(root, path)) return false;
-  const realRoot = realExisting(root);
-  return isInside(realRoot, realExisting(path));
+  try {
+    const realRoot = realExisting(root);
+    return isInside(realRoot, realExisting(path));
+  } catch {
+    return false;
+  }
 }
 
 /** `agent.promptFile` from the project config and its local overlay (local wins); undefined when unset. */

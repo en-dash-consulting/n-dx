@@ -29,6 +29,8 @@ const DOC = {
         { id: "t-queued", title: "The queued task", level: "task" as const, status: "pending" as const, priority: "low" as const },
         { id: "t-done", title: "Already done", level: "task" as const, status: "completed" as const },
         { id: "t-blocked", title: "Waits on the first", level: "task" as const, status: "pending" as const, blockedBy: ["t-first"] },
+        { id: "t-status-blocked", title: "Blocked by status", level: "task" as const, status: "blocked" as const },
+        { id: "t-deferred", title: "Deferred for now", level: "task" as const, status: "deferred" as const },
       ],
     },
   ],
@@ -81,11 +83,16 @@ describe("the planned run queue", () => {
   });
 
   it("marks a finished or missing item for removal, and keeps a blocked one for later", async () => {
-    await writeRunQueue(henchDir, [queued("t-blocked"), queued("t-done"), queued("t-gone"), queued("t-queued")]);
+    await writeRunQueue(henchDir, [queued("t-blocked"), queued("t-status-blocked"), queued("t-deferred"), queued("t-done"), queued("t-gone"), queued("t-queued")]);
     const out = await dryRun();
     const line = (id: string) => out.split("\n").find((l) => l.includes(`passed over ${id} `)) ?? "";
     expect(line("t-blocked")).not.toBe("");
     expect(line("t-blocked")).not.toContain("off the queue");
+    // A blocked or deferred status is a state the task leaves again: it keeps its place.
+    expect(line("t-status-blocked")).not.toBe("");
+    expect(line("t-status-blocked")).not.toContain("off the queue");
+    expect(line("t-deferred")).not.toBe("");
+    expect(line("t-deferred")).not.toContain("off the queue");
     // A dry run only says what a real run would take off.
     expect(line("t-done")).toContain("would take it off the queue");
     expect(line("t-gone")).toContain("Task not found: t-gone");

@@ -132,6 +132,60 @@ describe("formatAgentPromptSection", () => {
   });
 });
 
+describe("writeAgentPrompt through a dangling symlink", () => {
+  /** A link at `at` to `target`; false where the host refuses symlinks. */
+  function link(target: string, at: string): boolean {
+    try {
+      symlinkSync(target, at);
+      return true;
+    } catch {
+      return false; // symlinks need privileges on some Windows hosts
+    }
+  }
+
+  it("refuses the default path when it links to a missing file outside the project, creating nothing", () => {
+    const outside = mkdtempSync(join(tmpdir(), "ndx-agent-prompt-outside-"));
+    try {
+      const target = join(outside, "outside.md");
+      if (!link(target, useNdxLayout())) return;
+      expect(() => writeAgentPrompt(root, "escape")).toThrow(/outside the project/);
+      expect(existsSync(target)).toBe(false);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a configured path that links to a missing file outside, by a relative link", () => {
+    const outside = mkdtempSync(join(tmpdir(), "ndx-agent-prompt-outside-"));
+    try {
+      writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ agent: { promptFile: "docs/prompt.md" } }));
+      mkdirSync(join(root, "docs"));
+      const target = join(outside, "made.md");
+      // Relative, as `.ndx/agent-prompt.md -> ../../outside.md` was in the report.
+      if (!link(join("..", "..", outside.split(/[\\/]/).pop()!, "made.md"), join(root, "docs", "prompt.md"))) return;
+      expect(() => writeAgentPrompt(root, "escape")).toThrow(/outside the project/);
+      expect(existsSync(target)).toBe(false);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a link loop rather than following it", () => {
+    const a = useNdxLayout();
+    const b = join(root, ".ndx", "other.md");
+    if (!link(b, a) || !link(a, b)) return;
+    expect(() => writeAgentPrompt(root, "loop")).toThrow(/outside the project/);
+  });
+
+  it("still writes through a dangling link whose target is inside the project", () => {
+    const target = join(root, "notes", "prompt.md");
+    mkdirSync(join(root, "notes"));
+    if (!link(target, useNdxLayout())) return;
+    writeAgentPrompt(root, "inside");
+    expect(readFileSync(target, "utf-8")).toBe("inside");
+  });
+});
+
 describe("writeAgentPrompt", () => {
   it("creates the file and its directory", () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ agent: { promptFile: "docs/agents/prompt.md" } }));

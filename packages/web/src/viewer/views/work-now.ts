@@ -18,6 +18,8 @@ import { useEffect, useState } from "preact/hooks";
 import { asLiveSnapshot, countsAsLive, useLive, useProductRead, useStatusLayout, type LiveRunFull } from "../hooks/index.js";
 import {
   ElapsedTime,
+  PeekLink,
+  runTarget,
   elapsedUntilNow,
   ReadyToRun,
   TypicalRun,
@@ -70,7 +72,8 @@ function useNow(ms: number): number {
   return now;
 }
 
-function RunningRow({ run, estimates, now, navigateTo }: {
+/** One running task. Exported for its tests. */
+export function RunningRow({ run, estimates, now, navigateTo }: {
   run: LiveRunFull;
   estimates: RunEstimates | null;
   now: number;
@@ -82,13 +85,10 @@ function RunningRow({ run, estimates, now, navigateTo }: {
   const title = run.rowText ?? run.taskTitle ?? "Untitled task";
   return h("li", { class: "wn-run", "data-run": run.runId },
     h("div", { class: "wn-run-main" },
+      // Live's own link: in place for this worktree's run, else the run's page in
+      // the worktree that owns it (its `/w/<key>/` slot), where its log and Stop are.
       run.taskId
-        ? h("button", {
-            type: "button",
-            role: "link",
-            class: "wn-run-title",
-            onClick: () => navigateTo("live-task", { taskId: run.taskId! }),
-          }, title)
+        ? h(PeekLink, { target: runTarget(run), navigateTo, class: "wn-run-title" }, title)
         : h("span", { class: "wn-run-title" }, title),
       h("div", { class: "wn-run-meta" },
         h("span", { class: run.assignee ? "wn-who" : "wn-who wn-who-none", title: run.assignee ?? "Nobody is assigned" },

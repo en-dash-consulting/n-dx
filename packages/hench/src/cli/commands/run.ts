@@ -45,6 +45,9 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
 import { readRunQueue, takeFromRunQueue } from "../../queue/run-queue.js";
+
+/** Statuses a queued task never leaves by itself: the queue drops it. Blocked and deferred keep it queued. */
+const QUEUE_FINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "cancelled", "deleted"]);
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { section, detail, formatDuration } from "../../types/output.js";
@@ -1579,7 +1582,9 @@ async function runOne(
       }),
       {
         dryRun,
-        final: (_id, err) => err instanceof TaskNotActionableError || err instanceof TaskNotFoundError,
+        // Finished or gone is final; blocked and deferred are statuses a task leaves again, so it waits.
+        final: (_id, err) =>
+          (err instanceof TaskNotActionableError && QUEUE_FINAL_STATUSES.has(err.status)) || err instanceof TaskNotFoundError,
         ...(excludeTaskIds ? { skip: excludeTaskIds } : {}),
       },
     );
@@ -1587,6 +1592,7 @@ async function runOne(
       const off = skip.dropped ? (dryRun ? " and would take it off the queue" : " and took it off the queue") : "";
       info(`Run queue: passed over ${skip.taskId} (${skip.reason})${off}.`);
     }
+    if (queued.removalError) warn(`Run queue: could not update the queue (${queued.removalError}); it is tidied on a later run.`);
     if (queued.picked) {
       info(`Run queue: running ${queued.picked.taskId}, next in the queue.`);
       taskId = queued.picked.value.item.id;

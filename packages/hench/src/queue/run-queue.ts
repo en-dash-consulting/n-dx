@@ -13,7 +13,7 @@
  * @module hench/queue/run-queue
  */
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export const RUN_QUEUE_FILE = "run-queue.json";
@@ -58,13 +58,75 @@ export async function writeRunQueue(henchDir: string, items: readonly RunQueueIt
   await rename(temp, path);
 }
 
-/** Take `taskIds` off the queue, keeping the rest in order. A no-op when none is on it. */
-export async function removeFromRunQueue(henchDir: string, taskIds: Iterable<string>): Promise<void> {
+/** The lock both writers hold around a read-modify-write of the queue: `run-queue.json.lock`. */
+export function runQueueLockPath(henchDir: string): string {
+  return `${runQueuePath(henchDir)}.lock`;
+}
+
+/** How long a writer waits for the lock before giving up. */
+export const RUN_QUEUE_LOCK_WAIT_MS = 5_000;
+/** A lock older than this was left by a writer that died: it is broken. A real hold lasts milliseconds. */
+export const RUN_QUEUE_LOCK_STALE_MS = 30_000;
+const LOCK_POLL_MS = 20;
+
+/**
+ * Run `fn` holding the queue's lock. The lock is a file created exclusively
+ * (`wx`) beside the queue, which the dashboard's queue route takes the same
+ * way (web `server/routes-hench-queue.ts`): the two processes share no code,
+ * only this file contract. Without it, `ndx work` reading `[a,b]`, the
+ * dashboard saving `[a,b,c]`, and `ndx work` writing `[b]` would drop `c`.
+ * Throws when the lock is still held after {@link RUN_QUEUE_LOCK_WAIT_MS}.
+ */
+export async function withRunQueueLock<T>(
+  henchDir: string,
+  fn: () => Promise<T>,
+  { waitMs = RUN_QUEUE_LOCK_WAIT_MS }: { waitMs?: number } = {},
+): Promise<T> {
+  await mkdir(henchDir, { recursive: true });
+  const lock = runQueueLockPath(henchDir);
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    try {
+      await writeFile(lock, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }), { encoding: "utf-8", flag: "wx" });
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      try {
+        if (Date.now() - (await stat(lock)).mtimeMs > RUN_QUEUE_LOCK_STALE_MS) {
+          await rm(lock, { force: true });
+          continue;
+        }
+      } catch {
+        continue; // released between the create and the stat: try again at once
+      }
+      if (Date.now() > deadline) throw new Error(`The run queue is locked by another writer (${lock}).`);
+      await new Promise((r) => setTimeout(r, LOCK_POLL_MS));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await rm(lock, { force: true });
+  }
+}
+
+/**
+ * Take `taskIds` off the queue, keeping the rest in order. A no-op when none
+ * is on it. The read and the write happen under the queue's lock, so a save
+ * the dashboard makes meanwhile is read here, not overwritten.
+ */
+export async function removeFromRunQueue(
+  henchDir: string,
+  taskIds: Iterable<string>,
+  lock: { waitMs?: number } = {},
+): Promise<void> {
   const drop = new Set(taskIds);
   if (drop.size === 0) return;
-  const items = await readRunQueue(henchDir);
-  const kept = items.filter((item) => !drop.has(item.taskId));
-  if (kept.length !== items.length) await writeRunQueue(henchDir, kept);
+  await withRunQueueLock(henchDir, async () => {
+    const items = await readRunQueue(henchDir);
+    const kept = items.filter((item) => !drop.has(item.taskId));
+    if (kept.length !== items.length) await writeRunQueue(henchDir, kept);
+  }, lock);
 }
 
 /** Why a queued item was passed over, for the run's log. */
@@ -88,8 +150,8 @@ export interface QueueSkip {
 export async function takeFromRunQueue<T>(
   henchDir: string,
   tryItem: (taskId: string) => Promise<T>,
-  options: { dryRun?: boolean; final?: (taskId: string, err: unknown) => boolean; skip?: ReadonlySet<string> } = {},
-): Promise<{ picked: { taskId: string; value: T } | null; skipped: QueueSkip[] }> {
+  options: { dryRun?: boolean; final?: (taskId: string, err: unknown) => boolean; skip?: ReadonlySet<string>; lockWaitMs?: number } = {},
+): Promise<{ picked: { taskId: string; value: T } | null; skipped: QueueSkip[]; removalError?: string }> {
   const items = await readRunQueue(henchDir);
   const skipped: QueueSkip[] = [];
   let picked: { taskId: string; value: T } | null = null;
@@ -106,9 +168,16 @@ export async function takeFromRunQueue<T>(
       skipped.push({ taskId, reason: err instanceof Error ? err.message : String(err), dropped });
     }
   }
+  let removalError: string | undefined;
   if (!options.dryRun) {
     const done = [...skipped.filter((s) => s.dropped).map((s) => s.taskId), ...(picked ? [picked.taskId] : [])];
-    await removeFromRunQueue(henchDir, done);
+    try {
+      await removeFromRunQueue(henchDir, done, options.lockWaitMs === undefined ? {} : { waitMs: options.lockWaitMs });
+    } catch (err) {
+      // The queue only steers selection: a lock held too long must not fail the run.
+      // What was not taken off is dropped later, once it reads as finished.
+      removalError = err instanceof Error ? err.message : String(err);
+    }
   }
-  return { picked, skipped };
+  return { picked, skipped, ...(removalError ? { removalError } : {}) };
 }

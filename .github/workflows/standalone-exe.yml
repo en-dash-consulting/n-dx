@@ -7,7 +7,10 @@
 #
 # Triggers:
 #  - workflow_dispatch: build every target; with `release-tag` (for example
-#    `@n-dx/core@0.10.5`), also attach the archives to that GitHub release.
+#    `@n-dx/core@0.10.5`), build that tag rather than the dispatch ref, check
+#    the packaged @n-dx/core version is the tag's, and attach the archives to
+#    that GitHub release. Without it, the dispatch ref is built and nothing is
+#    attached.
 #    Run by hand after a release: changesets/action creates releases with
 #    GITHUB_TOKEN, and events from that token start no other workflow.
 #  - pull_request touching the build: catch a broken build before merge.
@@ -52,8 +55,13 @@ jobs:
           - { target: win-arm64, runner: windows-11-arm }
 
     steps:
+      # A release build is the release's own commit, whatever the dispatch ref
+      # has moved on to; an empty ref is checkout's default (the dispatch ref,
+      # or a pull request's merge ref).
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release-tag || '' }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -92,6 +100,16 @@ jobs:
           "$exe" which | grep -q "standalone executable"
           "$exe" rex --help > /dev/null
           "$exe" sv --help > /dev/null
+
+      - name: Check the release tag names this version
+        if: github.event_name == 'workflow_dispatch' && inputs.release-tag != ''
+        shell: bash
+        env:
+          TAG: ${{ inputs.release-tag }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./packages/core/package.json').version")
+          [ "${TAG##*@}" = "$version" ] || { echo "Release tag '$TAG' is not @n-dx/core $version"; exit 1; }
 
       - name: Archive
         shell: bash
@@ -138,5 +156,10 @@ jobs:
         run: |
           set -euo pipefail
           cd archives
+          # Every archive is named for the version it packs: refuse to attach another version's.
+          version="${TAG##*@}"
+          for f in ndx-*; do
+            case "$f" in "ndx-${version}-"*) ;; *) echo "$f is not version $version"; exit 1 ;; esac
+          done
           sha256sum ndx-* > SHA256SUMS.txt
           gh release upload "$TAG" ndx-* SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
