@@ -10,6 +10,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { InboxTriagePage, isTypingTarget, shortcutFor } from "../../../src/viewer/views/inbox-triage.js";
 import { renderActiveView } from "../../../src/viewer/views/view-registry.js";
+import { requestInboxSelection } from "../../../src/viewer/views/inbox.js";
 import { takeTitleFocus } from "../../../src/viewer/components/prd-tree/change-placement.js";
 import { PlaceWithSidecarContext } from "../../../src/viewer/components/place-with-sidecar.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -202,6 +203,20 @@ describe("the Inbox page", () => {
     expect($$(".inbox-detail .cp-target").map((el) => el.dataset.target)).toEqual(["cap-c1", "cap-c2"]);
     expect(counts()).toBe(" · 3 to place · 0 placed this visit");
     expect($(".inbox-keys")?.textContent).toContain("place & next");
+  });
+
+  it("opens on the change a Plan row's Place asked for, rather than the first", async () => {
+    serveThree();
+    requestInboxSelection("b");
+    await mountPage();
+    expect(selectedId()).toBe("b");
+    expect($(".inbox-detail-title")?.textContent).toBe("Change b");
+  });
+
+  it("offers Place best guesses above the queue", async () => {
+    serveThree();
+    await mountPage();
+    expect($(".inbox-best-open")?.textContent).toMatch(/^Place best guesses \(\d+\)$/);
   });
 
   it("selects a change by clicking it, and the breadcrumb returns to Plan", async () => {
