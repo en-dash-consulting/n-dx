@@ -111,10 +111,8 @@ export interface StageSidePanel {
   id: string;
   /** The tab's text. */
   label: string;
-  /** The panel's heading. */
+  /** The panel's heading. A page may word it its own way (`StagePage`'s `sidePanelTitle`). */
   title: string;
-  /** Its heading while Plan is in Solo mode ("Your inbox"), when that differs. */
-  soloTitle?: string;
   /** One line under the heading: what the panel is for. */
   blurb: string;
   /** Where the panel's "Open" goes; also what is rendered when `panel` is unset. */
@@ -383,7 +381,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { id: "new-change", label: "New change", title: "Add to the plan", blurb: "Describe it, and n-dx suggests where it goes.", view: "analysis", panel: "capture", requiresServer: true },
       // The Analysis page's recommended fixes; "Open" goes to its Suggestions.
       { id: "from-analysis", label: "From analysis", title: "From analysis", blurb: "Findings from the last run, ready to plan.", view: "suggestions", panel: "recommendations" },
-      { id: "inbox", label: "Inbox", title: "Inbox", soloTitle: "Your inbox", blurb: "Waiting to be placed on the map.", view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true },
+      { id: "inbox", label: "Inbox", title: "Inbox", blurb: "Waiting to be placed on the map.", view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true },
       // Create's tiles the new layout does not place yet, kept rather than removed.
       { id: "open-changes", label: "Open changes", title: "Open changes", blurb: "Placed open changes by stage, with their gaps.", view: "changes", panel: "changes-glance", v2Only: true, requiresServer: true, transitional: true },
       { id: "plan-health", label: "Plan health", title: "Plan health", blurb: "The last validation of the PRD, as lights.", view: "validation", panel: "plan-health", transitional: true },

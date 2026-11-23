@@ -21,7 +21,6 @@ import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { PLAN_DRAG_EVENT } from "./plan-placement.js";
-import { usePlanView } from "./plan-view-state.js";
 import type { NavigateTo } from "../types.js";
 import { ActionIcon, useEscapeKey, useProjectStatus } from "../components/index.js";
 import { LiveBadge } from "./stage-badge.js";
@@ -48,15 +47,23 @@ export interface StageSidePanelsProps {
   onToggle: (id: string | null) => void;
   renderPanel: RenderSidePanel;
   navigateTo: NavigateTo;
+  /**
+   * The open panel's heading, when the page words it differently from the
+   * config (Plan's Inbox is "Your inbox" in Solo). Absent: `panel.title`.
+   * The page supplies it, so this component reads no page's state.
+   */
+  titleOf?: SidePanelTitle;
 }
 
-export function StageSidePanels({ stage, panels, openId, onToggle, renderPanel, navigateTo }: StageSidePanelsProps) {
+/** A page's heading for one of its side panels. */
+export type SidePanelTitle = (panel: StageSidePanel) => string;
+
+export function StageSidePanels({ stage, panels, openId, onToggle, renderPanel, navigateTo, titleOf }: StageSidePanelsProps) {
   const status = useProjectStatus();
   const layout = status ? (status.rex?.exists === false ? "none" : status.rex?.layout ?? "v2") : null;
   const shown = sidePanelsForLayout(panels, layout);
   const found = shown.find((p) => p.id === openId) ?? null;
-  const solo = usePlanView().mode === "solo";
-  const open = found && solo && found.soloTitle ? { ...found, title: found.soloTitle } : found;
+  const open = found && titleOf ? { ...found, title: titleOf(found) } : found;
   const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   /** The control that opened the panel, focused again when it closes. */

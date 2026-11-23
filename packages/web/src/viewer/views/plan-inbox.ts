@@ -19,8 +19,17 @@ import { InboxPage } from "./inbox.js";
 import type { InboxRow } from "./inbox-read.js";
 import { ScopeToggle, ShowAll, flowStageLabel } from "./plan-controls.js";
 import { placeTouches } from "./plan-placement.js";
-import { usePlanView } from "./plan-view-state.js";
+import { usePlanView, type PlanMode } from "./plan-view-state.js";
 import type { PlacementCandidate } from "./product-model.js";
+import type { StageSidePanel } from "./stages.js";
+
+/**
+ * Plan's heading for one of its side panels: the Inbox is "Your inbox" in Solo,
+ * where all the work is yours; every other heading is the panel's own.
+ */
+export function planSidePanelTitle(panel: StageSidePanel, mode: PlanMode): string {
+  return panel.id === "inbox" && mode === "solo" ? "Your inbox" : panel.title;
+}
 
 /** The hint over the list, in the design's words for each mode. */
 export const PLAN_INBOX_HINT = {

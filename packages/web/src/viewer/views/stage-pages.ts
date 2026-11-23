@@ -38,7 +38,7 @@ import { useFeatureToggle, useCliName, useStatusLayout, resolveCliLabel } from "
 import { isDeployedMode } from "../deployed-mode.js";
 import { BADGES, CountPill } from "./stage-badge.js";
 import { TileGrid, tileKey, titleVariesByLayout, type TileGridProps, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
-import { StageSidePanels, type RenderSidePanel } from "./stage-side-panels.js";
+import { StageSidePanels, type RenderSidePanel, type SidePanelTitle } from "./stage-side-panels.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -195,6 +195,8 @@ export interface StagePageProps {
   headActions?: ComponentChild;
   /** The stage's side panels (`StageDef.sidePanels`); none are drawn without it. */
   renderSidePanel?: RenderSidePanel;
+  /** A side panel's heading when the page words it its own way; absent, the config's title. */
+  sidePanelTitle?: SidePanelTitle;
 }
 
 const NO_PANEL: RenderPanel = () => null;
@@ -264,7 +266,7 @@ function ModeToggle({ stage, modes, active, onPick }: {
   );
 }
 
-export function StagePage({ stage, view, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null, renderSidePanel }: StagePageProps) {
+export function StagePage({ stage, view, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null, renderSidePanel, sidePanelTitle }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
   const cliName = useCliName();
@@ -375,7 +377,7 @@ export function StagePage({ stage, view, validViews, navigateTo, renderView, ren
   return renderSidePanel && sidePanels.length > 0
     ? h("div", { class: `stage-page stage-page-${product} stage-page--side`, "data-stage": stage },
         h("div", { class: "stage-page-main" }, page),
-        h(StageSidePanels, { stage, panels: sidePanels, openId: openSide, onToggle: setOpenSide, renderPanel: renderSidePanel, navigateTo }),
+        h(StageSidePanels, { stage, panels: sidePanels, openId: openSide, onToggle: setOpenSide, renderPanel: renderSidePanel, navigateTo, titleOf: sidePanelTitle }),
       )
     : h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage }, page);
 }

@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import type { VNode } from "preact";
 import { act } from "preact/test-utils";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,7 +16,8 @@ import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summar
 import { InboxView, PLAN_INBOX_EMPTY, planInLabels } from "../../../src/viewer/views/inbox.js";
 import { FLOW_STAGES } from "../../../src/viewer/views/plan-controls.js";
 import { PlanFlow } from "../../../src/viewer/views/plan-flow.js";
-import { PLAN_INBOX_HINT, PlanInbox } from "../../../src/viewer/views/plan-inbox.js";
+import { PLAN_INBOX_HINT, PlanInbox, planSidePanelTitle } from "../../../src/viewer/views/plan-inbox.js";
+import { PlanStagePage, renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import type { InboxRow } from "../../../src/viewer/views/inbox-read.js";
 import { PLAN_DRAG_EVENT, candidateInArea, endPlanDrag, startPlanDrag } from "../../../src/viewer/views/plan-placement.js";
 import { PlanHeadControls, TOUR_STEPS, cardPosition } from "../../../src/viewer/views/plan-tour.js";
@@ -248,12 +250,31 @@ describe("the Inbox panel follows How work moves", () => {
     expect(root.querySelector(".inbox-filtered-empty p")?.textContent).toBe(PLAN_INBOX_EMPTY);
   });
 
-  it("is titled Your inbox in Solo", () => {
-    const panels: StageSidePanel[] = [{ id: "inbox", label: "Inbox", title: "Inbox", soloTitle: "Your inbox", blurb: "b", view: "inbox" }];
-    act(() => { render(h(StageSidePanels, { stage: "plan", panels, openId: "inbox", onToggle: vi.fn(), renderPanel: () => null, navigateTo: vi.fn() }), root); });
-    expect(root.querySelector(".stage-side-title")?.textContent).toBe("Inbox");
+  it("is titled Your inbox in Solo, by Plan's own rule", () => {
+    const inbox: StageSidePanel = { id: "inbox", label: "Inbox", title: "Inbox", blurb: "b", view: "inbox" };
+    const other: StageSidePanel = { id: "from-analysis", label: "From analysis", title: "From analysis", blurb: "b", view: "suggestions" };
+    expect(planSidePanelTitle(inbox, "team")).toBe("Inbox");
+    expect(planSidePanelTitle(inbox, "solo")).toBe("Your inbox");
+    expect(planSidePanelTitle(other, "solo")).toBe("From analysis");
+  });
+
+  it("the shared side panels take their heading from the page, and read no Plan state themselves", () => {
+    const panels: StageSidePanel[] = [{ id: "inbox", label: "Inbox", title: "Inbox", blurb: "b", view: "inbox" }];
+    const props = { stage: "plan" as const, panels, openId: "inbox", onToggle: vi.fn(), renderPanel: () => null, navigateTo: vi.fn() };
     act(() => { setPlanView({ mode: "solo" }); });
+    // Without a page's titleOf, Solo changes nothing: the component does not look at Plan's mode.
+    act(() => { render(h(StageSidePanels, props), root); });
+    expect(root.querySelector(".stage-side-title")?.textContent).toBe("Inbox");
+    act(() => { render(h(StageSidePanels, { ...props, titleOf: (p: StageSidePanel) => planSidePanelTitle(p, "solo") }), root); });
     expect(root.querySelector(".stage-side-title")?.textContent).toBe("Your inbox");
+    const source = readFileSync(resolve(__dirname, "../../../src/viewer/views/stage-side-panels.ts"), "utf-8");
+    expect(source).not.toMatch(/plan-view-state/);
+  });
+
+  it("Plan's page is the one that supplies the heading", () => {
+    const ctx = { navigateTo: vi.fn(), validViews: new Set(["plan"]) } as unknown as ViewRenderContext;
+    const provider = renderActiveView("plan", ctx) as VNode;
+    expect((provider.props as { children: VNode }).children.type).toBe(PlanStagePage);
   });
 });
 

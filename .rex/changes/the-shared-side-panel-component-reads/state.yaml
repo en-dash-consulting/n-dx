@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "36d64119-c7ef-44e1-9b23-5b1d0a9147d1":
+    status: "completed"
+    startedAt: "2026-11-23T21:03:37.092Z"
+    completedAt: "2026-11-23T21:03:37.092Z"
+    endedAt: "2026-11-23T21:03:37.092Z"
+    activeIntervals: [{"end":"2026-11-23T21:03:37.092Z","start":"2026-11-23T21:03:37.092Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "StageSidePanels/StagePage take titleOf/sidePanelTitle; PlanStagePage supplies planSidePanelTitle from plan-view-state; soloTitle removed from StageSidePanel; tests incl. a source check that stage-side-panels reads no Plan state."
+    appliedAt: "2026-11-23T21:03:37.092Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-23T20:59:34.746Z"
+    lastModified: "2026-11-23T21:03:37.092Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

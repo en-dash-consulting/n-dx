@@ -61,7 +61,7 @@ import {
 import { WorkspacesView } from "./domain-workspaces.js";
 import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
-import { HomeView, StagePage } from "./stage-pages.js";
+import { HomeView, StagePage, type StagePageProps } from "./stage-pages.js";
 import { RunningNow, UpNext } from "./work-now.js";
 import { RunQueuePanel } from "./run-queue.js";
 import { AgentSettingsPanel } from "./agent-settings.js";
@@ -78,7 +78,8 @@ import { SpendSummary } from "./spend-summary.js";
 import { PlanGlance } from "./plan-glance.js";
 import { PlanAreas } from "./plan-areas.js";
 import { PlanFlow } from "./plan-flow.js";
-import { PlanInbox } from "./plan-inbox.js";
+import { PlanInbox, planSidePanelTitle } from "./plan-inbox.js";
+import { usePlanView } from "./plan-view-state.js";
 import { PlanHeadControls } from "./plan-tour.js";
 import { PrdTools, WorkStats } from "./work-stats.js";
 import { SettingsDisclosure } from "./settings-disclosure.js";
@@ -176,8 +177,17 @@ function workTileSummary(tile: StageTile): ComponentChild | null {
  * `route` is the view that opened it when that is one of the stage's modes
  * (`tune` opens Work on Tune).
  */
+/**
+ * Plan's stage page: its side-panel headings follow Solo / Team (the Inbox is
+ * "Your inbox" in Solo), so the shared side-panel component reads no Plan state.
+ */
+export function PlanStagePage(props: StagePageProps) {
+  const mode = usePlanView().mode;
+  return h(StagePage, { ...props, sidePanelTitle: (panel) => planSidePanelTitle(panel, mode) });
+}
+
 function stage(id: StageId, route: ViewId = id): ViewRenderer {
-  const page: ViewRenderer = (ctx) => h(StagePage, {
+  const page: ViewRenderer = (ctx) => h(id === "plan" ? PlanStagePage : StagePage, {
     stage: id,
     view: route,
     validViews: validViewsOf(ctx),
