@@ -2808,7 +2808,11 @@ var DATA_FILES = {
   sdlcProfile: "sdlc-profile.json",
   readiness: "readiness.json",
   infrastructure: "infrastructure.json",
-  outbound: "outbound.json"
+  outbound: "outbound.json",
+  /** Written only when a language pack produced config reads or flag checks. */
+  config: "config.json",
+  /** Written only when a language pack produced version floors or legacy-construct uses. */
+  legacy: "legacy.json"
 };
 var ALL_DATA_FILES = Object.values(DATA_FILES);
 
@@ -2879,6 +2883,7 @@ function findIaCFiles(root, limit = 400) {
         walk(full, depth + 1);
         continue;
       }
+      if (!entry.isFile()) continue;
       const ext = extname2(entry.name);
       const path = relative2(root, full).split(sep2).join("/");
       if (ext === ".tf" && terraform.length < limit) terraform.push(path);

@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "0971b4cc-4ea7-4af9-99ec-c4e14d1b90db":
+    status: "completed"
+    startedAt: "2026-11-16T16:31:34.879Z"
+    completedAt: "2026-11-16T16:45:02.372Z"
+    endedAt: "2026-11-16T16:45:02.372Z"
+    activeIntervals: [{"end":"2026-11-16T16:45:02.372Z","start":"2026-11-16T16:31:34.879Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New lang-kit EntryPointFact kind (entryPoints); lang-php php-entry framework (shebang, cli checks under bin/cli/cron/scripts/jobs, crontab jobs with schedule); sourcevision marks them entrypoint in classifications.json with pack evidence."
+    lastModified: "2026-11-16T16:45:02.372Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "238cd947-069f-4b9f-980c-9c800c2cafae":
+    status: "completed"
+    startedAt: "2026-11-16T16:45:02.372Z"
+    completedAt: "2026-11-16T16:45:02.372Z"
+    endedAt: "2026-11-16T16:45:02.372Z"
+    activeIntervals: [{"end":"2026-11-16T16:45:02.372Z","start":"2026-11-16T16:45:02.372Z"}]
+    appliedAt: "2026-11-16T16:45:02.372Z"
+    appliedAmendsHash: "1a37104ed2cb2d86f5e6d2e895dea7ac8c200b5291aa32860a13741ddf384cb8"
+    createdAt: "2026-11-14T05:17:57.140Z"
+    lastModified: "2026-11-16T16:45:02.372Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3a05f5ae-c70a-4380-af5d-2f0ff142d000":
+    status: "completed"
+    startedAt: "2026-11-16T16:15:55.132Z"
+    completedAt: "2026-11-16T16:30:36.590Z"
+    endedAt: "2026-11-16T16:30:36.590Z"
+    activeIntervals: [{"end":"2026-11-16T16:30:36.590Z","start":"2026-11-16T16:15:55.132Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-php php-docroot framework: docroot pages + .htaccess front controllers as routes (source field), denials excluded; serverRoutes via pack facts"
+    lastModified: "2026-11-16T16:30:36.590Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

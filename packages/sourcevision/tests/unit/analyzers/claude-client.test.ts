@@ -35,6 +35,10 @@ import {
   resolveLightModel,
   DEFAULT_MODEL,
   DEFAULT_CODEX_MODEL,
+  ClaudeClientError,
+  getJudgmentRoute,
+  isStaticOnly,
+  setStaticOnly,
 } from "../../../src/analyzers/claude-client.js";
 
 beforeEach(() => {
@@ -222,5 +226,36 @@ describe("getJudgmentRoute", () => {
       vi.unstubAllEnvs();
       rmSync(home, { recursive: true, force: true });
     }
+  });
+});
+
+describe("static-only mode (sv analyze --fast)", () => {
+  it("resolves no judgment route even with a TypeSafe key, and restores it when turned off", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
+    try {
+      setLLMConfig({ vendor: "claude", routes: { "zone.judge": "typesafe" } });
+      setStaticOnly(true);
+      expect(isStaticOnly()).toBe(true);
+      expect(getJudgmentRoute("code.classify")).toBeUndefined();
+      expect(getJudgmentRoute("zone.judge")).toBeUndefined();
+      expect(getJudgmentRoute("finding.judge")).toBeUndefined();
+      setStaticOnly(false);
+      expect(getJudgmentRoute("code.classify")).toBe("typesafe");
+    } finally {
+      setStaticOnly(false);
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("refuses a text-model call without reaching the client", async () => {
+    try {
+      setStaticOnly(true);
+      await expect(callClaude("hello", undefined, { taskClass: "zone.enrich" })).rejects.toBeInstanceOf(ClaudeClientError);
+      expect(mockComplete).not.toHaveBeenCalled();
+    } finally {
+      setStaticOnly(false);
+    }
+    await callClaude("hello");
+    expect(mockComplete).toHaveBeenCalledTimes(1);
   });
 });

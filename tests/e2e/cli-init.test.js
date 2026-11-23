@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { tmpdir, homedir } from "node:os";
 import { DEFAULT_TIMEOUT, withSandboxedClaudeConfig } from "./e2e-helpers.js";
 
@@ -531,6 +532,117 @@ describe("n-dx init provider selection", () => {
         await removeDirs(binDir, projectDir);
       }
     });
+  });
+});
+
+describe("ndx init --no-llm", () => {
+  const FETCH_RECORDER = pathToFileURL(join(import.meta.dirname, "../fixtures/no-network/fetch-recorder.mjs")).href;
+
+  /**
+   * One `--no-llm` init from inside the project, as a batch wrapper runs it.
+   * Fake `claude` and `codex` record any spawn; every node process records any
+   * fetch; a fresh TMPDIR leaves the update check no cache to answer from.
+   */
+  async function initNoLlm(prefix, extraArgs) {
+    const projectDir = await mkdtemp(join(tmpdir(), `${prefix}-`));
+    const binDir = await mkdtemp(join(tmpdir(), `${prefix}-bin-`));
+    const tmp = await mkdtemp(join(tmpdir(), `${prefix}-tmp-`));
+    const fakes = [join(binDir, "claude"), join(binDir, "codex")];
+    await writeFakeBinary(fakes[0], { stdout: '{"result":"ok"}', captureArgs: true });
+    await writeFakeBinary(fakes[1], { stdout: "ok", captureArgs: true });
+    const fetchLog = join(tmp, "fetch.log");
+    const { CLAUDE_CLI_PATH: _omit, ...base } = pathEnvWith(binDir);
+    const result = runCapture(["init", "--no-llm", ...extraArgs, "."], {
+      cwd: projectDir,
+      env: {
+        ...base,
+        TMPDIR: tmp,
+        TEMP: tmp,
+        TMP: tmp,
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import=${FETCH_RECORDER}`].filter(Boolean).join(" "),
+        NDX_TEST_FETCH_LOG: fetchLog,
+      },
+    });
+    return {
+      result,
+      projectDir,
+      spawned: fakes.filter((bin) => existsSync(fakeBinaryArgsPath(bin))),
+      fetched: existsSync(fetchLog) ? readFileSync(fetchLog, "utf-8").trim().split("\n") : [],
+      cleanup: () => removeDirs(projectDir, binDir, tmp),
+    };
+  }
+
+  /** The `llm.vendor` init recorded, or undefined when it wrote none. */
+  function recordedVendor(projectDir) {
+    const path = projectConfigPath(projectDir);
+    return existsSync(path) ? JSON.parse(readFileSync(path, "utf-8")).llm?.vendor : undefined;
+  }
+
+  describe("with a provider and local-scope MCP registration", () => {
+    let init;
+    beforeAll(async () => {
+      init = await initNoLlm("ndx-init-nollm-claude", ["--provider=claude", "--mcp-scope=local"]);
+    });
+    afterAll(async () => {
+      await init.cleanup();
+    });
+
+    it("succeeds", () => {
+      expect(init.result.status, init.result.stderr).toBe(0);
+    });
+
+    it("spawns no vendor CLI", () => {
+      expect(init.spawned).toEqual([]);
+    });
+
+    it("makes no network request", () => {
+      expect(init.fetched).toEqual([]);
+    });
+
+    it("writes no claude_commands.log", () => {
+      expect(existsSync(join(init.projectDir, "claude_commands.log"))).toBe(false);
+    });
+
+    it("still records the chosen vendor", () => {
+      expect(recordedVendor(init.projectDir)).toBe("claude");
+    });
+
+    it("says what it skipped, once, and that model features were not checked", () => {
+      const out = init.result.stdout + init.result.stderr;
+      expect(out.match(/--no-llm: skipped/g)).toHaveLength(1);
+      expect(init.result.stdout).toMatch(/Model features\s+not checked \(--no-llm\)/);
+    });
+  });
+
+  describe("with no provider, non-interactive", () => {
+    let init;
+    beforeAll(async () => {
+      init = await initNoLlm("ndx-init-nollm-bare", []);
+    });
+    afterAll(async () => {
+      await init.cleanup();
+    });
+
+    it("initializes instead of asking for a provider", () => {
+      expect(init.result.status, init.result.stderr).toBe(0);
+      expect(init.result.stdout).toContain("n-dx initialized");
+    });
+
+    it("spawns no vendor CLI and makes no network request", () => {
+      expect(init.spawned).toEqual([]);
+      expect(init.fetched).toEqual([]);
+      expect(existsSync(join(init.projectDir, "claude_commands.log"))).toBe(false);
+    });
+
+    it("leaves the vendor unset and says model features were not checked", () => {
+      expect(recordedVendor(init.projectDir)).toBeUndefined();
+      expect(init.result.stdout).toMatch(/Model features\s+not checked \(--no-llm\)/);
+    });
+  });
+
+  it("is documented in ndx init --help", () => {
+    const out = run(["init", "--help"]);
+    expect(out).toContain("--no-llm");
   });
 });
 

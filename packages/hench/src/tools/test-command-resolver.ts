@@ -14,6 +14,7 @@ import { access, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveLayout } from "../prd/llm-gateway.js";
 import { applyGateTemplate } from "./test-gate-template.js";
+import { detectPhpunitCommand } from "./php-guards.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,7 +120,8 @@ async function hasXcodeProjectMarker(projectDir: string): Promise<boolean> {
  * 4. `Package.swift` or `.xcodeproj/.xcworkspace` → swift test.
  * 5. `Cargo.toml` → cargo test.
  * 6. `go.mod` → go test ./....
- * 7. `pyproject.toml` or `requirements.txt` → pytest.
+ * 7. `phpunit.xml` / `phpunit.xml.dist` with `vendor/bin/phpunit` → vendor/bin/phpunit.
+ * 8. `pyproject.toml` or `requirements.txt` → pytest.
  *
  * Returns undefined when no signal matches; the resolver then prompts or
  * surfaces a clear "configure a test command" error.
@@ -168,7 +170,11 @@ async function autoDetectTestCommand(projectDir: string): Promise<string | undef
   // 6. Go.
   if (await fileExists(join(projectDir, "go.mod"))) return "go test ./...";
 
-  // 7. Python (pyproject or requirements).
+  // 7. PHP: the project's own PHPUnit, only with a config and the installed binary.
+  const phpunit = await detectPhpunitCommand(projectDir);
+  if (phpunit) return phpunit;
+
+  // 8. Python (pyproject or requirements).
   if (
     (await fileExists(join(projectDir, "pyproject.toml"))) ||
     (await fileExists(join(projectDir, "requirements.txt")))

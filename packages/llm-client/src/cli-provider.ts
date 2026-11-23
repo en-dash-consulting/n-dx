@@ -292,8 +292,9 @@ function extractStdoutError(stdout: string, format: "json" | "stream-json"): str
 /**
  * Parse --output-format json output.
  *
- * Handles both shapes the Claude Code CLI has emitted in this mode:
+ * Handles the shapes the Claude Code CLI has emitted in this mode:
  *   - Legacy single envelope: `{ result: "...", input_tokens, ... }`
+ *   - Single result object: `{ type: "result", result: "...", usage: { input_tokens, ... } }`
  *   - Newer JSON array of stream events:
  *     `[{type:"system",...}, {type:"assistant",...}, {type:"result", result:"...", usage:{...}}]`
  *
@@ -321,9 +322,12 @@ function parseJsonOutput(stdout: string): CompletionResult {
       return { text: stdout };
     }
 
+    // A single object: the legacy envelope with top-level token counts, or
+    // the current CLI's result object, whose counts are nested under `usage`
+    // (reading only the top level recorded every such call as 0 tokens).
     const envelope = parsed as Record<string, unknown>;
     const text = typeof envelope.result === "string" ? envelope.result : stdout;
-    const tokenUsage = parseCliTokenUsage(envelope);
+    const tokenUsage = parseCliTokenUsage(envelope) ?? parseStreamTokenUsage(envelope);
     return { text, tokenUsage };
   } catch {
     return { text: stdout };

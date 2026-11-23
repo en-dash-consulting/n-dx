@@ -1,0 +1,4 @@
+{
+    "name": "other/app",
+    "autoload": { "psr-4": { "Brumann\\Polyfill\\": "src/" } }
+}

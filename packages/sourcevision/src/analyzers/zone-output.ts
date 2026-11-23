@@ -13,6 +13,7 @@ import type {
   ZoneSummary,
 } from "../schema/index.js";
 import { toCanonicalJSON } from "../util/sort.js";
+import { redactLiterals } from "../util/redact-literals.js";
 
 /** Generate context.md content for a single zone. */
 export function generateZoneContext(
@@ -192,7 +193,7 @@ export function generateZoneContext(
     lines.push("");
   }
 
-  return lines.join("\n");
+  return redactLiterals(lines.join("\n"));
 }
 
 /** Build summary.json for a single zone. */

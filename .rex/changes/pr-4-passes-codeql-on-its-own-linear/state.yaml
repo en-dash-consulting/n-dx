@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "ca56d11e-15bc-4a41-9305-ec8c540d0f2f":
+    status: "completed"
+    startedAt: "2026-11-19T03:33:02.618Z"
+    completedAt: "2026-11-19T03:33:02.618Z"
+    endedAt: "2026-11-19T03:33:02.618Z"
+    activeIntervals: [{"end":"2026-11-19T03:33:02.618Z","start":"2026-11-19T03:33:02.618Z"}]
+    appliedAt: "2026-11-19T03:33:02.618Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-19T03:21:23.191Z"
+    lastModified: "2026-11-19T03:33:02.618Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f6c4b312-9c16-4a69-8339-caa40512a98d":
+    status: "completed"
+    startedAt: "2026-11-19T03:29:50.004Z"
+    completedAt: "2026-11-19T03:33:02.618Z"
+    endedAt: "2026-11-19T03:33:02.618Z"
+    activeIntervals: [{"end":"2026-11-19T03:33:02.618Z","start":"2026-11-19T03:29:50.004Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ported php-line-cap.ts, the php-includes.ts linear include_path scans and trimTrailing dirname, the include-config test hunk, and the parsePhpIncludeConfig block of php-linear-scans.test.ts from 87292366a/58add3923."
+    lastModified: "2026-11-19T03:33:02.618Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

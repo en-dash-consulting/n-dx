@@ -1,0 +1,3 @@
+<form method="post" action="contact.phtml">
+<?php if (isset($_POST['email'])) { mail('info@example.com', 'Contact', $_POST['email']); } ?>
+</form>

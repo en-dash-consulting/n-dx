@@ -133,6 +133,8 @@ export function findDeclaredContracts(
         walk(full, depth + 1);
         continue;
       }
+      // Regular files only, as the inventory: a symlink may point outside the project.
+      if (!entry.isFile()) continue;
       record(relative(targetDir, full).split(sep).join("/"));
     }
   };

@@ -22,7 +22,6 @@ import type { CarryOutResult } from "./carry-out.js";
 
 /** What a draft file is. */
 export const DRAFT_FILE_KINDS = ["prompt", "restack-plan", "release-checklist"] as const;
-export type DraftFileKind = (typeof DRAFT_FILE_KINDS)[number];
 
 /** A draft's content may be this long: it is a hand-off document, not a log. */
 export const DRAFT_FILE_MAX_CHARS = 100_000;

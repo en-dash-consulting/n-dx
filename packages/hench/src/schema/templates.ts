@@ -239,6 +239,22 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     },
     builtIn: true,
   },
+  {
+    id: "php-project",
+    name: "PHP Project",
+    description: "Tuned for PHP codebases: php -l on changed files, the project's PHPUnit and composer validate, vendor blocking",
+    useCases: [
+      "Composer projects with composer.json",
+      "Projects with a phpunit.xml or phpunit.xml.dist test suite",
+      "Legacy PHP applications",
+    ],
+    tags: ["php", "composer", "phpunit"],
+    config: {
+      language: "php",
+      guard: guardDefaultsForLanguage("php"),
+    },
+    builtIn: true,
+  },
 ];
 
 /** Look up a built-in template by ID. */
