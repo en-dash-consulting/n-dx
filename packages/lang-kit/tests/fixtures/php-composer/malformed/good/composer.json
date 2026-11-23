@@ -1,0 +1,5 @@
+{
+    "name": "fine/app",
+    "autoload": { "psr-4": 3, "classmap": ["src/", 7] },
+    "config": { "vendor-dir": false }
+}

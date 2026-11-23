@@ -1,0 +1,5 @@
+{
+    "name": "brumann/polyfill-unserialize",
+    "require": { "acme/c": "*" },
+    "autoload": { "psr-4": { "Brumann\\Polyfill\\": "src/" } }
+}

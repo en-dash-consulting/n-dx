@@ -1,0 +1,5 @@
+{
+    "name": "acme/x",
+    "require": { "acme/y": "*" },
+    "autoload": { "psr-4": { "X\\": "src/" } }
+}

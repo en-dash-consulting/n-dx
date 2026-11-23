@@ -255,6 +255,7 @@ describe("pack locations", () => {
       "ndx sv pack add go",
       "ndx sv pack add terraform",
       "ndx sv pack add python",
+      "ndx sv pack add php",
       "ndx sv pack add sql",
     ]);
   });

@@ -18,7 +18,6 @@ export type SyncedKind = (typeof SYNCED_KINDS)[number];
  * acceptanceCriteria, source). Add it here the day rex does.
  */
 export const SYNC_FIELDS = ["status", "priority", "title", "tags"] as const;
-export type SyncField = (typeof SYNC_FIELDS)[number];
 /** Our field that holds rex's version of a record: what a two-way sync agrees on. */
 export const VERSION_FIELD = "lastModified";
 

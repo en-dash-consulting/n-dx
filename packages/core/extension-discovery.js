@@ -48,9 +48,6 @@ import { resolveNdxHome } from "./layout.js";
 import { isPidAlive } from "./child-lifecycle.js";
 import { isObject, validateExtensionManifest } from "./extension-manifest.js";
 
-/** Sources in precedence order, highest first. */
-export const EXTENSION_SOURCES = Object.freeze(["project", "user", "global", "dev"]);
-
 /** The cache file, under the n-dx home. */
 export const EXTENSIONS_CACHE_FILE = "extensions.json";
 

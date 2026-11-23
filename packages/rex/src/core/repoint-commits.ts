@@ -32,10 +32,6 @@ import { assertFullHistory, git, itemIdFromTrailer, ITEM_TRAILER_KEY, resolveMai
 
 export type RepointRule = "on-main" | "author-date-subject" | "patch-id" | "trailer-subject" | "host-pull-request";
 
-export const REPOINT_RULES: readonly RepointRule[] = [
-  "on-main", "author-date-subject", "patch-id", "trailer-subject", "host-pull-request",
-];
-
 /**
  * A code host that knows which pull requests contained a commit. Optional:
  * inject one only to resolve what git alone cannot (squash merges of

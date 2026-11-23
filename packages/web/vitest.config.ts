@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 import { testMaxWorkers } from "../../tests/test-max-workers.mjs";
+import { coverageConfig } from "../../tests/vitest-coverage.mjs";
 
 const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
@@ -10,6 +11,10 @@ const claudeClientRoot = resolve(import.meta.dirname, "../claude-client");
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
 const packagesRoot = resolve(import.meta.dirname, "..");
 const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "1";
+
+// Coverage floors for `test:coverage`: what this suite reached, rounded down, less one point.
+// Raise them as coverage rises. See tests/vitest-coverage.mjs.
+const COVERAGE_FLOORS = { statements: 81, branches: 74, functions: 80, lines: 83 };
 
 export default defineConfig({
   resolve: {
@@ -35,6 +40,7 @@ export default defineConfig({
     ],
   },
   test: {
+    coverage: coverageConfig({ thresholds: COVERAGE_FLOORS }),
     // NDX_TEST_MAX_WORKERS caps workers for every project; unset keeps vitest's default.
     maxWorkers: testMaxWorkers(),
     // Console output is kept for failing tests and dropped for passing ones.

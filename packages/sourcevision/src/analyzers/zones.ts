@@ -86,6 +86,7 @@ export { deriveZoneId, deriveZoneIdFromFilenames, deriveZoneName, disambiguateZo
 import { getJudgmentRoute } from "./claude-client.js";
 import { recordPartitionReview, recordRerun, setRunMode } from "./run-ledger.js";
 import { computeAreas } from "./zone-areas.js";
+import { isOutsideStructure } from "./third-party.js";
 import { nameAreas } from "./area-naming.js";
 import { nameSubZones } from "./subzone-naming.js";
 import { addCallUsage, emptyAnalyzeTokenUsage } from "./token-usage.js";
@@ -1063,8 +1064,9 @@ export function computeInputFingerprint(
   zoneAnchors?: readonly ZoneAnchor[],
   algorithmVersion: number = ZONE_ALGORITHM_VERSION,
 ): string {
+  // A third-party or mirror mark changes the zoned set, so it is part of the input; unmarked files hash as before.
   const fileData = inventory.files
-    .map((f) => `${f.path}\0${f.hash}`)
+    .map((f) => `${f.path}\0${f.hash}${f.thirdParty === undefined ? "" : `\0tp=${f.thirdParty}`}${f.mirrorOf === undefined ? "" : `\0mirror=${f.mirrorOf}`}`)
     .sort()
     .join("\n");
   const pinData = Object.entries(zonePins ?? {})
@@ -2223,16 +2225,20 @@ function prepareScopeAndEdges(
   testFiles: Set<string>;
   subAnalyzedPrefixes: string[];
 } {
+  // Third-party and mirror-copy files are not part of the application's structure (third-party.ts).
+  const outside = new Set(fullInventory.files.filter(isOutsideStructure).map((f) => f.path));
   const inventory: Inventory = {
     ...fullInventory,
-    files: fullInventory.files.filter((f) => f.language !== "Terraform"),
+    files: fullInventory.files.filter((f) => f.language !== "Terraform" && !outside.has(f.path)),
   };
   const subAnalyzedPrefixes = getSubAnalyzedPrefixes(subAnalyses);
-  const filteredEdges = subAnalyzedPrefixes.length > 0
+  const filteredEdges = subAnalyzedPrefixes.length > 0 || outside.size > 0
     ? imports.edges.filter(
         (e) =>
           !isSubAnalyzedFile(e.from, subAnalyzedPrefixes) &&
-          !isSubAnalyzedFile(e.to, subAnalyzedPrefixes)
+          !isSubAnalyzedFile(e.to, subAnalyzedPrefixes) &&
+          !outside.has(e.from) &&
+          !outside.has(e.to)
       )
     : imports.edges;
 

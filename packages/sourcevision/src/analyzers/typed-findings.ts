@@ -45,6 +45,7 @@ import { askJev, noul } from "@n-dx/llm-client";
 import type { JevQuestion, JsonValue } from "@n-dx/llm-client";
 import { ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
 import { buildZoneEvidence } from "./enrich-judge.js";
+import { askSplittingWhenTooLarge, jevRequestByteCeiling, jsonBytes, logJevRequest, packBySize } from "./jev-split.js";
 import type { FindingEvidence } from "./enrich-judge.js";
 import { extractTopLevelDeclarations, isTestPath } from "./zone-symbols.js";
 import { addCallTokens } from "./token-usage.js";
@@ -355,6 +356,8 @@ export interface TypedFindingResult {
   uncertain: number;
   /** Probability per finding text, for the agreement rate against the heuristic Noul. */
   probabilities: Map<string, number>;
+  /** Trim level per finding text judged on trimmed evidence (a lone finding too large untrimmed). */
+  trimmedLevels: Map<string, number>;
 }
 
 /**
@@ -372,49 +375,54 @@ export async function judgeTypedFindings(
     demoted: 0,
     uncertain: 0,
     probabilities: new Map(),
+    trimmedLevels: new Map(),
   };
   if (typed.length === 0 || getJudgmentRoute("finding.judge") !== "typesafe") return result;
 
   const usage: TokenUsage = { input: 0, output: 0 };
   const out = [...result.findings];
 
-  for (let start = 0; start < typed.length; start += TYPED_PER_REQUEST) {
-    const slice = typed.slice(start, start + TYPED_PER_REQUEST);
+  // Each zone's evidence, built once per scope: it sizes the chunks and fills
+  // the requests. A scope that names no zone has none (undefined).
+  const zoneEvidence = new Map<string, JsonValue | undefined>();
+  const zoneOf = (scope: string): JsonValue | undefined => {
+    if (!zoneEvidence.has(scope)) zoneEvidence.set(scope, buildZoneEvidence([scope], evidence)[scope]);
+    return zoneEvidence.get(scope);
+  };
+
+  let judged = 0;
+  let trimmed = 0;
+  const askSlice = async (slice: TypedAsk[]): Promise<void> => {
     const fState: Record<string, JsonValue> = {};
     const questions: Record<string, JevQuestion> = {};
-    slice.forEach((t, i) => {
-      fState[`f${i}`] = {
-        kind: t.kind,
-        text: t.finding.text,
-        scope: t.finding.scope,
-        edges: t.edges.slice(0, EDGES_SHOWN).map((e) => `${e.from} → ${e.to}`),
-        anchors: (t.finding.anchors ?? []).map((a) => (a.symbol ? `${a.file}:${a.symbol}` : a.file)),
-      };
-      questions[`t${i}`] = noul(
-        `\`findings.f${i}\` was derived from the import edges in \`findings.f${i}.edges\`. ` +
-          `Given those edges and the zone they belong to, does it describe a real maintainability problem, ` +
-          `rather than an expected arrangement for this kind of module or an artifact of how zones were detected?`,
-      );
+    const zones: Record<string, JsonValue> = {};
+    slice.forEach(({ t, level }, i) => {
+      fState[`f${i}`] = typedFindingState(t, level);
+      questions[`t${i}`] = typedFindingQuestion(i);
+      const zone = zoneOf(t.finding.scope);
+      if (zone !== undefined && !(t.finding.scope in zones)) zones[t.finding.scope] = trimZoneEvidence(zone, level);
     });
-    const state: JsonValue = {
-      findings: fState,
-      zones: buildZoneEvidence(slice.map((t) => t.finding.scope), evidence),
-    };
+    const request = { state: { findings: fState, zones }, questions };
+    const bytes = jsonBytes(request);
     let response;
     try {
-      response = await askJev({ state, questions }, { taskClass: "finding.judge" });
+      response = await askJev(request, { taskClass: "finding.judge" });
     } catch (err) {
-      if (!(err instanceof ClaudeClientError)) throw err;
-      console.warn(`  [judge] typed-finding judgment failed (${err.reason}) — keeping derived severities: ${err.message.slice(0, 160)}`);
-      break;
+      logJevRequest("finding.judge", bytes, err);
+      throw err;
     }
+    logJevRequest("finding.judge", bytes);
     result.calls++;
     addCallTokens(usage, response.tokenUsage);
-    slice.forEach((t, i) => {
+    slice.forEach(({ t, index, level }, i) => {
       const a = response.answers[`t${i}`];
       if (a?.type !== "noul") return;
       const p = Math.round(a.noul * 100) / 100;
-      const index = start + i;
+      judged++;
+      if (level > 0) {
+        trimmed++;
+        result.trimmedLevels.set(t.finding.text, level);
+      }
       result.probabilities.set(t.finding.text, p);
       if (p <= TYPED_ARTIFACT_MAX_PROBABILITY) {
         out[index] = { ...t.finding, severity: "info", confidence: p };
@@ -424,19 +432,111 @@ export async function judgeTypedFindings(
         if (p < TYPED_REAL_MIN_PROBABILITY) result.uncertain++;
       }
     });
+  };
+
+  // Packed under the byte ceiling and the count cap. A refused-as-too-large
+  // request is asked again as halves, a lone refused finding on trimmed
+  // evidence; any other failure stops judgment and the findings left keep
+  // their derived severity.
+  const asks: TypedAsk[] = typed.map((t, index) => ({ t, index, level: 0 }));
+  const chunks = packBySize(
+    asks,
+    ({ t }) => jsonBytes(typedFindingState(t, 0)) + jsonBytes(typedFindingQuestion(0)),
+    jevRequestByteCeiling(),
+    {
+      maxCount: TYPED_PER_REQUEST,
+      shared: ({ t }) => {
+        const zone = zoneOf(t.finding.scope);
+        return zone === undefined ? [] : [[t.finding.scope, jsonBytes(zone)] as const];
+      },
+    },
+  );
+  let tooLarge = 0;
+  for (const chunk of chunks) {
+    try {
+      const alone = await askSplittingWhenTooLarge(chunk, askSlice, trimTypedAsk);
+      tooLarge += alone.length;
+    } catch (err) {
+      if (!(err instanceof ClaudeClientError)) throw err;
+      console.warn(`  [judge] typed-finding judgment failed (${err.reason}) — keeping derived severities: ${err.message.slice(0, 160)}`);
+      break;
+    }
+  }
+  if (tooLarge > 0) {
+    console.warn(`  [judge] ${tooLarge} typed finding(s) too large for one request — keeping derived severities`);
   }
 
   result.findings = out;
   result.tokenUsage = result.calls > 0 ? usage : undefined;
   if (result.calls > 0) {
-    const outside = typed.length - result.uncertain;
+    const outside = judged - result.uncertain;
+    const of = judged === typed.length ? "" : ` of ${typed.length}`;
     console.log(
-      `  [judge] typed findings: ${typed.length} judged in ${result.calls} request(s) — ` +
-        `${result.demoted} demoted to info, ${outside}/${typed.length} outside the uncertain band ` +
+      `  [judge] typed findings: ${judged}${of} judged in ${result.calls} request(s) — ` +
+        `${result.demoted} demoted to info, ${outside}/${judged} outside the uncertain band` +
+        `${trimmed > 0 ? `, ${trimmed} on trimmed evidence` : ""} ` +
         `(${usage.input} in / ${usage.output} out)`,
     );
   }
   return result;
+}
+
+/** One finding as asked, at the trim level its evidence is cut to. */
+interface TypedAsk {
+  t: TypedFinding;
+  /** Position in the input, where its answer lands. */
+  index: number;
+  /** 0 untrimmed; see {@link trimTypedAsk}. */
+  level: number;
+}
+
+/** Highest trim level; {@link trimTypedAsk} gives up past it. */
+const MAX_TRIM_LEVEL = 4;
+/** Zone files kept from trim level 3. */
+const TRIMMED_ZONE_FILES = 10;
+/** Edges kept from trim level 4. */
+const TRIMMED_EDGES = 4;
+
+/**
+ * A lone finding refused as too large, at the next trim level. Cumulative,
+ * cut from that request's evidence: 1 drops zone `headers`; 2 also
+ * `declarations` and `exportedSymbols`; 3 cuts zone `files` to
+ * {@link TRIMMED_ZONE_FILES}; 4 cuts the finding's edges to {@link TRIMMED_EDGES}.
+ * Deterministic, so the judgment cache keys on the same state every run.
+ */
+function trimTypedAsk(ask: TypedAsk, level: number): TypedAsk | undefined {
+  return level > MAX_TRIM_LEVEL ? undefined : { ...ask, level };
+}
+
+function typedFindingState(t: TypedFinding, level: number): JsonValue {
+  return {
+    kind: t.kind,
+    text: t.finding.text,
+    scope: t.finding.scope,
+    edges: t.edges.slice(0, level >= 4 ? TRIMMED_EDGES : EDGES_SHOWN).map((e) => `${e.from} → ${e.to}`),
+    anchors: (t.finding.anchors ?? []).map((a) => (a.symbol ? `${a.file}:${a.symbol}` : a.file)),
+  };
+}
+
+function typedFindingQuestion(i: number): JevQuestion {
+  return noul(
+    `\`findings.f${i}\` was derived from the import edges in \`findings.f${i}.edges\`. ` +
+      `Given those edges and the zone they belong to, does it describe a real maintainability problem, ` +
+      `rather than an expected arrangement for this kind of module or an artifact of how zones were detected?`,
+  );
+}
+
+/** A zone's evidence cut to `level` (see {@link trimTypedAsk}); level 0 is the entry itself. */
+function trimZoneEvidence(zone: JsonValue, level: number): JsonValue {
+  if (level === 0 || zone === null || typeof zone !== "object" || Array.isArray(zone)) return zone;
+  const out: Record<string, JsonValue> = { ...zone };
+  delete out.headers;
+  if (level >= 2) {
+    delete out.declarations;
+    delete out.exportedSymbols;
+  }
+  if (level >= 3 && Array.isArray(out.files)) out.files = out.files.slice(0, TRIMMED_ZONE_FILES);
+  return out;
 }
 
 // ── Band calibration ─────────────────────────────────────────────────────────

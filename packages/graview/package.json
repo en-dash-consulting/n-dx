@@ -33,6 +33,7 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "validate": "tsc --noEmit && vitest run",
     "prepare": "pnpm run build"
@@ -46,6 +47,7 @@
   "devDependencies": {
     "@graview/core": "0.1.67",
     "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.5",
     "typescript": "^6.0.3",
     "vitest": "^5.0.5"
   }

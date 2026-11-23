@@ -327,6 +327,44 @@ a comment near the top of the file. This annotation is machine-verified by
 `tests/e2e/architecture-policy.test.js` to prevent silent removal of required test
 coverage.
 
+## Code Coverage
+
+Every package with a vitest suite can measure which source lines its tests
+execute, and how many times each one ran:
+
+```sh
+pnpm test:coverage                          # every package suite, with coverage
+pnpm --filter @n-dx/rex test:coverage       # one package
+pnpm coverage:lines rex                     # per-file table, most missed lines first
+pnpm coverage:lines rex store/ --uncovered  # lines under src/store/ that never ran
+pnpm coverage:lines rex parser.ts           # each line of parser.ts with its hit count
+pnpm coverage:lines web --hot 20            # the 20 most-executed lines in web
+```
+
+Coverage is off in a plain `vitest run`; `--coverage` turns it on. The
+settings live in one helper, `tests/vitest-coverage.mjs`
+(`coverageConfig()`), which every package `vitest.config.ts` reads at the top
+of `test`. A run writes `packages/<pkg>/coverage/` (gitignored):
+
+| File | What it holds |
+|------|---------------|
+| `index.html` | Browsable report; each line shows its hit count (`12x`), missed lines are red |
+| `lcov.info` | `DA:<line>,<hits>` per executable line, for editor gutters and CI services |
+| `coverage-final.json` | Raw V8 counts per statement, function and branch (`scripts/coverage-lines.mjs` reads it) |
+| `coverage-summary.json` | Per-file and whole-package percentages |
+
+**Floors.** Each package config sets `COVERAGE_FLOORS`: the statement,
+branch, function and line percentages its suite reached when they were set,
+rounded down, less one point of slack for the tests Windows and Linux skip
+differently. A `test:coverage` run below any floor fails. Raise a floor when
+coverage rises past it; lower one only with the reason in the commit that does
+it. The floors apply only to a whole-package run, so `vitest run <file>` never
+trips them.
+
+**Root suites are not measured.** `tests/**` drives the built CLIs in child
+processes, which the runner's V8 coverage cannot see, so `pnpm test:coverage`
+runs only the package suites.
+
 ## Capping Test Workers
 
 `NDX_TEST_MAX_WORKERS` caps the workers every vitest suite in the repository

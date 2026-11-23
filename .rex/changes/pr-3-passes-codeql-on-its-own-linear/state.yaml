@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "2bf98899-1738-4fea-a5b0-f1fd120823f9":
+    status: "completed"
+    startedAt: "2026-11-19T03:17:40.405Z"
+    completedAt: "2026-11-19T03:20:21.013Z"
+    endedAt: "2026-11-19T03:20:21.013Z"
+    activeIntervals: [{"end":"2026-11-19T03:20:21.013Z","start":"2026-11-19T03:17:40.405Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ported text-trim helper, its test, index export, AGENTS.md guidance and the php-composer/python-build/php-resolver trims from 87292366a + 58add3923."
+    lastModified: "2026-11-19T03:20:21.013Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5ff5f41f-eb0f-4fcb-9758-a2f96d7c7827":
+    status: "completed"
+    startedAt: "2026-11-19T03:20:21.013Z"
+    completedAt: "2026-11-19T03:20:21.013Z"
+    endedAt: "2026-11-19T03:20:21.013Z"
+    activeIntervals: [{"end":"2026-11-19T03:20:21.013Z","start":"2026-11-19T03:20:21.013Z"}]
+    appliedAt: "2026-11-19T03:20:21.013Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-19T03:16:35.965Z"
+    lastModified: "2026-11-19T03:20:21.013Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
