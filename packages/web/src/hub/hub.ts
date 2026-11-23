@@ -627,6 +627,10 @@ export class Hub {
     }
     this.persist();
 
+    // A hub that has just started listens before attachAll() has finished
+    // spawning its registered projects; answering mid-spawn would report
+    // "starting" to a caller that is waiting for the server. Wait for it.
+    await sup.settled();
     if (sup.status().state === "stopped") {
       await sup.start();
       this.persist();
