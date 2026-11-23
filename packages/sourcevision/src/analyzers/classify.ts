@@ -23,6 +23,7 @@ import type {
   ClassificationsSummary,
   AnalyzeTokenUsage,
 } from "../schema/index.js";
+import { isOutsideStructure } from "./third-party.js";
 import { BUILTIN_ARCHETYPES } from "./archetypes.js";
 import { sortClassifications } from "../util/sort.js";
 import { callClaude, ClaudeClientError, getJudgmentRoute } from "./claude-client.js";
@@ -34,6 +35,7 @@ import type { PromptEnvelope } from "@n-dx/llm-client";
 import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
 import { collectFileHeaders } from "./file-headers.js";
 import { markBatch } from "./analyze-progress.js";
+import { askSplittingWhenTooLarge, jevRequestByteCeiling, jsonBytes, logJevRequest, packBySize } from "./jev-split.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -58,6 +60,21 @@ export interface ClassifyOptions {
    * languages match. Falls back to `[projectLanguage]` when omitted.
    */
   projectLanguages?: string[];
+  /**
+   * Path → what a language pack read in the file's content that points to an
+   * archetype (a PHP script cron runs is an entry point). Scored like any
+   * signal, recorded with `signalKind` `pack`. A file with pack signals, or
+   * whose previous classification had any, is always reclassified: the
+   * facts can change without the file changing (an edited crontab).
+   */
+  packSignals?: ReadonlyMap<string, readonly PackSignal[]>;
+}
+
+/** A language pack's evidence for an archetype, read from file content rather than its path. */
+export interface PackSignal {
+  archetypeId: string;
+  detail: string;
+  weight: number;
 }
 
 /**
@@ -84,7 +101,8 @@ export function analyzeClassifications(
     }
   }
 
-  const sourceFiles = inventory.files.filter((f) => f.role === "source");
+  // Third-party and mirror-copy files get no archetype, and so never reach the model escalation pass.
+  const sourceFiles = inventory.files.filter((f) => f.role === "source" && !isOutsideStructure(f));
   const classifications: FileClassification[] = [];
 
   for (const file of sourceFiles) {
@@ -102,10 +120,13 @@ export function analyzeClassifications(
     }
 
     // Incremental: reuse cached classification for unchanged files
+    const packSignals = options?.packSignals?.get(file.path);
     if (
       options?.changedFiles &&
       !options.changedFiles.has(file.path) &&
-      previousMap.has(file.path)
+      previousMap.has(file.path) &&
+      !packSignals?.length &&
+      !previousMap.get(file.path)!.evidence?.some((e) => e.signalKind === "pack")
     ) {
       const prev = previousMap.get(file.path)!;
       // Don't reuse user overrides that were removed
@@ -122,6 +143,7 @@ export function analyzeClassifications(
       exportMap.get(file.path),
       options?.projectLanguages
         ?? (options?.projectLanguage ? [options.projectLanguage] : undefined),
+      packSignals,
     );
     classifications.push(result);
   }
@@ -143,6 +165,7 @@ function classifyFile(
   archetypes: ArchetypeDefinition[],
   exports?: string[],
   projectLanguages?: string[],
+  packSignals: readonly PackSignal[] = [],
 ): FileClassification {
   const fileName = basename(filePath);
   const evidence: ClassificationEvidence[] = [];
@@ -152,6 +175,12 @@ function classifyFile(
 
   for (const archetype of archetypes) {
     let archetypeScore = 0;
+
+    for (const signal of packSignals) {
+      if (signal.archetypeId !== archetype.id) continue;
+      archetypeScore += signal.weight;
+      evidence.push({ archetypeId: archetype.id, signalKind: "pack", detail: signal.detail, weight: signal.weight });
+    }
 
     for (const signal of archetype.signals) {
       // Skip signals scoped to languages that don't match any project language
@@ -328,6 +357,14 @@ export interface LLMClassifyResult {
 const LLM_BATCH_SIZE = 30;
 
 /**
+ * Files per escalation call. Escalations are queued across Jev batches and
+ * sent this many at a time: one text-model call per batch that had any
+ * ambiguous file used to make the pass ~30× slower than Jev on a large
+ * legacy repository, for calls of one to a few files each.
+ */
+export const ESCALATION_BATCH_SIZE = 40;
+
+/**
  * Enrich unclassified files by asking the LLM to assign archetypes.
  * Runs after the algorithmic pass. Files the LLM can't classify stay null.
  */
@@ -366,15 +403,36 @@ export async function enrichClassificationsWithLLM(
     .sort((a, b) => b[1] - a[1])
     .map(([lang]) => lang);
 
-  // Batch unclassified files
-  const batches: FileClassification[][] = [];
-  for (let i = 0; i < unclassified.length; i += LLM_BATCH_SIZE) {
-    batches.push(unclassified.slice(i, i + LLM_BATCH_SIZE));
-  }
+  // Batch unclassified files: by count for the text model, and for Jev also
+  // under the request byte ceiling.
+  const batches = judgmentRoute === "typesafe"
+    ? packBySize(unclassified, (f) => jevClassifyFileBytes(f, archetypeCatalog, projectLanguages), jevRequestByteCeiling(), { maxCount: LLM_BATCH_SIZE })
+    : packBySize(unclassified, () => 0, Infinity, { maxCount: LLM_BATCH_SIZE });
 
   // Valid archetype IDs for validation
   const validIds = new Set(classifications.archetypes.map((a) => a.id));
 
+  // Escalation: a file Jev leaned on but not confidently goes to the text
+  // model with more evidence than Jev was given — its leading doc comment.
+  // A confident `none` is a real answer and stays unclassified. Queued across
+  // batches and sent ESCALATION_BATCH_SIZE at a time.
+  const pending: FileClassification[] = [];
+  let escalated = 0;
+  let escalationCalls = 0;
+  const escalate = async (all: boolean): Promise<"auth-error" | void> => {
+    while (pending.length >= ESCALATION_BATCH_SIZE || (all && pending.length > 0)) {
+      const chunk = pending.splice(0, ESCALATION_BATCH_SIZE);
+      escalationCalls++;
+      const label = ` escalation ${escalationCalls}`;
+      console.log(`  [classify]${label} ${chunk.length} ambiguous file(s) escalated to the text model with headers`);
+      const headers = collectFileHeaders(chunk.map((f) => f.path), opts?.projectDir);
+      const result = await classifyBatchWithLLM(chunk, archetypeCatalog, validIds, label, tokenUsage, headers);
+      if (result === "auth-error") return "auth-error";
+      if (result) updatedFiles.push(...result);
+    }
+  };
+
+  let stopped = false;
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
     const batchLabel = batches.length > 1 ? ` batch ${batchIdx + 1}/${batches.length}` : "";
@@ -388,20 +446,22 @@ export async function enrichClassificationsWithLLM(
     }
 
     const judged = await classifyBatchWithJev(batch, archetypeCatalog, batchLabel, tokenUsage, projectLanguages);
-    if (judged === "auth-error") break;
+    if (judged === "auth-error") {
+      stopped = true;
+      break;
+    }
     if (!judged) continue;
     updatedFiles.push(...judged.results);
-
-    // Escalation: a file Jev leaned on but not confidently goes to the text
-    // model with more evidence than Jev was given — its leading doc comment.
-    // A confident `none` is a real answer and stays unclassified.
-    if (judged.escalate.length > 0) {
-      console.log(`  [classify]${batchLabel} ${judged.escalate.length} ambiguous file(s) escalated to the text model with headers`);
-      const headers = collectFileHeaders(judged.escalate.map((f) => f.path), opts?.projectDir);
-      const result = await classifyBatchWithLLM(judged.escalate, archetypeCatalog, validIds, batchLabel, tokenUsage, headers);
-      if (result === "auth-error") break;
-      if (result) updatedFiles.push(...result);
+    pending.push(...judged.escalate);
+    escalated += judged.escalate.length;
+    if ((await escalate(false)) === "auth-error") {
+      stopped = true;
+      break;
     }
+  }
+  if (!stopped) await escalate(true);
+  if (escalated > 0) {
+    console.log(`  [classify] ${escalated} ambiguous file(s) escalated in ${escalationCalls} text-model call(s)`);
   }
   markBatch("classification", batches.length, batches.length);
 
@@ -530,9 +590,12 @@ const JEV_NONE = "none";
 /**
  * Probability on `none` at which "no archetype fits" is taken as the answer
  * rather than as uncertainty. Below it, and below {@link JEV_MIN_PROBABILITY}
- * for any other option, the file is escalated to the text model.
+ * for any other option, the file is escalated to the text model. 0.45, not
+ * the earlier 0.6: on a real legacy repository nearly every batch escalated,
+ * yet most files still ended with no archetype, so the text model added
+ * little for most of the run's model time.
  */
-const JEV_CONFIDENT_NONE = 0.6;
+const JEV_CONFIDENT_NONE = 0.45;
 
 /** Outcome of one Jev classification batch. */
 export interface JevClassifyBatch {
@@ -591,6 +654,19 @@ export function buildJevClassifyRequest(
 }
 
 /**
+ * What one file adds to a Jev classification request, in UTF-8 bytes: its
+ * state entry and its question, which carries the whole archetype catalog.
+ */
+export function jevClassifyFileBytes(
+  file: FileClassification,
+  archetypes: ArchetypeDefinition[],
+  projectLanguages: string[],
+): number {
+  const { state, questions } = buildJevClassifyRequest([file], archetypes, projectLanguages);
+  return jsonBytes((state as { files: Record<string, JsonValue> }).files.f0) + jsonBytes(questions.f0);
+}
+
+/**
  * Classify a batch by asking Jev. No attempt ladder: the answer is an option
  * id with a probability, so there is no free text to fail to parse. Three
  * outcomes per file: a probability at or above {@link JEV_MIN_PROBABILITY}
@@ -604,26 +680,56 @@ async function classifyBatchWithJev(
   tokenUsage: AnalyzeTokenUsage,
   projectLanguages: string[],
 ): Promise<JevClassifyBatch | null | "auth-error"> {
-  const { state, questions, ids } = buildJevClassifyRequest(batch, archetypes, projectLanguages);
-  const spinner = startSpinner(`  [classify]${batchLabel} Asking Jev (${batch.length} files)...`);
+  // A request refused as too large is asked again as halves; what each slice
+  // answers is merged, so the batch reads as one.
+  let merged: JevClassifyBatch | null = null;
+  try {
+    const alone = await askSplittingWhenTooLarge(batch, async (files) => {
+      const judged = await askJevForFiles(files, archetypes, projectLanguages, tokenUsage, batchLabel);
+      merged ??= { results: [], escalate: [] };
+      merged.results.push(...judged.results);
+      merged.escalate.push(...judged.escalate);
+    });
+    if (alone.length > 0) {
+      console.warn(`  [classify]${batchLabel} ${alone.length} file(s) too large for one Jev request — leaving them unclassified`);
+    }
+  } catch (err) {
+    if (!(err instanceof ClaudeClientError)) throw err;
+    if (err.reason === "auth") {
+      console.warn("  [classify] TypeSafe authentication error — check the key (`ndx config credentials.typesafe`, or an exported TYPESAFE_API_KEY)");
+      console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
+      return "auth-error";
+    }
+    console.warn(`  [classify]${batchLabel} Jev request failed (${err.reason}) — leaving files unclassified`);
+  }
+  return merged;
+}
 
+/**
+ * One Jev request for `files`. Throws what `askJev` throws; a failed request
+ * still counts as a call.
+ */
+async function askJevForFiles(
+  files: FileClassification[],
+  archetypes: ArchetypeDefinition[],
+  projectLanguages: string[],
+  tokenUsage: AnalyzeTokenUsage,
+  batchLabel: string,
+): Promise<JevClassifyBatch> {
+  const { state, questions, ids } = buildJevClassifyRequest(files, archetypes, projectLanguages);
+  const spinner = startSpinner(`  [classify]${batchLabel} Asking Jev (${files.length} files)...`);
+
+  const bytes = jsonBytes({ state, questions });
   let response;
   try {
     response = await askJev({ state, questions }, { taskClass: "code.classify" });
   } catch (err) {
+    logJevRequest("code.classify", bytes, err);
     spinner.stop();
-    if (err instanceof ClaudeClientError) {
-      accumulateTokenUsage(tokenUsage, undefined);
-      if (err.reason === "auth") {
-        console.warn("  [classify] TypeSafe authentication error — check the key (`ndx config credentials.typesafe`, or an exported TYPESAFE_API_KEY)");
-        console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
-        return "auth-error";
-      }
-      console.warn(`  [classify]${batchLabel} Jev request failed (${err.reason}) — leaving files unclassified`);
-      return null;
-    }
+    if (err instanceof ClaudeClientError) accumulateTokenUsage(tokenUsage, undefined);
     throw err;
   }
+  logJevRequest("code.classify", bytes);
   spinner.stop();
   accumulateTokenUsage(tokenUsage, response.tokenUsage);
   tokenUsage.model = response.model;

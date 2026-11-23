@@ -114,7 +114,7 @@ const PruneConfigSchema = z
 // Must list every member of `ProjectLanguage`: `DEFAULT_HENCH_CONFIG(language)`
 // writes the value straight into `.hench/config.json`, so a language this enum
 // omits produces a config hench itself then refuses to load. "swift" was missing.
-const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go", "swift"]).optional();
+const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go", "swift", "php"]).optional();
 
 export const HenchConfigSchema = z.object({
   schema: z.string(),

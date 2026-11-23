@@ -15,14 +15,14 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { useHenchRunsLiveRefresh } from "../hooks/index.js";
 import { appUrl } from "../base-path.js";
-import { workCommandArgs } from "../external.js";
+import { itemTypeLabel, workCommandArgs } from "../external.js";
 import { shellWord } from "./prepare-task-model.js";
 import { QueuedNotice } from "./queued-notice.js";
 import { ImpactTags, displayTitle, useItemImpacts } from "./impact-tags.js";
 import type { QueuedReply } from "./prepare-task-model.js";
 
-/** Rows shown before "Show all N". */
-export const READY_TOP_ROWS = 10;
+/** Rows shown before "Show all N": the next few picks, not the whole queue. */
+export const READY_TOP_ROWS = 3;
 /** The first request's page size (the server's maximum). */
 const READY_PAGE = 50;
 const TOAST_MS = 8000;
@@ -33,8 +33,12 @@ export interface ReadyTask {
   title: string;
   /** Plain-language summary, shown in place of the title when present. */
   summary?: string;
+  /** The start of the description, already cut short by the server. */
+  description?: string;
   status: string;
   priority: string | null;
+  /** change, task or subtask on v2; epic, feature, task or subtask on v1. Absent from an older server. */
+  itemType?: string;
   parentChain: string[];
   /** The change the task belongs to. Absent from a server that predates it. */
   change?: { id: string; title: string } | null;
@@ -77,6 +81,10 @@ export function filterReady(tasks: ReadyTask[], f: ReadyFilters): ReadyTask[] {
     return [t.summary ?? "", t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
   });
 }
+
+/** Whether a row names its change: not when the chain already ends at it, or the row is the change. */
+const showChange = (task: ReadyTask) =>
+  !!task.change && task.change.title !== task.title && task.parentChain[task.parentChain.length - 1] !== task.change.title;
 
 /** The terminal command Start now would run: `ndx work --task=<id> --auto <dir>`. */
 export function readyCommandLine(taskId: string, dir: string): string {
@@ -295,67 +303,89 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
         )
       : shown.length === 0
         ? h("p", { class: "ready-empty" }, "No ready task matches.")
-        : h("ul", { class: "ready-list", id: "ready-to-run-list" }, shown.map((task) => {
+        // Each task is a card in the Up next format (the card Work used to show
+        // below this list for the same first task): badges and the run button
+        // on top, the title, where it sits, the start of its description, then
+        // its tags. The first card is the pick and leads; the rest follow it.
+        : h("ul", { class: "ready-list", id: "ready-to-run-list" }, shown.map((task, index) => {
           const status = STATUS_ICON[task.status] ?? { icon: "○", label: task.status };
           const menuId = `ready-menu-${task.id}`;
-          return h("li", { key: task.id, class: "ready-row", "data-task-id": task.id },
-            h("span", { class: `prd-status-icon prd-status-${task.status}`, title: status.label, "aria-label": status.label }, status.icon),
-            h("div", { class: "ready-main" },
-              // The plain-language summary leads; the technical title is the tooltip and the modal's heading.
-              h("button", {
-                type: "button",
-                class: "ready-title",
-                title: task.summary ? task.title : undefined,
-                onClick: () => onPrepare(task.id),
-              },
-                displayTitle(task),
-                // A task that will not run on the project defaults says so
-                // before the modal is opened. The label carries the meaning:
-                // the dot alone is decoration to a screen reader.
-                task.saved
-                  ? h("span", { class: "ready-saved-dot", role: "img", "aria-label": "Saved run settings", title: "Saved run settings" }, "●")
-                  : null,
-              ),
-              h("div", { class: "ready-meta" },
-                task.parentChain.length ? h("span", { class: "ready-chain" }, task.parentChain.join(" › ")) : null,
-                // The chain ends at the change on v2; a task-less change is its own row.
-                task.change && task.change.title !== task.title && task.parentChain[task.parentChain.length - 1] !== task.change.title
-                  ? h("span", { class: "ready-change" }, task.change.title)
-                  : null,
+          const emphasis = task.priority === "critical" ? " rex-dash-next-critical" : task.priority === "high" ? " rex-dash-next-high" : "";
+          const tags = task.tags ?? [];
+          return h("li", { key: task.id, class: `ready-row rex-dash-next-card${emphasis}${index === 0 ? " ready-row--lead" : ""}`, "data-task-id": task.id },
+            h("div", { class: "rex-dash-next-top" },
+              h("div", { class: "rex-dash-next-badges ready-meta" },
+                h("span", { class: `prd-status-icon prd-status-${task.status}`, title: status.label, "aria-label": status.label }, status.icon),
+                task.itemType ? h("span", { class: `prd-level-badge prd-level-${task.itemType}` }, itemTypeLabel(task.itemType)) : null,
                 task.priority ? h("span", { class: `prd-priority-badge prd-priority-${task.priority}` }, task.priority) : null,
-                h("span", null, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
+                h("span", { class: "ready-criteria" }, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
                 task.resume ? h("span", { class: "ready-resume" }, "in progress · no live run") : null,
-                h(ImpactTags, { impact: impacts[task.id] }),
+              ),
+              h("div", { class: "ready-split" },
+                h("button", {
+                  type: "button",
+                  class: "prep-btn prep-btn-primary ready-primary",
+                  disabled: busyId === task.id,
+                  onClick: () => onPrepare(task.id),
+                }, task.resume ? "Resume…" : "Prepare…"),
+                h("button", {
+                  type: "button",
+                  class: "prep-btn prep-btn-primary ready-caret",
+                  "aria-haspopup": "menu",
+                  "aria-expanded": String(menuFor === task.id),
+                  "aria-controls": menuId,
+                  "aria-label": `More ways to run ${task.title}`,
+                  onClick: () => setMenuFor(menuFor === task.id ? null : task.id),
+                }, "▾"),
+                menuFor === task.id
+                  ? h("div", { class: "ready-menu", id: menuId, role: "menu" },
+                      h("button", { type: "button", role: "menuitem", onClick: () => void startNow(task) }, "Start now"),
+                      h("button", { type: "button", role: "menuitem", onClick: () => void copyCommand(task) }, "Copy terminal command"),
+                    )
+                  : null,
               ),
             ),
-            h("div", { class: "ready-split" },
-              h("button", {
-                type: "button",
-                class: "prep-btn prep-btn-primary ready-primary",
-                disabled: busyId === task.id,
-                onClick: () => onPrepare(task.id),
-              }, task.resume ? "Resume…" : "Prepare…"),
-              h("button", {
-                type: "button",
-                class: "prep-btn prep-btn-primary ready-caret",
-                "aria-haspopup": "menu",
-                "aria-expanded": String(menuFor === task.id),
-                "aria-controls": menuId,
-                "aria-label": `More ways to run ${task.title}`,
-                onClick: () => setMenuFor(menuFor === task.id ? null : task.id),
-              }, "▾"),
-              menuFor === task.id
-                ? h("div", { class: "ready-menu", id: menuId, role: "menu" },
-                    h("button", { type: "button", role: "menuitem", onClick: () => void startNow(task) }, "Start now"),
-                    h("button", { type: "button", role: "menuitem", onClick: () => void copyCommand(task) }, "Copy terminal command"),
-                  )
+            // The plain-language summary leads; the technical title is the tooltip and the modal's heading.
+            h("button", {
+              type: "button",
+              class: "ready-title rex-dash-next-link",
+              title: task.summary ? task.title : undefined,
+              onClick: () => onPrepare(task.id),
+            },
+              displayTitle(task),
+              // A task that will not run on the project defaults says so
+              // before the modal is opened. The label carries the meaning:
+              // the dot alone is decoration to a screen reader.
+              task.saved
+                ? h("span", { class: "ready-saved-dot", role: "img", "aria-label": "Saved run settings", title: "Saved run settings" }, "●")
                 : null,
             ),
+            task.parentChain.length || showChange(task)
+              ? h("div", { class: "ready-chain" },
+                  task.parentChain.join(" › "),
+                  // The chain ends at the change on v2; a task-less change is its own row.
+                  showChange(task) ? h("span", { class: "ready-change" }, task.change!.title) : null,
+                )
+              : null,
+            task.description ? h("p", { class: "rex-dash-next-desc ready-desc" }, task.description) : null,
+            tags.length > 0 || impacts[task.id]
+              ? h("div", { class: "rex-dash-next-tags" },
+                  h(ImpactTags, { impact: impacts[task.id] }),
+                  tags.map((tag) => h("span", { key: tag, class: "prd-tag" }, tag)),
+                )
+              : null,
           );
         }));
 
+  // The Up next panel (styled as .rex-dash-next, without that class: the
+  // scroll reveal fades .rex-dash-next in, and this list must never wait on it).
   return h("section", { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" },
-    h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
+    h("div", { class: "rex-dash-section-header" },
+      h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
+      total > 0
+        ? h("span", { class: "rex-dash-section-meta" }, `${total} ready · in the order the agent picks them`)
+        : null,
+    ),
     controls,
     body,
     more,

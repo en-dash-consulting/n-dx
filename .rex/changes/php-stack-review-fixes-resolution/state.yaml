@@ -1,0 +1,61 @@
+schema: "rex/v2"
+items:
+  "08c6f81a-f090-4a59-8966-08d65bf3a58b":
+    status: "completed"
+    startedAt: "2026-11-16T22:51:30.168Z"
+    completedAt: "2026-11-16T23:05:00.091Z"
+    endedAt: "2026-11-16T23:05:00.091Z"
+    activeIntervals: [{"end":"2026-11-16T23:05:00.091Z","start":"2026-11-16T22:51:30.168Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-resolver.ts scopes PSR-4/PSR-0/classmap/lock prefixes and the declared-class fallback to the referring file's owning Composer project plus required path repositories; project-less files keep every project's mappings."
+    lastModified: "2026-11-16T23:05:00.091Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "938d1611-a5d7-4fd9-81e5-422e2b47a776":
+    status: "completed"
+    startedAt: "2026-11-16T23:16:18.861Z"
+    completedAt: "2026-11-16T23:24:04.689Z"
+    endedAt: "2026-11-16T23:24:04.689Z"
+    activeIntervals: [{"end":"2026-11-16T23:24:04.689Z","start":"2026-11-16T23:16:18.861Z"}]
+    lastModified: "2026-11-16T23:24:04.689Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e2fb42b1-e547-4682-a2ef-176d0e7d7857":
+    status: "completed"
+    startedAt: "2026-11-16T23:55:02.188Z"
+    completedAt: "2026-11-16T23:55:02.188Z"
+    endedAt: "2026-11-16T23:55:02.188Z"
+    activeIntervals: [{"end":"2026-11-16T23:55:02.188Z","start":"2026-11-16T23:55:02.188Z"}]
+    appliedAt: "2026-11-16T23:55:02.188Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-16T22:45:23.943Z"
+    lastModified: "2026-11-16T23:55:02.188Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "eb319918-d699-4f6f-99ce-1fc453155d70":
+    status: "completed"
+    startedAt: "2026-11-16T23:24:40.020Z"
+    completedAt: "2026-11-16T23:35:40.736Z"
+    endedAt: "2026-11-16T23:35:40.736Z"
+    activeIntervals: [{"end":"2026-11-16T23:35:40.736Z","start":"2026-11-16T23:24:40.020Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Static calls on a value class are dispatch sites fed to database flow; provenance kept per element/property path, literal writes clear a path."
+    lastModified: "2026-11-16T23:35:40.736Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f0979b38-b04d-418e-9509-ddf5f7400203":
+    status: "completed"
+    startedAt: "2026-11-16T23:39:02.140Z"
+    completedAt: "2026-11-16T23:55:02.188Z"
+    endedAt: "2026-11-16T23:55:02.188Z"
+    activeIntervals: [{"end":"2026-11-16T23:55:02.188Z","start":"2026-11-16T23:39:02.140Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Eleven flagged regexes replaced with linear scans/trims, 64 KiB config line cap with notices, pathological-input tests via worker budget"
+    lastModified: "2026-11-16T23:55:02.188Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f0d1bbab-2a17-4645-af58-aa002a7efb5b":
+    status: "completed"
+    startedAt: "2026-11-16T23:08:53.515Z"
+    completedAt: "2026-11-16T23:13:27.649Z"
+    endedAt: "2026-11-16T23:13:27.649Z"
+    activeIntervals: [{"end":"2026-11-16T23:13:27.649Z","start":"2026-11-16T23:08:53.515Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "loadedBy now adds every in-repository Composer project required by name (case-insensitive, transitive, path-repository match preferred); new fixture php-composer-required."
+    lastModified: "2026-11-16T23:13:27.649Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

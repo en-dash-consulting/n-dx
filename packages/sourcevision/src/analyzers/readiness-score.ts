@@ -122,6 +122,12 @@ export interface ReadinessScore {
   dimensions: Record<ReadinessDimensionName, ReadinessDimensionScore>;
   /** Top improvement suggestions, worst dimension first. At most three. */
   suggestions: string[];
+  /**
+   * The profile's `ecosystem` (language packs' facts, such as PHP's version
+   * floors and legacy constructs), carried through unscored. Absent when the
+   * profile has none.
+   */
+  ecosystem?: SdlcProfile["ecosystem"];
 }
 
 /**
@@ -742,7 +748,12 @@ export function computeReadinessScore(
     overall += resolved.score * resolved.weight;
   }
 
-  return { overall: Math.round(overall), dimensions, suggestions: suggest(dimensions) };
+  return {
+    overall: Math.round(overall),
+    dimensions,
+    suggestions: suggest(dimensions),
+    ...(profile.ecosystem === undefined ? {} : { ecosystem: profile.ecosystem }),
+  };
 }
 
 // ── Suggestions ─────────────────────────────────────────────────────────────

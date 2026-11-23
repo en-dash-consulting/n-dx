@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "8c21ab2a-b6fb-4acb-8126-8260d817e3df":
+    status: "completed"
+    startedAt: "2026-11-16T20:06:31.357Z"
+    completedAt: "2026-11-16T20:14:31.700Z"
+    endedAt: "2026-11-16T20:14:31.700Z"
+    activeIntervals: [{"end":"2026-11-16T20:14:31.700Z","start":"2026-11-16T20:06:31.357Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Version floor drops captures inside ERROR nodes or recovery-built beside/around ERROR/MISSING nodes, and attribute groups alone on their line (plus anything inside them); fixtures under tests/fixtures/php-compat/exceptions/."
+    lastModified: "2026-11-16T20:14:31.700Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ce7224ec-beb6-4cac-8350-0e9e10f3bebd":
+    status: "completed"
+    startedAt: "2026-11-16T20:14:31.700Z"
+    completedAt: "2026-11-16T20:14:31.700Z"
+    endedAt: "2026-11-16T20:14:31.700Z"
+    activeIntervals: [{"end":"2026-11-16T20:14:31.700Z","start":"2026-11-16T20:14:31.700Z"}]
+    appliedAt: "2026-11-16T20:14:31.700Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-16T20:05:48.532Z"
+    lastModified: "2026-11-16T20:14:31.700Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -24,12 +24,6 @@ export function getZoneColorByIndex(index: number): string {
   return ZONE_COLORS[index % ZONE_COLORS.length];
 }
 
-/** Get the display color for a zone by its index in the zones array. */
-export function getZoneColor(zones: Zones, zoneId: string): string {
-  const idx = zones.zones.findIndex((z) => z.id === zoneId);
-  return idx >= 0 ? getZoneColorByIndex(idx) : "#555";
-}
-
 /** Build a map from zone id to its display color. */
 export function buildZoneColorMap(
   zones: Zones | null,

@@ -1,0 +1,15 @@
+<?php
+// The shapes of Drupal 7's php.module and locale.module: an exception class
+// declared in a module file, and eval of a parameter.
+
+class PhpEvalException extends Exception {}
+
+function php_eval($code) {
+  ob_start();
+  print eval('?>' . $code);
+  return ob_get_clean();
+}
+
+function php_locale_eval($source) {
+  return @eval($source);
+}

@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "83cb1372-8369-49b3-893e-f4aad0c4dc8c":
+    status: "completed"
+    startedAt: "2026-11-16T19:56:12.405Z"
+    completedAt: "2026-11-16T19:59:47.577Z"
+    endedAt: "2026-11-16T19:59:47.577Z"
+    activeIntervals: [{"end":"2026-11-16T19:59:47.577Z","start":"2026-11-16T19:56:12.405Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "php-legacy.ts inlineHtmlHits tracks non-PHP <script> elements across inline-HTML segments in order and skips <%/<%= inside them; legacy.scm also captures segments with <script/</script. Fixture shapes/js-templates.php + test; docs and changeset updated."
+    lastModified: "2026-11-16T19:59:47.577Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b0545263-34bc-40dc-bb81-04cb046e02ed":
+    status: "completed"
+    startedAt: "2026-11-16T19:59:47.577Z"
+    completedAt: "2026-11-16T19:59:47.577Z"
+    endedAt: "2026-11-16T19:59:47.577Z"
+    activeIntervals: [{"end":"2026-11-16T19:59:47.577Z","start":"2026-11-16T19:59:47.577Z"}]
+    appliedAt: "2026-11-16T19:59:47.577Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-16T19:44:52.286Z"
+    lastModified: "2026-11-16T19:59:47.577Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

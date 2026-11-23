@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, chmod, symlink } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { MAX_BUILD_FILE_BYTES } from "../../src/build-file.js";
@@ -28,6 +28,21 @@ describe("discoverJavaModules", () => {
     const layout = await discoverJavaModules(dir);
     return { layout, get: (n: string) => layout.modules.find((m) => m.name === n) };
   };
+
+  // File symlinks need a privilege on Windows.
+  it.skipIf(process.platform === "win32")("reads no source through a symlink when finding package roots", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "sv-java-outside-"));
+    try {
+      await writeFile(join(outside, "Outside.java"), "class Outside {}\n");
+      await mkdir(join(dir, "lib"));
+      await symlink(join(outside, "Outside.java"), join(dir, "lib", "Outside.java"));
+      await file("src/App.java", "class App {}\n");
+      const { layout } = await discover();
+      expect(layout.modules.map((m) => m.sourceRoots)).toEqual([["src"]]);
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
 
   it("reads a single-module Maven project with only the roots that exist", async () => {
     await file("pom.xml", "<project><artifactId>app</artifactId></project>");

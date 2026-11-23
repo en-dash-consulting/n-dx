@@ -1920,20 +1920,22 @@ export function execFileSyncNoShell(
  * the same Windows recipe and the same refusal. For callers that need the
  * output before they can continue — sourcevision reads `rex tree` this way.
  * Options are `execFileSync`'s; `windowsHide` defaults on, as everywhere else.
+ * `logInvocation: false` keeps the call out of `claude_commands.log`, for a
+ * tool that is not a vendor CLI (sourcevision's `rex` reads).
  *
  * TWIN: packages/core/win-spawn.js execFileSyncCli.
  */
 export function execFileSyncCli(
   binary: string,
   args: string[],
-  options: ExecFileSyncOptions = {},
+  { logInvocation = true, ...options }: ExecFileSyncOptions & { logInvocation?: boolean } = {},
   _platform: NodeJS.Platform = process.platform,
 ): string | Buffer {
   const cwd = typeof options.cwd === "string" ? options.cwd : undefined;
   if (_platform === "win32") {
     assertNoWindowsEnvExpansion([binary, ...args], options.env ?? process.env);
     const cmdLine = buildWindowsCliCommandLine(binary, args);
-    logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform, commandLine: cmdLine });
+    if (logInvocation) logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform, commandLine: cmdLine });
     // `/v:off`: delayed `!VAR!` expansion is a registry setting `/d` does not
     // reach; off, a `!` in a token stays a `!`. `/s` strips only the outer
     // quote pair, keeping each token's own quotes.
@@ -1945,7 +1947,7 @@ export function execFileSyncCli(
       windowsVerbatimArguments: true,
     } as ExecFileSyncOptions);
   }
-  logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform });
+  if (logInvocation) logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform });
   return execFileSync(binary, args, { windowsHide: true, ...options });
 }
 

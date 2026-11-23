@@ -1,0 +1,4 @@
+{
+    "name": "brumann/polyfill-unserialize",
+    "autoload": { "psr-4": { "Brumann\\Polyfill\\": "src/" } }
+}
