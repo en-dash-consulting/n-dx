@@ -97,7 +97,7 @@ export type StageSectionBadge = "inbox";
  * and recommended fixes, Plan's strips and glances.
  */
 export type StagePanelId =
-  | "capture" | "map" | "glance" | "recommendations" | "flow" | "changes-glance" | "plan-health" | "spec-gaps"
+  | "capture" | "map" | "glance" | "recommendations" | "changes-glance" | "plan-health" | "spec-gaps"
   | "outcomes" | "running" | "up-next" | "agent-settings"
   | "plan-glance" | "plan-areas" | "inbox" | "work-stats" | "prd-tools";
 
@@ -333,12 +333,13 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
         id: "create",
         label: "Create",
         focus: "How, why and what",
-        // What you are doing, what matters most and what is next; how work
-        // moves; then the product areas it lands in. Adding work, the
-        // analysis findings and the Inbox are side panels (`sidePanels`).
+        // What you are doing, what matters most and what is next; then the
+        // product areas the work lands in, filtered by whose work and by stage
+        // from the tile's own chips. Adding work, the analysis findings and
+        // the Inbox are side panels (`sidePanels`). No lifecycle counts band:
+        // the Inbox tab carries its count and the glance card the next pick.
         tiles: [
           { view: "changes", panel: "plan-glance", title: "At a glance", band: true, v2Only: true, requiresServer: true },
-          { view: "changes", panel: "flow", title: "How work moves", band: true, requiresServer: true },
           // The Product page's areas, each with the open changes moving it.
           // Full-screen and "Open" show the whole Product page.
           { view: "product", panel: "plan-areas", title: "Product areas", embedsView: true, cols: 12, rows: 3, grow: true, v2Only: true, requiresServer: true },
@@ -355,9 +356,6 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
         label: "Preparation",
         focus: "Who and when",
         tiles: [
-          // Where the work stands, and rex's next pick. On both layouts: a v1
-          // tree reads Pending, In progress and Next.
-          { view: "changes", panel: "flow", title: "Lifecycle", band: true, requiresServer: true },
           // The full list: each open change with its assignee picker, release
           // and priority, under the assignee filter.
           // The Tasks tree is its Tree tab, now Create's Open changes tile is a side panel.

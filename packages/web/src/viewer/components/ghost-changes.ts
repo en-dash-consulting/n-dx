@@ -1,8 +1,8 @@
 /**
  * Ghosts outside the tree (SP5): while a Sidecar change-set card waits, its
  * items show wherever a change appears on Plan, as dashed, uncounted marks —
- * rows in Open changes, "+N" markers on the map blocks they target and a
- * "+N waiting on a card" note under the strip. Real counts never include them;
+ * rows in Open changes and "+N" markers on the map blocks they target. Real
+ * counts never include them;
  * they go when the card is denied and give way to the real items on approval,
  * because the cards are read again on every `sidecar:card` announcement.
  *
@@ -65,11 +65,4 @@ export function ghostCountsByTarget(cards: readonly GhostSource[]): Map<string, 
     }
   }
   return counts;
-}
-
-/** How many waiting changes the strip notes under Inbox and under Proposed. */
-export function ghostStripCounts(cards: readonly GhostSource[]): { inbox: number; proposed: number } {
-  const changes = ghostChanges(cards);
-  const inbox = changes.filter((c) => c.target === null).length;
-  return { inbox, proposed: changes.length - inbox };
 }

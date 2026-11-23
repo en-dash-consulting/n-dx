@@ -32,7 +32,7 @@ import { h, Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import {
   AssigneeFilter, AssigneeFilterPending, AssigneePicker, PlaceWithSidecarButton, StrengthChip,
-  pickerChoices, saveAssignee, useAssigneeFilter, usePeople, useProjectStatus,
+  isMine, pickerChoices, saveAssignee, useAssigneeFilter, usePeople, useProjectStatus,
 } from "../components/index.js";
 import type { AssignableRow } from "../components/index.js";
 import type { KnownPerson } from "../external.js";
@@ -46,6 +46,7 @@ import { changeAssignees, shortChangeId } from "./product-model.js";
 import { PrioritizedTag } from "./prioritized-tag.js";
 import { bestGuess, guessOf, sortInbox, useInbox, type Guess, type InboxRow } from "./inbox-read.js";
 import { errorMessage } from "../utils/format.js";
+import { endPlanDrag, startPlanDrag } from "./plan-placement.js";
 
 // The Inbox's data — its read, order and guesses — is in inbox-read.ts, which
 // the detail panel's placement section and placement mode read without
@@ -288,7 +289,7 @@ function ageOf(row: InboxRow): string | null {
   return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
-function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted }: {
+function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAssignee = false, dragToPlan = false, onPlanIn }: {
   row: InboxRow;
   onOpen: (id: string) => void;
   onPlace?: (id: string) => void;
@@ -297,6 +298,12 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted }: {
   onAssigned?: () => void;
   /** After Accept wrote: read the Inbox again. Absent, no Accept. */
   onAccepted?: () => void;
+  /** Solo mode: nobody else to assign to, so no picker. */
+  hideAssignee?: boolean;
+  /** Plan's Inbox panel: the row can be dragged onto a product area. */
+  dragToPlan?: boolean;
+  /** Plan's Inbox panel: "Plan in <area>" places the change on its best guess (in place of Accept). */
+  onPlanIn?: (row: InboxRow, candidate: PlacementCandidate) => void;
 }) {
   const { change } = row;
   const guess = guessOf(row);
@@ -320,26 +327,42 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted }: {
   // The row is the target; the title button gives it keyboard reach, and its
   // click bubbles here. Place opens placement mode when the page can, and
   // otherwise bubbles to the row too.
-  return h("li", { class: "inbox-row", "data-change-id": change.id, onClick: () => onOpen(change.id) },
+  return h("li", {
+    class: dragToPlan ? "inbox-row inbox-row--draggable" : "inbox-row",
+    "data-change-id": change.id,
+    onClick: () => onOpen(change.id),
+    ...(dragToPlan
+      ? {
+          draggable: true,
+          title: "Drag onto a product area to plan it there",
+          onDragStart: (e: DragEvent) => startPlanDrag(row, e),
+          onDragEnd: () => endPlanDrag(),
+        }
+      : {}),
+  },
     h("div", { class: "inbox-row-head" },
+      dragToPlan ? h("span", { class: "inbox-grip", "aria-hidden": "true" }, "⠿") : null,
       h("span", { class: "ch-display-id" }, shortChangeId(change)),
       h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
       h(PrioritizedTag, { prioritized: change.prioritized }),
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),
       age ? h("span", { class: "inbox-age", title: "Time in the Inbox" }, age) : null,
-      h(AssigneePicker, {
-        itemId: change.id,
-        assignee: change.assignee,
-        people,
-        me,
-        onSave: async (assignee: string) => { await saveAssignee(change.id, assignee); onAssigned?.(); },
-      }),
+      hideAssignee
+        ? null
+        : h(AssigneePicker, {
+            itemId: change.id,
+            assignee: change.assignee,
+            people,
+            me,
+            onSave: async (assignee: string) => { await saveAssignee(change.id, assignee); onAssigned?.(); },
+          }),
     ),
     h("div", { class: "inbox-row-foot" },
       h(GuessLine, { row }),
       draftNote ? h("span", { class: "tag inbox-draft", "data-draft": "placement" }, draftNote) : null,
-      guess && onAccepted
+      // Plan's panel names the step and the area ("Plan in <area>"), so it does not also offer Accept.
+      guess && onAccepted && !onPlanIn
         ? h("button", {
             type: "button",
             class: "btn btn-sm btn-primary inbox-accept",
@@ -348,6 +371,14 @@ function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted }: {
             disabled: accepting,
             onClick: accept,
           }, accepting ? "Placing…" : "Accept")
+        : null,
+      onPlanIn && guess?.candidate.area
+        ? h("button", {
+            type: "button",
+            class: "btn btn-sm inbox-plan-in",
+            "aria-label": `Plan ${change.title} in ${guess.candidate.area}`,
+            onClick: (e: MouseEvent) => { e.stopPropagation(); onPlanIn(row, guess.candidate); },
+          }, `Plan in ${guess.candidate.area}`)
         : null,
       h("button", {
         type: "button",
@@ -385,6 +416,17 @@ export interface InboxViewProps {
   onPlaced?: () => void;
   /** Reads the Inbox again after a row's assignee is saved. */
   onAssigned?: () => void;
+  /**
+   * Plan's For me / Everyone, which replaces the Inbox's own assignee filter:
+   * "me" shows only the rows assigned to the current user.
+   */
+  scope?: "me" | "all";
+  /** Solo mode: no assignee pickers and no assignee filter. */
+  hideAssignees?: boolean;
+  /** Rows can be dragged onto Plan's product areas. */
+  dragToPlan?: boolean;
+  /** Each row with a guessed area offers "Plan in <area>". */
+  onPlanIn?: (row: InboxRow, candidate: PlacementCandidate) => void;
 }
 
 /** The filter's view of Inbox rows: every one is open work, assigned by the change or its open tasks. */
@@ -392,7 +434,7 @@ export function assignableInboxRows(rows: readonly InboxRow[]): AssignableRow[] 
   return rows.map((r) => ({ assignees: changeAssignees(r.change), open: true }));
 }
 
-export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced, onAssigned }: InboxViewProps) {
+export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced, onAssigned, scope, hideAssignees = false, dragToPlan = false, onPlanIn }: InboxViewProps) {
   const cliName = useCliName();
   const peopleRead = usePeople();
   const assignable = useMemo(() => assignableInboxRows(rows), [rows]);
@@ -401,29 +443,36 @@ export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenCha
     () => pickerChoices(peopleRead?.people ?? [], rows.map((r) => r.change.assignee)),
     [peopleRead, rows],
   );
+  const me = peopleRead?.me ?? null;
   const sorted = sortInbox(rows);
+  // Plan's scope, when given, replaces the Inbox's own filter (and Solo drops both).
+  const planScoped = scope !== undefined || hideAssignees;
+  const shows = (row: InboxRow) => planScoped
+    ? hideAssignees || scope !== "me" || changeAssignees(row.change).some((a) => isMine(a, me))
+    : filter.shows(changeAssignees(row.change));
   // The filter hides rows only; All shows every one.
-  const visible = sorted.filter((row) => filter.shows(changeAssignees(row.change)));
+  const visible = sorted.filter(shows);
   const shown = limit === undefined ? visible : visible.slice(0, limit);
   const hidden = visible.length - shown.length;
+  const pending = !planScoped && filter.pending;
 
   return h("div", { class: "inbox-container" },
     onPlaced
       ? h(PlaceBestGuesses, { rows: sorted, applied: appliedRows, onPlaced, onOpenReview: onOpenAll })
       : null,
-    sorted.length > 0 && !filter.pending ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
+    sorted.length > 0 && !planScoped && !filter.pending ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
     sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" },
           h("p", null, "Inbox is empty"),
           h("p", { class: "section-sub" }, resolveCliLabel(HELD_EXPLANATION, cliName)))
       // Held until the people list is read: the default (Mine or All) depends on it.
-      : filter.pending
+      : pending
         ? h(AssigneeFilterPending, null)
       : visible.length === 0
         ? h("div", { class: "empty-state inbox-empty inbox-filtered-empty", role: "status" },
-            h("p", null, "No Inbox changes match this filter."))
+            h("p", null, planScoped ? "Nothing in the Inbox is assigned to you." : "No Inbox changes match this filter."))
         : h("ul", { class: "inbox-list" },
-            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, me: peopleRead?.me ?? null, onAssigned, onAccepted: onPlaced })),
+            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, me, onAssigned, onAccepted: onPlaced, hideAssignee: hideAssignees, dragToPlan, onPlanIn })),
           ),
     hidden > 0 && onOpenAll
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
@@ -482,7 +531,12 @@ export function AppliedHistory({ count, rows = [], onOpen }: {
  * The Inbox in its Plan section: `limit` rows, each opening its change in
  * the Tasks tree. Its own page is `InboxTriagePage` (inbox-triage.ts).
  */
-export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limit?: number }) {
+export function InboxPage({ navigateTo, limit, plan }: {
+  navigateTo?: NavigateTo;
+  limit?: number;
+  /** Plan's Inbox panel: its scope, Solo mode, dragging and "Plan in". */
+  plan?: Pick<InboxViewProps, "scope" | "hideAssignees" | "dragToPlan" | "onPlanIn">;
+}) {
   const { load, rows, applied, refetch } = useInbox();
   const status = useProjectStatus();
   if (load.state === "v1") return null;
@@ -500,6 +554,7 @@ export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limi
       onOpenAll: navigateTo ? () => navigateTo("inbox") : undefined,
       onPlaced: refetch,
       onAssigned: refetch,
+      ...plan,
     }),
   );
 }

@@ -19,7 +19,7 @@ vi.mock("../../../src/viewer/hooks/use-prd-changed-refresh.js", async () => {
 });
 
 import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
-import { LifecycleStrip } from "../../../src/viewer/views/lifecycle-strip.js";
+import { PlanGlance } from "../../../src/viewer/views/plan-glance.js";
 import { ChangesGlance } from "../../../src/viewer/views/changes-glance.js";
 
 const SUMMARY = {
@@ -48,13 +48,13 @@ describe("Plan's changes summary read", () => {
   it("makes one request per load and one per PRD change, feeding both panels", async () => {
     await act(async () => {
       render(h(ChangesSummaryProvider, null,
-        h(LifecycleStrip, { navigateTo }),
+        h(PlanGlance, { navigateTo }),
         h(ChangesGlance, { navigateTo }),
       ), root);
     });
     await act(async () => {});
     expect(summaryRequests()).toBe(1);
-    expect(root.querySelector(".lifecycle-strip .ls-cell")).not.toBeNull();
+    expect(root.querySelector(".plan-glance .plan-glance-card")).not.toBeNull();
     expect(root.querySelectorAll(".cg-row")).toHaveLength(1);
 
     await act(async () => { for (const refresh of [...subscribers.refreshes]) refresh(); });

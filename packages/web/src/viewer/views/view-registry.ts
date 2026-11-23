@@ -62,7 +62,6 @@ import { WorkspacesView } from "./domain-workspaces.js";
 import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
-import { LifecycleStrip } from "./lifecycle-strip.js";
 import { RunningNow, UpNext } from "./work-now.js";
 import { AgentSettingsPanel } from "./agent-settings.js";
 import { ChangesGlance } from "./changes-glance.js";
@@ -77,6 +76,8 @@ import { AnalyzeActionsProvider } from "./analyze-actions-context.js";
 import { SpendSummary } from "./spend-summary.js";
 import { PlanGlance } from "./plan-glance.js";
 import { PlanAreas } from "./plan-areas.js";
+import { PlanInbox } from "./plan-inbox.js";
+import { PlanHeadControls } from "./plan-tour.js";
 import { PrdTools, WorkStats } from "./work-stats.js";
 import { SettingsDisclosure } from "./settings-disclosure.js";
 import type { TileGridApi } from "./stage-tiles.js";
@@ -193,11 +194,13 @@ function stage(id: StageId, route: ViewId = id): ViewRenderer {
       : renderActiveView(side.view, { ...ctx, inSection: true }),
     detailOpen: ctx.detailOpen ?? false,
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
-    headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
+    headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs })
+      : id === "plan" ? h(PlanHeadControls, null)
+      : null,
   });
-  // Plan's lifecycle strip and open-changes glance share one summary read
-  // (its capture draft is shared from main.ts, above the router); Analyze's
-  // tiles and map share what to do, and the item hovered.
+  // Plan's glance cards, product areas and open-changes panel share one
+  // summary read (its capture draft is shared from main.ts, above the
+  // router); Analyze's tiles and map share what to do, and the item hovered.
   return id === "plan"
     ? (ctx) => h(ChangesSummaryProvider, null, page(ctx))
     : id === "analyze"
@@ -218,7 +221,6 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
     case "glance": return h(GlancePanel, { data: ctx.data, opened, setDetail: ctx.setDetail, loading: ctx.analysisLoading });
     case "recommendations": return h(RecommendationsPanel, { data: ctx.data, opened, navigateTo: ctx.navigateTo });
-    case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
     case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);
@@ -231,8 +233,10 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "plan-areas": return opened
       ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo })
       : h(PlanAreas, { navigateTo: ctx.navigateTo });
-    // The whole Inbox, not the section's first rows: the side panel scrolls.
-    case "inbox": return h(InboxPage, { navigateTo: ctx.navigateTo });
+    // The whole Inbox, not the section's first rows (the side panel scrolls),
+    // under Plan's For me / Everyone and Solo / Team, its rows draggable onto
+    // the product areas.
+    case "inbox": return h(PlanInbox, { navigateTo: ctx.navigateTo });
     // Full-screen and "Open" show the whole Rex dashboard.
     case "work-stats": return opened ? h(RexDashboard, { navigateTo: ctx.navigateTo }) : h(WorkStats, null);
     case "prd-tools": return h(PrdTools, { navigateTo: ctx.navigateTo });

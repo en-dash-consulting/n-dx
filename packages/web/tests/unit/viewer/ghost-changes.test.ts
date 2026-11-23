@@ -1,18 +1,17 @@
 // @vitest-environment jsdom
 /**
  * Ghosts outside the tree (SP5): a waiting change-set card's changes show as
- * dashed rows in Open changes, "+N" markers on the blocks they target and a
- * "+N waiting on a card" note on the strip. Real counts never include them,
- * and with no card (denied, or approved and written) nothing extra is drawn.
+ * dashed rows in Open changes and "+N" markers on the blocks they target. Real
+ * counts never include them, and with no card (denied, or approved and
+ * written) nothing extra is drawn.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { GhostCardsContext, ghostChanges, ghostCountsByTarget, ghostStripCounts } from "../../../src/viewer/components/ghost-changes.js";
+import { GhostCardsContext, ghostChanges, ghostCountsByTarget } from "../../../src/viewer/components/ghost-changes.js";
 import type { GhostSource } from "../../../src/viewer/components/prd-tree/ghost-rows.js";
 import { areaBlock } from "../../../src/viewer/views/product-area-map.js";
 import { ChangesGlance } from "../../../src/viewer/views/changes-glance.js";
-import { LifecycleStrip, v2Cells } from "../../../src/viewer/views/lifecycle-strip.js";
 import { ChangesSummaryProvider } from "../../../src/viewer/views/changes-summary-context.js";
 import type { AreaSection, ChangeSummary } from "../../../src/viewer/views/product-model.js";
 
@@ -68,21 +67,10 @@ describe("ghost helpers", () => {
     expect(ghostCountsByTarget([card]).get("cap-2")).toBe(1);
   });
 
-  it("splits the strip note between Inbox and Proposed", () => {
-    expect(ghostStripCounts([PLACED, INBOX])).toEqual({ inbox: 1, proposed: 1 });
-    expect(ghostStripCounts([])).toEqual({ inbox: 0, proposed: 0 });
-  });
-
   it("puts waiting counts on map blocks through an area or its capabilities", () => {
     const counts = ghostCountsByTarget([PLACED]);
     const blocks = [AREA("a1", ["cap-1", "cap-9"]), AREA("a2", ["cap-2"])].map((a) => areaBlock(a, counts));
     expect(blocks.map((b) => b.ghosts)).toEqual([2, 0]);
-  });
-
-  it("never touches the real strip counts", () => {
-    const cells = v2Cells(SUMMARY, { inbox: 1, proposed: 1 });
-    expect(cells.map((c) => c.count)).toEqual([3, 4, 0, 2, 1]);
-    expect(cells.map((c) => c.waiting)).toEqual([1, 1, 0, 0, 0]);
   });
 });
 
@@ -111,16 +99,6 @@ describe("the Plan surfaces", () => {
     await mount(h(ChangesGlance, { navigateTo }), [], { summary: { ...SUMMARY, open: [] } });
     expect(root.querySelector(".cg-ghost")).toBeNull();
     expect(root.textContent).toContain("No open changes.");
-  });
-
-  it("the strip notes the waiting changes and keeps its counts", async () => {
-    await mount(h(LifecycleStrip, { navigateTo }), [PLACED, INBOX], { summary: SUMMARY });
-    const note = (stage: string) => root.querySelector(`[data-stage="${stage}"] .ls-waiting`)?.textContent;
-    expect(note("inbox")).toBe("+1 waiting on a card");
-    expect(note("proposed")).toBe("+1 waiting on a card");
-    expect(note("ready")).toBeUndefined();
-    expect(root.querySelector('[data-stage="inbox"] .ls-number')?.textContent).toBe("3");
-    expect(root.querySelector('[data-stage="proposed"] .ls-number')?.textContent).toBe("4");
   });
 
 });

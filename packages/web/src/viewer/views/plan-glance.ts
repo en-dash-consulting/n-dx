@@ -14,6 +14,7 @@ import { h } from "preact";
 import type { NavigateTo } from "../types.js";
 import { displayTitle, isMine, personLabel, titleTooltip, usePeople } from "../components/index.js";
 import { useChangesSummary } from "./changes-summary-context.js";
+import { usePlanView } from "./plan-view-state.js";
 import {
   CHANGE_STAGE_LABELS,
   UNSCHEDULED_RELEASE_LABEL,
@@ -73,6 +74,8 @@ function ChangeTitle({ change, onOpen }: { change: GlanceChange; onOpen: () => v
 export function PlanGlance({ navigateTo }: { navigateTo: NavigateTo }) {
   const load = useChangesSummary();
   const people = usePeople();
+  // Solo: everything is yours, so the cards name nobody.
+  const solo = usePlanView().mode === "solo";
   if (load.state === "loading") return h("p", { class: "plan-glance-empty", role: "status" }, "Loading…");
   if (load.state === "error") return h("p", { class: "plan-glance-empty" }, `Could not read the open changes: ${load.message}`);
   // The band is v2-only; a v1 tree has no changes to glance at.
@@ -105,7 +108,9 @@ export function PlanGlance({ navigateTo }: { navigateTo: NavigateTo }) {
             h("p", { key: "w", class: "plan-glance-note" },
               model.top.prioritized
                 ? "Marked prioritized, so it leads the queue."
-                : model.top.assignee
+                : solo
+                  ? "Sorted to the top by priority."
+                  : model.top.assignee
                   ? `Sorted to the top by priority. Assigned to ${personLabel(model.top.assignee)}.`
                   : "Sorted to the top by priority. Nobody is assigned yet."),
           ]

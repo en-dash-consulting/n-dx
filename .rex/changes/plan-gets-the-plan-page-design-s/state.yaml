@@ -1,18 +1,53 @@
 schema: "rex/v2"
 items:
   "034a93c8-153c-4319-8f1d-ce0b11dac0ff":
-    lastModified: "2026-11-23T18:49:21.710Z"
+    status: "completed"
+    startedAt: "2026-11-23T19:13:13.340Z"
+    completedAt: "2026-11-23T19:13:13.340Z"
+    endedAt: "2026-11-23T19:13:13.340Z"
+    activeIntervals: [{"end":"2026-11-23T19:13:13.340Z","start":"2026-11-23T19:13:13.340Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "For me / Everyone (shared plan-view-state, remembered per browser) filters the area boxes and the Inbox panel using isMine; unit tests."
+    lastModified: "2026-11-23T19:13:13.340Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "3126ccc4-dea4-4cdb-ad07-16ad4c9cf60c":
-    lastModified: "2026-11-23T18:49:33.080Z"
+    status: "completed"
+    startedAt: "2026-11-23T19:13:35.498Z"
+    completedAt: "2026-11-23T19:13:35.498Z"
+    endedAt: "2026-11-23T19:13:35.498Z"
+    activeIntervals: [{"end":"2026-11-23T19:13:35.498Z","start":"2026-11-23T19:13:35.498Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Solo / Team in Plan's head (remembered per browser) hides assignees and For me / Everyone; 'Take the tour' runs a 4-step spotlight tour with Skip/Back/Next and Escape; unit tests."
+    lastModified: "2026-11-23T19:13:35.498Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "533600ce-bcd3-4632-812d-4d286c4c078d":
+    status: "completed"
+    startedAt: "2026-11-23T19:13:35.498Z"
+    completedAt: "2026-11-23T19:13:35.498Z"
+    endedAt: "2026-11-23T19:13:35.498Z"
+    activeIntervals: [{"end":"2026-11-23T19:13:35.498Z","start":"2026-11-23T19:13:35.498Z"}]
+    appliedAt: "2026-11-23T19:13:35.498Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-23T18:48:56.502Z"
-    lastModified: "2026-11-23T18:49:33.080Z"
+    lastModified: "2026-11-23T19:13:35.498Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "aa011302-421a-4c32-b2b4-e162aa7833d4":
-    lastModified: "2026-11-23T18:49:28.732Z"
+    status: "completed"
+    startedAt: "2026-11-23T19:13:28.088Z"
+    completedAt: "2026-11-23T19:13:28.088Z"
+    endedAt: "2026-11-23T19:13:28.088Z"
+    activeIntervals: [{"end":"2026-11-23T19:13:28.088Z","start":"2026-11-23T19:13:28.088Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Inbox rows in Plan's panel are draggable and offer 'Plan in <area>'; a drop on an area places a touches on its best candidate (POST /place) or opens placement mode; the panel steps aside while dragging; unit tests for button, drop and fallback."
+    lastModified: "2026-11-23T19:13:28.088Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "e9fea9c9-5616-42fa-ac4e-f94a1174cfc2":
-    lastModified: "2026-11-23T18:49:24.922Z"
+    status: "completed"
+    startedAt: "2026-11-23T19:13:20.734Z"
+    completedAt: "2026-11-23T19:13:20.734Z"
+    endedAt: "2026-11-23T19:13:20.734Z"
+    activeIntervals: [{"end":"2026-11-23T19:13:20.734Z","start":"2026-11-23T19:13:20.734Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Stage chips with counts (aria-pressed) in the Product areas toolbar focus the boxes on one stage; pressing again or Show all clears; combines with For me; unit tests."
+    lastModified: "2026-11-23T19:13:20.734Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

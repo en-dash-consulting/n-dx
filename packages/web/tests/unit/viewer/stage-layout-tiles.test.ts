@@ -59,8 +59,8 @@ describe("Plan tiles before the first status", () => {
   it("mounts no v2-only tile with null status, only its placeholder, then a v1 status", () => {
     status = null;
     mount();
-    // The lifecycle band reads either layout, so it draws at once.
-    expect(live()).toContain("flow");
+    // Every Create part is v2-only now that the lifecycle band is gone: only placeholders draw.
+    expect(live()).toEqual([]);
     for (const v of V2_ONLY) {
       expect(live()).not.toContain(v);
       expect(root.querySelector(`[data-tile="${v}"][data-pending]`)).not.toBeNull();
@@ -106,9 +106,8 @@ describe("Plan tiles before the first status", () => {
     status = withLayout("v2");
     mount();
     expect(loading).toEqual(tiles());
-    // The glance, then how work moves, then the product areas.
-    expect(loading.indexOf("plan-glance")).toBeLessThan(loading.indexOf("flow"));
-    expect(loading.indexOf("flow")).toBeLessThan(loading.indexOf("plan-areas"));
+    // The glance, then the product areas.
+    expect(loading).toEqual(["plan-glance", "plan-areas"]);
   });
 
   it("shows Tasks, and no tile that says to migrate, when status arrives with no PRD", () => {

@@ -154,7 +154,7 @@ export type { DescribeInSidecar } from "./describe-in-sidecar.js";
 export { DiagnoseInSidecarContext, DiagnoseInSidecarButton, RunVerdictChip, isFailedRun, newestRunIds } from "./diagnose-in-sidecar.js";
 export { AskInSidecarContext, AskInSidecarButton } from "./ask-in-sidecar.js";
 export type { AskInSidecar, AskInSidecarKind } from "./ask-in-sidecar.js";
-export { GhostCardsContext, ghostChanges, ghostCountsByTarget, ghostStripCounts } from "./ghost-changes.js";
+export { GhostCardsContext, ghostChanges, ghostCountsByTarget } from "./ghost-changes.js";
 export type { GhostChange } from "./ghost-changes.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";

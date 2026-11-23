@@ -19,7 +19,8 @@
 
 import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { PLAN_DRAG_EVENT } from "./plan-placement.js";
 import type { NavigateTo } from "../types.js";
 import { ActionIcon, useEscapeKey, useProjectStatus } from "../components/index.js";
 import { LiveBadge } from "./stage-badge.js";
@@ -59,6 +60,16 @@ export function StageSidePanels({ stage, panels, openId, onToggle, renderPanel, 
   const openerRef = useRef<HTMLElement | null>(null);
   /** Set while closing, so the focus trap lets focus go back to the opener. */
   const closingRef = useRef(false);
+  /**
+   * An Inbox row is being dragged out of the panel onto the page: the panel
+   * slides almost out of view and the scrim lifts, so the page takes the drop.
+   */
+  const [peek, setPeek] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => setPeek(!!(e as CustomEvent<{ active: boolean }>).detail?.active);
+    window.addEventListener(PLAN_DRAG_EVENT, on);
+    return () => window.removeEventListener(PLAN_DRAG_EVENT, on);
+  }, []);
 
   const close = () => {
     closingRef.current = true;
@@ -134,10 +145,10 @@ export function StageSidePanels({ stage, panels, openId, onToggle, renderPanel, 
       named.length > 0 && transitional.length > 0 ? h("span", { class: "stage-side-divider", "aria-hidden": "true" }) : null,
       transitional.map(tab),
     ),
-    open ? h("div", { class: "stage-side-scrim", onClick: close, "aria-hidden": "true" }) : null,
+    open && !peek ? h("div", { class: "stage-side-scrim", onClick: close, "aria-hidden": "true" }) : null,
     open
       ? h("aside", {
-          class: "stage-side-panel",
+          class: peek ? "stage-side-panel stage-side-panel--peek" : "stage-side-panel",
           id: panelId,
           role: "dialog",
           "aria-modal": "true",

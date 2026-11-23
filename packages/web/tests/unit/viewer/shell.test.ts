@@ -555,11 +555,12 @@ describe("StagePage", () => {
   const bands = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-band")).map((el) => el.dataset.tile);
   const sideTabs = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-side-tab")).map((el) => el.querySelector(".stage-side-tab-label")?.textContent);
 
-  it("renders Create as the glance cards, how work moves and the product areas, with the rest in side panels", async () => {
+  it("renders Create as the glance cards and the product areas, with no lifecycle band and the rest in side panels", async () => {
     stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v2" } });
     await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo: vi.fn(), renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
     expect(sectionViews()).toEqual([]);
-    expect(bands()).toEqual(["plan-glance", "flow"]);
+    // The Inbox / Proposed / Ready … counts band is gone from Plan.
+    expect(bands()).toEqual(["plan-glance"]);
     expect(planTiles()).toEqual(["plan-areas"]);
     expect(root.querySelector('.stage-tile[data-tile="plan-areas"]')?.className).toContain("stage-tile--c12 stage-tile--r3");
     expect(root.querySelector('.stage-tile[data-tile="plan-areas"] .stage-tile-title')?.textContent).toBe("Product areas");
@@ -602,6 +603,8 @@ describe("StagePage", () => {
   it("opens Preparation's Assign and schedule full-screen with List and Tree tabs", async () => {
     localStorage.setItem("ndx.stage-mode", JSON.stringify({ plan: "prepare" }));
     await mount(page("plan"));
+    // Preparation is Assign and schedule alone: no Lifecycle band above it.
+    expect(bands()).toEqual([]);
     act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes"] .stage-tile-head')!.click(); });
     const full = root.querySelector(".stage-tile-fullscreen")!;
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -615,7 +618,7 @@ describe("StagePage", () => {
     stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v1" } });
     await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo: vi.fn(), renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
     expect(planTiles()).toEqual(["prd", "product"]);
-    expect(bands()).toEqual(["flow"]);
+    expect(bands()).toEqual([]);
     const tasks = root.querySelector<HTMLElement>('.stage-tile[data-tile="prd"]')!;
     expect(tasks.className).toContain("stage-tile--c8 stage-tile--r2");
     expect(tasks.querySelector(".stage-tile-title")?.textContent).toBe("Tasks");
