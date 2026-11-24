@@ -271,6 +271,20 @@ function findDebugSentinel(message: string): { path: string; start: number; end:
   return null;
 }
 
+/** Preserve same-line word order without backtracking over provider-controlled text. */
+function hasChatGptModelRejection(message: string): boolean {
+  for (const line of message.toLowerCase().split("\n")) {
+    const model = line.indexOf("model");
+    const chatGpt = line.lastIndexOf("chatgpt");
+    if (model === -1 || chatGpt < model + "model".length) continue;
+    // The first model and last ChatGPT span every possible ordered match.
+    // Each fixed substring search scans this line only once.
+    const reason = line.slice(model + "model".length, chatGpt);
+    if (reason.includes("not supported") || reason.includes("unavailable") || reason.includes("not available")) return true;
+  }
+  return false;
+}
+
 /**
  * Classify an LLM error and return a user-friendly message, suggestion, and category.
  *
@@ -319,8 +333,7 @@ export function classifyLLMError(
 
   // Use the provider's authentication-specific rejection, never a static
   // retirement list or an inference from the presence/absence of an API key.
-  if (vendor === LLM_VENDOR.CODEX &&
-      /model[^\n]*(?:not supported|unavailable|not available)[^\n]*chatgpt/i.test(authCheckMessage)) {
+  if (vendor === LLM_VENDOR.CODEX && hasChatGptModelRejection(authCheckMessage)) {
     return {
       message: `The pinned Codex model is unavailable with ChatGPT authentication.${suffix}`,
       suggestion: "Keep the pin and explicitly choose API-key authentication if your API project supports it " +
