@@ -24,7 +24,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } 
 import { join } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { errorResponse, jsonResponse, readJsonBody } from "./response-utils.js";
+import { errorMessage, errorResponse, jsonResponse, readJsonBody } from "./response-utils.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { loadPRDSync } from "./prd-io.js";
 import { walkTree } from "./rex-gateway.js";
@@ -198,7 +198,7 @@ export async function handleHenchQueueRoute(
         return { saved: items };
       }, options);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorMessage(err);
       if (err instanceof QueueLockedError) errorResponse(res, 503, `${message} Try again.`);
       else errorResponse(res, 500, `Could not save the run queue: ${message}`);
       return true;

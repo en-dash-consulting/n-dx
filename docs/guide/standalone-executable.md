@@ -108,3 +108,5 @@ runs that script the way `node` would. Otherwise it runs `ndx`, or the tool
 named by the executable's own name. Every child process, from the dashboard
 server and MCP servers to hench's agent tooling and extension commands, goes
 through the same binary and the same unpacked runtime.
+
+See: [Skills Reference](./skills) for the assistant skills `ndx init` installs; they work the same with the standalone `ndx`.

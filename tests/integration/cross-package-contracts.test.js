@@ -407,6 +407,7 @@ describe("hench → llm-client gateway contract", () => {
     "resolveLayout",
     "detectLayoutMode",
     "relativeToRoot",
+    "agentPromptSection",
     "readAvailableMemory",
     "getAvailableMemory",
     "createAvailableMemoryReader",
@@ -996,6 +997,9 @@ describe("gateway export auto-detection", () => {
         // (`.ndx/hench` → the project, not the container), which is the
         // resolver's knowledge of its own layout.
         "resolveLayout", "detectLayoutMode", "relativeToRoot", "projectRootOf",
+        // The operator's agent prompt file: llm-client reads it once so a hench
+        // run and the Sidecar append the same text.
+        "agentPromptSection",
         // The per-user home, under which the host-wide validation slot lives.
         "resolveNdxHome",
         // Available-memory reading. One reading for hench, the dashboard and
