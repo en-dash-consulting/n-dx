@@ -484,9 +484,14 @@ describe("direct OpenAI agent execution", () => {
     ]]);
     const running = run("task-1", controller.signal);
     try {
-      await vi.waitFor(async () => expect(await readFile(join(projectDir, "started.txt"), "utf8")).toBe("started"));
+      // Spawning the real guarded command can exceed waitFor's one-second
+      // default on Windows. Cancellation must wait until that command starts.
+      await vi.waitFor(async () => expect(await readFile(join(projectDir, "started.txt"), "utf8")).toBe("started"), { timeout: 10_000 });
     } finally {
       controller.abort();
+      // Finalization still needs the fixture when readiness fails. Settle it
+      // before afterEach removes the project or restores the mocked transport.
+      await running;
     }
     const { run: record } = await running;
     expect(record.status).toBe("cancelled");
