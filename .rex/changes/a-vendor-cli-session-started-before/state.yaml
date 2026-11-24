@@ -10,6 +10,7 @@ items:
     resolutionDetail: "Fixed in 9d828a7fd by task 58c29a6c (Give every vendor CLI session the host slot directory): the session spawn waits, bounded and abortable, for the host lookup."
     appliedAt: "2026-11-14T06:49:34.060Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.5"
     createdAt: "2026-11-14T06:36:49.155Z"
     lastModified: "2026-11-14T06:49:34.060Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

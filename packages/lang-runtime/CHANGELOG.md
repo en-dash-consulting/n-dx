@@ -1,5 +1,43 @@
 # @n-dx/lang-runtime
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`966597b`](https://github.com/en-dash-consulting/n-dx/commit/966597bab5a972213e5a2a12edffee0092445a6d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: in a chain of calls such as `$a->b()->c()`, each call's receiver in a pack's call facts is the expression directly before its name, whatever order the query captures it in.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`8aefbe2`](https://github.com/en-dash-consulting/n-dx/commit/8aefbe2a7f24f8ffc67cd1ba86e28ca93ebf33f1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: a framework pack's context now carries `configFiles`, the configuration text its pack's resolver read beside the sources, and `RouteFact` gains an optional `source` naming where a route was declared outside its handler's code.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: every package suite can measure line, branch and function coverage with per-line hit counts, and fails below its recorded coverage floor.
+  
+  `pnpm test:coverage` runs each package's new `test:coverage` script, which writes HTML, lcov and JSON reports to `packages/<pkg>/coverage/`. `pnpm coverage:lines <pkg>` prints how many times the suite executed each line. Shared settings live in `tests/vitest-coverage.mjs`; see TESTING.md, "Code Coverage".
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`0a55de6`](https://github.com/en-dash-consulting/n-dx/commit/0a55de6523e6ace586a206f68cec4ad1b80d4d5d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - PHP 5 files that use `$s{0}` string offsets now keep their includes, calls and symbols, and `imports.json` reports them under `summary.parseIssues.php.legacySyntax`, not as syntax errors.
+  
+  The PHP 8 grammar cannot parse the curly-brace offset, so these valid legacy files used to lose facts and count as broken. The PHP pack now rewrites each offset to `$s[0]` in place, at the same length so every position is the source's, and parses again. `legacySyntax` counts the files and the rewrites by construct (`brace-offset`), and each offset still counts once as a `curly-offset` legacy construct. Short open tags and `each()` were never parse failures; they stay legacy-construct facts.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`86e8aab`](https://github.com/en-dash-consulting/n-dx/commit/86e8aabd3a8923a40ba44e7ad3649a2688f17862) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: the language pack contract gains `trait`, `namespace` and `constant` symbol kinds, a `conditional` import guard (`IMPORT_GUARDS`) and optional `WrittenImport.candidates` for dynamic includes, which never become import edges. No pack produces them yet, so analyze output is unchanged.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`fa3e4a3`](https://github.com/en-dash-consulting/n-dx/commit/fa3e4a37c721a7fc427248e2973960fb9c68c50f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx sv pack add php` installs the new opt-in `@n-dx/lang-php` pack, and `ndx analyze` suggests it for PHP repositories in its `Optional packs` line.
+  
+  The pack parses PHP, including PHP 5 pages with `<?php … ?>` blocks between HTML, with a pinned tree-sitter-php 0.25.1 grammar. Without the pack, PHP files get inventory only and analyze output is unchanged. The grammar build script can now build a grammar from a subdirectory of its release archive.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`966597b`](https://github.com/en-dash-consulting/n-dx/commit/966597bab5a972213e5a2a12edffee0092445a6d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The opt-in PHP pack (`ndx sv pack add php`) now reads each PHP file's includes, `use` imports, declarations and calls, including PHP 5 pages with HTML between `<?php` blocks.
+  
+  Includes inside conditions, loops and functions are marked conditional. Imports are reported as written and not yet linked to files, so `imports.json` gains no PHP edges; with the pack installed, `ndx analyze` lists PHP among the analysed languages.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`228d348`](https://github.com/en-dash-consulting/n-dx/commit/228d348026f1dd4d05585dc308780f539e1cb054) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: a call written with a space or comment before its argument list, such as PHP's `foo ($x)` or `$db->query ($sql)`, keeps its callee and receiver in a pack's call facts.
+  
+  The name is the one the call holds directly, outside any inner call, that ends last before the list opens; a call whose callee is not a name, such as `foo() ($x)`, still has none.
+
+- [#1065](https://github.com/en-dash-consulting/n-dx/pull/1065) [`1dc0110`](https://github.com/en-dash-consulting/n-dx/commit/1dc01107170e5152c4874798bacd765fa490b8f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: refactor llm-client and the language packs without changing behaviour: shared HTTP retry and child-process settling, one merged project-config loader, vendor failover as a table, and shared span helpers in the packs.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`a4f0ab9`](https://github.com/en-dash-consulting/n-dx/commit/a4f0ab91e1c6a69c86a296edb0e26bd831126f76) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv analyze` now reports language-pack files that do not parse cleanly, in one `[<pack>-parse]` line and in `imports.json` `summary.parseIssues`.
+  
+  The report counts files with syntax errors, files over the parser's 1 MiB limit, unreadable files and files that are not valid UTF-8, with up to 50 sorted example paths for each. It covers every pack the imports phase runs (PHP, Java, Go, Python). Nothing becomes fatal: facts are still read from a file with syntax errors, and a non-UTF-8 file is still parsed. When every file parses cleanly the field is absent and `imports.json` is unchanged. The field names are new and under review.
+- Updated dependencies [[`a01e575`](https://github.com/en-dash-consulting/n-dx/commit/a01e5753f70be4774dab4e2a0bcc673e48d13d0c), [`8aefbe2`](https://github.com/en-dash-consulting/n-dx/commit/8aefbe2a7f24f8ffc67cd1ba86e28ca93ebf33f1), [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95), [`1e55cf9`](https://github.com/en-dash-consulting/n-dx/commit/1e55cf9f2dd1eafa6176f9965cc71e174aef4695), [`98a2c93`](https://github.com/en-dash-consulting/n-dx/commit/98a2c939f2081fe6c3825a5c85fcd629202bfe9e), [`e6b640b`](https://github.com/en-dash-consulting/n-dx/commit/e6b640b9e5956116d088dc775c79159c5d9ca898), [`6bf5241`](https://github.com/en-dash-consulting/n-dx/commit/6bf5241853c8233ce5202eee62aefcee64ca6927), [`9eddb9f`](https://github.com/en-dash-consulting/n-dx/commit/9eddb9f8bcf19d50b2de8662cf11c3e84bfc8fab), [`263d95e`](https://github.com/en-dash-consulting/n-dx/commit/263d95e1bd0d40c52b7e9bab1139a536a3b7b085), [`0c31f42`](https://github.com/en-dash-consulting/n-dx/commit/0c31f4223c595c4ee0d202c64533d411e998e675), [`a592749`](https://github.com/en-dash-consulting/n-dx/commit/a5927499f0f28212f41c6e494490a6c617fd5511), [`0a55de6`](https://github.com/en-dash-consulting/n-dx/commit/0a55de6523e6ace586a206f68cec4ad1b80d4d5d), [`80bcac9`](https://github.com/en-dash-consulting/n-dx/commit/80bcac989a958219ad4d4b2ad61ba1dd68f6e72b), [`f867805`](https://github.com/en-dash-consulting/n-dx/commit/f86780564927ea637da9293cbe34bf042c167921), [`86e8aab`](https://github.com/en-dash-consulting/n-dx/commit/86e8aabd3a8923a40ba44e7ad3649a2688f17862), [`966597b`](https://github.com/en-dash-consulting/n-dx/commit/966597bab5a972213e5a2a12edffee0092445a6d), [`f17f946`](https://github.com/en-dash-consulting/n-dx/commit/f17f94636d3a5d9ca51bb5c8615c720965bc0cc9), [`1dc0110`](https://github.com/en-dash-consulting/n-dx/commit/1dc01107170e5152c4874798bacd765fa490b8f8), [`d4d2866`](https://github.com/en-dash-consulting/n-dx/commit/d4d28664500af935874abbc49084703d7e28871f), [`a4f0ab9`](https://github.com/en-dash-consulting/n-dx/commit/a4f0ab91e1c6a69c86a296edb0e26bd831126f76), [`5e253e4`](https://github.com/en-dash-consulting/n-dx/commit/5e253e4a8e2043ddf5082703e307850f29e1a2ec)]:
+  - @n-dx/lang-kit@0.10.5
+
 ## 0.10.4
 
 ### Patch Changes

@@ -1,5 +1,171 @@
 # @n-dx/llm-client
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`3c39a05`](https://github.com/en-dash-consulting/n-dx/commit/3c39a05a8bffb6bd6bbaa8c87a03a5bd83270fdd) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx plan` and analysis report Codex CLI token usage, including cached input and measured spend from retries.
+  
+  Structured accounting preserves the exact final response text. Missing or malformed usage is distinguished from measured zero. Sourcevision cache tokens reach CLI and dashboard rollups, and failed completions retain measured spend.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`0915a65`](https://github.com/en-dash-consulting/n-dx/commit/0915a6527b22ed5bada412d6ef89d0dfbef30a07) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The dashboard discovers Codex models through the configured CLI without requiring an API key for ChatGPT login.
+  
+  Codex model lists identify their client-catalog provenance, CLI version and check time; they do not prove inference access. Failed or unsupported probes retain the built-in list with an actionable reason. Account and binary changes are rechecked on each lookup. OpenAI API catalog membership no longer determines the dashboard's live Codex choices.
+  
+  Unaccepted checkouts retain a fallback until `n-dx trust accept .`. Existing explicit model pins remain unchanged.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`72ff8ef`](https://github.com/en-dash-consulting/n-dx/commit/72ff8efe0997769ddca7ac02a0e3f98f0e70667d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Test-only: Verify literal Codex model pins through Windows command wrapping while preserving rejection and migration-guidance checks.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`388ea30`](https://github.com/en-dash-consulting/n-dx/commit/388ea30de298e7db30f01f9aaf9aba2813d5dabc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` rejects Codex sandbox policies with network or writable-root settings that the selected mode cannot honor.
+  
+  Action needed: use `workspace-write` for bounded writes and network controls. Read-only policies require network access disabled; full-access policies cannot carry network denial or bounded writable roots.
+  
+  Strict configuration validation now applies to every sandbox mode and continuation. An installed CLI that rejects the required flag fails without retrying with weaker controls. Command allowlists and read-path guards remain unsupported by general native Codex execution.
+  
+  The hub `Sidecar` uses a separate confined profile for audited macOS Codex CLI 0.167.0-alpha.3.2 (experimental, off by default; enable with `web.sidecar`). This admission does not extend its read confinement to general native Hench runs. Other hub platforms, versions and unavailable executables are refused.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`35c3d57`](https://github.com/en-dash-consulting/n-dx/commit/35c3d574f49f8e6bcbf8b6d3ad409e04a134d6e0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` gives Codex execution and review processes private writable temporary directories, including resumed and forked sessions.
+  
+  Normal temporary-file APIs use the private directory through `TMPDIR`, `TMP` and `TEMP`. Each spawn removes its directory after exit, including failure and cancellation. Host temporary directories stay excluded and network permissions stay unchanged.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`5a62b27`](https://github.com/en-dash-consulting/n-dx/commit/5a62b2765a585347ad9e91187623817f2617c090) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` and Codex completions refuse native environment allowlists that would remove their private temporary directories before model work starts.
+  
+  Action needed: If `shell_environment_policy.include_only` is nonempty, retain `TMPDIR`, `TMP` and `TEMP` explicitly alongside its existing entries. Preserve other exclusions. The selected Codex CLI must support strict `app-server config/read`; update the CLI or `llm.codex.cli_path` if that check is unavailable.
+  
+  The check reads effective native configuration without changing filters, credentials, network permissions or writable roots. Fresh, resumed and forked execution and review calls use the same check.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`5a62b27`](https://github.com/en-dash-consulting/n-dx/commit/5a62b2765a585347ad9e91187623817f2617c090) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` cleans populated read-only Codex temporary directories without replacing successful results, failures or cancellations with cleanup errors.
+  
+  Cleanup repairs permissions only on owned directories, leaves symlink targets untouched and reports an actionable warning if removal cannot finish.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`1d98c43`](https://github.com/en-dash-consulting/n-dx/commit/1d98c439e2ca62fa47a5dfe27894f32a1b91b39f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `llm.effort` now controls supported Codex CLI and OpenAI API reasoning effort, including agent execution and review.
+  
+  Codex checks the selected client's advertised model capabilities before sending an override. Unsupported settings and unavailable capability information warn clearly. OpenAI blocking and streaming requests validate effort against model support. Without an explicit rule, existing client settings and defaults remain unchanged.
+  
+  `n-dx config` accepts `none`, `minimal`, and `ultra` alongside the existing effort levels, and recognizes `agent.review`. Each provider still checks support for the selected model before sending the setting.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`66d672d`](https://github.com/en-dash-consulting/n-dx/commit/66d672d8eda9875885ff6cd48c5503f350d89edb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` reuses eligible Codex work sessions for transient retries and self-review while preserving prior attempt context.
+  
+  Reuse requires a supported selected CLI and matching checkout, model, execution policy and credential identity. Failed retry continuations stop without replaying the work; unsupported or changed identities use a fresh context with the existing retry notice. Review with a different model starts fresh. Batch continuation and pair repair retain their existing behavior.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`231b98e`](https://github.com/en-dash-consulting/n-dx/commit/231b98e2aab4c0c40dad63618137d9b5a0a1b177) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The experimental dashboard `Sidecar` (`web.sidecar`, off by default) carries selected Codex provider credentials securely and honors configured model pins on fresh and resumed turns.
+  
+  Action needed: custom providers require codex-cli `0.167.0-alpha.3.2` and a Responses provider in the operator's Codex config. Export required credential variables before starting the dashboard. Command-backed authentication, OAuth and unsupported provider settings refuse explicitly; no provider fallback occurs.
+  
+  Only the selected provider and profile model are carried. Unrelated MCP servers and integrations remain excluded, and hub sessions retain their existing audited executable and sandbox restrictions. Provider credentials travel through hidden environment references, including static headers and bearer tokens in the confined hub, and are masked in agent commands. Worktree sessions require environment-backed credentials. Explicit session models override the project's Codex model pin, which overrides the selected Codex profile model.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`5424d95`](https://github.com/en-dash-consulting/n-dx/commit/5424d95cff4272c252493733ced790cd198e822c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` uses Luna, Sol 6.1 and Astra for unpinned Codex light, standard and heavy work, with matching init choices and dashboard defaults.
+  
+  Action needed: To retain a previous standard execution default, set `n-dx config llm.codex.model <model-id> .`. This pins standard work only. Preserve heavy work with `n-dx config llm.tiers.codex.heavy <model-id> .` and light work with `n-dx config llm.tiers.codex.light <model-id> .` (or `n-dx config llm.codex.lightModel <model-id> .`). To retain a reviewer, set `n-dx config llm.codex.reviewModel <model-id> .`. Use the previous model ID for each slot you want to keep.
+  
+  Routine review uses Sol 6.1; a saved heavy review tier uses Astra. Existing execution, tier, Hench, task and reviewer pins are preserved without rewriting saved settings. GPT-5.5 remains selectable with an API-key-only label reflecting its ChatGPT sign-in retirement.
+  
+  The heavy tier pin also retains the model for saved `run.reviewTier: heavy` reviews. Such a saved tier takes precedence over `llm.codex.reviewModel`; explicit task reviewer models and CLI reviewer overrides still win.
+  
+  These are workload recommendations, not n-dx benchmarks or proof of account access. Codex effort remains at client defaults pending separate effort support.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`c225ddf`](https://github.com/en-dash-consulting/n-dx/commit/c225ddfcbca6a9ae128dbf93d86dc2dc58c33af3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` supports warm-parent forks with capability-gated Codex binaries and falls back to cold sessions when the selected binary lacks support.
+  
+  Action needed: To retain per-task cold starts on supported Codex versions, set `hench.sessionStrategy` to `cold`.
+  
+  Each task forks the orientation parent, reapplies sandbox, approvals, model and credential hiding, and must report a distinct child session ID. Parent reuse checks checkout, execution policy, binary version and credential/config identity. Opaque keychain identity uses cold starts. Custom-provider fork requests fall back to cold. Batch and explicit cold strategies retain their behavior.
+  
+  The initial conservative version floor is Codex CLI 0.167, with an additional command-surface probe.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`f2a6963`](https://github.com/en-dash-consulting/n-dx/commit/f2a6963b6fb79981bf884dedc55e971b520489b5) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` explicitly sets Codex workspace network access and writable roots instead of inheriting broader grants from native configuration.
+  
+  Action needed: use a Codex CLI supporting `--strict-config`. Workspace-write policies must include `.`; use read-only mode when project-root writes are unwanted. Temporary directories are no longer implicitly writable.
+  
+  Fresh, resumed and forked workspace-write turns carry the same overrides and retain shell credential masking. This does not establish command allowlists or read-path confinement.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`59b22c4`](https://github.com/en-dash-consulting/n-dx/commit/59b22c401d4bcc421af760f0f22f7f884a53a995) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Claude CLI calls now record their token counts, so `ndx analyze` ledgers and run costs include Claude escalations and zone enrichment instead of showing 0 tokens.
+  
+  The run ledger also keeps prompt-cache tokens per task class (`cacheCreationTokens`, `cacheReadTokens`, omitted when zero), prices them at the model's cache rates, and shows them as `+ N cached` in the per-class and run token lines.
+  
+  The current Claude CLI prints one JSON result object with its counts nested under `usage`; only top-level counts used to be read. A TypeSafe cascade run that also reached a text model now writes the startup primer instead of skipping it as "cascade mode". When stdout isn't a terminal, analyze notes on stderr, even under `--quiet`, that background zone narration continues after it exits, with the log path and `--wait`.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`12f8590`](https://github.com/en-dash-consulting/n-dx/commit/12f85901302afb7e5aa9455cc7e2ed233681d5d4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work` in a PHP project now runs `php -l` on each changed PHP file and, when Composer files changed, `composer validate`; the test gate runs the project's own `vendor/bin/phpunit`.
+  
+  Action needed: a PHP checkout (as detected below) is now judged against the PHP guard baseline (`php`, `composer`, `phpunit`, `git`). If its `.hench/config.json` was written with the JavaScript defaults, `ndx trust .` reports the extra commands; run `ndx trust accept .` to keep them, or replace the guard with the PHP defaults.
+  
+  A project with a root `composer.json` is detected as PHP by `hench init` and by repository trust. When a root `package.json` sits beside it, the project is PHP only if it has more PHP files than JavaScript/TypeScript files, so a JavaScript app with a little PHP keeps its npm tools while a Laravel app stays PHP. A PHP project gets the PHP guard defaults and the new `php-project` template. Each check runs only when its prerequisite exists: `php -l` and `composer validate` need the tool on PATH, `composer validate` runs only when the change touched `composer.json` or `composer.lock`, and PHPUnit needs `phpunit.xml` or `phpunit.xml.dist` plus an installed `vendor/bin/phpunit`. n-dx installs nothing; a missing tool skips its check. A failing `php -l` or `composer validate` fails the run, so the task is not marked done. These checks run even with `--skip-test-gate`.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`0b2cff4`](https://github.com/en-dash-consulting/n-dx/commit/0b2cff4f72112b52261b2bb41eeaba48ff86d4e2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `exec` takes an optional `onSpawn` callback that receives the child's pid as soon as it starts, and whether that pid is also its process group.
+  
+  Callers that omit it behave exactly as before. hench uses it to record a test command in the host validation slot.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`966bfdc`](https://github.com/en-dash-consulting/n-dx/commit/966bfdc0227f593b9040408ed048af28a3e7c14f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` preserves OpenAI API cache reads and writes and requests final streaming token usage, improving usage totals and cost estimates.
+  
+  Blocking and streaming responses use the same disjoint token categories. Missing, partial, malformed and interrupted accounting is explicitly identified; interrupted stream errors retain previously received usage.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`796e7f7`](https://github.com/en-dash-consulting/n-dx/commit/796e7f7277a95c20bf9baabc6a83ec47b172da9f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` preserves earlier context in summaries when OpenAI API runs use the default model tiers.
+  
+  Compaction uses Chat Completions for the default Luna summary and keeps the Responses endpoint for existing Sol and Astra agent-model pins. Summary requests honor explicit tier, route, and effort settings. Billed tokens from a truncated or filtered Chat Completions summary count toward the run even when its text is discarded.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`ebcfab1`](https://github.com/en-dash-consulting/n-dx/commit/ebcfab1180b813b0482ba72b0c01ecda3485dfea) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work --provider=api` runs Codex tasks and sequential loops through OpenAI Responses, with guarded tools, budgets, cancellation and completion checks.
+  
+  Select a supported model (`gpt-6.1-sol` or `gpt-6-astra`) and configure OpenAI API authentication. CLI execution with API-key authentication remains a separate supported option. Direct runs support diff approval; CLI self/pair review remains unavailable on API execution. OpenAI API failover is opt-in through `llm.autoFailover`: Codex light, Claude standard, then Claude light, at most once per selection per run. Claude uses its own API credentials; unsupported OpenAI fallback models are skipped.
+  
+  The dashboard offers both Codex providers and checks API readiness from the selected authentication mode. API model discovery no longer requires a Codex CLI install.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`be3ca15`](https://github.com/en-dash-consulting/n-dx/commit/be3ca157bec442233a17495296baa6b8dd20eae1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` preflight and dashboard estimates use refreshed OpenAI rates and context metadata, including retained model pins and supported 150K-token prompts.
+  
+  API maximum context is separate from Codex/Work defaults. Request estimates support published processing modes, cache durations and long-context rates; subscription usage has no inferred API bill. Aggregate estimates retain explicit assumptions and labelled unknown-model fallbacks. Model defaults and execution pins are unchanged.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`144a340`](https://github.com/en-dash-consulting/n-dx/commit/144a3402adafdef7674df3f7611ea5c026eefc2b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: Add a Responses API agent-turn contract for GPT-6.1 Sol and GPT-6 Astra, preserving tool identities, reasoning history, cancellation and usage.
+  
+  The optional provider methods support text and function tools, including streamed turns and tool failure results. Unsupported models no longer advertise function calling. Existing text completion methods remain compatible; this does not enable direct API task execution in `n-dx work`.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: every package suite can measure line, branch and function coverage with per-line hit counts, and fails below its recorded coverage floor.
+  
+  `pnpm test:coverage` runs each package's new `test:coverage` script, which writes HTML, lcov and JSON reports to `packages/<pkg>/coverage/`. `pnpm coverage:lines <pkg>` prints how many times the suite executed each line. Shared settings live in `tests/vitest-coverage.mjs`; see TESTING.md, "Code Coverage".
+
+- [#1085](https://github.com/en-dash-consulting/n-dx/pull/1085) [`6d42dbc`](https://github.com/en-dash-consulting/n-dx/commit/6d42dbce2a9121f03a6c4e7a4d23b2b490e5aaa1) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard's add-change box shows a `+` for attaching images when the model `ndx work` runs takes images, with thumbnails below the box until you add.
+  
+  Pick images with `+` or paste one into the box. PNG, JPEG, GIF and WebP up to 5 MB each are accepted, at most eight per change. Add creates the change first, then stores each image beside its `index.md` in the change's folder under `changes/`. The image moves with the change when it is placed or reparented. If an image cannot be stored, the change is still added and the box says which image failed.
+  
+  `ndx work` lists a change's images in the agent's brief, under Attached Images, with their paths, so the agent opens them before starting. The `+` is offered for Claude, Codex and Gemini models. For a local model it is offered only when the model's name marks it as a vision model (for example `llava` or `qwen2.5vl`). It is offered only on v2 PRDs.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`d5e1f90`](https://github.com/en-dash-consulting/n-dx/commit/d5e1f90f795c8e042c56e003dfad9fd6e1a51198) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` preserves explicit Codex model pins across configuration, task execution and review, including older IDs supported by API-key authentication.
+  
+  Action needed: If Codex rejects a pinned model with ChatGPT authentication, explicitly select an available model in the originating setting, or configure an API key with `n-dx config credentials.codex` and select `n-dx config llm.codex.auth api` if your API project supports that model.
+  
+  Model defaults no longer replace older pins. Authentication-specific model rejections explain the choice without changing settings or retrying with another model. Older IDs missing from the pricing table are reported as unknown instead of using a replacement model's rates as known prices.
+  
+  Long, repetitive provider errors no longer stall Codex model-rejection guidance.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`a1cf1a2`](https://github.com/en-dash-consulting/n-dx/commit/a1cf1a29169fb953a90353e0fefc23025e5592a1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` sends compatible output limits when using supported OpenAI reasoning models, allowing configured reasoning effort to reach the API.
+  
+  Blocking and streaming Chat Completions requests use `max_completion_tokens` for verified reasoning models, with or without explicit effort. Custom and nonreasoning models retain the legacy `max_tokens` parameter.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`a1cf1a2`](https://github.com/en-dash-consulting/n-dx/commit/a1cf1a29169fb953a90353e0fefc23025e5592a1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx config` explains that `agent.review` controls effort only, and Settings shows the actual reviewer separately from model tiers.
+  
+  Choose the reviewer with `llm.<vendor>.reviewModel` or a task's saved `reviewTier` or `reviewModels`. Existing model precedence and effort rules remain unchanged; an `llm.routes.agent.review` entry has no effect and no longer appears as an active route override.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`196c89c`](https://github.com/en-dash-consulting/n-dx/commit/196c89c94357fe21bb71f97081e60799c33eb9c1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The OS sandbox lets confined test gates and agent shells use the host validation slot in `<ndx home>/validation-slot/`, so the slot works with `NDX_SANDBOX` on.
+  
+  Before this, a confined command that took the slot (the repository's own test runner, or a gate with `hench.testGate.hostSlot` on) failed with `EPERM` before any test ran, because the sandbox denies the ndx home. Tool children and the vendor CLI now get read and write access to that one directory, which holds only pids, tokens, timestamps and project paths. The dashboard token, the credential store and the rest of the ndx home stay denied, and git hooks get no access. The directory is created before the spawn. A nested acquire now reads the holder record before it creates or writes anything, so it needs read access only.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`c38983e`](https://github.com/en-dash-consulting/n-dx/commit/c38983e92756424a1126f8b553268b07cdcff9fc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Under bubblewrap on Linux, a confined test runner now nests inside its gate's validation slot and waits for a live holder instead of taking the slot from it.
+  
+  bubblewrap gives the confined command its own PID namespace, where the holder's pid outside it looked dead. A gate's runner then queued behind its own gate, and an agent shell with no token removed a live holder's record and ran beside it. Each slot record now names the PID namespace it was written in, and the sandbox tells the confined command which namespaces enclose it. A holder outside the reader's namespace, or in a sibling sandbox, is never judged dead. One inside it is judged by its pid there. Seatbelt on macOS, and records written by earlier versions, keep the plain pid check.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`0248eed`](https://github.com/en-dash-consulting/n-dx/commit/0248eed741f3e48ef39b986dc88e6a7a7fb65ab4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work --provider=api` continues OpenAI reasoning and token-limited turns safely, identifies Claude refusals correctly, and returns cancelled tasks to pending.
+  
+  Stateless Responses requests ask for encrypted reasoning. JSON and streaming output-token exhaustion retain measured usage and prompt continuation, including reasoning-only responses. Calls and opaque reasoning from truncated turns are discarded; other incomplete or malformed responses fail safely, and truncated context summaries remain rejected.
+  
+  Opt-in `llm.autoFailover` consumes Codex light, Claude standard and Claude light at most once each per run, with separate credentials and usage attribution. Refusals, malformed output, budget limits and caller aborts do not switch providers. Cancelled OpenAI and Claude API tasks emit `task_cancelled`.
+  
+  Healthy reasoning/output turns can exceed one minute. Each attempt in this OpenAI-origin chain, including Claude fallbacks, gets two minutes plus `ceil(hench.maxTokens / 10)` seconds, clamped to 10–30 minutes. The deadline covers body reads and primary retries/backoff; secondary calls do not retry. Caller abort wins over timeout. Failover stays off by default.
+
+- [#1065](https://github.com/en-dash-consulting/n-dx/pull/1065) [`1dc0110`](https://github.com/en-dash-consulting/n-dx/commit/1dc01107170e5152c4874798bacd765fa490b8f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: refactor llm-client and the language packs without changing behaviour: shared HTTP retry and child-process settling, one merged project-config loader, vendor failover as a table, and shared span helpers in the packs.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`2f58d1c`](https://github.com/en-dash-consulting/n-dx/commit/2f58d1c309c8ee327a9209f8bff28c67bead098f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv analyze --fast` now makes no model or network calls: no TypeSafe (Jev) judgment requests and no `claude_commands.log` in the project, even with a TypeSafe key set.
+  
+  Action needed: a run that relied on Jev judgments (move, finding, fragility, typed-finding grading) while passing `--fast` gets none now; drop `--fast` to keep them.
+  
+  Every judgment route resolves to none under `--fast`, and a text-model call is refused, so no phase can reach a model whatever keys or config exist. The `rex tree` and `rex tree-diff` reads behind `pr-markdown.md`, and the `ps` liveness check, are no longer written to `claude_commands.log`: they are not vendor-CLI calls. `pr-markdown.md` is unchanged. `execFileSyncCli` takes `logInvocation: false` for such calls.
+
 ## 0.10.4
 
 ### Patch Changes
