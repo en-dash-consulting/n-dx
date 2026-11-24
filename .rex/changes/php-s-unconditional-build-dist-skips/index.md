@@ -10,9 +10,10 @@ acceptanceCriteria:
   - "mergeLanguageConfigs([javaConfig, phpConfig]) keeps src/main/java/com/acme/build/"
   - "A PHP-only repository still skips web/themes/t/node_modules/ and web/themes/t/dist/"
   - "A unit test in lang-kit's language-registry tests covers both merges and fails on the current behaviour"
+  - "`packages/sourcevision/tests/e2e/cli-analyze-third-party.test.ts` passes (copied-in libraries under a PHP project's `build/` are inventoried and marked third-party, not skipped)"
 touches:
   - "956b7119-989e-41f1-ba0e-3e8d26494fee"
-priority: "low"
+priority: "high"
 discoveredFrom: {"item":"dcd473b7-2b77-42f1-8720-e1cd223a4562","run":"ba81723e-7f3d-49d7-b1fd-656e546c7a2c"}
 tags:
   - "ndx-adversarial-review"
