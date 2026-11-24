@@ -14,7 +14,7 @@
  * Rules, from `cmdRun`'s pre-flight checks (near run.ts:1531 as of this
  * writing):
  * - claude has both a CLI (Claude Code) and a direct API path.
- * - codex only has a CLI — hench refuses `provider="api"` for it.
+ * - codex supports its CLI and direct OpenAI Responses API.
  * - google and local have no CLI binary — hench silently runs them on `api`
  *   even when `provider="cli"` was configured.
  */
@@ -28,7 +28,7 @@ export type HenchProvider = "cli" | "api";
 /** Providers each vendor accepts, in the order hench prefers them. */
 export const VENDOR_PROVIDERS: Readonly<Record<LLMVendor, readonly HenchProvider[]>> = {
   [LLM_VENDOR.CLAUDE]: ["cli", "api"],
-  [LLM_VENDOR.CODEX]: ["cli"],
+  [LLM_VENDOR.CODEX]: ["cli", "api"],
   [LLM_VENDOR.GOOGLE]: ["api"],
   [LLM_VENDOR.LOCAL]: ["api"],
 };

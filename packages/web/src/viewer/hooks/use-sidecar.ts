@@ -540,6 +540,8 @@ export interface SidecarState {
   /** Put a message on the drawer's error line. */
   reportError: (message: string) => void;
   stop: () => Promise<void>;
+  /** End the current conversation through this drawer's scoped endpoint. */
+  endCurrent?: () => Promise<boolean>;
   /**
    * The page item attached as the session's target, and the lens it asks
    * with. The open session follows it through PATCH /api/sidecar/sessions/:id.
@@ -821,6 +823,15 @@ export function useSidecar(
     if (!res.ok) setError(res.error);
   }, []);
 
+  const endCurrent = useCallback(async (): Promise<boolean> => {
+    const id = tailRef.current.sessionId;
+    if (!id) return false;
+    const result = await postJson<SidecarSessionEntry>(`${sessionsPath()}/${encodeURIComponent(id)}/end`, {});
+    if (!result.ok) { setError(result.error); return false; }
+    follow(result.data.session, result.data.running);
+    return true;
+  }, [follow]);
+
   // The open session follows the attachment: the page item is its target and
   // the lens it runs is the one the chip shows (General while that lens is not
   // available yet). One PATCH per change; an ended session is left alone.
@@ -929,7 +940,7 @@ export function useSidecar(
   return {
     session, frames, running, sending, waiting, sessionWaiting, cards, commandManifest, decide,
     readOnly: session?.endedAt !== undefined, sessions, openSession,
-    lastTurn, error, agent, catalog, chooseAgent, send, newSession, reportError, stop, attachment, followError,
+    lastTurn, error, agent, catalog, chooseAgent, send, newSession, reportError, stop, endCurrent, attachment, followError,
   };
 }
 

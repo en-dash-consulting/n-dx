@@ -525,7 +525,7 @@ export type {
 // quote the same dollar figure as `ndx usage`. It imports the arithmetic — not
 // a copy of it — through its rex gateway.
 
-export { estimateCostFromTotals, estimateCost, aggregateTokenUsage } from "./core/token-usage.js";
+export { extractRexTokenEvents, estimateCostFromTotals, estimateCost, aggregateTokenUsage } from "./core/token-usage.js";
 export type { CostEstimate, ModelCostLine, AggregateTokenUsage } from "./core/token-usage.js";
 
 // ---- Core: per-item duration rollup -----------------------------------------

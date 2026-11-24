@@ -316,7 +316,23 @@ describe("the resolution report", () => {
     const r = await resolve({ task: "t-pending" });
 
     expect(r.resolved.permissionMode).toEqual({ value: null, source: "built-in" });
-    expect(r.options.find((o) => o.key === "provider")?.values).toEqual(["cli"]);
+    expect(r.warnings).toContainEqual(expect.objectContaining({
+      code: "policy-unsupported",
+      message: expect.stringContaining("hench.guard.allowedGitSubcommands"),
+    }));
+    expect(r.options.find((o) => o.key === "provider")?.values).toEqual(["cli", "api"]);
+  });
+
+  it("reports the Codex pair reviewer in CLI and dashboard resolution", async () => {
+    await projectConfig({ llm: { vendor: "claude" } });
+    const r = await resolve({ task: "t-pending", "review-mode": "pair", reviewer: "codex" });
+    expect(r.warnings).toContainEqual(expect.objectContaining({
+      code: "policy-unsupported", message: expect.stringContaining("pair reviewer"),
+    }));
+    for (const flags of [{ "no-review": "true" }, { "review-mode": "self" }, { provider: "api" }]) {
+      const off = await resolve({ task: "t-pending", ...flags });
+      expect(off.warnings.some(w => w.code === "policy-unsupported")).toBe(false);
+    }
   });
 
   describe("repository trust", () => {
@@ -532,9 +548,13 @@ describe("refusals are reported, not thrown", () => {
     expect(codes(await resolve({ task: "t-pending" }))).toEqual(["vendor-cli-missing"]);
   });
 
-  it("provider-unsupported: codex has no API provider", async () => {
-    await projectConfig({ llm: { vendor: "codex", codex: { cli_path: process.execPath } } });
-    expect(codes(await resolve({ task: "t-pending", provider: "api" }))).toEqual(["provider-unsupported"]);
+  it("Codex direct API resolves without requiring a CLI", async () => {
+    await projectConfig({ llm: { vendor: "codex", codex: { api_key: "fixture-key", model: "gpt-6-astra" } } });
+    expect(codes(await resolve({ task: "t-pending", provider: "api" }))).toEqual([]);
+    const unsupported = await resolve({ task: "t-pending", provider: "api", model: "gpt-unverified" });
+    expect(unsupported.refusals).toContainEqual(expect.objectContaining({
+      code: "provider-unsupported", message: expect.stringContaining("no verified agent-turn support"),
+    }));
   });
 
   it("provider-unsupported: --review on a vendor with no CLI", async () => {

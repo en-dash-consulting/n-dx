@@ -15,7 +15,7 @@ LLM Client sits at the foundation tier — the lowest level of the dependency hi
 
 - **Provider interfaces** — abstract types for LLM calls, responses, and token usage
 - **Claude adapter** — API and CLI modes for Anthropic's Claude models
-- **Codex adapter** — CLI adapter for OpenAI's Codex models
+- **Codex adapter** — CLI and direct OpenAI API adapters
 - **Google adapter** — API adapter for Google's Gemini models
 - **Local adapter** — OpenAI-compatible adapter for a local LM Studio / Ollama server
 - **Provider registry** — resolve the configured vendor to the right adapter
@@ -28,12 +28,28 @@ LLM Client sits at the foundation tier — the lowest level of the dependency hi
 | Vendor | API Mode | CLI Mode | Token Accounting | Default model |
 |--------|----------|----------|-----------------|---------------|
 | Claude | Yes (recommended) | Yes | Full | `claude-sonnet-5-5` |
-| Codex | No | Yes | Limited (CLI doesn't return usage) | `gpt-5.6-terra` |
+| Codex | Yes | Yes | Request usage on API; reported CLI usage | `gpt-6.1-sol` |
 | Google | Yes | No | Full | `gemini-2.5-pro` |
 | Local | Yes (OpenAI-compatible) | No | Depends on server | _(whatever is loaded)_ |
 
 Defaults live in `NEWEST_MODELS` / `TIER_MODELS` in `src/config.ts` — that is the
 single place to update when a vendor ships a new model.
+
+## OpenAI agent turns
+
+The Responses codec requests `reasoning.encrypted_content` with `store: false`.
+JSON and streaming terminal results report output-budget exhaustion as
+`max_tokens`, preserving measured usage and only visible text for continuation.
+No partial or unanswered function call from that turn is exposed or replayed.
+Other incomplete statuses and malformed payloads fail; `context.summarize` still
+rejects truncated summaries.
+
+Hench's opt-in `llm.autoFailover` integrates the codec with a once-per-run chain:
+Codex light, Claude standard, Claude light. Each attempt, including Claude, gets
+two minutes plus `ceil(hench.maxTokens / 10)` seconds, clamped to 10–30 minutes;
+body reads and primary retries/backoff share the deadline, secondary calls do not
+retry. Aborts take precedence over timeouts and do not switch providers. See
+[configuration](../guide/configuration.md#llm-vendor) for eligibility and credentials.
 
 ## Not a Public API
 

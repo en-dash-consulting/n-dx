@@ -100,19 +100,17 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
     expect(resolveFor({ item: task({ models: { claude: "opus" } }) }).model.value).toBe(
       resolveModel("opus"),
     );
-    // … and a Codex id retired by OpenAI remaps to its replacement. Resolving
-    // the pin with `resolveModel` alone knew only Claude's aliases, so this was
-    // sent to Codex unchanged and the run failed on a withdrawn model.
+    // Codex IDs remain literal; availability depends on authentication.
     const codex = resolveFor({
       vendor: "codex",
       llm: { vendor: "codex" },
       item: task({ models: { codex: "gpt-5.4" } }),
     });
-    expect(codex.model).toMatchObject({ value: NEWEST_MODELS.codex, source: "task.run.models" });
+    expect(codex.model).toMatchObject({ value: "gpt-5.4", source: "task.run.models" });
     expect(codex.warnings).toEqual([]);
   });
 
-  it("maps a retired Codex pin to the tier its replacement belongs to", () => {
+  it("preserves an older pin and reports a custom weight", () => {
     // The weight follows the model that will actually run, not the id typed.
     const light = resolveFor({
       vendor: "codex",
@@ -120,8 +118,8 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
       item: task({ models: { codex: "gpt-5.4-mini" } }),
     });
 
-    expect(light.model.value).toBe(TIER_MODELS.codex.light);
-    expect(light.model.weight).toBe("light");
+    expect(light.model.value).toBe("gpt-5.4-mini");
+    expect(light.model.weight).toBe("custom");
   });
 
   it("judges vendor compatibility on the normalized id, not the one that was typed", () => {
@@ -489,21 +487,14 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
     expect(r.warnings).toEqual([]);
   });
 
-  it("skips a saved provider the active vendor has no loop for, and warns naming the task", () => {
-    // `api` on codex: there is no API loop, and `resolveRunProvider` offers no
-    // fallback. Refusing would end a whole --loop on one task's saved value.
+  it("honours a saved direct API provider for Codex", () => {
     const r = resolveFor({
-      vendor: "codex",
-      llm: { vendor: "codex" },
-      item: task({ provider: "api" }, "Mis-saved provider"),
+      vendor: "codex", llm: { vendor: "codex", codex: { auth: "api", api_key: "fixture" } },
+      item: task({ provider: "api" }, "API task"),
     });
-
-    expect(r.provider.value).toBe("cli");
-    expect(r.provider.source).not.toBe("task.run");
+    expect(r.provider).toMatchObject({ value: "api", source: "task.run" });
     expect(r.provider.error).toBeUndefined();
-    expect(r.warnings).toHaveLength(1);
-    expect(r.warnings[0].code).toBe("saved-provider-unavailable");
-    expect(r.warnings[0].message).toContain("Mis-saved provider");
+    expect(r.warnings).toEqual([]);
   });
 
   it("still switches a saved provider the vendor can only serve the other way, with no warning", () => {
@@ -787,5 +778,65 @@ describe("ndx work --resolve reports the task's saved settings", () => {
 
     expect(r.resolved.model).toEqual({ value: TIER_MODELS.claude.light, source: "cli-flag" });
     expect(r.resolved.maxTurns).toEqual({ value: 4, source: "cli-flag" });
+  });
+});
+
+describe("literal Codex execution and review precedence", () => {
+  it.each(["api", "cli", "auto"] as const)("preserves all pins under %s authentication", auth => {
+    const llm: LLMConfig = { vendor: "codex", model: "gpt-5.2", codex: { auth, model: "gpt-5.3-codex", reviewModel: "gpt-5.4-mini" } };
+    const base = { vendor: "codex" as const, llm };
+    expect(resolveFor(base).model.value).toBe("gpt-5.2");
+    expect(resolveFor(base).reviewModel.value).toBe("gpt-5.4-mini");
+    expect(resolveFor({ ...base, config: { models: { codex: "gpt-5.4" } } }).model.value).toBe("gpt-5.4");
+    const item = task({ models: { codex: "gpt-5.4-mini" }, reviewModels: { codex: "gpt-5.4" } });
+    const resolved = resolveFor({ ...base, item });
+    expect(resolved.model.value).toBe("gpt-5.4-mini");
+    expect(resolved.reviewModel.value).toBe("gpt-5.4");
+    expect(resolveFor({ ...base, item, flags: { review: "true", model: "gpt-5-codex", "review-model": "gpt-5.2" } }).model.value).toBe("gpt-5-codex");
+    expect(resolveFor({ ...base, item, flags: { review: "true", "review-model": "gpt-5.2" } }).reviewModel.value).toBe("gpt-5.2");
+    expect(resolveFor({ ...base, item: task({ tier: "light" }), llm: { ...llm, tiers: { codex: { light: "gpt-5.4-mini" } } } }).model.value).toBe("gpt-5.4-mini");
+  });
+});
+
+
+describe("Codex default upgrade preserves saved intent", () => {
+  const base = { vendor: "codex" as const, llm: { vendor: "codex" as const } };
+  it.each([
+    ["light", "gpt-6-luna"], ["standard", "gpt-6.1-sol"], ["heavy", "gpt-6-astra"],
+  ])("resolves saved %s execution and review tiers", (tier, model) => {
+    const r = resolveFor({ ...base, item: task({ tier, review: true, reviewTier: tier }) });
+    expect(r.model.value).toBe(model);
+    expect(r.reviewModel.value).toBe(model);
+  });
+
+  it("uses Sol for ordinary execution and review", () => {
+    const r = resolveFor(base);
+    expect(r.model.value).toBe("gpt-6.1-sol");
+    expect(r.reviewModel.value).toBe("gpt-6.1-sol");
+  });
+
+  it("retains each explicit execution pin across an upgrade", () => {
+    for (const options of [
+      { llm: { vendor: "codex" as const, model: "gpt-5.5" } },
+      { llm: { vendor: "codex" as const, codex: { model: "gpt-5.5" } } },
+      { llm: { vendor: "codex" as const, tiers: { codex: { standard: "gpt-5.5" } } } },
+      { config: { models: { codex: "gpt-5.5" } } },
+      { item: task({ models: { codex: "gpt-5.5" } }) },
+      { flags: { model: "gpt-5.5" } },
+    ]) {
+      const input = { ...base, ...options };
+      const before = JSON.stringify(input);
+      expect(resolveFor(input).model.value).toBe("gpt-5.5");
+      expect(JSON.stringify(input)).toBe(before);
+    }
+  });
+
+  it("retains reviewer pins and CLI > task > vendor > shared precedence", () => {
+    const llm: LLMConfig = { vendor: "codex", reviewModel: "gpt-5.4", codex: { reviewModel: "gpt-5.5" } };
+    expect(resolveFor({ ...base, llm }).reviewModel.value).toBe("gpt-5.5");
+    const item = task({ review: true, reviewModels: { codex: "gpt-5.6-sol" } });
+    expect(resolveFor({ ...base, llm, item }).reviewModel.value).toBe("gpt-5.6-sol");
+    expect(resolveFor({ ...base, llm, item, flags: { review: "true", "review-model": "gpt-5.2" } }).reviewModel.value).toBe("gpt-5.2");
+    expect(resolveFor({ ...base, llm: { vendor: "codex", reviewModel: "gpt-5.4" } }).reviewModel.value).toBe("gpt-5.4");
   });
 });

@@ -272,13 +272,22 @@ describe("POST /api/hench/execute — run options", () => {
     expect((await res.json()).key).toBe("options");
   });
 
-  it("refuses a provider the vendor does not support", async () => {
+  it("accepts the direct Codex API provider and forwards it to the work command", async () => {
     await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
     const res = await execute({ taskId: "task-1", options: { provider: "api" } });
+    expect(res.status).toBe(202);
+    expect((await res.json()).options).toEqual({ provider: "api" });
+    expect(spawnedFlags()).toEqual(["--provider=api"]);
+  });
+
+  it.each(["google", "local"])("refuses the unsupported CLI provider for %s", async (vendor) => {
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor } }));
+    const res = await execute({ taskId: "task-1", options: { provider: "cli" } });
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.key).toBe("provider");
-    expect(body.error).toContain("codex");
+    expect(body.error).toContain(vendor);
+    expect(spawnManagedMock).not.toHaveBeenCalled();
   });
 
   it("starts an in-progress task no run holds, without --reset-deferred", async () => {

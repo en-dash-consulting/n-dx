@@ -97,6 +97,11 @@
 
 // Generic provider interface (vendor-agnostic)
 export type {
+  ProviderToolCall,
+  ProviderMessage,
+  ProviderTurnRequest,
+  ProviderTurnResult,
+  ProviderTurnEvent,
   ProviderAuthMode,
   ProviderCapability,
   ProviderInfo,
@@ -189,6 +194,8 @@ export {
 } from "./config.js";
 export type { TaskModelResolution, ModelSourceKey, JudgmentRoute, ModelCost } from "./config.js";
 
+export { resolveCodexCliEffort } from "./codex-effort.js";
+
 // Claude Messages API effort (output_config.effort)
 export {
   CLAUDE_EFFORT_LEVELS,
@@ -264,11 +271,13 @@ export {
   DEFAULT_CODEX_MODEL,
   createCodexCliClient,
   compileCodexPolicyFlags,
+  createCodexScratch,
   codexShellEnvFlags,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
 } from "./codex-cli-provider.js";
 export type { CodexCliProviderOptions } from "./codex-cli-provider.js";
+export { assertCodexScratchEnvironment } from "./codex-scratch-env.js";
 
 export {
   CodexProjectConfigError,
@@ -277,6 +286,9 @@ export {
 } from "./codex-project-config.js";
 
 export { codexUserConfigPath, codexUserModelProvider } from "./codex-user-config.js";
+export { codexConfigAssignments } from "./codex-project-config.js";
+
+export { supportsOpenAiTurns } from "./openai-responses.js";
 
 export {
   createOpenAiApiProvider,
@@ -668,6 +680,10 @@ export {
 } from "./vendor-model-reset.js";
 export type { VendorModelResetResult } from "./vendor-model-reset.js";
 
+// Codex CLI client catalog (not an inference entitlement check)
+export { listCodexModels } from "./codex-model-list.js";
+export type { CodexModelListOptions } from "./codex-model-list.js";
+
 // Live model listing from the vendor APIs
 export { listVendorModels } from "./vendor-model-list.js";
 export type {
@@ -930,3 +946,7 @@ export type { RepoCommandEnvOptions } from "./repo-command-env.js";
 // The file name is public so consumers that classify a project's files (hench's
 // uncommitted-work gate, ndx init's gitignore) name the log the writer writes.
 export { CLI_LOG_FILENAME } from "./cli-log.js";
+
+// Dated OpenAI API metadata; surface limits and subscription billing stay distinct.
+export { OPENAI_MODEL_METADATA, resolveOpenAIModel, resolveOpenAICost } from "./openai-model-metadata.js";
+export type { ModelSurface, OpenAIProcessingMode, ModelEstimateOptions, OpenAIModelMetadata } from "./openai-model-metadata.js";

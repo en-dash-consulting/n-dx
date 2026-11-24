@@ -2,9 +2,11 @@
  * OpenAI API provider — calls OpenAI-compatible APIs via native fetch.
  *
  * Implements the generic {@link LLMProvider} interface for the "codex" vendor
- * in "api" mode. Uses the OpenAI Chat Completions API format:
+ * in "api" mode. Text completions retain the Chat Completions format;
+ * completeTurn/streamTurn use Responses for verified tool-capable models:
  *
- * - `POST /v1/chat/completions` for completions
+ * - `POST /v1/chat/completions` for text completions
+ * - `POST /v1/responses` for agent turns (no tool execution here)
  * - `GET /v1/models` for auth validation
  *
  * ## When this provider is selected
@@ -25,19 +27,24 @@
  * @see {@link createCodexCliClient} in `codex-cli-provider.ts` for the CLI alternative
  */
 
+import { setTimeout as delay } from "node:timers/promises";
+import { createOpenAiTurns, responseError, supportsOpenAiTurns } from "./openai-responses.js";
+import { resolveOpenAiEffort, usesOpenAiCompletionTokenLimit } from "./codex-effort.js";
+import { parseRetryAfterHeader, DEFAULT_AUTO_RETRY_THRESHOLD_MS } from "./rate-limit.js";
+
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { CodexConfig } from "./llm-types.js";
 import { requireVendorApiKey, resolveVendorKey } from "./vendor-auth.js";
-import { resolveApiEndpoint } from "./config.js";
-import { postJsonWithRetries, throwHttpStatusError } from "./http-retry.js";
+import { NEWEST_MODELS, resolveApiEndpoint } from "./config.js";
+import { throwHttpStatusError } from "./http-retry.js";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_MODEL = "gpt-5.6-terra";
+const DEFAULT_MODEL = NEWEST_MODELS.codex;
 
 // ── Options ───────────────────────────────────────────────────────────────
 
@@ -57,21 +64,50 @@ export interface OpenAiApiProviderOptions {
 
 // ── Token parsing ─────────────────────────────────────────────────────────
 
-/**
- * Parse token usage from an OpenAI API response `usage` object.
- *
- * OpenAI uses `prompt_tokens` / `completion_tokens` at the top level.
- * Maps to the shared TokenUsage shape: `prompt_tokens` → `input`,
- * `completion_tokens` → `output`.
- *
- * Always returns a TokenUsage — missing numeric fields default to 0.
- */
-export function parseOpenAiTokenUsage(
-  raw: Record<string, unknown>,
-): TokenUsage {
-  const input = typeof raw.prompt_tokens === "number" ? raw.prompt_tokens : 0;
-  const output = typeof raw.completion_tokens === "number" ? raw.completion_tokens : 0;
-  return { input, output };
+/** Parse Chat Completions usage into disjoint pricing categories. */
+export function parseOpenAiTokenUsage(raw: Record<string, unknown>): TokenUsage {
+  return parseUsage(raw).tokenUsage ?? { input: 0, output: 0 };
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : undefined;
+}
+
+/** Both blocking and streaming calls use the same validation and accounting. */
+function parseUsage(raw: unknown): Pick<CompletionResult, "tokenUsage" | "usageStatus"> {
+  if (raw == null) return { usageStatus: "unavailable" };
+  const source = record(raw);
+  if (!source) return { usageStatus: "malformed" };
+  let malformed = false;
+  const count = (obj: Record<string, unknown>, key: string): number | undefined => {
+    const value = obj[key];
+    if (value === undefined) return undefined;
+    if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
+    malformed = true;
+    return undefined;
+  };
+  const input = count(source, "prompt_tokens");
+  const output = count(source, "completion_tokens");
+  const details = record(source.prompt_tokens_details);
+  if (source.prompt_tokens_details != null && !details) malformed = true;
+  const read = count(details ?? {}, "cached_tokens");
+  const write = count(details ?? {}, "cache_write_tokens");
+  const cached = (read ?? 0) + (write ?? 0);
+  if (input !== undefined && cached > input) malformed = true;
+  const present = [input, output, read, write].some(value => value !== undefined);
+  return {
+    tokenUsage: present ? {
+      // OpenAI reports both cache categories inside prompt_tokens.
+      input: Math.max(0, (input ?? 0) - cached),
+      output: output ?? 0,
+      ...(read ? { cacheReadInput: read } : {}),
+      ...(write ? { cacheCreationInput: write } : {}),
+    } : undefined,
+    usageStatus: malformed ? "malformed"
+      : input !== undefined && output !== undefined ? "measured"
+      : present ? "partial" : "unavailable",
+  };
 }
 
 // ── Response reading ──────────────────────────────────────────────────────
@@ -93,11 +129,7 @@ export function readChatCompletion(data: Record<string, unknown>): CompletionRes
     }
   }
 
-  const tokenUsage = data.usage
-    ? parseOpenAiTokenUsage(data.usage as Record<string, unknown>)
-    : undefined;
-
-  return { text, tokenUsage };
+  return { text, ...parseUsage(data.usage) };
 }
 
 /** The first choice's delta content in a streamed Chat Completions chunk, if it carries one. */
@@ -176,11 +208,12 @@ export function createOpenAiApiProvider(
     vendor: LLM_VENDOR.CODEX,
     mode: "api",
     ...(defaultModel ? { model: defaultModel } : {}),
-    capabilities: ["streaming", "function-calling"],
+    capabilities: supportsOpenAiTurns(defaultModel) ? ["streaming", "function-calling"] : ["streaming"],
   };
 
   return {
     info,
+    ...createOpenAiTurns({ baseUrl, headers, maxTokens, maxRetries, baseDelayMs, parseUsage }),
 
     async validateAuth(): Promise<boolean> {
       try {
@@ -211,33 +244,84 @@ export function createOpenAiApiProvider(
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       const model = request.model || defaultModel;
+      const effort = resolveOpenAiEffort(model, request.effort, request.taskClass);
+      const signal = AbortSignal.any([
+        ...(request.signal ? [request.signal] : []),
+        ...(request.timeoutMs === undefined ? [] : [AbortSignal.timeout(request.timeoutMs)]),
+      ]);
+      const abortError = (): Error => request.signal?.aborted
+        ? new DOMException("OpenAI request cancelled", "AbortError")
+        : new ClaudeClientError("OpenAI request timed out", "timeout", true);
 
-      return postJsonWithRetries({
-        url: () => `${baseUrl}/chat/completions`,
-        body: () => JSON.stringify({
-          model,
-          max_tokens: maxTokens,
-          messages: [{ role: "user", content: request.prompt }],
-        }),
-        headers,
-        maxRetries,
-        baseDelayMs,
-        throwForStatus: (status, body) => throwHttpStatusError(status, `OpenAI API error ${status}: ${body}`),
-        read: readChatCompletion,
-      });
+      for (let attempt = 0; ; attempt++) {
+        if (signal.aborted) throw abortError();
+        let failure: ClaudeClientError;
+        try {
+          const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: "POST",
+            headers,
+            signal,
+            redirect: "error",
+            body: JSON.stringify({
+              model,
+              ...(usesOpenAiCompletionTokenLimit(model)
+                ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+              ...(effort !== undefined ? { reasoning_effort: effort } : {}),
+              messages: [{ role: "user", content: request.prompt }],
+            }),
+          });
+
+          if (!response.ok) {
+            const error = responseError(response.status, parseRetryAfterHeader(response.headers.get("retry-after")));
+            await response.body?.cancel();
+            throw error;
+          }
+
+          const data = await response.json() as Record<string, unknown>;
+          if (signal.aborted) throw abortError();
+          const choices = data.choices as Array<Record<string, unknown>> | undefined;
+          let text = "";
+
+          if (choices && choices.length > 0) {
+            const choice = choices[0];
+            const message = choice.message as Record<string, unknown> | undefined;
+            // A truncated or filtered fragment cannot stand in for the dropped history.
+            const incompleteSummary = request.taskClass === "context.summarize" &&
+              (choice.finish_reason === "length" || choice.finish_reason === "content_filter");
+            if (!incompleteSummary && message && typeof message.content === "string") {
+              text = message.content;
+            }
+          }
+
+          return { text, ...parseUsage(data.usage) };
+        } catch (err) {
+          if (signal.aborted) throw abortError();
+          failure = err instanceof ClaudeClientError ? err
+            : err instanceof SyntaxError ? new ClaudeClientError("Invalid OpenAI text completion payload", "unknown", false)
+            : new ClaudeClientError("OpenAI connection failed", "network", true);
+        }
+        if (!failure.retryable || attempt >= maxRetries ||
+            (failure.retryAfterMs ?? 0) > DEFAULT_AUTO_RETRY_THRESHOLD_MS) throw failure;
+        try { await delay(failure.retryAfterMs ?? baseDelayMs * 2 ** attempt, undefined, { signal }); }
+        catch { throw abortError(); }
+      }
     },
 
     async *stream(request: CompletionRequest): AsyncIterable<StreamChunk> {
       const model = request.model || defaultModel;
+      const effort = resolveOpenAiEffort(model, request.effort, request.taskClass);
 
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           model,
-          max_tokens: maxTokens,
+          ...(usesOpenAiCompletionTokenLimit(model)
+            ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+          ...(effort !== undefined ? { reasoning_effort: effort } : {}),
           messages: [{ role: "user", content: request.prompt }],
           stream: true,
+          stream_options: { include_usage: true },
         }),
       });
 
@@ -261,62 +345,103 @@ export function createOpenAiApiProvider(
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let totalUsage: TokenUsage | undefined;
+      let accounting = parseUsage(undefined);
+      let snapshot: Record<string, unknown> = {};
+      let malformedEvent = false;
+      const terminal = (finished: boolean): StreamChunk => ({
+        done: true,
+        usage: accounting.tokenUsage,
+        usageStatus: malformedEvent ? "malformed"
+          : !finished && accounting.usageStatus === "measured" ? "partial"
+          : accounting.usageStatus,
+      });
+      const parseLine = (line: string): StreamChunk | undefined => {
+        const trimmed = line.trim();
+        if (trimmed === "data: [DONE]") return terminal(true);
+        if (!trimmed.startsWith("data:")) return undefined;
+        let payload: unknown;
+        try {
+          payload = JSON.parse(trimmed.slice(5).trimStart());
+        } catch {
+          // Retain prior spend but never label a damaged stream fully measured.
+          malformedEvent = true;
+          return undefined;
+        }
+        const data = record(payload);
+        if (!data) {
+          malformedEvent = true;
+          return undefined;
+        }
+        if (data.usage != null) {
+          const next = parseUsage(data.usage);
+          const raw = record(data.usage);
+          if (next.usageStatus === "malformed") malformedEvent = true;
+          if (raw) {
+            // Preserve each valid counter, even when a sibling is malformed.
+            // Snapshots replace counters; they are never additive deltas.
+            const mergeCounts = (previous: Record<string, unknown>, incoming: Record<string, unknown>, keys: string[]) => {
+              const merged = { ...previous };
+              for (const key of keys) {
+                const value = incoming[key];
+                if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) continue;
+                const prior = previous[key];
+                merged[key] = next.usageStatus === "malformed" && typeof prior === "number"
+                  ? Math.max(prior, value) : value;
+              }
+              return merged;
+            };
+            snapshot = {
+              ...mergeCounts(snapshot, raw, ["prompt_tokens", "completion_tokens"]),
+              prompt_tokens_details: mergeCounts(
+                record(snapshot.prompt_tokens_details) ?? {},
+                record(raw.prompt_tokens_details) ?? {},
+                ["cached_tokens", "cache_write_tokens"],
+              ),
+            };
+            accounting = parseUsage(snapshot);
+            // Old counters are useful lower bounds, not evidence that the
+            // final snapshot supplied all of this request's usage.
+            if (next.usageStatus !== "measured" && accounting.usageStatus === "measured") {
+              accounting.usageStatus = "partial";
+            }
+          }
+
+        }
+        const choices = data.choices;
+        const first = Array.isArray(choices) ? record(choices[0]) : undefined;
+        const delta = record(first?.delta);
+        return typeof delta?.content === "string" ? { text: delta.content } : undefined;
+      };
 
       try {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
+          buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
-          // Keep the last (possibly incomplete) line in the buffer
           buffer = lines.pop() ?? "";
-
+          if (done && buffer) { lines.push(buffer); buffer = ""; }
           for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith(":")) continue;
-
-            if (trimmed === "data: [DONE]") {
-              yield { done: true, usage: totalUsage };
-              return;
-            }
-
-            if (trimmed.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
-                const text = readChatDeltaText(data);
-                if (text !== undefined) {
-                  yield { text };
-                }
-
-                // Some OpenAI-compatible endpoints include usage in stream chunks
-                if (data.usage) {
-                  totalUsage = parseOpenAiTokenUsage(
-                    data.usage as Record<string, unknown>,
-                  );
-                }
-              } catch {
-                // Skip malformed JSON lines
-              }
+            const chunk = parseLine(line);
+            if (chunk) {
+              yield chunk;
+              if (chunk.done) return;
             }
           }
+          if (done) break;
         }
-
-        // Flush any remaining buffer
-        if (buffer.trim()) {
-          const trimmed = buffer.trim();
-          if (trimmed === "data: [DONE]") {
-            yield { done: true, usage: totalUsage };
-            return;
-          }
-        }
+      } catch (cause) {
+        const error = new ClaudeClientError(
+          cause instanceof Error ? cause.message : "OpenAI stream interrupted",
+          "network", true,
+        );
+        error.tokenUsage = accounting.tokenUsage;
+        error.usageStatus = terminal(false).usageStatus;
+        throw error;
       } finally {
         reader.releaseLock();
       }
 
-      // Terminal chunk if we didn't get [DONE]
-      yield { done: true, usage: totalUsage };
+      yield terminal(false);
     },
   };
 }

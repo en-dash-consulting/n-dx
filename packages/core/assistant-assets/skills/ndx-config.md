@@ -1,5 +1,7 @@
 View or change n-dx configuration with guided assistance.
 
+Usage measurement supports Claude Code message usage and Codex rollout `event_msg/token_count` cumulative `total_token_usage`. Discovery uses `CLAUDE_CODE_SESSION_ID` or `CODEX_THREAD_ID`, with `CLAUDE_CONFIG_DIR` or `CODEX_HOME` respected. Wrappers can pass `--vendor=codex --session=<id> --transcript=<path>` to both `n-dx hench usage mark` and `n-dx hench record`. Codex `exec --json` output is not a rollout transcript. Missing/unsupported usage and counter resets are reported as unavailable; incomplete reads are partial. Keep the same session for mark and record; do not substitute another session or estimate counters.
+
 **Before anything else, mark where this run's token usage starts:** run `ndx hench usage mark --task=skill:ndx-config .`. The CLI snapshots the session transcript's cumulative usage and position under that id; the record step at the end computes this run's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
 **Then note what is already dirty:** run `git -c core.quotepath=false status --porcelain --untracked-files=all` against the project root and keep its output. Every path it lists is the user's work in progress, and the commit step at the end stages only paths that are not on this list.
@@ -47,7 +49,7 @@ ndx hench record --task=skill:ndx-config --status=completed   --title="ndx-confi
 
 Token usage is computed by the CLI as the difference between the `skill:ndx-config` mark taken at the start and the session transcript now — several skill runs in one session each get exactly their own slice. Use `--task=skill:ndx-config`. A config change belongs to no PRD item, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket.
 
-Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
+Skip this only if you changed nothing at all. If no transcript is found the record is still written with unavailable usage diagnostics; the command reports which happened.
 
 ## Done when
 

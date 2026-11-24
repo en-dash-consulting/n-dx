@@ -7,8 +7,8 @@
  *   1. **Legacy** (`false`, default) — manual vendor check + original error messages
  *   2. **Registry** (`true`) — ProviderRegistry.getActiveProvider() resolution
  *
- * Both paths must produce identical Claude API behavior. The flag only
- * changes how the provider is resolved, not how the loop executes.
+ * Both paths must produce identical Claude API behavior. Codex uses the
+ * direct OpenAI provider with either flag, preserving auth and capability gates.
  *
  * Neither path makes real API calls — tests verify resolution, validation,
  * and error handling up to (but not including) the first Anthropic SDK call.
@@ -202,51 +202,64 @@ describe("registry-based provider resolution", () => {
     });
   });
 
-  // ── Vendor rejection ───────────────────────────────────────────────────────
+  // ── Direct OpenAI admission ────────────────────────────────────────────────
 
-  describe("non-Claude vendor rejection", () => {
-    it("legacy path rejects non-Claude vendor with original error message", async () => {
-      const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
-      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
-      const { loadConfig } = await import("../../src/store/config.js");
-
-      // Write .n-dx.json with codex vendor
-      await writeFile(
-        join(projectDir, ".n-dx.json"),
-        JSON.stringify({ llm: { vendor: "codex" } }),
-        "utf-8",
-      );
-
-      const config = await loadConfig(henchDir);
-      config.useRegistryProvider = false;
-      const rexDir = join(projectDir, ".rex");
-      const store = createStore("file", rexDir);
-
-      await expect(
-        agentLoop({ config, store, projectDir, henchDir }),
-      ).rejects.toThrow("Hench API mode requires llm.vendor=claude");
+  describe.each([false, true])("Codex with useRegistryProvider=%s", (useRegistryProvider) => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
     });
 
-    it("registry path rejects non-Claude vendor with capability error", async () => {
+    it("requires OpenAI credentials before changing the task or calling the API", async () => {
       const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { loadConfig } = await import("../../src/store/config.js");
 
-      // Write .n-dx.json with codex vendor
+      vi.stubEnv("OPENAI_API_KEY", undefined);
+      const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected API request"));
       await writeFile(
         join(projectDir, ".n-dx.json"),
-        JSON.stringify({ llm: { vendor: "codex" } }),
+        JSON.stringify({ llm: { vendor: "codex", codex: { auth: "api" } } }),
         "utf-8",
       );
 
       const config = await loadConfig(henchDir);
-      config.useRegistryProvider = true;
+      config.provider = "api";
+      config.useRegistryProvider = useRegistryProvider;
       const rexDir = join(projectDir, ".rex");
       const store = createStore("file", rexDir);
 
       await expect(
-        agentLoop({ config, store, projectDir, henchDir }),
-      ).rejects.toThrow("Hench API loop requires a Claude-compatible provider");
+        agentLoop({ config, store, projectDir, henchDir, model: "gpt-6-astra" }),
+      ).rejects.toThrow("OpenAI (Codex) API needs a key");
+      expect((await store.getItem("task-1"))?.status).toBe("pending");
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("refuses an unverified model before changing the task or calling the API", async () => {
+      const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { loadConfig } = await import("../../src/store/config.js");
+
+      vi.stubEnv("OPENAI_API_KEY", "fixture-key");
+      const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected API request"));
+      await writeFile(
+        join(projectDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "codex", codex: { auth: "api" } } }),
+        "utf-8",
+      );
+
+      const config = await loadConfig(henchDir);
+      config.provider = "api";
+      config.useRegistryProvider = useRegistryProvider;
+      const rexDir = join(projectDir, ".rex");
+      const store = createStore("file", rexDir);
+
+      await expect(
+        agentLoop({ config, store, projectDir, henchDir, model: "unverified-model" }),
+      ).rejects.toThrow('OpenAI model "unverified-model" has no verified agent-turn support');
+      expect((await store.getItem("task-1"))?.status).toBe("pending");
+      expect(fetch).not.toHaveBeenCalled();
     });
   });
 

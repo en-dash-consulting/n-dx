@@ -498,14 +498,15 @@ export interface HenchConfig {
    * How task spawns relate to vendor sessions.
    *
    * - `"fork"` (default where supported) — run orientation once, then fork
-   *   that session per task (`--resume <id> --fork-session`), so no task
-   *   re-pays cold-start context or re-explores the repo.
+   *   that session per task (Claude: `--resume <id> --fork-session`;
+   *   capability-gated Codex: `exec fork <id>`), so tasks reuse orientation.
    * - `"batch"` — execute up to {@link tasksPerSession} tasks in one session,
    *   feeding each next brief as a follow-up turn. Vendor-neutral.
    * - `"cold"` — a fresh spawn per task (the original behavior).
    *
-   * Forking requires a CLI that can resume by session id (Claude today), so
-   * other vendors and the API provider resolve to `"cold"` regardless. See
+   * Forking supports Claude CLI and Codex CLI when capability and execution
+   * identity checks pass. Unsupported CLIs, unverifiable Codex identities and
+   * the API provider resolve to `"cold"`. Resume support alone is insufficient. See
    * `resolveSessionStrategy` in `agent/lifecycle/session-cache.ts`.
    */
   sessionStrategy?: "fork" | "batch" | "cold";

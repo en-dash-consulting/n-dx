@@ -34,6 +34,8 @@ export interface FakeCliOptions {
    * For fakes whose output depends on their argv or stdin.
    */
   script?: string;
+  /** Simulate Codex config/read without consuming the execution fixture. */
+  codexConfigRead?: Record<string, unknown>;
 }
 
 /**
@@ -50,13 +52,13 @@ export function writeFakeCli(dir: string, options: FakeCliOptions): string {
   const impl = join(dir, `${name}-impl.mjs`);
   writeFileSync(
     impl,
-    script ?? [
+    (options.codexConfigRead ? codexConfigReadScript(options.codexConfigRead) : "") + (script ?? [
       ...(drainStdin ? ["for await (const _chunk of process.stdin) { /* drain */ }"] : []),
       ...(stdout ? [`process.stdout.write(${JSON.stringify(stdout)});`] : []),
       ...(stderr ? [`process.stderr.write(${JSON.stringify(stderr)});`] : []),
       `process.exit(${exitCode});`,
       "",
-    ].join("\n"),
+    ].join("\n")),
     "utf-8",
   );
 
@@ -71,4 +73,26 @@ export function writeFakeCli(dir: string, options: FakeCliOptions): string {
   writeFileSync(shim, `#!/bin/sh\nexec node "${impl}" "$@"\n`, "utf-8");
   chmodSync(shim, 0o755);
   return shim;
+}
+
+/** Protocol fixture only: parses the set overrides used by the scratch tests. */
+export function codexConfigReadScript(config: Record<string, unknown> = {}): string {
+  return `
+    if (process.argv.includes('app-server')) {
+      const config = ${JSON.stringify(config)};
+      const policy = config.shell_environment_policy ??= {};
+      policy.set ??= {};
+      for (const arg of process.argv) {
+        const match = /^shell_environment_policy\\.set\\.(TMPDIR|TMP|TEMP)=(.*)$/.exec(arg);
+        if (match) policy.set[match[1]] = JSON.parse(match[2]);
+      }
+      const lines = (await import('node:readline')).createInterface({ input: process.stdin });
+      for await (const line of lines) {
+        const message = JSON.parse(line);
+        if (message.id) console.log(JSON.stringify({ id: message.id,
+          result: message.method === 'initialize' ? {} : { config } }));
+      }
+      process.exit(0);
+    }
+  `;
 }

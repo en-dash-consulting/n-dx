@@ -229,6 +229,20 @@ describe("getJudgmentRoute", () => {
   });
 });
 
+ it.each(["provider", "filesystem"])("records measured spend before rethrowing a Codex %s failure", async (kind) => {
+   const { startRunLedger, snapshotRunLedger } = await import("../../../src/analyzers/run-ledger.js");
+   startRunLedger();
+   setLLMConfig({ vendor: "codex" });
+   const error = Object.assign(kind === "provider" ? new ClaudeClientError("failed", "network", false) : new Error("EACCES: output file unreadable"), {
+     tokenUsage: { input: 20, output: 5, cacheReadInput: 80 }, usageStatus: "partial",
+   });
+   mockComplete.mockRejectedValueOnce(error);
+   await expect(callClaude("fixture")).rejects.toBe(error);
+   expect(snapshotRunLedger().llm.byTaskClass.unclassed).toMatchObject({
+     calls: 1, inputTokens: 20, outputTokens: 5, cacheReadTokens: 80, unmeasuredCalls: 1,
+   });
+ });
+
 describe("static-only mode (sv analyze --fast)", () => {
   it("resolves no judgment route even with a TypeSafe key, and restores it when turned off", async () => {
     vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");

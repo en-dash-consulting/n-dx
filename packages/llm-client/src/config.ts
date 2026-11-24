@@ -5,6 +5,7 @@
  * in hench, rex, and sourcevision into a single shared implementation.
  */
 
+import { OPENAI_MODEL_COSTS, OPENAI_CONTEXT_WINDOWS } from "./openai-model-metadata.js";
 import { resolveLayout } from "./layout.js";
 import { warn } from "./output.js";
 import { deepMerge, loadJSONFile } from "./project-config.js";
@@ -49,7 +50,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5";
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   [LLM_VENDOR.CLAUDE]: DEFAULT_CLAUDE_MODEL,
-  [LLM_VENDOR.CODEX]: "gpt-5.6-terra",
+  [LLM_VENDOR.CODEX]: "gpt-6.1-sol",
   // Google: newest *stable* Pro model. `gemini-3.1-pro-preview` is newer but
   // is a preview release — preview IDs can be renamed or withdrawn, so it is
   // not shipped as a default. Users can still select it via llm.google.model.
@@ -93,47 +94,13 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
     heavy: "claude-opus-5-5",
   },
   [LLM_VENDOR.CODEX]: {
-    light: "gpt-5.6-luna",
-    standard: NEWEST_MODELS.codex, // gpt-5.6-terra
-    heavy: "gpt-5.6-sol",
+    light: "gpt-6-luna",
+    standard: NEWEST_MODELS.codex, // gpt-6.1-sol
+    heavy: "gpt-6-astra",
   },
   [LLM_VENDOR.GOOGLE]: GOOGLE_MODELS,
   // Local: no catalog — model is whatever LM Studio has loaded.
   [LLM_VENDOR.LOCAL]: { light: "", standard: "", heavy: "" },
-};
-
-/**
- * Legacy Codex model IDs that map to current canonical models.
- *
- * Keys are model IDs shipped by prior versions (the old `gpt-5-codex` /
- * `gpt-5.1-codex-*` brand names) or since retired by OpenAI; values are the
- * current model they resolve to. `normalizeCodexModel()` applies this mapping
- * when reading config, so an existing `.n-dx.json` pinned to a dead model keeps
- * working after an upgrade instead of failing at request time.
- *
- * `gpt-5.4` and `gpt-5.4-mini` retire from Codex on 2026-08-31 for
- * ChatGPT-authenticated sessions (they remain on the OpenAI API and on Codex
- * sessions authenticated with an API key). OpenAI's documented replacements are
- * `gpt-5.6-terra` and `gpt-5.6-luna` respectively. `gpt-5.3-codex` and
- * `gpt-5.2` are already unavailable when signing in with ChatGPT.
- *
- * `gpt-5.5` is deliberately absent — it is still supported and remains a
- * selectable catalog entry rather than being silently rewritten.
- *
- * Keep in sync with the orchestration-tier legacy list in
- * `packages/core/init-llm.js` (`LEGACY_CATALOG_MODEL_ALIASES.codex`), which
- * treats these same IDs as "known" during `ndx init`. The two tiers cannot
- * import each other, so the sets are duplicated by design.
- */
-const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
-  "gpt-5-codex": NEWEST_MODELS.codex,
-  "gpt-5.1-codex-max": NEWEST_MODELS.codex,
-  "gpt-5.1-codex-mini": TIER_MODELS.codex.light,
-  // Retired / retiring from Codex — remap to OpenAI's stated replacements.
-  "gpt-5.4": NEWEST_MODELS.codex,
-  "gpt-5.4-mini": TIER_MODELS.codex.light,
-  "gpt-5.3-codex": NEWEST_MODELS.codex,
-  "gpt-5.2": NEWEST_MODELS.codex,
 };
 
 /**
@@ -166,8 +133,8 @@ export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
  * Per-model context window sizes in tokens.
  *
  * Used by budget preflight to estimate whether a prompt fits within a model's
- * context window. Values are conservative minimums — actual limits may be higher
- * depending on the API tier or region.
+ * context window. OpenAI entries are API maxima; surface defaults and input limits live in
+ * openai-model-metadata.ts and are applied separately by budget preflight.
  *
  * ~4 chars per token is the standard approximation for English prose.
  */
@@ -188,12 +155,7 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "claude-sonnet-5": 1_000_000,
   "claude-sonnet-4-6": 1_000_000,
   "claude-opus-4-7": 1_000_000,
-  // Codex / OpenAI
-  "gpt-5.6-sol": 1_050_000,
-  "gpt-5.6-terra": 1_050_000,
-  "gpt-5.6-luna": 1_050_000,
-  "gpt-5.4-mini": 128_000,
-  "gpt-5.5": 200_000,
+  ...OPENAI_CONTEXT_WINDOWS,
 };
 
 /** All four billed token kinds for one model, in USD per million tokens. */
@@ -212,7 +174,8 @@ export interface ModelCost {
  * The single price table for the monorepo. Budget preflight reads the input
  * rate; `resolveModelPricing` in `model-pricing.ts` serves every other caller
  * (`ndx usage`, the dashboard's spend views). Values are approximate public
- * list pricing as of 2026-08 and should be updated when vendors change rates.
+ * list pricing; OpenAI was verified 2026-11-16 (see openai-model-metadata.ts).
+ * Other vendors retain their existing 2026-08 estimates.
  * Gemini Pro has tiered rates; the values here are the standard (higher) tier
  * so estimates never under-report.
  *
@@ -224,7 +187,7 @@ export interface ModelCost {
  * | Vendor | Cache write | Cache read |
  * |--------|-------------|------------|
  * | Claude | 1.25x input | 0.1x input (exceptions: Opus 5.5 0.05x, Fable 5.1 0.025x) |
- * | OpenAI | 1x input (caching is automatic and carries no write premium) | 0.1x input |
+ * | OpenAI | Model/duration-specific; see openai-model-metadata.ts | Model-specific |
  * | Google | 1x input (explicit cache write is billed as input) | 0.25x input |
  *
  * Two known inaccuracies, both of which under-report and neither of which the
@@ -234,7 +197,7 @@ export interface ModelCost {
  *   1.25x. Recorded token counts carry no TTL, so a run using the long TTL is
  *   priced as though it used the 5-minute one.
  * - **Long-context surcharge.** Several models charge a higher rate above
- *   200K input tokens in a single request. Aggregates are summed across
+ *   their per-request input threshold in a single request. Aggregates are summed across
  *   requests, so per-request input size is not recoverable here.
  */
 export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
@@ -303,27 +266,7 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
     inputPerMToken: 5.00, outputPerMToken: 25.00,
     cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
   },
-  // Codex / OpenAI — no cache-write premium, read at 0.1x.
-  "gpt-5.6-sol": {
-    inputPerMToken: 4.00, outputPerMToken: 20.00,
-    cacheWritePerMToken: 4.00, cacheReadPerMToken: 0.40,
-  },
-  "gpt-5.6-terra": {
-    inputPerMToken: 2.00, outputPerMToken: 12.00,
-    cacheWritePerMToken: 2.00, cacheReadPerMToken: 0.20,
-  },
-  "gpt-5.6-luna": {
-    inputPerMToken: 0.20, outputPerMToken: 1.20,
-    cacheWritePerMToken: 0.20, cacheReadPerMToken: 0.02,
-  },
-  "gpt-5.4-mini": {
-    inputPerMToken: 0.40, outputPerMToken: 1.60,
-    cacheWritePerMToken: 0.40, cacheReadPerMToken: 0.04,
-  },
-  "gpt-5.5": {
-    inputPerMToken: 7.00, outputPerMToken: 21.00,
-    cacheWritePerMToken: 7.00, cacheReadPerMToken: 0.70,
-  },
+  ...OPENAI_MODEL_COSTS,
 };
 
 /**
@@ -353,7 +296,9 @@ export function resolveModel(model: string): string {
 }
 
 export function normalizeCodexModel(model: string): string {
-  return LEGACY_CODEX_MODEL_ALIASES[model] ?? model;
+  // Availability depends on authentication and provider. A model ID is an
+  // operator pin, not an alias for a moving default; let the provider validate it.
+  return model;
 }
 
 /**
@@ -369,9 +314,9 @@ export function normalizeCodexModel(model: string): string {
  * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
- * - `'light'` — cheaper/faster models (haiku, gemini-flash-lite, gpt-5.6-luna)
- * - `'standard'` or omitted — full-capability balanced models (sonnet, gemini-3.7-flash, gpt-5.6-terra)
- * - `'heavy'` — most capable models (opus, gemini-2.5-pro, gpt-5.6-sol); always uses TIER_MODELS.heavy
+ * - `'light'` — cheaper/faster models (haiku, gemini-flash-lite, gpt-6-luna)
+ * - `'standard'` or omitted — full-capability balanced models (sonnet, gemini-3.7-flash, gpt-6.1-sol)
+ * - `'heavy'` — most capable models (opus, gemini-2.5-pro, gpt-6-astra); always uses TIER_MODELS.heavy
  *
  * For the 'light' weight, if `lightModel` is configured, it takes precedence
  * over both `model` and `TIER_MODELS`. This allows users to customize which
@@ -807,10 +752,11 @@ export function routesToTier(taskClass: string, config?: LLMConfig): boolean {
  *   and below Opus 5 ($5/$25). `claude-fable-5-1` is stronger still but costs
  *   2.5x Opus 5.5 ($10/$50) — available via override, not worth it as the
  *   default for a single-pass review.
- * - **codex → `gpt-5.6-terra`** (`NEWEST_MODELS.codex`). The review model
- *   equals the execution model. `gpt-5.6-sol` is the heavy tier ($4/$20 vs
- *   terra's $2/$12) — available via override or `reviewModel` config, but not
- *   the default pending evidence its review quality justifies 2x the price.
+ * - **codex → `gpt-6.1-sol`** for routine review; select the heavy review
+ *   tier for `gpt-6-astra`. Workload recommendations verified against
+ *   https://learn.chatgpt.com/docs/models?surface=cli on 2026-11-16,
+ *   not n-dx benchmarks or evidence of account access. Effort stays at the
+ *   client's default unless an explicit supported effort rule applies.
  * - **google → `gemini-2.5-pro`.** The heavy tier; `gemini-3.7-flash` is the
  *   balanced execution default.
  * - **local → `""`.** LM Studio serves whichever model is loaded; there is no

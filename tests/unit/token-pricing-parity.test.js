@@ -26,6 +26,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { budgetPreflight } from "../../packages/llm-client/dist/public.js";
+import { estimateCostFromTotals } from "../../packages/rex/dist/public.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 const REX_SRC = join(ROOT, "packages/rex/src/core/token-usage.ts");
@@ -43,6 +45,17 @@ const COST_SURFACES = [
 const RATE_NAMES = /(\w+PerMillion)\s*:\s*([\d.]+)/g;
 
 describe("token pricing parity between the CLI and the dashboard", () => {
+  it("shares verified OpenAI rates with preflight without treating aggregate input as one long request", () => {
+    const tokens = { inputTokens: 150_000, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+    const preflight = budgetPreflight("gpt-6.1-sol", 600_000);
+    const dashboard = estimateCostFromTotals(tokens, { "gpt-6.1-sol": tokens });
+    expect(preflight.fits).toBe(true);
+    expect(dashboard.totalRaw).toBe(preflight.estimatedCostUsd);
+    expect(dashboard.byModel[0]).toMatchObject({ known: true, pricedAs: "gpt-6.1-sol", totalRaw: 0.3 });
+    const aggregate = { ...tokens, inputTokens: 1_000_000 };
+    expect(estimateCostFromTotals(aggregate, { "gpt-6.1-sol": aggregate }).totalRaw).toBe(2);
+  });
+
   it("neither surface defines its own rate literal", () => {
     // A hardcoded rate here is the drift this file exists to prevent. Rates
     // belong in MODEL_COSTS, where one edit updates every surface at once.

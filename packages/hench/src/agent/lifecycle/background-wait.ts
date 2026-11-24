@@ -1,6 +1,6 @@
 /**
- * Detect a CLI session that ended waiting on a background command, and decide
- * whether to resume it.
+ * Resume a CLI session that ended unfinished, including a background wait or
+ * a truncated event stream.
  *
  * WHY THIS EXISTS. The system prompt's Foreground Invariant
  * (`agent/planning/prompt.ts`) tells the agent never to background a command
@@ -44,8 +44,9 @@ export type { BackgroundWaitSignal };
 export const WORK_SESSION_RESUME_MESSAGE =
   "Nothing will notify you: this run is non-interactive, and a background command, " +
   "scheduled wake-up, or monitor will never report back to this session. " +
-  "Run the command again in the foreground and wait for it to exit, then finish: " +
-  "commit your work, update the task status, and write your summary.";
+  "Inspect existing progress first; do not repeat completed commands, task mutations or commits. " +
+  "Finish only the remaining work in the foreground under the original task's commit and " +
+  "status instructions, then write your summary. Do not bypass validation or review.";
 
 /**
  * The message that resumes a review session which ended waiting instead of
@@ -57,20 +58,21 @@ export function buildReviewResumeMessage(reportPath: string): string {
     "scheduled wake-up, or monitor will never report back to this session. Do not wait " +
     "for anything and do not start another check. Write the JSON report now, from what " +
     `you already have, to this exact path:\n\n    ${reportPath}\n\n` +
+    "Do not repeat task mutations, commits or repairs. " +
     "Say in `summary` which checks you did not see finish."
   );
 }
 
 /**
- * The run error when a work session ends waiting a second time, after it has
+ * The run error when a work session ends unfinished a second time, after it has
  * already been resumed once.
  */
 export function formatBackgroundWaitFailure(signal: BackgroundWaitSignal): string {
   const what = signal.detail ? `${signal.tool} (${signal.detail})` : signal.tool;
   return (
-    `The agent ended its session waiting on a background command again after being resumed ` +
-    `to finish in the foreground (last: ${what}). Nothing notifies a non-interactive run, ` +
-    `so its work was left uncommitted. The task is reset to pending.`
+    `The agent left its session unfinished again after being resumed ` +
+    `to finish in the foreground (last: ${what}). Its work was left uncommitted. ` +
+    `The task is reset to pending.`
   );
 }
 

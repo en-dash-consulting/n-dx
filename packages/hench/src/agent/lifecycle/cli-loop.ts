@@ -22,6 +22,9 @@
  * @see packages/hench/src/agent/lifecycle/event-accumulator.ts — legacy mutation-based parsers
  */
 
+import { codexGuardLimitations } from "./codex-policy.js";
+import { CodexManagedUsage } from "./codex-managed-usage.js";
+import { createHash } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RetryConfig, RunRecord, TokenUsage, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
@@ -96,6 +99,7 @@ import {
   cacheEntryAgeMs,
   type BatchChainIdentity,
 } from "./session-cache.js";
+import { codexReuseIdentity, sameCodexSessionIdentity } from "./codex-session-reuse.js";
 import { buildTaskBoundaryDivider } from "./batch-divider.js";
 import {
   createSpawnLedger,
@@ -117,13 +121,16 @@ import {
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveCodexCliEffort, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { prdLayout } from "../../prd/rex-gateway.js";
 import { reviewDedupeDir, reviewInboxDir } from "./uncommitted-work-gate.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
 import {
+  createCodexScratch,
+  assertCodexScratchEnvironment,
+  codexSessionDriver,
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
   type ExecutionPolicy,
@@ -235,6 +242,7 @@ export interface CliLoopResult {
  * carries no stability guarantee.
  */
 export interface SpawnResult {
+  usageNotes?: string[];
   turns: number;
   toolCalls: ToolCallRecord[];
   tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
@@ -414,14 +422,15 @@ export function shouldSendRetryNotice(
 /**
  * Session a retry should resume, or undefined for a cold retry.
  *
- * Resume is Claude-CLI-only today; other vendors have no equivalent on this
- * path and fall back to a cold spawn, which is why the notice still exists.
+ * Codex additionally requires selected-binary and work-session identity admission.
  */
 export function resolveRetryResume(
   vendor: string,
   lastSessionId: string | undefined,
+  codexAdmitted = false,
 ): string | undefined {
-  return vendor === LLM_VENDOR.CLAUDE && lastSessionId ? lastSessionId : undefined;
+  return (vendor === LLM_VENDOR.CLAUDE || (vendor === LLM_VENDOR.CODEX && codexAdmitted))
+    ? lastSessionId : undefined;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -782,6 +791,8 @@ function addTokenUsage(
 // ── Generic adapter-based spawn ───────────────────────────────────────────
 
 export interface SpawnWithAdapterOptions {
+  /** A fork must never execute under the shared parent identity. */
+  forkParentId?: string;
   adapter: VendorAdapter;
   spawnConfig: SpawnConfig;
   cliBinary: string;
@@ -929,13 +940,26 @@ export async function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<S
     const reason = describeAbortReason(opts.abortSignal.reason);
     return { ...emptySpawnResult(), error: reason, aborted: { reason } };
   }
-  const spawned = spawnVendorProcess(opts);
   const backstop = opts.configBackstop;
-  if (!backstop) return spawned;
-  return spawned.finally(() => {
-    const writes = backstop.restore();
-    if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
-  });
+  const scratch = opts.spawnConfig.withScratchDir ? createCodexScratch() : undefined;
+  try {
+    if (scratch) {
+      const spawnConfig = opts.spawnConfig.withScratchDir!(scratch.dir);
+      opts = { ...opts, spawnConfig, cliEnv: { ...opts.cliEnv, ...spawnConfig.env } };
+      await assertCodexScratchEnvironment({ binary: opts.cliBinary, args: spawnConfig.args,
+        cwd: opts.cwd, env: opts.cliEnv, scratchDir: scratch.dir, signal: opts.abortSignal });
+    }
+    return await spawnVendorProcess(opts);
+  } finally {
+    try {
+      scratch?.dispose();
+    } finally {
+      if (backstop) {
+        const writes = backstop.restore();
+        if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
+      }
+    }
+  }
 }
 
 function emptySpawnResult(): SpawnResult {
@@ -947,6 +971,11 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress, abortSignal,
   } = opts;
+  const codexUsage = adapter.vendor === LLM_VENDOR.CODEX
+    ? await CodexManagedUsage.start(spawnConfig.usageResumeSessionId, cliEnv, !!opts.forkParentId) : undefined;
+  // Resumes must never fall back to charging an unbounded session summary.
+  // Fresh legacy wrappers, however, still report invocation-local JSON/text.
+  let managedUsage = spawnConfig.usageResumeSessionId ? codexUsage : undefined;
   const pidHolder = liveProgress ?? opts.pidHolder;
   const timeoutMs = opts.timeoutMs !== undefined && opts.timeoutMs > 0 ? opts.timeoutMs : 0;
   const maxTurns = opts.maxTurns !== undefined && opts.maxTurns > 0 ? opts.maxTurns : 0;
@@ -988,7 +1017,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     const proc = spawnCli(inv.file, inv.args, {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: { ...spawnEnv, ...inv.env },
+      env: { ...spawnEnv, ...inv.env, NDX_MANAGED_USAGE: "1" },
     });
     if (sandbox) proc.once("close", () => sandbox.dispose());
 
@@ -1003,7 +1032,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       void terminateTrackedVendorProcess(proc);
     };
     /** Whichever bound stopped this spawn first; later ones defer to it. */
-    let stopReason: "aborted" | "timeout" | "turn-cap" | undefined;
+    let stopReason: "aborted" | "timeout" | "turn-cap" | "fork-identity" | undefined;
     const settle = (): void => {
       untrack();
       if (stopTimer) clearTimeout(stopTimer);
@@ -1039,6 +1068,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       proc.stdin.end();
     }
 
+    const unfinishedTracker = adapter.createUnfinishedSessionTracker?.();
     const result: SpawnResult = {
       turns: 0,
       toolCalls: [],
@@ -1114,12 +1144,23 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       reject(err);
     });
 
-    proc.on("close", (code) => {
+    proc.on("close", async (code) => {
       settle();
       if (pidHolder) pidHolder.vendorPid = undefined;
       // Flush remaining buffered output
       if (lineBuffer.trim()) {
         processLine(lineBuffer);
+      }
+
+      const terminalUsage = await managedUsage?.finish(cliEnv, turnCounter.value || 1);
+      if (terminalUsage?.tokenUsage) {
+        if (useEventPipeline && accumulator) accumulator.push(terminalUsage);
+        else {
+          result.tokenUsage = addTokenUsage(result.tokenUsage, terminalUsage.tokenUsage);
+          result.turnTokenUsage.push({ ...terminalUsage.tokenUsage, turn: terminalUsage.turn,
+            vendor: tokenMetadata.vendor, model: tokenMetadata.model,
+            diagnosticStatus: terminalUsage.tokenDiagnosticStatus, cacheProvenance: terminalUsage.tokenCacheProvenance });
+        }
       }
 
       if (useEventPipeline && accumulator) {
@@ -1134,14 +1175,14 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           }
 
           // Codex-specific: extract token usage from raw stdout
-          if (adapter.vendor === LLM_VENDOR.CODEX) {
+          if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
             pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
 
         // Codex token usage fallback: structured events parsed but no usage
         if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
-          if (adapter.vendor === LLM_VENDOR.CODEX) {
+          if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
             pushCodexStdoutUsage(accumulator, fullStdout, tokenMetadata.vendor);
           }
         }
@@ -1187,7 +1228,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           }
 
           // Codex-specific: extract token usage from raw stdout via heuristic mapping
-          if (adapter.vendor === LLM_VENDOR.CODEX) {
+          if (adapter.vendor === LLM_VENDOR.CODEX && !managedUsage) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -1246,7 +1287,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           // zero. Stays undefined on the text-format branch, which genuinely
           // has no presence information to offer.
           let mappedDiagnostic: TokenDiagnosticStatus | undefined;
-          if (fullStdout.trim()) {
+          if (fullStdout.trim() && !managedUsage) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -1291,7 +1332,9 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
       // the exit code is our own signal, and "exited with code 143" reads as
       // transient. The Claude CLI's own --max-turns stop arrives as a result
       // line rather than a kill, and is labelled the same way.
-      if (result.aborted) {
+      if (stopReason === "fork-identity") {
+        result.error = "Codex fork did not report a distinct child session id";
+      } else if (result.aborted) {
         result.error = result.aborted.reason;
       } else if (result.timedOut) {
         result.error =
@@ -1308,6 +1351,13 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
         result.error = formatCloseError({ code, stderr, vendor: adapter.vendor, cliBinary });
       }
 
+      if (!result.error && !result.planModeIntercept) {
+        result.backgroundWait ??= unfinishedTracker?.signal();
+      }
+      if (managedUsage?.notes.length) {
+        result.usageNotes = [...new Set(managedUsage.notes)];
+        info(result.usageNotes.join("\n"));
+      }
       resolve(result);
     });
 
@@ -1326,9 +1376,22 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
      * Claude shape, which is what this function used to hardcode.
      */
     function captureSessionId(rawJson: unknown): void {
+      unfinishedTracker?.observe(rawJson);
+      if (codexUsage && rawJson && typeof rawJson === "object") {
+        const type = (rawJson as Record<string, unknown>).type;
+        if (type === "thread.started" || type === "turn.started" || type === "turn.completed" || type === "turn.failed") {
+          managedUsage = codexUsage;
+        }
+      }
       if (result.sessionId) return;
       if (adapter.extractSessionId) {
         const id = adapter.extractSessionId(rawJson);
+        if (id && id === opts.forkParentId) {
+          stopReason = "fork-identity";
+          result.error = "Codex fork did not report a distinct child session id";
+          void terminateTrackedVendorProcess(proc);
+          return;
+        }
         if (id) result.sessionId = id;
         return;
       }
@@ -1346,6 +1409,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     }
 
     function processLine(line: string): void {
+      if (stopReason === "fork-identity") return;
       // Step 1: Parse the line through the adapter for event classification.
       // One line can carry several events (a Claude `user` line answering two
       // tool calls), so every step below runs per event.
@@ -1442,7 +1506,9 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
         const rawJson = JSON.parse(line);
         captureSessionId(rawJson);
         if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
-        const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
+        const tokenEvent = managedUsage
+          ? managedUsage.observe(rawJson, turnCounter.value || 1)
+          : rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
         if (tokenEvent) {
           accumulator.push(tokenEvent);
           // Mirror the accumulator's own arithmetic (a plain sum over token
@@ -1460,7 +1526,7 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           if (typeof rawJson.cost_usd === "number") completionCostUsd = rawJson.cost_usd;
 
           // Fallback token usage from completion event
-          if (rawJson.usage && typeof rawJson.usage === "object") {
+          if (!managedUsage && rawJson.usage && typeof rawJson.usage === "object") {
             if (accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
               const fallback = parseStreamTokenUsage(rawJson);
               if (fallback) {
@@ -1490,12 +1556,20 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
           const rawJson = JSON.parse(line);
           captureSessionId(rawJson);
           if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
-          extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
+          if (managedUsage) {
+            const event = managedUsage.observe(rawJson, turnCounter.value || 1);
+            if (event?.tokenUsage) {
+              result.tokenUsage = addTokenUsage(result.tokenUsage, event.tokenUsage);
+              result.turnTokenUsage.push({ ...event.tokenUsage, turn: event.turn,
+                vendor: tokenMetadata.vendor, model: tokenMetadata.model,
+                diagnosticStatus: event.tokenDiagnosticStatus, cacheProvenance: event.tokenCacheProvenance });
+            }
+          } else extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
 
           // Extract completion metadata (num_turns, cost_usd, fallback usage)
           const type = rawJson.type as string | undefined;
           if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
-            extractCompletionMetadata(rawJson, result);
+            if (!managedUsage) extractCompletionMetadata(rawJson, result);
           }
         } catch {
           // Not JSON — stream raw output for visibility if adapter didn't handle it
@@ -1574,6 +1648,8 @@ function syncRunFromAccumulated(
  * half a dozen unused ones.
  */
 export interface ReviewPassContext {
+  /** Rechecks the actual work session against the reviewer execution identity. */
+  canResumeCodex?: (sessionId: string, model: string, policy: ExecutionPolicy, permissionMode: PermissionMode) => boolean;
   adapter: VendorAdapter;
   vendor: LLMVendor;
   cliBinary: string;
@@ -1582,6 +1658,7 @@ export interface ReviewPassContext {
   henchDir: string;
   /** Resolved review model. Empty string means "send no model flag" (local vendor). */
   reviewModel: string;
+  effort?: string;
   /** Permission posture for the reviewer. It must be able to apply must-fixes. */
   permissionMode: PermissionMode;
   /** True when no human is attached — the reviewer applies the verdict policy itself. */
@@ -1637,6 +1714,7 @@ export interface PairFixContext {
   mcpConfigPath?: string;
   /** `hench.review.rounds`: fix rounds the executor gets. */
   rounds: number;
+  effort?: string;
 }
 
 /**
@@ -1660,7 +1738,7 @@ export interface PairFixContext {
  */
 export function chargeReviewToRun(
   run: RunRecord,
-  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
+  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage" | "usageNotes">,
   reviewModel: string,
 ): void {
   // The review's own share, kept apart for the Live page's Review tab.
@@ -1675,6 +1753,12 @@ export function chargeReviewToRun(
   chargeSpawnToRun(run, result, reviewModel);
 }
 
+function noteUsageDiagnostics(run: RunRecord, result: Pick<SpawnResult, "usageNotes">): void {
+  if (!result.usageNotes?.length) return;
+  run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "json", notes: [] };
+  run.diagnostics.notes.push(...result.usageNotes);
+}
+
 /**
  * Add a spawn's tokens to the run's own usage, per turn and in total. The
  * executor's fix sessions use it directly: they are the run's own work, not
@@ -1682,9 +1766,10 @@ export function chargeReviewToRun(
  */
 function chargeSpawnToRun(
   run: RunRecord,
-  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
+  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage" | "usageNotes">,
   model: string,
 ): void {
+  noteUsageDiagnostics(run, result);
   run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
 
   if (result.turnTokenUsage.length === 0) return;
@@ -1787,6 +1872,7 @@ async function runExecutorFix(
   ]);
   const spawnConfig = fix.adapter.buildSpawnConfig(envelope, ctx.policy, {
     model: fix.spawnModel,
+    effort: fix.effort,
     // The executor has to edit; `plan` would leave it able to describe a fix only.
     permissionMode: "acceptEdits",
     resumeSessionId: sessionId,
@@ -1825,12 +1911,9 @@ async function runExecutorFix(
 /**
  * Run the adversarial review pass for a completed task.
  *
- * The pass never fails the task. By the time it runs, completion validation
- * has already passed and the work is real; a reviewer that crashes, times out,
- * or writes an unparseable report tells us nothing about the work's quality,
- * so the failure is reported and the run continues. The alternative — treating
- * a broken reviewer as a broken task — would make `--review` strictly riskier
- * than not reviewing at all, which is the fastest way to get it switched off.
+ * Completion validation has already passed. A failed pass records its outcome;
+ * finalizeRun refuses reviewed completion without a usable report, preserving
+ * the work. The explicit review-optional setting allows best-effort review.
  *
  * What the pass *can* change is the working tree: a must-fix repair lands
  * before the commit prompt, so it ships in the same commit as the work it
@@ -1851,12 +1934,12 @@ export async function runAdversarialReviewPass(
       : "Adversarial review",
   );
 
-  // Resume only when the adapter can actually honor it. Codex, Google, and
-  // local have no `--resume` equivalent here, so they get a fresh reviewer
-  // seeded with the full task context instead. A pair reviewer is a different
-  // vendor's CLI and cannot resume the executor's session at all.
-  const resumeSessionId =
-    !pair && ctx.vendor === LLM_VENDOR.CLAUDE && inv.sessionId ? inv.sessionId : undefined;
+  // A pair reviewer never continues the executor. Codex self-review must match
+  // the identity captured before the work spawn, including the model and policy.
+  const resumeSessionId = !pair && inv.sessionId
+    ? resolveRetryResume(ctx.vendor, inv.sessionId,
+        ctx.canResumeCodex?.(inv.sessionId, ctx.reviewModel, ctx.policy, ctx.permissionMode) === true)
+    : undefined;
 
   const reportPath = reviewStepReportPath(ctx.henchDir, inv.run.id, step?.round ?? 0);
   // Remove a stale report from a previous pass at this path before spawning.
@@ -1926,6 +2009,7 @@ export async function runAdversarialReviewPass(
 
   const spawnConfig = ctx.adapter.buildSpawnConfig(envelope, ctx.policy, {
     model: ctx.reviewModel || undefined,
+    effort: ctx.effort,
     permissionMode: ctx.permissionMode,
     resumeSessionId,
     mcpConfigPath: ctx.mcpConfigPath,
@@ -1980,7 +2064,13 @@ export async function runAdversarialReviewPass(
     // completing this task, and leaving it out would make `--review` look free
     // in `ndx usage`.
     chargeReviewToRun(inv.run, spawned, ctx.reviewModel);
-    if (spawned.error) return { ok: false, reason: "spawn-failed", detail: spawned.error };
+    if (spawned.error) {
+      const diagnosis = classifyLLMError(new Error(spawned.error), ctx.vendor as LLMVendor);
+      const detail = diagnosis.code === "NDX_CLI_INVALID_CONFIGURATION"
+        ? `${spawned.error}\n${diagnosis.suggestion}`
+        : spawned.error;
+      return { ok: false, reason: "spawn-failed", detail };
+    }
     return { ok: true, spawned };
   };
 
@@ -1993,13 +2083,22 @@ export async function runAdversarialReviewPass(
     return failed;
   };
 
+  const reviewerIdentity = () => ctx.vendor === "codex" ? codexReuseIdentity({
+    binary: ctx.cliBinary, env: ctx.cliEnv, cwd: inv.projectDir,
+    model: ctx.reviewModel, policy: ctx.policy, permissionMode: ctx.permissionMode,
+  }) : undefined;
+  const firstReviewerIdentity = reviewerIdentity();
   const first = await spawnReviewer(spawnConfig);
   if (!first.ok) return failReview(first);
+  if (ctx.vendor === "codex" && resumeSessionId && first.spawned.sessionId !== resumeSessionId) {
+    return failReview({ ok: false, reason: "spawn-failed",
+      detail: "Codex review did not confirm the work session id; refusing to accept its report" });
+  }
 
   let outcome = await readReviewReport(reportPath);
 
-  // A reviewer that ended waiting on a background command, with no report
-  // written, is resumed once and told to write the report now. It had usually
+  // A Codex reviewer with no report, or a Claude reviewer that ended waiting
+  // on a background command, is resumed once to write the report now. It had usually
   // done the review — run 01d15d75's reviewer printed its findings and then
   // deferred the file for a suite that would never report back.
   const reviewerSession = ctx.adapter.resumesUnfinishedSessions
@@ -2007,11 +2106,15 @@ export async function runAdversarialReviewPass(
     : undefined;
   if (
     !outcome.ok && outcome.reason === "no-report" && reviewerSession &&
-    (first.spawned.backgroundWait !== undefined || inv.inheritedBackgroundWait === true)
+    (ctx.vendor === "codex" || first.spawned.backgroundWait !== undefined || inv.inheritedBackgroundWait === true)
   ) {
+    if (ctx.vendor === "codex" && !sameCodexSessionIdentity(firstReviewerIdentity, reviewerIdentity())) {
+      return failReview({ ok: false, reason: "no-report",
+        detail: "Codex reviewer wrote no report and its session cannot be safely resumed. Check CLI resume support and execution identity, then rerun the review." });
+    }
     backgroundResumed = true;
     info(
-      "⚠ The reviewer ended waiting on a background command without writing its report. " +
+      "⚠ The reviewer ended without writing its required report. " +
         "Resuming it once to write the report now.",
     );
     const resumeEnvelope = createPromptEnvelope([
@@ -2021,6 +2124,7 @@ export async function runAdversarialReviewPass(
     const resumed = await spawnReviewer(
       ctx.adapter.buildSpawnConfig(resumeEnvelope, ctx.policy, {
         model: ctx.reviewModel || undefined,
+        effort: ctx.effort,
         permissionMode: ctx.permissionMode,
         resumeSessionId: reviewerSession,
         // Same pin as the first review spawn: a resumed session does not keep
@@ -2029,10 +2133,16 @@ export async function runAdversarialReviewPass(
       }),
     );
     if (!resumed.ok) return failReview(resumed);
+    if (ctx.vendor === "codex" && resumed.spawned.sessionId !== reviewerSession) {
+      return failReview({ ok: false, reason: "spawn-failed",
+        detail: "Codex review continuation did not confirm the reviewer session id; rerun the review." });
+    }
     outcome = await readReviewReport(reportPath);
   }
 
-  if (!outcome.ok) return failReview(outcome);
+  if (!outcome.ok) return failReview(backgroundResumed ? {
+    ...outcome, detail: `${outcome.detail} Review continuation failed to produce a valid report; rerun the review.`,
+  } : outcome);
 
   // A re-review does not repeat the lesser findings of the round before it, so
   // they are copied in: the last report is the whole review.
@@ -2433,6 +2543,8 @@ interface ErrorContext {
   taskId: string;
   retryConfig: RetryConfig;
   vendor: string;
+  /** A failed Codex continuation cannot resume again or replay the task cold. */
+  codexContinuation?: "retry" | "unfinished-work";
 }
 
 /**
@@ -2482,17 +2594,41 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
     return "break";
   }
 
+  // A rejected model requires an explicit operator choice, not a retry.
+  const diagnosis = classifyLLMError(new Error(result.error!), vendor as LLMVendor);
+  if (diagnosis.code === "NDX_CLI_INVALID_CONFIGURATION") {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "failed";
+    run.summary = result.summary;
+    run.error = `${result.error}\n${diagnosis.suggestion}`;
+    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    return "break";
+  }
+
   // Authentication / session loss is never transient: retrying just burns
   // turns and cascades the same failure. Detect it first — before the
   // transient check that would otherwise treat a bare "claude exited with
   // code N" as retryable — and fail immediately with re-auth guidance.
   if (isAuthError(result.error!)) {
-    const classified = classifyLLMError(new Error(result.error!), vendor as LLMVendor);
     syncRunFromAccumulated(run, accumulated, attempt);
     run.status = "failed";
     run.summary = result.summary;
-    run.error = `${classified.message} ${classified.suggestion}`;
+    run.error = `${diagnosis.message} ${diagnosis.suggestion}`;
     await handleRunFailure(store, taskId, "deferred", "auth_error", run.error);
+    return "break";
+  }
+
+  if (ctx.codexContinuation) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    const transient = isTransientError(result.error!);
+    run.status = transient ? "error_transient" : "failed";
+    run.summary = result.summary;
+    run.error =
+      `Codex ${ctx.codexContinuation} continuation failed during attempt ${attempt + 1}/${retryConfig.maxRetries + 1}. ` +
+      "Stopping recovery without another resume or cold replay. " +
+      `Last error: ${result.error}`;
+    info(`\n${run.error}`);
+    await handleRunFailure(store, taskId, transient ? "pending" : "deferred", "codex_continuation_failed", run.error);
     return "break";
   }
 
@@ -2580,6 +2716,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     return { run };
   }
 
+  const policyLimitations = codexGuardLimitations(vendor, "cli",
+    opts.reviewPass ? opts.reviewMode : "off", opts.reviewVendor);
+  if (policyLimitations) stream("Guard", policyLimitations);
+
   // Shared: transition task to in_progress
   // Confinement: Codex runs inside its own sandbox; the Claude CLI runs
   // inside ours, and an autonomous run never runs it unconfined by accident.
@@ -2654,6 +2794,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
 
+  if (policyLimitations) {
+    run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: adapter.parseMode, notes: [] };
+    run.diagnostics.notes.push(policyLimitations);
+  }
+
   // The brief as sent: the run's commit trailers included, so the agent's own
   // commits carry N-DX-Item (the autoCommit path writes no trailers of hench's).
   const { briefText, envelope: baseEnvelope } = briefForRun(brief, run, config, opts.extraContext);
@@ -2674,6 +2819,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const cliEnv = resolveSessionCliEnv(llmConfig, config, "CLI environment", (line) => {
     detail(line, { captureWhenQuiet: true });
   });
+
+  const configuredEffort = vendor === LLM_VENDOR.CODEX
+    ? resolveTaskModel("agent.execute", llmConfig).effort
+    : resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig);
+  const executionEffort = vendor === LLM_VENDOR.CODEX
+    ? await resolveCodexCliEffort(opts.spawnModel, configuredEffort, { binary: cliBinary, env: cliEnv, cwd: projectDir }, "agent.execute")
+    : configuredEffort;
 
   // Pin the spawned session's MCP servers to *this* project directory, so the
   // agent's PRD writes land in the worktree the run is executing in. Without
@@ -2738,6 +2890,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     ...(spendGate ? { spendGate } : {}),
   };
 
+  let codexWorkSession: { id: string; identity: string | undefined } | undefined;
+  const reuseIdentity = (spawnModel: string, spawnPolicy: ExecutionPolicy, permissionMode: string) =>
+    codexReuseIdentity({ binary: cliBinary, env: cliEnv, cwd: projectDir,
+      model: spawnModel, policy: spawnPolicy, permissionMode });
+
   const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
         // A pair reviewer is the other vendor's CLI: its own adapter, binary
@@ -2763,14 +2920,25 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
                 cliEnv,
                 model: eventModel,
                 spawnModel: opts.spawnModel,
+                effort: executionEffort,
                 mcpConfigPath,
                 rounds: opts.reviewRounds ?? config.review?.rounds ?? DEFAULT_REVIEW_ROUNDS,
               },
             }
           : {}),
         policy,
+        canResumeCodex: (id, reviewModel, reviewPolicy, permissionMode) =>
+          id === codexWorkSession?.id && sameCodexSessionIdentity(codexWorkSession?.identity,
+            reuseIdentity(reviewModel, reviewPolicy, permissionMode)),
         henchDir,
         reviewModel,
+        effort: reviewVendor === LLM_VENDOR.CODEX
+          ? await resolveCodexCliEffort(reviewModel, resolveTaskModel("agent.review", llmConfig).effort, {
+              binary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
+              env: pairVendor ? resolveSessionCliEnv({ ...llmConfig, vendor: pairVendor }, config, "review effort", (line) => detail(line, { captureWhenQuiet: true })) : cliEnv,
+              cwd: projectDir,
+            }, "agent.review")
+          : resolveAgentCliEffort(reviewModel, llmConfig, "agent.review"),
         // The reviewer has to be able to apply must-fixes and run the
         // project's checks. `plan` would leave it able to do neither, so the
         // review pass always runs with edit permission regardless of the
@@ -2919,7 +3087,15 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // it, so no task re-pays cold-start context or re-explores the repo.
   // `cliLoop` runs once per task, so the cache — not loop plumbing — is what
   // makes orientation happen once per loop and persist across invocations.
+  const forkCapability = vendor === "codex" && config.provider === "cli" &&
+    config.sessionStrategy !== "batch" && config.sessionStrategy !== "cold"
+    ? codexSessionDriver.probeFork?.(cliBinary, cliEnv, projectDir) : undefined;
+  if (forkCapability && (!forkCapability.supported || !forkCapability.reusable)) {
+    const reason = forkCapability.supported ? "Codex account identity is opaque" : forkCapability.reason;
+    detail(`Warm session: ${reason}; continuing with cold spawns`);
+  }
   const sessionStrategy = resolveSessionStrategy({
+    codexForkSupported: forkCapability?.supported === true && forkCapability.reusable === true,
     vendor,
     provider: config.provider,
     configured: config.sessionStrategy,
@@ -2978,11 +3154,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         ? "not-consulted"
         : config.sessionStrategy === "cold"
           ? "configured-cold"
-          // `resolveSessionStrategy` degrades to cold for any vendor or
-          // provider that cannot resume a session by id. Saying so is the
-          // difference between "forking is off" and "forking was asked for and
-          // this vendor cannot do it".
-          : "fork-unsupported",
+          // Forking needs a supported CLI surface and a reusable identity;
+          // resume support alone does not make a warm parent safe to fork.
+          : forkCapability?.supported && !forkCapability.reusable
+            ? "identity-unavailable"
+            : "fork-unsupported",
   };
 
   if (sessionStrategy === "batch" && batchIdentity) {
@@ -3020,7 +3196,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   }
 
   if (sessionStrategy === "fork") {
+    // Codex binds orientation to the full execution identity without persisting
+    // credentials. Preserve Claude's historical parent admission checks.
+    const identityHash = vendor === "codex" ? createHash("sha256").update(JSON.stringify([
+      run.worktreeRoot ?? projectDir, chainRefIdentity(run), policyFingerprint(policy),
+      cliBinary, forkCapability?.version, forkCapability?.identity, config.permissionMode,
+      Object.entries(cliEnv ?? process.env).sort(([a], [b]) => a.localeCompare(b)),
+    ])).digest("hex") : undefined;
     const decision = await ensureWarmParent({
+      identityHash,
+      codexOrientationFlags: forkCapability?.orientationFlags,
       adapter,
       vendor,
       cliBinary,
@@ -3122,8 +3307,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
    */
   let lastSessionId: string | undefined;
   /**
-   * Session to resume because it ended waiting on a background command with
-   * its work uncommitted. Set for exactly one spawn, then cleared.
+   * Session to resume because it ended unfinished with its work uncommitted.
+   * Set for exactly one spawn, then cleared.
    *
    * Once per task: a session that ends the same way after being told nothing
    * will notify it is not going to be talked out of it by a second message,
@@ -3142,6 +3327,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries - planRespawnsChargedToRetries; attempt++) {
       let result!: SpawnResult;
+      let codexContinuation: ErrorContext["codexContinuation"];
       let attemptAccumulator: EventAccumulator | undefined;
 
       // Inner re-spawn loop: handles plan-mode interceptions without
@@ -3149,6 +3335,23 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // triggering ExitPlanMode (or when the plan-respawn cap is hit / the
       // user rejects the plan).
       while (true) {
+        const expectedContinuationSession = backgroundResumeSessionId ?? retryResumeSessionId;
+        const codexSpawnIdentity = vendor === "codex"
+          ? reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits") : undefined;
+        if (vendor === "codex" && backgroundResumeSessionId &&
+            !sameCodexSessionIdentity(codexWorkSession?.identity, codexSpawnIdentity)) {
+          throw new Error("Codex unfinished session identity changed; refusing to replay work. Restore the execution identity and rerun the task.");
+        }
+        // Recheck immediately before using a retry handle; backoff may outlive
+        // a checkout, credential, model or execution-policy change.
+        if (vendor === "codex" && attempt > 0) {
+          const admitted = sameCodexSessionIdentity(codexWorkSession?.identity,
+            codexSpawnIdentity);
+          retryResumeSessionId = admitted ? retryResumeSessionId : undefined;
+          // A retry must never return to the shared parent or previous task.
+          warmParentId = undefined;
+          batchResumeId = undefined;
+        }
         // Batch turns after the first arrive in a conversation that already
         // finished a task, so the brief needs an explicit boundary or it
         // reads as a continuation of the previous one.
@@ -3168,6 +3371,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // A fork inherits the orientation transcript, which declares itself
         // read-only. Lift that before the brief; a resume continues a session
         // that already left orientation, so it never gets the sentence.
+        // Recheck after orientation and on retries: auth/config may have changed
+        // while the model was running. Never fork a parent admitted under a
+        // different account, binary version or configuration snapshot.
+        if (warmParentId && vendor === "codex" && !retryResumeSessionId && !backgroundResumeSessionId) {
+          const current = codexSessionDriver.probeFork?.(cliBinary, cliEnv, projectDir);
+          if (!current?.supported || !current.reusable || current.version !== forkCapability?.version ||
+            current.identity !== forkCapability?.identity) {
+            await clearSessionCache(henchDir);
+            warmParentId = undefined;
+            run.parentSessionId = undefined;
+            run.session = { strategy: "cold", outcome: "miss", reason: "identity-changed" };
+            detail("Warm session: Codex execution identity changed; continuing with a cold spawn");
+          }
+        }
         const forkingWarmParent =
           !backgroundResumeSessionId && !retryResumeSessionId && !!warmParentId;
         const briefContent =
@@ -3201,8 +3418,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           model: opts.spawnModel,
           // A matching llm.effort rule for agent.execute, validated against
           // this model. Undefined leaves the flag off so the vendor applies
-          // its own default; non-Claude adapters ignore it either way.
-          effort: resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig),
+          // its own default.
+          effort: executionEffort,
           permissionMode: currentPermissionMode,
           // Fork the orientation session rather than continuing it, so the
           // parent stays reusable by the next task and this spawn gets its
@@ -3219,6 +3436,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           resumeSessionId:
             backgroundResumeSessionId ?? retryResumeSessionId ?? warmParentId ?? batchResumeId,
           forkSession: forkingWarmParent ? true : undefined,
+          codexForkSupported: forkCapability?.supported,
           mcpConfigPath,
           maxTurns,
         });
@@ -3231,7 +3449,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
 
         if (backgroundResumeSessionId) {
-          subsection("Resuming the session: it ended waiting on a background command");
+          subsection("Resuming the unfinished session");
         } else if (readOnlyRetryPending) {
           subsection("Re-spawn cold after a read-only refusal");
         } else if (attempt > 0 && planRespawns === 0) {
@@ -3265,11 +3483,15 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         }
         recordSpawn(spawnLedger, nextSpawnReason);
 
+        codexContinuation = vendor === "codex"
+          ? backgroundResumeSessionId ? "unfinished-work" : retryResumeSessionId ? "retry" : undefined
+          : undefined;
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
         resetLiveSpawnProgress(liveProgress);
         result = await withHeartbeat(
           `waiting on ${vendor} CLI`,
           spawnWithAdapter({
+            forkParentId: forkingWarmParent && vendor === "codex" ? warmParentId : undefined,
             adapter,
             spawnConfig,
             cliBinary,
@@ -3285,6 +3507,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             configBackstop: opts.configBackstop,
           }),
         );
+        if (forkingWarmParent && vendor === "codex" && !result.error &&
+          (!result.sessionId || result.sessionId === warmParentId)) {
+          result.error = "Codex fork did not report a distinct child session id";
+        }
         // This attempt's numbers are about to be added to `accumulated`; the
         // live counters must stop claiming them or the two would be summed.
         resetLiveSpawnProgress(liveProgress);
@@ -3310,7 +3536,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // about the parent.
         if (
           result.error && !result.livelock && !stoppedByRunBound(result) && !wasBackgroundResume &&
-          warmParentId && !forkFallbackUsed
+          forkingWarmParent && warmParentId && !forkFallbackUsed &&
+          (vendor !== "codex" || (!result.sessionId && result.turns === 0 && result.toolCalls.length === 0))
         ) {
           forkFallbackUsed = true;
           nextSpawnReason = "fork-fallback";
@@ -3324,33 +3551,42 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           continue;
         }
 
+        if (vendor === "codex") {
+          codexWorkSession = result.sessionId ? { id: result.sessionId, identity: codexSpawnIdentity } : undefined;
+          if (codexContinuation && !result.error && result.sessionId !== expectedContinuationSession) {
+            result.error = "Codex did not confirm the resumed work session id; refusing to replay this task";
+          }
+        }
         if (result.sessionId) lastSessionId = result.sessionId;
 
+        noteUsageDiagnostics(run, result);
         accumulateResult(accumulated, result);
 
-        // Background wait: the session handed work to the background and then
-        // ended, and nothing will ever notify it. Only a session that left its
-        // work uncommitted needs anything — one that backgrounded a command
-        // but still committed has finished.
+        // An unfinished session may have backgrounded work or emitted a
+        // truncated stream. Only uncommitted work needs a continuation.
         if (
           result.backgroundWait && !result.error && !result.planModeIntercept &&
           (await hasUnfinishedWork({ projectDir, autoCommit: config.autoCommit === true }))
         ) {
           const signal = result.backgroundWait;
-          const resumeId = adapter.resumesUnfinishedSessions ? result.sessionId : undefined;
+          const resumeId = adapter.resumesUnfinishedSessions && (vendor !== "codex" ||
+            sameCodexSessionIdentity(codexWorkSession?.identity,
+              reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits")))
+            ? result.sessionId : undefined;
           if (backgroundResumes === 0 && resumeId) {
             backgroundResumes++;
             backgroundResumeSessionId = resumeId;
             nextSpawnReason = "background-resume";
             run.backgroundResume = { ...signal };
             info(
-              `\n⚠ The session ended waiting on a background command (${signal.tool}` +
+              `\n⚠ The session ended unfinished (${signal.tool}` +
                 `${signal.detail ? `: ${signal.detail}` : ""}) with its work uncommitted. ` +
                 "Resuming it once to finish in the foreground.",
             );
             await toolRexAppendLog(store, taskId, {
               event: "background_wait_resumed",
-              detail: `Session ${resumeId.slice(0, 8)} ended waiting on ${signal.tool}; resumed once.`,
+              detail: `Session ${resumeId.slice(0, 8)} ended unfinished (last: ${signal.tool}` +
+                `${signal.detail ? `: ${signal.detail}` : ""}); resumed once.`,
             });
             continue;
           }
@@ -3450,17 +3686,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       } else {
         const action = await processErrorResult({
           run, result, accumulated, attempt,
-          store, taskId, retryConfig, vendor,
+          store, taskId, vendor,
+          retryConfig, codexContinuation,
         });
         if (action === "break") break;
         // action === "retry" → continue loop.
         //
-        // Resume the failed session on vendors that can, so the retry keeps
-        // what the attempt already did instead of rediscovering it. Only the
-        // Claude CLI honors resume today; elsewhere this stays undefined and
-        // the retry is a cold spawn carrying the retry notice.
         nextSpawnReason = "retry";
-        retryResumeSessionId = resolveRetryResume(vendor, lastSessionId);
+        retryResumeSessionId = resolveRetryResume(vendor,
+          vendor === "codex" ? result.sessionId : lastSessionId,
+          vendor === "codex" && sameCodexSessionIdentity(codexWorkSession?.identity,
+            reuseIdentity(opts.spawnModel ?? "", policy, currentPermissionMode ?? "acceptEdits")));
+        if (vendor === "codex" && !retryResumeSessionId) {
+          detail("Codex retry: resume unavailable or execution identity changed; using prior-attempt context");
+        }
       }
     }
   } catch (err) {

@@ -1171,6 +1171,16 @@ describe("n-dx config", () => {
   // ── Help — Claude settings ───────────────────────────────────────────────
 
   describe("help — claude settings", () => {
+    it("describes capability-gated Codex forks and their cold fallback", () => {
+      const start = helpOutput.indexOf("hench.sessionStrategy");
+      const block = helpOutput.slice(start, helpOutput.indexOf("hench.tasksPerSession    ", start));
+      expect(block).toContain("Claude CLI");
+      expect(block).toContain("Codex CLI");
+      expect(block).toContain("capability and identity checks pass");
+      expect(block).toContain('fall back to "cold"');
+      expect(block).not.toContain("Claude today");
+    });
+
     it("documents claude.cli_path", () => {
       const output = helpOutput;
       expect(output).toContain("claude.cli_path");
@@ -2401,11 +2411,11 @@ describe("n-dx config", () => {
       expect(stderr).toMatch(/light.*standard.*heavy|tier/i);
     });
 
-    it("sets an effort level per class", async () => {
-      run(["llm.effort.agent.execute", "high", tmpDir]);
+    it.each(["none", "minimal", "high", "max", "ultra"])("sets effort %s per class for provider validation", async (effort) => {
+      run(["llm.effort.agent.execute", effort, tmpDir]);
 
       const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
-      expect(config.llm.effort["agent.execute"]).toBe("high");
+      expect(config.llm.effort["agent.execute"]).toBe(effort);
     });
 
     it("rejects an unknown effort level", async () => {

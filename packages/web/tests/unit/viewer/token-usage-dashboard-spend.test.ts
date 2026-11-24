@@ -148,6 +148,43 @@ describe("LLM Utilization view — dashboard spend", () => {
     return Array.from(row.cells).map((c) => c.textContent ?? "");
   }
 
+  it("identifies the pricing basis without presenting subscription charges", () => {
+    expect(root.textContent).toContain("API list-price estimates, not subscription charges.");
+    expect(root.textContent).toContain("standard short-context rates and default cache duration");
+  });
+
+  it.each([
+    { status: "unavailable", complete: false, total: "Unknown (usage unavailable)", input: 0 },
+    { status: "partial", complete: false, total: "$0.05 recorded (usage partial)", input: 100 },
+    { status: "complete", complete: true, total: "$0.00", input: 0 },
+  ])("renders $status measurements without implying missing tokens were free", async ({ status, complete, total, input }) => {
+    const counts = { ...pkg({ inputTokens: input, calls: 1 }), diagnosticStatus: status };
+    const cost = { ...COST, total, totalRaw: input ? 0.05 : 0, measurementStatus: status, measurementComplete: complete,
+      byModel: [{ model: "gpt-5.4", pricedAs: "gpt-5.4", known: true, unattributed: false,
+        tokens: input, totalRaw: input ? 0.05 : 0, total, measurementStatus: status, measurementComplete: complete }] };
+    const usage = { packages: { rex: counts }, diagnosticStatus: status, totalInputTokens: input,
+      totalOutputTokens: 0, totalCacheCreationTokens: 0, totalCacheReadTokens: 0, totalCalls: 1,
+      byModel: { "gpt-5.4": counts } };
+    vi.mocked(fetch).mockImplementation((request) => Promise.resolve(jsonResponse(
+      String(request).startsWith("/api/token/utilization") ? { ...UTILIZATION, usage, cost,
+        byVendorModel: [{ ...counts, vendor: "codex", model: "gpt-5.4", toolBreakdown: { rex: counts } }],
+        commands: [{ ...counts, package: "rex", command: "analyze" }],
+        trend: [{ period: "2026-11-18", totalTokens: input, toolBreakdown: { rex: counts }, estimatedCost: cost }],
+      } : { rollup: {}, items: [] },
+    )));
+    await act(async () => {
+      render(null, root);
+      render(h(TokenUsageView, null), root);
+    });
+    await settle();
+    expect(root.textContent).toContain(total);
+    expect(root.textContent?.includes("missing usage is not free")).toBe(!complete);
+    expect(root.textContent?.includes("Recorded Tokens")).toBe(!complete);
+    expect(root.textContent?.includes(`analyze (usage ${status})`)).toBe(!complete);
+    expect(root.textContent?.includes(`gpt-5.4 (usage ${status})`)).toBe(!complete);
+    if (complete) expect(root.textContent).toContain("0 measured tokens");
+  });
+
   it("labels the dashboard bucket rather than folding it into Sourcevision", () => {
     const badges = Array.from(root.querySelectorAll(".pkg-badge")).map((b) => b.textContent);
     expect(badges).toContain("Dashboard");

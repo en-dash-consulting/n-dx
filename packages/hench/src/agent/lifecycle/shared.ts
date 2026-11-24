@@ -61,7 +61,7 @@ import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import {
   formatMissingReviewRefusal,
   formatUnresolvedMustFixRefusal,
-  reviewNeverRan,
+  reviewHasNoUsableReport,
 } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { appendTrailerBlock } from "./commit-trailers.js";
@@ -1337,6 +1337,8 @@ export async function runPostTaskTestsIfNeeded(
  * entries for vendor="codex").
  */
 async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): Promise<void> {
+  // Direct API turns already carry request-scoped usage; quota totals are not run usage.
+  if (run.invocationContext === "api") return;
   // Check if any turn used Codex as the vendor
   const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
   if (!isCodexRun) {
@@ -4183,7 +4185,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // know, which is a config fix and a re-run. `gated` carries that to
   // stuck-task detection (agent/analysis/stuck.ts).
   let reviewGateRefused = false;
-  if (run.status === "completed" && opts.reviewOptional !== true && reviewNeverRan(run.review)) {
+  if (run.status === "completed" && opts.reviewOptional !== true && reviewHasNoUsableReport(run.review)) {
     reviewGateRefused = true;
     run.status = "failed";
     run.error = formatMissingReviewRefusal(run.review);

@@ -15,10 +15,13 @@
 
 import { readFile } from "node:fs/promises";
 import {
+  assistedSession,
+  transcriptUsageStatus,
   loadUsageCursor,
   resolveTranscriptPath,
   saveUsageMark,
   takeUsageMark,
+  usageCountersRegressed,
 } from "../../store/session-usage.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { CLIError } from "../errors.js";
@@ -43,22 +46,30 @@ export async function cmdUsage(
 }
 
 async function cmdUsageMark(dir: string, flags: Record<string, string>): Promise<void> {
+  if (process.env.NDX_MANAGED_USAGE === "1") {
+    result(flags.format === "json"
+      ? JSON.stringify({ skipped: true, reason: "managed-execution-owns-usage" })
+      : "Usage belongs to the managed execution; assisted bookkeeping skipped.");
+    return;
+  }
+
   const task = flags.task;
   if (!task) throw new CLIError("Missing --task.", USAGE_TEXT);
 
   const henchDir = resolveHenchPaths(dir).henchDir;
-  const sessionId = flags.session || process.env.CLAUDE_CODE_SESSION_ID || "";
+  const session = assistedSession(flags);
+  const sessionId = session.id;
   if (!sessionId) {
     // Nothing to mark against, and nothing to fail: `hench record` will say the
     // same thing and fall back. A skill's first step must not abort over it.
     warn(
-      "No Claude Code session detected (CLAUDE_CODE_SESSION_ID unset) — nothing marked. " +
+      "No assisted session detected (CLAUDE_CODE_SESSION_ID / CODEX_THREAD_ID unset) — nothing marked. " +
         "The record for this task will fall back to the session watermark.",
     );
     return;
   }
 
-  const transcriptPath = flags.transcript || (await resolveTranscriptPath(sessionId));
+  const transcriptPath = flags.transcript || (await resolveTranscriptPath(sessionId, { vendor: session.vendor }));
   if (!transcriptPath) {
     warn(
       `No transcript found for session ${sessionId} — nothing marked. ` +
@@ -78,7 +89,18 @@ async function cmdUsageMark(dir: string, flags: Record<string, string>): Promise
     return;
   }
 
+  const measurement = transcriptUsageStatus(text);
+  if (measurement.status === "unavailable" ||
+      (session.vendor && session.vendor !== measurement.vendor) ||
+      (measurement.sessionId && measurement.sessionId !== sessionId)) {
+    warn("Usage unavailable or session identity mismatched — nothing marked. Pass a supported Claude or Codex rollout transcript with cumulative usage.");
+    return;
+  }
   const mark = takeUsageMark(text, task);
+  if (measurement.vendor === "codex" && usageCountersRegressed(mark.totals, await loadUsageCursor(henchDir, sessionId))) {
+    warn("Usage counters are behind a previously observed boundary — nothing marked. Retry with the current rollout.");
+    return;
+  }
   await saveUsageMark(henchDir, sessionId, mark);
 
   if (flags.format === "json") {
@@ -99,8 +121,9 @@ async function cmdUsageMark(dir: string, flags: Record<string, string>): Promise
 
 async function cmdUsageMarks(dir: string, flags: Record<string, string>): Promise<void> {
   const henchDir = resolveHenchPaths(dir).henchDir;
-  const sessionId = flags.session || process.env.CLAUDE_CODE_SESSION_ID || "";
-  if (!sessionId) throw new CLIError("No session: pass --session=<id> or run inside Claude Code.", USAGE_TEXT);
+  const session = assistedSession(flags);
+  const sessionId = session.id;
+  if (!sessionId) throw new CLIError("No session: pass --session=<id> or run inside Claude Code or Codex.", USAGE_TEXT);
 
   const cursor = await loadUsageCursor(henchDir, sessionId);
   const marks = Object.values(cursor.marks ?? {});

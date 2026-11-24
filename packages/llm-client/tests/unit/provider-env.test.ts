@@ -6,6 +6,8 @@ import type { SpawnCliOptions } from "../../src/exec.js";
 import { createCliClient } from "../../src/cli-provider.js";
 import { createCodexCliClient } from "../../src/codex-cli-provider.js";
 
+vi.mock("../../src/codex-scratch-env.js", () => ({ assertCodexScratchEnvironment: vi.fn().mockResolvedValue(undefined) }));
+
 const { spawnCli } = vi.hoisted(() => ({ spawnCli: vi.fn() }));
 vi.mock("../../src/exec.js", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../src/exec.js")>(), spawnCli,

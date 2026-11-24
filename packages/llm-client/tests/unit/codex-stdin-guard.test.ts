@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "node:events";
 
+// The stdin guard is independent of the native config protocol, covered by
+// codex-scratch-env and the real-process provider scratch tests.
+vi.mock("../../src/codex-scratch-env.js", () => ({ assertCodexScratchEnvironment: vi.fn().mockResolvedValue(undefined) }));
+
 // Mock spawnCli so we can hand the provider a controllable fake child process.
 // diagnoseCliInvocation / isCliNotFoundError stay real (spread from actual).
 vi.mock("../../src/exec.js", async (importOriginal) => {

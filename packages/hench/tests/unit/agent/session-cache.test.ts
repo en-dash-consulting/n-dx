@@ -285,3 +285,11 @@ describe("resolveSessionStrategy", () => {
     expect(resolveSessionStrategy({ vendor: "codex", provider: "cli", configured: "batch" })).toBe("batch");
   });
 });
+
+ it("allows Codex forks only with evidence from the selected binary", () => {
+   expect(resolveSessionStrategy({ vendor: "codex", provider: "cli", codexForkSupported: true })).toBe("fork");
+   expect(resolveSessionStrategy({ vendor: "codex", provider: "cli", codexForkSupported: false })).toBe("cold");
+   expect(resolveSessionStrategy({ vendor: "codex", provider: "api", codexForkSupported: true })).toBe("cold");
+   expect(resolveSessionStrategy({ vendor: "codex", provider: "cli", configured: "batch", codexForkSupported: true })).toBe("batch");
+   expect(resolveSessionStrategy({ vendor: "codex", provider: "cli", configured: "cold", codexForkSupported: true })).toBe("cold");
+ });

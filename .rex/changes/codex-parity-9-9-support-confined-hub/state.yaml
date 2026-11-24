@@ -1,0 +1,30 @@
+schema: "rex/v2"
+items:
+  "5d47b98c-517a-46c6-90be-2f4ed5d3434a":
+    status: "completed"
+    startedAt: "2026-11-19T00:02:55.223Z"
+    completedAt: "2026-11-19T00:50:31.095Z"
+    endedAt: "2026-11-19T00:50:31.095Z"
+    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:02:55.223Z"},{"end":"2026-11-19T00:44:11.654Z","start":"2026-11-19T00:38:09.671Z"},{"end":"2026-11-19T00:50:31.095Z","start":"2026-11-19T00:46:46.129Z"}]
+    lastModified: "2026-11-19T00:50:31.095Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a85b9cf9-c01a-48ec-bdec-bfbedea973f1":
+    status: "completed"
+    startedAt: "2026-11-19T00:27:25.939Z"
+    completedAt: "2026-11-19T00:52:04.384Z"
+    endedAt: "2026-11-19T00:52:04.384Z"
+    activeIntervals: [{"end":"2026-11-19T00:27:25.939Z","start":"2026-11-19T00:27:25.939Z"},{"end":"2026-11-19T00:52:04.384Z","start":"2026-11-19T00:46:26.784Z"}]
+    failureReason: "Provider candidate committed in d0139660 with freshreview10findingsfixed; actual selectedCLI/localprovider host acceptance and three listener-dependent tests still outstanding. Preserve raw completion; no claim of completed acceptance."
+    appliedAt: "2026-11-19T00:27:25.939Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-11T21:06:47.523Z"
+    lastModified: "2026-11-19T00:52:04.384Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b42b3957-511c-42f7-aed8-37980dfe6d13":
+    status: "completed"
+    startedAt: "2026-11-18T22:28:26.427Z"
+    completedAt: "2026-11-18T23:58:04.807Z"
+    endedAt: "2026-11-18T23:58:04.807Z"
+    activeIntervals: [{"end":"2026-11-18T22:31:24.310Z","start":"2026-11-18T22:28:26.427Z"},{"end":"2026-11-18T22:38:17.039Z","start":"2026-11-18T22:33:45.157Z"},{"end":"2026-11-18T22:45:11.896Z","start":"2026-11-18T22:44:21.719Z"},{"end":"2026-11-18T22:54:25.439Z","start":"2026-11-18T22:47:14.974Z"},{"end":"2026-11-18T22:59:29.909Z","start":"2026-11-18T22:59:29.909Z"},{"end":"2026-11-18T23:09:24.234Z","start":"2026-11-18T23:08:20.119Z"},{"end":"2026-11-18T23:33:33.732Z","start":"2026-11-18T23:13:08.194Z"},{"end":"2026-11-18T23:58:04.807Z","start":"2026-11-18T23:53:52.948Z"}]
+    lastModified: "2026-11-18T23:58:07.553Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

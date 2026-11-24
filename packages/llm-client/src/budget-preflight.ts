@@ -15,7 +15,9 @@
  * ```
  */
 
-import { MODEL_CONTEXT_WINDOWS, MODEL_COSTS } from "./config.js";
+import { MODEL_CONTEXT_WINDOWS } from "./config.js";
+import { resolveModelPricing } from "./model-pricing.js";
+import { resolveOpenAIModel, resolveOpenAICost, type ModelEstimateOptions } from "./openai-model-metadata.js";
 
 /** Conservative fallback context window used when the model is not in MODEL_CONTEXT_WINDOWS. */
 const DEFAULT_CONTEXT_WINDOW = 128_000;
@@ -50,6 +52,8 @@ export interface BudgetPreflightResult {
   tokenEstimate: number;
   /** Context window size in tokens for this model (from MODEL_CONTEXT_WINDOWS or the default). */
   contextWindow: number;
+  /** False means contextWindow is a conservative policy fallback, not a verified model limit. */
+  contextKnown: boolean;
   /** Estimated utilization as a percentage (0–100+). Values above 90 fail the fits check. */
   utilizationPercent: number;
   /**
@@ -73,21 +77,32 @@ export interface BudgetPreflightResult {
 export function budgetPreflight(
   modelId: string,
   promptCharCount: number,
+  options: ModelEstimateOptions = {},
 ): BudgetPreflightResult {
   const tokenEstimate = estimateTokens(promptCharCount);
-  const contextWindow = MODEL_CONTEXT_WINDOWS[modelId] ?? DEFAULT_CONTEXT_WINDOW;
+  const metadata = resolveOpenAIModel(modelId);
+  const resolved = resolveModelPricing(modelId);
+  const surface = options.surface ?? "api";
+  const verifiedContext = metadata
+    ? (surface === "api" ? metadata.apiContext : surface === "codex" ? metadata.codexContext : metadata.workContext)
+    : (surface === "api" && resolved.known ? MODEL_CONTEXT_WINDOWS[resolved.modelId] : undefined);
+  const contextWindow = verifiedContext ?? DEFAULT_CONTEXT_WINDOW;
   const utilizationPercent = (tokenEstimate / contextWindow) * 100;
-  const fits = tokenEstimate <= contextWindow * MAX_UTILIZATION;
+  const inputLimit = surface === "api" ? metadata?.apiMaxInput : undefined;
+  const fits = tokenEstimate <= Math.min(contextWindow * MAX_UTILIZATION, inputLimit ?? Infinity);
 
-  const costs = MODEL_COSTS[modelId];
-  const estimatedCostUsd =
-    costs !== undefined ? (tokenEstimate / 1_000_000) * costs.inputPerMToken : undefined;
+  const rate = metadata
+    ? resolveOpenAICost(modelId, { ...options, inputTokens: tokenEstimate })?.inputPerMToken
+    : (resolved.known && options.billing !== "subscription" && !options.mode && !options.cacheDuration
+      ? resolved.pricing.inputPerMillion : undefined);
+  const estimatedCostUsd = rate === undefined ? undefined : (tokenEstimate / 1_000_000) * rate;
 
   return {
     modelId,
     fits,
     tokenEstimate,
     contextWindow,
+    contextKnown: verifiedContext !== undefined,
     utilizationPercent,
     estimatedCostUsd,
   };

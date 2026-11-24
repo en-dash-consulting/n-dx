@@ -6,8 +6,8 @@
  * `/hub/session/drawer`), so it fills its frame and has no resize edge: the
  * hub home owns the dock. Its head says where it stands — the purple
  * "Hub · all projects" scope chip, how much of the snapshot changed since the
- * last turn, and the Hub lens. There is no vendor picker and no lens menu: the
- * session is Claude on the hub lens, for good. The composer says the session
+ * last turn, and the Hub lens. The vendor picker follows host admission and
+ * stays fixed while a session is open. The composer says the session
  * reads and drafts, never does, and meters the context against the hub
  * ceiling. Under the head, the snapshot's worktrees each offer "Open in
  * worktree sidecar", which hands the latest question to that worktree's own
@@ -142,6 +142,21 @@ export function HubSessionDrawer({ sidecar, info, onClose, onHandoff }: HubSessi
         h("button", { type: "button", class: "sidecar-close", onClick: onClose, "aria-label": "Close Hub session", title: "Close (⌘J)" }, "×"),
       ),
       h("div", { class: "hub-session-chips" },
+        h("label", { class: "sidecar-chip" }, "Vendor ",
+          h("select", {
+            "aria-label": "Hub session vendor",
+            value: sidecar.agent?.vendor ?? "claude",
+            disabled: busy || (!!sidecar.session && !sidecar.readOnly),
+            onChange: (event: Event) => { void sidecar.chooseAgent((event.currentTarget as HTMLSelectElement).value); },
+          },
+          (info.lens?.vendors ?? [{ vendor: "claude", available: true }]).map((entry) =>
+            h("option", { value: entry.vendor, disabled: !entry.available, title: entry.reason },
+              entry.vendor === "codex" ? "Codex" : "Claude")))),
+        sidecar.session && !sidecar.readOnly && sidecar.endCurrent
+          ? h("button", { type: "button", disabled: busy, title: "End this conversation to choose another vendor", onClick: () => { void sidecar.endCurrent?.(); } }, "End session")
+          : sidecar.readOnly
+            ? h("button", { type: "button", disabled: busy, onClick: () => { void sidecar.newSession(); } }, "New session")
+            : null,
         h("span", { class: "sidecar-chip sidecar-chip-scope-hub" },
           h("span", { class: "sidecar-chip-label" }, "Hub · all projects")),
         h("span", { class: "sidecar-chip sidecar-chip-snapshot", title: snapshotTitle },
@@ -154,6 +169,9 @@ export function HubSessionDrawer({ sidecar, info, onClose, onHandoff }: HubSessi
           lensNeeds ? h("span", { class: "sidecar-chip-note" }, "not available") : null),
       ),
     ),
+    info.lens?.vendors?.find((entry) => entry.vendor === "codex" && !entry.available)?.reason
+      ? h("p", { class: "sidecar-hint" }, info.lens.vendors.find((entry) => entry.vendor === "codex")?.reason)
+      : null,
     onHandoff && info.snapshot && info.snapshot !== "loading" && info.snapshot.worktrees
       ? h(HubWorktreeList, { worktrees: info.snapshot.worktrees, onHandoff })
       : null,

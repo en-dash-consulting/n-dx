@@ -158,7 +158,7 @@ export function resumeVendorSession(
 ): VendorSession {
   const driver = requireDriver(opts.vendor);
   if (!sessionId) throw new Error("resumeVendorSession needs a session id");
-  if (opts.fork && !driver.canFork) {
+  if (opts.fork && !driver.canFork && !driver.probeFork) {
     throw new Error(`The ${driver.vendor} CLI cannot fork a session`);
   }
   return createSession(driver, opts, { sessionId, fork: opts.fork || undefined });
@@ -199,13 +199,15 @@ function createSession(
   /** The next turn's spawn. A throw (from `codex.turnConfigFlags`) refuses the turn before anything runs. */
   function turnSpawn(prompt: string): SessionTurnSpawn {
     const resume: SessionResume | undefined = pending ?? (sessionId ? { sessionId } : undefined);
+    const capability = resume?.fork && driver.probeFork ? driver.probeFork(binary, env, opts.cwd) : undefined;
+    if (capability && !capability.supported) throw new Error(capability.reason);
     return driver.turnSpawn({
       systemPrompt: opts.systemPrompt ?? "",
       prompt,
       model: opts.model,
       resume,
       claude: opts.claude,
-      codex: opts.codex,
+      codex: { ...opts.codex, forkSupported: capability?.supported },
     });
   }
 
@@ -249,7 +251,17 @@ function createSession(
         }
         // First id of the turn wins, so a late payload cannot redirect the
         // next resume.
-        if (!turnSessionId) turnSessionId = driver.extractSessionId(raw);
+        if (!turnSessionId) {
+          const id = driver.extractSessionId(raw);
+          if (id && pending?.fork && id === pending.sessionId) {
+            failure = "Fork did not report a distinct child session id";
+            if (child) void terminateProcessTree(child, {
+              forceKillTimeoutMs: INTERRUPT_GRACE_MS, scanTimeoutMs: INTERRUPT_SCAN_MS,
+            });
+            return;
+          }
+          turnSessionId = id;
+        }
         const hasUsage = tokenUsage.input > 0 || tokenUsage.output > 0;
         const usage = driver.usageEvent(raw, turn, usageFilter, hasUsage);
         if (usage) emit(usage);
@@ -287,6 +299,12 @@ function createSession(
         if (buffer.trim()) processLine(buffer);
         buffer = "";
 
+        if (pending?.fork && (!turnSessionId || turnSessionId === pending.sessionId)) {
+          if (!failure && !spawnError && exitCode === 0) {
+            failure = "Fork did not report a distinct child session id";
+          }
+          turnSessionId = undefined;
+        }
         if (turnSessionId) {
           sessionId = turnSessionId;
           pending = undefined;
@@ -309,7 +327,7 @@ function createSession(
         resolve({
           turn,
           status,
-          sessionId,
+          sessionId: pending?.fork ? undefined : sessionId,
           events,
           tokenUsage,
           text: completion ?? lastAssistant,

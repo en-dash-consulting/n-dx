@@ -362,12 +362,12 @@ export function resolveRunPermissionMode(params: {
  * The provider a run uses, and the refusal when there is none it can.
  *
  * VENDOR_PROVIDERS (provider-support.ts) is the single source of truth:
- * claude accepts cli or api; codex only cli (no API loop); google and local
+ * claude and codex accept cli or api; google and local
  * only api (no CLI binary exists). A vendor that rejects "cli" always accepts
  * "api", so an unsupported "cli" switches silently (`switched`) — ndx config /
  * ndx init persist hench.provider=api when local or google is selected, so
  * this is a safety net for projects configured outside those flows. An
- * unsupported "api" (codex only), or a value that is neither, has no fallback.
+ * unknown provider value has no fallback.
  */
 export function resolveRunProvider(
   requested: string,
@@ -389,7 +389,7 @@ export function resolveRunProvider(
     provider: requested,
     switched: false,
     error: new CLIError(
-      "Hench API provider is only supported for vendor=claude or vendor=google.",
+      `Provider "${requested}" is not supported for vendor="${vendor}".`,
       "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
     ),
   };
@@ -774,20 +774,12 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // -- Model ---------------------------------------------------------------
   const routed = resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor });
   const cliModel = selectCliModelOverride(flags, vendor).value;
-  // Normalized the way every other model in the chain is: through
-  // `resolveTaskModel`, which applies the active vendor's own rules — Claude's
-  // aliases expand, and Codex's retired ids (`gpt-5.4`, `gpt-5-codex`, …) remap
-  // to the replacements OpenAI names. `resolveModel` alone knows only Claude's
-  // aliases, so a saved `gpt-5.4` passed the vendor check unchanged and the run
-  // was sent to a model Codex has withdrawn. Normalizing *before* the
-  // compatibility check also means the check judges the id that will actually
-  // be sent, not the one that was typed. `local` serves whatever LM Studio has
-  // loaded, so every string is legitimate there and the check does not apply.
+  // Normalize through the active vendor: Claude aliases expand, while
+  // intentional Codex IDs stay literal. Authentication-specific availability
+  // is checked by the provider rather than inferred from the tier catalog.
   const normalizeModel = (raw: string | undefined): { model: string | undefined; usable: boolean } => {
     const model = raw ? resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor, model: raw }).model : undefined;
-    const usable =
-      model !== undefined
-      && model.length > 0
+    const usable = model !== undefined && model.length > 0
       && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, model));
     return { model, usable };
   };
@@ -866,7 +858,7 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   }
 
   // -- Provider ------------------------------------------------------------
-  // A saved provider the active vendor has no loop for (`api` on codex) is
+  // A saved provider the active vendor has no loop for (an unsupported provider) is
   // skipped like an incompatible saved model: warn, fall back to the project's
   // provider, and carry on. Refusing instead would end a whole `--loop` on one
   // task's saved value, and saved blocks are vendor-agnostic by design — a task

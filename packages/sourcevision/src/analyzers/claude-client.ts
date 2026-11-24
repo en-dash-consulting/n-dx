@@ -245,17 +245,25 @@ export async function callClaude(
     : undefined;
   const resolved = resolution?.model ?? resolveModel(model);
   const startedAt = Date.now();
-  const result: CompletionResult = await client.complete({
-    prompt,
-    model: resolved,
-    effort: resolution?.effort,
-    taskClass: opts?.taskClass,
-  });
+  let result: CompletionResult;
+  try {
+    result = await client.complete({
+      prompt, model: resolved, effort: resolution?.effort, taskClass: opts?.taskClass,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      const failure: Error & Pick<CompletionResult, "tokenUsage" | "usageStatus"> = error;
+      recordLLMCall({
+        taskClass: opts?.taskClass ?? "unclassed", vendor: resolveVendor(), model: resolved,
+        tokenUsage: failure.tokenUsage, usageStatus: failure.usageStatus,
+        durationMs: Date.now() - startedAt,
+      });
+    }
+    throw error;
+  }
   recordLLMCall({
-    taskClass: opts?.taskClass ?? "unclassed",
-    vendor: resolveVendor(),
-    model: resolved,
-    tokenUsage: result.tokenUsage,
+    taskClass: opts?.taskClass ?? "unclassed", vendor: resolveVendor(), model: resolved,
+    tokenUsage: result.tokenUsage, usageStatus: result.usageStatus,
     durationMs: Date.now() - startedAt,
   });
   return {

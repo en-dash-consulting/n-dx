@@ -41,7 +41,7 @@
  * (`GET`/`POST` the collection, then `:id`, `turns`, `frames`, `interrupt`,
  * `end`, `cards`, `mcp` as above). There is one per machine, under
  * `<ndx home>/hub/sidecar/`; this server serves it only while it holds the
- * host lock (`hub/session-host.ts`). A create on Codex is refused, a second
+ * host lock (`hub/session-host.ts`). Codex requires audited confinement; a second
  * create answers the open session, and it keeps the hub lens, whose packet is
  * the hub snapshot rebuilt every turn. It drafts and never acts: its broker
  * offers only `run_command` (a fixed read-only set per project), a
@@ -133,6 +133,7 @@ import {
   type WorktreeSidecarRegistryOptions,
 } from "./sidecar/session-registry.js";
 import { codexUserProviderRefusal, hubVendorRefusal, sidecarCodexProjectFlags, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
+import { admitCodexHub, writeHubCodexSnapshot } from "./sidecar/hub-codex.js";
 import { hasHubSnapshotBaseline, hubSnapshotReader } from "./sidecar/hub-packet.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
 import {
@@ -818,7 +819,11 @@ export function hubSidecarContextOptions(ctx: ServerContext, dir: string, opts: 
           return got;
         },
       };
-      const built = await buildLensPacket(record.lens ?? HUB_LENS, {}, sources, new Date().toISOString(), signal);
+      const built = await buildLensPacket(HUB_LENS, {}, sources, new Date().toISOString(), signal);
+      if (record.vendor === "codex") {
+        if (built.status !== "ready" || !pending.has(record.id)) throw new Error("Codex hub snapshot is unavailable; refusing the turn");
+        writeHubCodexSnapshot(dir, record.id, built.packet.text);
+      }
       return built.status === "ready" ? built.packet.text : undefined;
     },
   };
@@ -984,6 +989,7 @@ function withHubSessionPageConfig(html: string): string {
 export interface HubLensResponse {
   lens: { id: string; available: boolean; needs?: string };
   ceiling: number;
+  vendors?: Array<{ vendor: string; available: boolean; reason?: string }>;
 }
 
 /** The hub lens on this server: unavailable while its feature is off here, read per request like every gate. */
@@ -1080,19 +1086,26 @@ function openHubSession(registry: SidecarSessionRegistry): SidecarSessionRecord 
 
 /**
  * Create the hub session, or answer the open one: there is one per machine.
- * Claude only (see `hubVendorRefusal`). `hostedElsewhere` is set when this
+ * Codex requires exact executable admission. `hostedElsewhere` is set when this
  * server does not hold the host lock: it may name the open session, never
  * create one.
  */
-function createHubSession(
+async function createHubSession(
   registry: SidecarSessionRegistry,
   dir: string,
   body: Record<string, unknown>,
   hostedElsewhere?: string,
-): CreateAnswer {
+  hostProjectDir?: string,
+): Promise<CreateAnswer> {
   const vendor = optionalString(body, "vendor");
-  if (!vendor || vendor instanceof Error) return { status: 400, error: `"vendor" must be "claude"` };
-  const refusal = hubVendorRefusal(vendor);
+  if (!vendor || vendor instanceof Error) return { status: 400, error: `"vendor" must be "claude" or "codex"` };
+  if (vendor === "codex") {
+    try {
+      if (!hostProjectDir) throw new Error("Codex hub host is unavailable");
+      await admitCodexHub(hostProjectDir);
+    } catch (error) { return { status: 400, error: errorMessage(error) }; }
+  }
+  const refusal = vendor === "codex" ? null : hubVendorRefusal(vendor);
   if (refusal) return { status: 400, error: refusal };
   const fields = readNameAndModel(body);
   if (fields instanceof Error) return { status: 400, error: fields.message };
@@ -1101,6 +1114,9 @@ function createHubSession(
   if (lens !== undefined && lens !== HUB_LENS) return { status: 400, error: `A hub session runs the ${HUB_LENS} lens, not "${lens}"` };
   if (body.target !== undefined) return { status: 400, error: "A hub session takes no target" };
   const open = openHubSession(registry);
+  if (open && open.vendor !== vendor) {
+    return { status: 409, error: `The open hub session uses ${open.vendor}. End it before starting a ${vendor} session.` };
+  }
   if (open) return { status: 200, session: open };
   if (hostedElsewhere) return { status: 409, error: hostedElsewhere };
   return {
@@ -1128,9 +1144,16 @@ async function handleHubSidecarRoute(
   const method = req.method || "GET";
   // Read by any project server, host or not: what the page and the hub home need before a session exists.
   if (pathname === HUB_DRAWER || pathname === HUB_LENS_PATH) {
-    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    if (method !== "GET" && !(pathname === HUB_LENS_PATH && method === "POST")) return refuse(res, 405, `${method} is not supported on ${pathname}`);
     if (pathname === HUB_LENS_PATH) {
-      jsonResponse(res, 200, { lens: hubLensInfo(ctx), ceiling: resolveContextCeiling(ctx.projectDir, "hub") } satisfies HubLensResponse);
+      // Probing an executable belongs to a gated POST, never a read-only GET.
+      let vendors: HubLensResponse["vendors"];
+      if (method === "POST") {
+        let reason: string | undefined;
+        try { await admitCodexHub(ctx.projectDir); } catch (error) { reason = errorMessage(error); }
+        vendors = [{ vendor: "claude", available: true }, { vendor: "codex", available: !reason, ...(reason && { reason }) }];
+      }
+      jsonResponse(res, 200, { lens: hubLensInfo(ctx), ceiling: resolveContextCeiling(ctx.projectDir, "hub"), ...(vendors && { vendors }) } satisfies HubLensResponse);
       return true;
     }
     const html = opts.drawerHtml?.() ?? null;
@@ -1158,7 +1181,7 @@ async function handleHubSidecarRoute(
     if (typeof body === "string") return refuse(res, 400, body);
     // Read from disk, never served: this server's registry would go stale under the host's turns.
     const onDisk = new SidecarSessionRegistry({ dir, connect: () => { throw new Error(hosted); } });
-    const answer = createHubSession(onDisk, dir, body, hosted);
+    const answer = await createHubSession(onDisk, dir, body, hosted, ctx.projectDir);
     if ("error" in answer) return refuse(res, answer.status, answer.error);
     jsonResponse(res, 200, { session: answer.session, hostedBy: holder });
     return true;
@@ -1182,7 +1205,7 @@ async function handleHubSidecarRoute(
     broadcast,
     actions: () => opts.actions ?? hubSidecarActions(ctx, opts, opts.exec),
     brokerScope: "hub",
-    create: (body) => createHubSession(registry, dir, body),
+    create: (body) => createHubSession(registry, dir, body, undefined, ctx.projectDir),
     lens: HUB_LENS,
   });
 }
@@ -1373,7 +1396,7 @@ interface SessionRouteScope {
   brokerScope?: BrokerScope;
   /** The connections whose tools the broker re-exposes; absent where none are offered (the hub). */
   connections?: () => BrokerConnections;
-  create: (body: Record<string, unknown>) => CreateAnswer;
+  create: (body: Record<string, unknown>) => CreateAnswer | Promise<CreateAnswer>;
   /** The one lens this scope's sessions run; a PATCH to another, or to a target, is refused. */
   lens?: string;
   /** Dry-runs an edited placement; absent where no placement card is offered (the hub). */
@@ -1430,7 +1453,7 @@ async function handleSessionRoutes(
     if (method === "POST") {
       const body = await readJsonObject(req, res);
       if (typeof body === "string") return refuse(res, 400, body);
-      const created = scope.create(body);
+      const created = await scope.create(body);
       if ("error" in created) return refuse(res, created.status, created.error);
       jsonResponse(res, created.status, sessionResponse(registry, created.session));
       return true;

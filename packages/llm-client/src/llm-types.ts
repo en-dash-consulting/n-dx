@@ -270,8 +270,9 @@ export interface LLMConfig {
    * Task class → effort level (`llm.effort.<class>`), matched with the same
    * exact-then-glob rules as `routes`. Returned verbatim by
    * `resolveTaskModel`; Claude API requests send it as `output_config.effort`
-   * after `resolveClaudeApiEffort` validates it. Claude Code CLI runs do not
-   * pass it yet.
+   * after validation. Claude Code sends --effort; Codex CLI sends
+   * model_reasoning_effort after a selected-client capability check. OpenAI
+   * Chat Completions sends reasoning_effort for supported models.
    */
   effort?: Record<string, string>;
   /**

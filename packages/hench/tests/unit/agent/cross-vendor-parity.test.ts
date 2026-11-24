@@ -141,33 +141,33 @@ describe("cross-vendor execution policy parity", () => {
 
   // Every policy ends with the overrides that keep the Codex credentials out
   // of the agent's commands; llm-client's own tests pin their spelling.
-  const shellEnv = compileCodexPolicyFlags(FULL_ACCESS_POLICY).slice(1);
+  const shellEnv = compileCodexPolicyFlags(FULL_ACCESS_POLICY).slice(2);
 
   it("a resumed spawn re-applies each policy with -c overrides and no --sandbox", () => {
     expect(compileCodexPolicyFlags(STANDARD_POLICY, { resume: true })).toEqual([
-      "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', ...shellEnv,
+      "-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', "--strict-config", "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}', ...shellEnv,
     ]);
     expect(compileCodexPolicyFlags(READONLY_POLICY, { resume: true })).toEqual([
-      "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="on-request"', ...shellEnv,
+      "-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="on-request"', "--strict-config", ...shellEnv,
     ]);
     expect(compileCodexPolicyFlags(FULL_ACCESS_POLICY, { resume: true })).toEqual([
-      "-c", 'sandbox_mode="danger-full-access"', "-c", 'approval_policy="never"', ...shellEnv,
+      "-c", 'sandbox_mode="danger-full-access"', "-c", 'approval_policy="never"', "--strict-config", ...shellEnv,
     ]);
   });
 
   it("standard policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);
-    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", ...shellEnv]);
+    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", "--strict-config", "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}', ...shellEnv]);
   });
 
   it("read-only policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(READONLY_POLICY);
-    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", ...shellEnv]);
+    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", "--strict-config", ...shellEnv]);
   });
 
   it("full-access policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(FULL_ACCESS_POLICY);
-    expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...shellEnv]);
+    expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", "--strict-config", ...shellEnv]);
   });
 
   it("every policy blanks OPENAI_API_KEY in the agent's commands", () => {

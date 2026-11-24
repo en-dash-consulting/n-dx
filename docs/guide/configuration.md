@@ -21,10 +21,10 @@ On re-init, if the vendor and model are already configured the LLM prompts are s
 | `claude` | `claude-opus-5-5` | Claude Opus 5.5 | |
 | `claude` | `claude-fable-5-1` | Claude Fable 5.1 | |
 | `claude` | `claude-haiku-4-5` | Claude Haiku 4.5 | |
-| `codex` | `gpt-5.6-terra` | GPT-5.6 Terra | yes |
-| `codex` | `gpt-5.6-sol` | GPT-5.6 Sol | |
-| `codex` | `gpt-5.6-luna` | GPT-5.6 Luna | |
-| `codex` | `gpt-5.5` | GPT-5.5 | |
+| `codex` | `gpt-6.1-sol` | GPT-6.1 Sol | yes |
+| `codex` | `gpt-6-astra` | GPT-6 Astra | |
+| `codex` | `gpt-6-luna` | GPT-6 Luna | |
+| `codex` | `gpt-5.5` | GPT-5.5 (API key only; retired from ChatGPT sign-in) | |
 | `google` | `gemini-2.5-pro` | Gemini 2.5 Pro | yes |
 | `google` | `gemini-3.7-flash` | Gemini 3.7 Flash | |
 | `google` | `gemini-3.5-flash-lite` | Gemini 3.5 Flash Lite | |
@@ -59,7 +59,7 @@ Examples:
 ndx init --provider=claude --model=claude-sonnet-5-5 .
 
 # Configure both vendors in a single call
-ndx init --provider=claude --claude-model=claude-sonnet-5-5 --codex-model=gpt-5.6-terra .
+ndx init --provider=claude --claude-model=claude-sonnet-5-5 --codex-model=gpt-6.1-sol .
 
 # A lone vendor-specific flag implies the provider
 ndx init --claude-model=claude-opus-5-5 .   # implies --provider=claude
@@ -119,7 +119,41 @@ ndx config llm.vendor claude .    # or: codex
 | Vendor | Rex Behavior | Hench Behavior | Token Accounting |
 |--------|-------------|----------------|------------------|
 | `claude` | Shared LLM client; API when key configured, CLI fallback | Both `api` and `cli` providers | Full support |
-| `codex` | Codex CLI adapter (`codex exec`) | CLI-only (`api` rejected) | Limited (CLI doesn't return usage) |
+| `codex` | CLI or OpenAI API, selected by authentication mode | Both `cli` and direct Responses `api` providers | Request usage on API; reported CLI usage |
+
+For direct OpenAI tasks, use `n-dx work --provider=api --model=gpt-6-astra .`
+with `llm.vendor=codex` and OpenAI API authentication. The agent codec supports
+`gpt-6.1-sol` and `gpt-6-astra`; other model pins are refused, not replaced.
+`hench.provider=cli` with `llm.codex.auth=api` remains CLI execution authenticated
+with an API key. Direct API runs support diff approval; CLI self/pair review
+remains unavailable on this path.
+
+Direct OpenAI API failover is opt-in (`llm.autoFailover=true`, off by default).
+Starting from the selected OpenAI model, a run can try the configured Codex light
+model, then Claude standard, then Claude light. Each selection is consumed once
+across the run, including successful tool turns. Unsupported OpenAI fallback
+models are skipped; the codec's supported models do not expand. Claude needs its
+own API credentials. No attempt uses a CLI or changes saved vendor/model settings.
+Authentication, unavailable-model, rate-limit, network and timeout errors can
+advance the chain; refusals, malformed output, budget limits and caller cancellation
+stop it. Exhaustion restores the original selection and error. Usage and switch
+diagnostics identify the effective provider/model.
+
+Each attempt in this OpenAI-origin chain, including Claude fallbacks, has a whole
+request deadline: two minutes plus the configured `hench.maxTokens` budget at ten
+tokens/second (rounded up to seconds), clamped to 10–30 minutes. For 8,192 tokens
+that is 15 minutes 40 seconds. It covers response-body reads and primary-provider
+retries/backoff; secondary clients have no transport retries. This deadline is
+separate from retry delays, and healthy turns may exceed one minute. Caller abort
+wins over a simultaneous timeout and does not trigger a switch. Cancelled OpenAI
+and Claude API tasks return to pending with a `task_cancelled` event.
+
+Stateless Responses requests include encrypted reasoning for tool-history replay.
+Output-token exhaustion continues on the same model, including reasoning-only
+turns, and records reported usage. No function call or opaque continuation from
+that truncated turn is executed or replayed; the agent is asked to retry unfinished
+tools. Other incomplete/failed statuses and malformed terminal payloads fail
+safely. Context compaction still rejects truncated summaries.
 
 ## Claude Configuration
 
@@ -148,15 +182,19 @@ Hench's `apiKeyEnv`, the variable the API loop sends as the Anthropic key, follo
 "Always applies" holds while `.n-dx.local.json` is untracked. A repository that commits the file (`git add -f`, or a checkout that never ran `ndx init`) makes it repository config: the trust review lists it (`local-config-tracked`) with the settings it carries, and nothing in it — `guard.env.allow`, `claudePath`, `cli.claudePath`, `cli_path`, `graview.bin`, `graview.app`, `api_endpoint`, `apiKeyEnv` — applies until you trust the checkout. `ndx init` never probes a `cli.claudePath` from a tracked file. Outside a git repository nothing is tracked, so the file applies as before.
 :::
 
-### Effort (API mode)
+### Reasoning effort
 
-`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). Values are `low`, `medium`, `high`, `xhigh` and `max`.
+`llm.effort` sets the reasoning effort per task class, keyed like `llm.routes` (exact class names or `prd.*`-style prefixes). `n-dx config` accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` and `ultra`; support depends on the model and client. Codex CLI can advertise `ultra`, while some API models support `none` or `minimal`.
+
+Codex CLI also honors these rules, including `agent.execute` and `agent.review`. `agent.review` is effort-only: choose the reviewer with `llm.<vendor>.reviewModel` or a task’s saved `reviewTier` / `reviewModels`; `llm.routes.agent.review` does not select a reviewer. Settings shows the actual reviewer in its review section, separately from the tier table. It checks the selected binary's `model/list` catalog for the selected model's advertised reasoning efforts before sending `-c model_reasoning_effort=...`. An unsupported value, missing model, older client without effort metadata, or failed catalog probe prints a warning and leaves the client setting unchanged. A catalog entry describes client support, not account entitlement.
+
+OpenAI Chat Completions sends a supported rule as `reasoning_effort` in both blocking and streaming requests. Its model allowlist is separate from CLI support: `ultra` is not an API effort. Unknown models and unsupported values warn and omit the field. With no matching rule, neither Codex path forces a tier/reviewer recommendation: intentional CLI/profile pins and API defaults remain in effect. Set an explicit rule to adopt a recommendation; exact task-class pins outrank wildcard rules.
 
 ```json
 { "llm": { "effort": { "prd.*": "low", "agent.execute": "xhigh" } } }
 ```
 
-With no matching rule, `claude-opus-5-5` gets `high` (Opus 5's API default; Opus 5.5's own is `medium`) and every other model gets the API default. A model that does not accept effort, such as `claude-haiku-4-5`, never receives it, and an unknown value is never sent; both print a warning. CLI mode (Claude Code) does not apply `llm.effort` yet.
+With no matching rule, `claude-opus-5-5` gets `high` (Opus 5's API default; Opus 5.5's own is `medium`) and every other model gets the API default. A model that does not accept effort, such as `claude-haiku-4-5`, never receives it, and an unknown value is never sent; both print a warning. Claude Code CLI sends a validated explicit rule as `--effort`, without applying the API default.
 
 ## API keys and auth modes
 
@@ -201,7 +239,7 @@ Writing `llm.<vendor>.api_key` still works as an alias for `credentials.<vendor>
 
 ```sh
 ndx config llm.codex.cli_path /path/to/codex .
-ndx config rex.model gpt-5.6-terra .
+ndx config rex.model gpt-6.1-sol .
 ```
 
 ## TypeSafe Jev for Judgment Calls
@@ -314,13 +352,21 @@ The escalated attempt runs on the vendor's CLI when it has one, else its API, an
 
 ### Review modes
 
-`hench.review.mode` sets how `ndx work` reviews a task's diff before it is committed.
+`hench.review.mode` sets how `n-dx work` reviews a task's diff before it is committed.
 
 | Mode | What it does |
 |------|--------------|
 | `off` (default) | No review. |
-| `self` | The executing vendor reviews its own work in a fresh session, as `--review` does. |
+| `self` | The executing vendor reviews its own work, as `--review` does. The CLI resumes the work session when eligible; otherwise the reviewer starts fresh with task context. |
 | `pair` | The other vendor's CLI reviews the diff in a fresh session and reports findings without editing any file. |
+
+**Self-review sessions.** Claude CLI resumes the captured work-session ID when
+available, including when the review model differs from the work model. Codex
+CLI resumes only when the selected binary supports resume and the explicit model,
+worktree, branch and execution identity still match; a different review model,
+missing ID or unavailable identity starts a fresh reviewer. Vendors without
+resume support also start fresh. Pair mode always gives the reviewer a fresh
+session independent of the executor's transcript.
 
 ```sh
 ndx config hench.review.mode pair .       # off, self or pair
@@ -438,3 +484,37 @@ See [Getting Started — Assistant Surfaces](./getting-started#assistant-surface
 | `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](./skills#ndx-config) | Interactive view, explanation, and validation of n-dx configuration settings |
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
+
+### Codex defaults and upgrades
+
+Unpinned Codex execution uses `gpt-6-luna` for light work, `gpt-6.1-sol` for
+standard work, and `gpt-6-astra` for heavy work. Routine review uses Sol;
+a saved `run.reviewTier: heavy` selects Astra. Explicit execution, tier,
+Hench, task and reviewer model pins remain literal; upgrading or re-running
+`n-dx init` does not migrate saved settings.
+
+To retain previous defaults, pin each tier you use. `llm.codex.model` pins
+standard execution only; it does not pin light or heavy work. Replace
+`<model-id>` with the previous model for that slot:
+
+```sh
+n-dx config llm.codex.model <model-id> .
+n-dx config llm.tiers.codex.light <model-id> .
+n-dx config llm.tiers.codex.heavy <model-id> .
+n-dx config llm.codex.reviewModel <model-id> .
+```
+
+`n-dx config llm.codex.lightModel <model-id> .` is also a light-work pin;
+an explicit `llm.tiers.codex.light` takes precedence over it. Saved task and
+Hench model overrides still apply according to the normal precedence rules.
+The heavy tier pin also applies to saved `run.reviewTier: heavy` reviews,
+which take precedence over `llm.codex.reviewModel`. Explicit task reviewer
+models and CLI reviewer overrides still win.
+
+These are workload recommendations, not n-dx benchmark results or proof of
+account access. [Official model guidance](https://learn.chatgpt.com/docs/models?surface=cli)
+was checked on 2026-11-16. GPT-5.5's retirement from ChatGPT-authenticated Codex
+does not retire it from the API or API-key sessions. Retained API pins remain
+usable subject to provider availability. Codex effort recommendations are not
+applied automatically: client defaults remain in effect unless an explicit
+supported `llm.effort` rule applies.

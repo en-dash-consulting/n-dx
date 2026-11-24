@@ -23,6 +23,22 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
+type UsageStatus = "complete" | "partial" | "unavailable" | "malformed";
+
+/** Token counts plus the provider's measurement provenance, independent of pricing. */
+type MeasuredTokens = BillableTokens & { diagnosticStatus?: UsageStatus };
+
+function mergeUsageStatus(...values: Array<UsageStatus | undefined>): UsageStatus | undefined {
+  return values.includes("unavailable") ? "unavailable" : values.includes("malformed") ? "malformed"
+    : values.includes("partial") ? "partial"
+    : values.includes("complete") ? "complete" : undefined;
+}
+
+function carryUsageStatus(target: { diagnosticStatus?: UsageStatus }, ...values: Array<UsageStatus | undefined>): void {
+  const status = mergeUsageStatus(target.diagnosticStatus, ...values);
+  if (status) target.diagnosticStatus = status;
+}
+
 /**
  * Aggregated token usage for a single package.
  *
@@ -33,6 +49,8 @@ import {
  * approximation, it is the wrong number.
  */
 export interface TokenCounts {
+  /** Missing/partial measured spend remains unknown after grouping. */
+  diagnosticStatus?: UsageStatus;
   /** Fresh (uncached) input tokens. */
   inputTokens: number;
   /** Total output tokens. */
@@ -66,13 +84,15 @@ export interface PackageTokenUsage extends TokenCounts {
    * Deliberately carries no `calls`. The unit is not the same across sources —
    * a run-level record contributes one call while a turn-level one contributes
    * many — so a per-model call count would mean different things in adjacent
-   * rows. These buckets exist to be priced, and pricing needs only tokens.
+   * rows. These buckets carry token totals and measurement provenance so
+   * an unmeasured call never becomes a definitive zero-cost model line.
    */
-  byModel?: Record<string, BillableTokens>;
+  byModel?: Record<string, MeasuredTokens>;
 }
 
 /** Combined token usage across all packages. */
 export interface AggregateTokenUsage {
+  diagnosticStatus?: UsageStatus;
   /** Per-package breakdown. */
   packages: {
     rex: PackageTokenUsage;
@@ -86,7 +106,7 @@ export interface AggregateTokenUsage {
   totalCacheReadTokens: number;
   totalCalls: number;
   /** Per-model split of the totals above. See {@link PackageTokenUsage.byModel}. */
-  byModel?: Record<string, BillableTokens>;
+  byModel?: Record<string, MeasuredTokens>;
 }
 
 /** Time-based filter options for token usage queries. */
@@ -153,14 +173,15 @@ function emptyPackageUsage(): PackageTokenUsage {
  * "unknown" bucket would look like a real model in every breakdown.
  */
 function attributeToModel(
-  target: Record<string, BillableTokens>,
+  target: Record<string, MeasuredTokens>,
   model: string | undefined,
-  tokens: BillableTokens,
+  tokens: MeasuredTokens,
 ): void {
   const key = model?.trim();
   if (!key || key === "unknown") return;
 
   const bucket = (target[key] ??= emptyBillableTokens());
+  carryUsageStatus(bucket, tokens.diagnosticStatus);
   bucket.inputTokens += tokens.inputTokens;
   bucket.outputTokens += tokens.outputTokens;
   bucket.cacheCreationTokens += tokens.cacheCreationTokens;
@@ -168,14 +189,14 @@ function attributeToModel(
 }
 
 /** The per-model split of a usage record, created on first use. */
-function modelBuckets(usage: PackageTokenUsage): Record<string, BillableTokens> {
+function modelBuckets(usage: PackageTokenUsage): Record<string, MeasuredTokens> {
   return (usage.byModel ??= {});
 }
 
 /** Fold `source`'s per-model buckets into `target`. */
 function mergeByModel(
-  target: Record<string, BillableTokens>,
-  source: Record<string, BillableTokens> | undefined,
+  target: Record<string, MeasuredTokens>,
+  source: Record<string, MeasuredTokens> | undefined,
 ): void {
   for (const [model, tokens] of Object.entries(source ?? {})) {
     attributeToModel(target, model, tokens);
@@ -207,10 +228,12 @@ function combinePackages(
   hench: PackageTokenUsage,
   sv: PackageTokenUsage,
 ): AggregateTokenUsage {
-  const byModel: Record<string, BillableTokens> = {};
+  const byModel: Record<string, MeasuredTokens> = {};
   for (const pkg of [rex, hench, sv]) mergeByModel(byModel, pkg.byModel);
 
   return {
+    ...(mergeUsageStatus(rex.diagnosticStatus, hench.diagnosticStatus, sv.diagnosticStatus)
+      ? { diagnosticStatus: mergeUsageStatus(rex.diagnosticStatus, hench.diagnosticStatus, sv.diagnosticStatus) } : {}),
     packages: { rex, hench, sv },
     totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
     totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
@@ -263,38 +286,14 @@ export function extractRexTokenUsage(
 ): PackageTokenUsage {
   const usage = emptyPackageUsage();
 
-  for (const entry of logEntries) {
-    if (!REX_TOKEN_EVENTS[entry.event]) continue;
-    if (!entry.detail) continue;
-    if (!isInRange(entry.timestamp, filter)) continue;
-
-    try {
-      const data = JSON.parse(entry.detail) as {
-        calls?: number;
-        inputTokens?: number;
-        outputTokens?: number;
-        cacheCreationInputTokens?: number;
-        cacheReadInputTokens?: number;
-        model?: string;
-      };
-      const counts: TokenCounts = {
-        inputTokens: typeof data.inputTokens === "number" ? data.inputTokens : 0,
-        outputTokens: typeof data.outputTokens === "number" ? data.outputTokens : 0,
-        cacheCreationTokens:
-          typeof data.cacheCreationInputTokens === "number" ? data.cacheCreationInputTokens : 0,
-        cacheReadTokens:
-          typeof data.cacheReadInputTokens === "number" ? data.cacheReadInputTokens : 0,
-        calls: typeof data.calls === "number" ? data.calls : 0,
-      };
-      usage.calls += counts.calls;
-      usage.inputTokens += counts.inputTokens;
-      usage.outputTokens += counts.outputTokens;
-      usage.cacheCreationTokens += counts.cacheCreationTokens;
-      usage.cacheReadTokens += counts.cacheReadTokens;
-      attributeToModel(modelBuckets(usage), normalizeEventMetadata(data.model), counts);
-    } catch {
-      // Malformed detail — skip
-    }
+  for (const event of extractRexTokenEvents(logEntries, filter)) {
+    carryUsageStatus(usage, event.diagnosticStatus);
+    usage.calls += event.calls;
+    usage.inputTokens += event.inputTokens;
+    usage.outputTokens += event.outputTokens;
+    usage.cacheCreationTokens += event.cacheCreationTokens;
+    usage.cacheReadTokens += event.cacheReadTokens;
+    attributeToModel(modelBuckets(usage), event.model, event);
   }
 
   return usage;
@@ -306,6 +305,8 @@ export function extractRexTokenUsage(
 
 /** Timestamped token event used internally for grouping and command breakdown. */
 export interface TokenEvent {
+  diagnosticStatus?: UsageStatus;
+  cacheProvenance?: string;
   timestamp: string;
   command: string;
   package: "rex" | "hench" | "sv";
@@ -327,6 +328,7 @@ export interface TokenEvent {
 
 /** Minimal shape of a hench RunRecord for token extraction. */
 interface HenchRunSummary {
+  diagnostics?: { tokenDiagnosticStatus?: UsageStatus };
   id?: string;
   startedAt: string;
   model?: string;
@@ -337,6 +339,8 @@ interface HenchRunSummary {
     cacheReadInput?: number;
   };
   turnTokenUsage?: Array<{
+    diagnosticStatus?: UsageStatus;
+    cacheProvenance?: string;
     input: number;
     output: number;
     cacheCreationInput?: number;
@@ -392,6 +396,7 @@ export async function extractHenchTokenUsage(
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, filter)) continue;
 
+      carryUsageStatus(usage, run.diagnostics?.tokenDiagnosticStatus, ...(run.turnTokenUsage ?? []).map(t => t.diagnosticStatus));
       usage.runs = (usage.runs ?? 0) + 1;
       // `calls` counts LLM calls (turns), matching what the per-turn event
       // stream sums to. A run without turn records is at least one call — the
@@ -413,10 +418,10 @@ export async function extractHenchTokenUsage(
       const buckets = modelBuckets(usage);
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
         for (const turn of run.turnTokenUsage) {
-          attributeToModel(buckets, turn.model ?? run.model, henchBillable(turn));
+          attributeToModel(buckets, turn.model ?? run.model, { ...henchBillable(turn), diagnosticStatus: turn.diagnosticStatus ?? run.diagnostics?.tokenDiagnosticStatus });
         }
       } else {
-        attributeToModel(buckets, run.model, henchBillable(run.tokenUsage));
+        attributeToModel(buckets, run.model, { ...henchBillable(run.tokenUsage), diagnosticStatus: run.diagnostics?.tokenDiagnosticStatus });
       }
     } catch {
       // Invalid run file — skip
@@ -434,9 +439,13 @@ export async function extractHenchTokenUsage(
 interface SvManifest {
   analyzedAt?: string;
   tokenUsage?: {
+    diagnosticStatus?: UsageStatus;
     calls?: number;
+    model?: string;
     inputTokens?: number;
     outputTokens?: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
   };
 }
 
@@ -460,9 +469,13 @@ export async function extractSvTokenUsage(
     if (!manifest.tokenUsage) return usage;
     if (manifest.analyzedAt && !isInRange(manifest.analyzedAt, filter)) return usage;
 
+    carryUsageStatus(usage, manifest.tokenUsage.diagnosticStatus);
     usage.calls += manifest.tokenUsage.calls ?? 0;
     usage.inputTokens += manifest.tokenUsage.inputTokens ?? 0;
     usage.outputTokens += manifest.tokenUsage.outputTokens ?? 0;
+    usage.cacheCreationTokens += manifest.tokenUsage.cacheCreationInputTokens ?? 0;
+    usage.cacheReadTokens += manifest.tokenUsage.cacheReadInputTokens ?? 0;
+    attributeToModel(modelBuckets(usage), normalizeEventMetadata(manifest.tokenUsage.model), usage);
   } catch {
     // Missing or invalid manifest — skip
   }
@@ -482,13 +495,14 @@ export function extractRexTokenEvents(
   logEntries: TokenUsageLogEntry[],
   filter: TokenUsageFilter = {},
 ): TokenEvent[] {
-  const events: TokenEvent[] = [];
+  const pending: Array<{ event: TokenEvent; diagnostic: boolean; scope?: string }> = [];
+  const owners = new Map<string, TokenEvent>();
 
   for (const entry of logEntries) {
+    const diagnostic = entry.event === "llm_usage_diagnostic";
     const command = REX_TOKEN_EVENTS[entry.event];
-    if (!command) continue;
+    if (!command && !diagnostic) continue;
     if (!entry.detail) continue;
-    if (!isInRange(entry.timestamp, filter)) continue;
 
     try {
       const data = JSON.parse(entry.detail) as {
@@ -499,25 +513,48 @@ export function extractRexTokenEvents(
         cacheReadInputTokens?: number;
         vendor?: string;
         model?: string;
+        command?: string;
+        usageStatus?: string;
+        usageScope?: string;
+        outcome?: string;
       };
-      events.push({
+      const status = data.usageStatus === "measured" ? "complete"
+        : data.usageStatus === "unavailable" || data.usageStatus === "malformed" || data.usageStatus === "partial"
+          ? data.usageStatus : undefined;
+      // Diagnostics annotate successful command-owned totals. They must never
+      // add a second call or spend, even if an older writer included counters.
+      if (diagnostic && !status) continue;
+      const event: TokenEvent = {
         timestamp: entry.timestamp,
-        command,
+        command: normalizeEventMetadata(data.command) ?? command ?? "unknown",
         package: "rex",
-        inputTokens: data.inputTokens ?? 0,
-        outputTokens: data.outputTokens ?? 0,
-        cacheCreationTokens: data.cacheCreationInputTokens ?? 0,
-        cacheReadTokens: data.cacheReadInputTokens ?? 0,
-        calls: data.calls ?? 0,
+        ...(status ? { diagnosticStatus: status } : {}),
+        inputTokens: !diagnostic && typeof data.inputTokens === "number" ? data.inputTokens : 0,
+        outputTokens: !diagnostic && typeof data.outputTokens === "number" ? data.outputTokens : 0,
+        cacheCreationTokens: !diagnostic && typeof data.cacheCreationInputTokens === "number" ? data.cacheCreationInputTokens : 0,
+        cacheReadTokens: !diagnostic && typeof data.cacheReadInputTokens === "number" ? data.cacheReadInputTokens : 0,
+        calls: !diagnostic && typeof data.calls === "number" ? data.calls : 0,
         vendor: normalizeEventMetadata(data.vendor) ?? "unknown",
         model: normalizeEventMetadata(data.model) ?? "unknown",
-      });
+      };
+      const scope = normalizeEventMetadata(data.usageScope);
+      pending.push({ event, diagnostic, scope });
+      if (scope && !diagnostic && data.outcome !== "failed") owners.set(scope, event);
     } catch {
       // Malformed detail — skip
     }
   }
 
-  return events;
+  // A completion can precede review/caching by minutes or cross midnight.
+  // Keep its metadata in the same reporting window as the aggregate that owns
+  // its counts. Correlate by invocation, never by model/adjacency: concurrent
+  // commands may use the same model. Unlinked historical diagnostics retain
+  // their recorded timestamp; there is no safe owner to guess for them.
+  return pending.flatMap(({ event, diagnostic, scope }) => {
+    const owner = diagnostic && scope ? owners.get(scope) : undefined;
+    const timestamp = owner?.timestamp ?? event.timestamp;
+    return isInRange(timestamp, filter) ? [{ ...event, timestamp }] : [];
+  });
 }
 
 /**
@@ -553,8 +590,13 @@ export async function extractHenchTokenEvents(
       const runId = run.id?.trim() || file.replace(/\.json$/, "");
 
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
+        let turnStatus: UsageStatus | undefined;
         for (const turn of run.turnTokenUsage) {
+          const diagnosticStatus = turn.diagnosticStatus ?? run.diagnostics?.tokenDiagnosticStatus;
+          turnStatus = mergeUsageStatus(turnStatus, diagnosticStatus);
           events.push({
+            ...(diagnosticStatus ? { diagnosticStatus } : {}),
+            ...(turn.cacheProvenance ? { cacheProvenance: turn.cacheProvenance } : {}),
             timestamp: run.startedAt,
             command: "run",
             package: "hench",
@@ -565,10 +607,21 @@ export async function extractHenchTokenEvents(
             runId,
           });
         }
+        // The run status normally summarizes its turns. A worse run-only
+        // diagnostic belongs to the aggregate, not every measured model.
+        const diagnosticStatus = mergeUsageStatus(turnStatus, run.diagnostics?.tokenDiagnosticStatus);
+        if (diagnosticStatus !== turnStatus) {
+          events.push({
+            timestamp: run.startedAt, command: "run", package: "hench", runId,
+            diagnosticStatus, calls: 0,
+            inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
+          });
+        }
         continue;
       }
 
       events.push({
+        ...(run.diagnostics?.tokenDiagnosticStatus ? { diagnosticStatus: run.diagnostics.tokenDiagnosticStatus } : {}),
         timestamp: run.startedAt,
         command: "run",
         package: "hench",
@@ -607,11 +660,12 @@ export async function extractSvTokenEvents(
       timestamp: manifest.analyzedAt ?? new Date().toISOString(),
       command: "analyze",
       package: "sv",
+      ...(manifest.tokenUsage.diagnosticStatus ? { diagnosticStatus: manifest.tokenUsage.diagnosticStatus } : {}),
+      model: normalizeEventMetadata(manifest.tokenUsage.model),
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
-      // The sourcevision manifest records no cache split.
-      cacheCreationTokens: 0,
-      cacheReadTokens: 0,
+      cacheCreationTokens: manifest.tokenUsage.cacheCreationInputTokens ?? 0,
+      cacheReadTokens: manifest.tokenUsage.cacheReadInputTokens ?? 0,
       calls: manifest.tokenUsage.calls ?? 0,
     });
   } catch {
@@ -669,6 +723,8 @@ export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
       };
       map.set(key, entry);
     }
+    carryUsageStatus(entry, ev.diagnosticStatus);
+    attributeToModel(modelBuckets(entry), ev.model, ev);
     entry.inputTokens += ev.inputTokens;
     entry.outputTokens += ev.outputTokens;
     entry.cacheCreationTokens += ev.cacheCreationTokens;
@@ -772,6 +828,7 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
 
   for (const ev of events) {
     const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
+    carryUsageStatus(pkg, ev.diagnosticStatus);
     pkg.inputTokens += ev.inputTokens;
     pkg.outputTokens += ev.outputTokens;
     pkg.cacheCreationTokens += ev.cacheCreationTokens;
@@ -782,12 +839,7 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
       ids.add(ev.runId);
       pkg.runs = ids.size;
     }
-    attributeToModel(modelBuckets(pkg), ev.model, {
-      inputTokens: ev.inputTokens,
-      outputTokens: ev.outputTokens,
-      cacheCreationTokens: ev.cacheCreationTokens,
-      cacheReadTokens: ev.cacheReadTokens,
-    });
+    attributeToModel(modelBuckets(pkg), ev.model, ev);
   }
 
   return combinePackages(rex, hench, sv);
@@ -842,6 +894,10 @@ const DEFAULT_PRICING: ModelPricing = FALLBACK_MODEL_PRICING;
 
 /** What one model contributed to the bill. */
 export interface ModelCostLine {
+  /** Annotated cost when measurement provenance is available. */
+  total?: string;
+  measurementStatus?: UsageStatus;
+  measurementComplete?: boolean;
   /** The model id as recorded, or "unattributed" for the residual line. */
   model: string;
   /**
@@ -862,6 +918,10 @@ export interface ModelCostLine {
 
 /** Estimated cost breakdown. */
 export interface CostEstimate {
+  /** Absent on legacy records with no explicit measurement provenance. */
+  measurementStatus?: UsageStatus;
+  /** Independent of whether the model has known prices. */
+  measurementComplete?: boolean;
   /** Formatted total cost string (e.g. "$1.23"). */
   total: string;
   /** Raw numeric total in USD. */
@@ -879,7 +939,7 @@ export interface CostEstimate {
   /**
    * True when every token was priced at its own model's rates — i.e. no line
    * is unattributed and no recorded model id was missing from the price table.
-   * Callers use this to decide whether the figure needs a caveat.
+   * This says nothing about missing measurements; see measurementComplete.
    */
   fullyAttributed: boolean;
 }
@@ -918,6 +978,7 @@ export function estimateCost(
       outputTokens: usage.totalOutputTokens,
       cacheCreationTokens: usage.totalCacheCreationTokens,
       cacheReadTokens: usage.totalCacheReadTokens,
+      diagnosticStatus: usage.diagnosticStatus,
     },
     usage.byModel,
     pricing,
@@ -936,13 +997,14 @@ export function estimateCost(
  * local copy of this loop.
  */
 export function estimateCostFromTotals(
-  totals: BillableTokens,
-  byModel?: Record<string, BillableTokens>,
+  totals: MeasuredTokens,
+  byModel?: Record<string, MeasuredTokens>,
   pricing?: ModelPricing,
 ): CostEstimate {
+  const status = mergeUsageStatus(totals.diagnosticStatus, ...Object.values(byModel ?? {}).map(t => t.diagnosticStatus));
   if (pricing) {
     const flat = priceTokens(totals, pricing);
-    return { ...flat, total: fmtUsd(flat.totalRaw), byModel: [], fullyAttributed: false };
+    return { ...flat, ...measurementCost(flat.totalRaw, status), byModel: [], fullyAttributed: false };
   }
 
   const buckets = Object.entries(byModel ?? {});
@@ -975,6 +1037,7 @@ export function estimateCostFromTotals(
       unattributed: false,
       tokens: totalTokens(tokens),
       totalRaw: cost.totalRaw,
+      ...(tokens.diagnosticStatus ? measurementCost(cost.totalRaw, tokens.diagnosticStatus) : {}),
     });
   }
 
@@ -1011,7 +1074,7 @@ export function estimateCostFromTotals(
   const totalRaw = inputCost + outputCost + cacheWriteCost + cacheReadCost;
 
   return {
-    total: fmtUsd(totalRaw),
+    ...measurementCost(totalRaw, status),
     totalRaw,
     inputCost,
     outputCost,
@@ -1019,6 +1082,19 @@ export function estimateCostFromTotals(
     cacheReadCost,
     byModel: lines,
     fullyAttributed: lines.length > 0 && lines.every((l) => l.known && !l.unattributed),
+  };
+}
+
+/** Keep the numeric recorded subtotal usable without presenting it as a complete bill. */
+function measurementCost(value: number, status?: UsageStatus): Pick<CostEstimate, "total" | "measurementStatus" | "measurementComplete"> {
+  if (!status) return { total: fmtUsd(value) };
+  const complete = status === "complete";
+  return {
+    measurementStatus: status,
+    measurementComplete: complete,
+    total: complete ? fmtUsd(value)
+      : value === 0 && status !== "partial" ? `Unknown (usage ${status})`
+        : `${fmtUsd(value)} recorded (usage ${status})`,
   };
 }
 

@@ -149,6 +149,12 @@ describe("prepare task model", () => {
     expect(warned[1]).toMatch(/two runs would share one working tree/);
   });
 
+  it("shows unsupported Codex controls from run resolution verbatim", () => {
+    const message = "Codex CLI does not enforce hench.guard.allowedGitSubcommands";
+    expect(workspaceWarnings(prepFixture({ warnings: [{ code: "policy-unsupported", message }] })))
+      .toContain(message);
+  });
+
   it("shows hench's warnings in the preflight", () => {
     const warned = workspaceWarnings(prepFixture({
       warnings: [{ code: "untrusted-repository", message: "Repository is not trusted" }],
