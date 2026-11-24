@@ -198,9 +198,25 @@ describe("skipsDirectory — PHP", () => {
     expect(skipsDirectory(phpConfig, name, holdsNothing, at(`web/themes/t/${name}`))).toBe(true);
   });
 
-  it("reuses the TypeScript skip directories and generated patterns, not copies", () => {
-    expect(phpConfig.skipDirectories).toBe(typescriptConfig.skipDirectories);
+  it("skips the TypeScript skip directories except build, and reuses its generated patterns", () => {
+    expect([...phpConfig.skipDirectories]).toEqual([...typescriptConfig.skipDirectories].filter((d) => d !== "build"));
     expect(phpConfig.generatedFilePatterns).toBe(typescriptConfig.generatedFilePatterns);
+  });
+
+  it("keeps a build directory: a PHP site copies libraries into one", () => {
+    expect(skipsDirectory(phpConfig, "build", holdsNothing, at("js/build"))).toBe(false);
+  });
+
+  it("merged with Python, a build package holding __init__.py is kept", () => {
+    const merged = mergeLanguageConfigs([pythonConfig, phpConfig]);
+    expect(skipsDirectory(merged, "build", (file) => file === "__init__.py", at("build"))).toBe(false);
+    expect(skipsDirectory(merged, "build", holdsNothing, at("build"))).toBe(true);
+  });
+
+  it("merged with Java, a build package below src/ is kept", () => {
+    const merged = mergeLanguageConfigs([javaConfig, phpConfig]);
+    expect(skipsDirectory(merged, "build", holdsNothing, at("src/main/java/com/acme/build", ["Foo.java"]))).toBe(false);
+    expect(skipsDirectory(merged, "build", holdsNothing, at("build", ["pom.xml"]))).toBe(true);
   });
 
   it("labels minified JS generated and leaves first-party JS source", () => {
