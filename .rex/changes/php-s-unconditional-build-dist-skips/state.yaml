@@ -1,12 +1,23 @@
 schema: "rex/v2"
 items:
   "b392e0e8-ac54-4dc3-a57c-b787af1a190f":
+    status: "completed"
+    startedAt: "2026-11-24T23:40:26.414Z"
+    completedAt: "2026-11-24T23:40:26.414Z"
+    endedAt: "2026-11-24T23:40:26.414Z"
+    activeIntervals: [{"end":"2026-11-24T23:40:26.414Z","start":"2026-11-24T23:40:26.414Z"}]
+    appliedAt: "2026-11-24T23:40:26.414Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-19T02:55:12.620Z"
-    lastModified: "2026-11-24T23:36:50.134Z"
+    lastModified: "2026-11-24T23:40:26.414Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cba3edbf-a5cf-4ca7-9504-6403b96500fb":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-24T23:37:15.967Z"
-    activeIntervals: [{"start":"2026-11-24T23:37:15.967Z"}]
-    lastModified: "2026-11-24T23:37:16.750Z"
+    completedAt: "2026-11-24T23:40:26.414Z"
+    endedAt: "2026-11-24T23:40:26.414Z"
+    activeIntervals: [{"end":"2026-11-24T23:40:26.414Z","start":"2026-11-24T23:37:15.967Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "phpConfig.skipDirectories is TYPESCRIPT_SKIP_DIRECTORIES without build; node_modules/dist stay unconditional. Python+PHP and Java+PHP merge tests added."
+    lastModified: "2026-11-24T23:40:26.414Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

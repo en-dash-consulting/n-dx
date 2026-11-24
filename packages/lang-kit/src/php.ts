@@ -26,6 +26,8 @@ export const PHP_REPOSITORY_ONLY_EXTENSIONS: ReadonlySet<string> = new Set([".in
  * directory of the root, docroot or not, is the weak PHP marker, as a `.php`
  * file at the root is.
  */
+export const PHP_DOCROOT_DIRECTORIES: readonly string[] = ["public", "web", "htdocs", "www", "public_html"];
+
 /**
  * The TypeScript config's skip directories without `build`: a PHP site keeps
  * copied-in libraries under `js/build/`, and an unconditional `build` would
@@ -34,8 +36,6 @@ export const PHP_REPOSITORY_ONLY_EXTENSIONS: ReadonlySet<string> = new Set([".in
 const PHP_SKIP_DIRECTORIES: ReadonlySet<string> = new Set(
   [...TYPESCRIPT_SKIP_DIRECTORIES].filter((name) => name !== "build"),
 );
-
-export const PHP_DOCROOT_DIRECTORIES: readonly string[] = ["public", "web", "htdocs", "www", "public_html"];
 
 /**
  * Language config for PHP projects.
