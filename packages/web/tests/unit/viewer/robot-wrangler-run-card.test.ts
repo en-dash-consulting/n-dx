@@ -37,7 +37,7 @@ function config(over: Json = {}): Json {
 
 const CATALOG: Json = {
   claude: { models: ["claude-sonnet-5"], providers: ["cli", "api"], defaultModel: "claude-sonnet-5", source: "live", checkedAt: "2026-10-01T12:00:00.000Z", cli: { found: true, version: "2.1.0", path: "/bin/claude" } },
-  codex: { models: ["gpt-5.6-sol"], providers: ["cli"], defaultModel: "gpt-5.6-sol", source: "built-in", checkedAt: null, cli: { found: false, version: null, path: null }, readiness: { state: "needs-setup", summary: "CLI not found" } },
+  codex: { models: ["gpt-5.6-sol"], providers: ["cli", "api"], defaultModel: "gpt-5.6-sol", source: "built-in", checkedAt: null, cli: { found: false, version: null, path: null }, readiness: { state: "needs-setup", summary: "CLI not found" } },
   google: { models: ["gemini-2.5-pro"], providers: ["api"], defaultModel: "gemini-2.5-pro", source: "built-in", checkedAt: null },
   local: { models: [], providers: ["api"], defaultModel: "", reachable: false },
 };
@@ -48,13 +48,14 @@ interface Api {
 }
 
 /** Serves config, catalog and auth; `preview` answers POST /api/llm/config/preview. */
-function stubApi(opts: { config: Json; preview?: Json; auth?: Json; authPending?: boolean }): Api {
+function stubApi(opts: { config: Json; preview?: Json; auth?: Json; authPending?: boolean; henchProvider?: string }): Api {
   const calls: Api["calls"] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
     const u = String(url);
     const method = init?.method ?? "GET";
     calls.push({ method, url: u, body: init?.body ? JSON.parse(init.body) as Json : undefined });
     const ok = (json: unknown) => ({ ok: true, status: 200, json: async () => json });
+    if (u.includes("/api/hench/config")) return ok({ config: { provider: opts.henchProvider } });
     if (u.includes("/api/commands/auth")) {
       if (opts.authPending) return new Promise(() => {});
       return ok(opts.auth ?? { ok: true, output: "claude: credentials OK", error: null });
@@ -141,7 +142,7 @@ describe("Robot Wrangler run card", () => {
       preview: config({
         vendor: "codex",
         effective: effective("codex", "gpt-5.6-sol"),
-        failover: { enabled: false, applies: false, reason: "Failover is not available for Codex.", chain: ["gpt-5.6-sol"] },
+        failover: { enabled: false, applies: false, reason: "Failover is not available for Codex CLI. Use the API connection with a supported OpenAI agent model for failover.", chain: ["gpt-5.6-sol"] },
       }),
     });
     await mount();
@@ -151,8 +152,36 @@ describe("Robot Wrangler run card", () => {
     await act(async () => { vendorCard("codex").click(); });
     await settle(350);
 
-    expect(root.querySelector(".llm-failover-warning")?.textContent).toContain("Failover is not available for Codex.");
+    expect(root.querySelector(".llm-failover-warning")?.textContent).toContain("Failover is not available for Codex CLI.");
     expect(Array.from(root.querySelectorAll(".llm-failover-pill")).map((p) => p.textContent)).toEqual(["gpt-5.6-sol"]);
+  });
+
+  it.each([false, true])("previews supported Codex API failover without a CLI warning (enabled=%s)", async (enabled) => {
+    const chain = ["gpt-6-astra", "gpt-6.1-sol", "claude-sonnet-5", "claude-haiku-4-5"];
+    stubApi({
+      henchProvider: "cli",
+      config: config({
+        vendor: "codex", autoFailover: enabled,
+        effective: effective("codex", "gpt-6-astra"),
+        failover: { enabled, applies: false, reason: "Failover is not available for Codex CLI.", chain },
+      }),
+      preview: config({
+        vendor: "codex", autoFailover: enabled,
+        effective: effective("codex", "gpt-6-astra", { provider: "api" }),
+        failover: { enabled, applies: true, chain },
+      }),
+    });
+    await mount();
+    expect(root.querySelector(".llm-failover-warning")?.textContent).toContain("Codex CLI");
+
+    await act(async () => { root.querySelector<HTMLButtonElement>(".llm-connection-card-api")!.click(); });
+    await settle(350);
+
+    expect(chips()).toContain("via api");
+    expect(root.querySelector(".llm-failover-warning")).toBeNull();
+    expect(Array.from(root.querySelectorAll(".llm-failover-pill")).map((p) => p.textContent)).toEqual(chain);
+    expect(root.querySelector<HTMLInputElement>('input[id="autoFailover"]')!.checked).toBe(enabled);
+    expect(root.querySelector(".llm-failover-chain")!.classList.contains("llm-failover-chain-dimmed")).toBe(!enabled);
   });
 
   it("names the pair reviewer and its model", async () => {
@@ -205,23 +234,17 @@ describe("Robot Wrangler run card", () => {
     expect(card().querySelector(".llm-runcard-model-id")?.textContent).toBe("claude-sonnet-5");
   });
 
-  it("shows the banner with the server's message for a refused configuration, and never offers an API switch for Codex", async () => {
+  it("offers Codex API without a CLI-missing refusal", async () => {
     stubApi({
       config: config({
         vendor: "codex",
-        effective: effective("codex", "gpt-5.6-sol", { provider: "api" }),
-        effectiveProblems: [{ field: "provider", message: 'Provider "api" is not supported for vendor "codex". Allowed: cli.' }],
+        effective: effective("codex", "gpt-6-astra", { provider: "api" }),
       }),
     });
     await mount();
-
-    expect(card().classList.contains("llm-runcard-refused")).toBe(true);
-    const banner = root.querySelector('.llm-runcard-banner[role="alert"]')!;
-    expect(banner.textContent).toContain("n-dx work would refuse this.");
-    expect(banner.textContent).toContain('Provider "api" is not supported for vendor "codex". Allowed: cli.');
-    expect(banner.textContent).toContain("Codex runs on its CLI only.");
-    expect(banner.textContent).not.toMatch(/\bAPI\b.*(switch|use|connection)|use the api/i);
-    expect(root.querySelector(".llm-connection-card-api")).toBeNull();
+    expect(card().classList.contains("llm-runcard-refused")).toBe(false);
+    expect(root.querySelector(".llm-connection-card-api")).toBeTruthy();
+    expect(root.querySelector(".llm-runcard-banner")).toBeNull();
   });
 
   it("offers How to install and pick another vendor when the Codex CLI is missing", async () => {

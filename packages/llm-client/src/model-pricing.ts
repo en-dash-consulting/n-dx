@@ -17,7 +17,7 @@
  * a table that will drift.
  */
 
-import { MODEL_COSTS, resolveModel, normalizeCodexModel, type ModelCost } from "./config.js";
+import { MODEL_COSTS, resolveModel, type ModelCost } from "./config.js";
 
 /** Per-million-token rates for all four billed token kinds. */
 export interface ModelTokenPricing {
@@ -67,14 +67,14 @@ function toPricing(cost: ModelCost): ModelTokenPricing {
  * Resolve rates for a recorded model id.
  *
  * Recorded ids are not guaranteed to be catalog ids: a run may have stored a
- * CLI shorthand (`opus`), a Codex model since retired and remapped
+ * CLI shorthand (`opus`), an older literal Codex model ID
  * (`gpt-5.4`), or a placeholder written by an older recorder (`unknown`).
  * Lookup therefore tries, in order: the id as given, the Claude alias
- * expansion, the Codex legacy remap, and a case-normalised retry — then falls
+ * expansion, the undated base ID, and a case-normalised retry — then falls
  * back with `known: false`.
  */
 export function resolveModelPricing(modelId?: string): ResolvedModelPricing {
-  const raw = modelId?.trim();
+  const raw = modelId?.trim().toLowerCase();
   if (raw) {
     // A dated snapshot is priced as the model it is a snapshot of. Vendors ship
     // ids like `claude-haiku-4-5-20251001` while the table is keyed on
@@ -83,9 +83,9 @@ export function resolveModelPricing(modelId?: string): ResolvedModelPricing {
     // miss produced plausible dollars at the wrong model’s rates rather than
     // anything that looked wrong. Pricing only: model *selection* keeps the id
     // it was given.
-    const undated = raw.replace(/-\d{8}$/, "");
-    for (const candidate of [raw, resolveModel(raw), normalizeCodexModel(raw), undated, raw.toLowerCase()]) {
-      const cost = MODEL_COSTS[candidate];
+    const undated = raw.replace(/-(?:\d{8}|\d{4}-\d{2}-\d{2})$/, "");
+    for (const candidate of [raw, resolveModel(raw), undated, raw.toLowerCase()]) {
+      const cost = Object.hasOwn(MODEL_COSTS, candidate) ? MODEL_COSTS[candidate] : undefined;
       if (cost) return { modelId: candidate, pricing: toPricing(cost), known: true };
     }
   }

@@ -153,6 +153,18 @@ describe("Token Usage API routes", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
+  it("includes Sourcevision cache reads in dashboard and budget totals", async () => {
+    await writeFile(join(svDir, "manifest.json"), JSON.stringify({
+      analyzedAt: new Date().toISOString(),
+      tokenUsage: { calls: 1, inputTokens: 20, outputTokens: 5, cacheReadInputTokens: 80, vendor: "codex", model: "gpt-5.4" },
+    }));
+    resetAggregationCache();
+    const response = await fetch(`http://127.0.0.1:${port}/api/token/utilization`);
+    const data = await response.json();
+    expect(data.usage.packages.sv).toMatchObject({ inputTokens: 20, outputTokens: 5, cacheReadTokens: 80 });
+    expect(data.usage.totalCacheReadTokens).toBeGreaterThanOrEqual(80);
+  });
+
   it("GET /api/token/summary returns aggregate usage with cost", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
     expect(res.status).toBe(200);

@@ -33,7 +33,7 @@ export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] 
     usage.totalCacheCreationTokens +
     usage.totalCacheReadTokens;
 
-  if (total === 0) {
+  if (total === 0 && !usage.diagnosticStatus) {
     return ["Token usage: none recorded"];
   }
 
@@ -55,7 +55,9 @@ export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] 
     segments.push(`${fmt(usage.totalCacheReadTokens)} cache read`);
   }
 
-  lines.push(`Token usage: ${fmt(total)} tokens (${segments.join(" / ")})`);
+  const incomplete = usage.diagnosticStatus && usage.diagnosticStatus !== "complete";
+  lines.push(`Token usage: ${fmt(total)}${incomplete ? " recorded" : ""} tokens (${segments.join(" / ")})`);
+  if (incomplete) lines.push(`  Usage ${usage.diagnosticStatus}: token measurements are missing or incomplete; totals include recorded tokens only.`);
 
   // Per-package breakdown — only show packages with usage
   const { rex, hench, sv } = usage.packages;
@@ -65,7 +67,7 @@ export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] 
     parts.push(`sv: ${fmt(totalTokens(sv))} (${sv.calls} calls)`);
   }
 
-  if (totalTokens(rex) > 0) {
+  if (totalTokens(rex) > 0 || rex.calls > 0 || rex.diagnosticStatus) {
     parts.push(`rex: ${fmt(totalTokens(rex))} (${rex.calls} calls)`);
   }
 

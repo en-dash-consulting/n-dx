@@ -1129,7 +1129,7 @@ function validateModel(value) {
  * Validate llm.google.model: must be a non-empty string starting with "gemini-".
  *
  * Gemini model IDs all start with "gemini-" (e.g. "gemini-2.5-pro",
- * "gemini-3.7-flash"). IDs from other vendors (e.g. "gpt-5.6-terra", "claude-sonnet-*")
+ * "gemini-3.7-flash"). IDs from other vendors (e.g. "gpt-6.1-sol", "claude-sonnet-*")
  * are rejected immediately.
  *
  * Canonical known models (from @n-dx/llm-client GOOGLE_MODELS):
@@ -1630,11 +1630,13 @@ const TASK_TIERS = new Set(["light", "standard", "heavy", "free"]);
 
 /**
  * Effort levels a `llm.effort.<class>` value may name — the vendor's
- * documented range for adaptive-thinking models. Light-tier models have no
- * effort parameter, so an effort entry for a light-routed class is inert
- * rather than invalid.
+ * documented vocabulary across clients. The provider validates support for
+ * the selected model before sending a configured effort.
  */
-const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
+const EFFORT_LEVELS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+
+// Review selects its model through reviewModel / saved reviewTier, not routes.
+export const EFFORT_ONLY_TASK_CLASSES = new Set(["agent.review"]);
 
 /**
  * Known task classes and the tier each routes to by default.
@@ -1755,6 +1757,11 @@ export function describeUnknownTaskClass(settingPath) {
 
   const taskClass = settingPath.slice(prefix.length);
   if (!taskClass || taskClass.includes("*")) return null;
+  if (EFFORT_ONLY_TASK_CLASSES.has(taskClass)) {
+    return prefix === "effort." ? null
+      : `Note: "${taskClass}" is effort-only; this route has no effect. ` +
+        "Set llm.<vendor>.reviewModel or the task's reviewTier instead.";
+  }
   if (Object.hasOwn(TASK_CLASSES, taskClass)) return null;
 
   const suggestion = nearestTaskClass(taskClass);
@@ -1876,6 +1883,18 @@ export async function loadVendorCliPath(dir, vendor) {
 export async function loadCodexShellEnvFlags() {
   const { codexShellEnvFlags } = await import("@n-dx/llm-client");
   return codexShellEnvFlags();
+}
+
+/** Read-only, unattended review policy, including shell credential masking.
+ * Keep compilation at this existing spawn-exempt config boundary.
+ * @returns {Promise<string[]>}
+ */
+export async function loadCodexReviewerFlags() {
+  const { compileCodexPolicyFlags, DEFAULT_EXECUTION_POLICY } = await import("@n-dx/llm-client");
+  return compileCodexPolicyFlags({
+    ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only", approvals: "never",
+    networkAccess: false, writableRoots: [],
+  });
 }
 
 /** The auth preflight's arguments for a CLI vendor. */
@@ -2292,8 +2311,10 @@ Hench settings (.hench/config.json):
                                                task re-pays cold-start context or re-explores the repo
                                        batch — run up to hench.tasksPerSession tasks in one session
                                        cold  — a fresh spawn per task
-                                     Forking needs a CLI that resumes by session id (Claude today);
-                                     other vendors and hench.provider=api fall back to "cold".
+                                     Forking supports Claude CLI and Codex CLI when its
+                                     capability and identity checks pass. Unsupported CLIs,
+                                     unverifiable Codex identities and hench.provider=api
+                                     fall back to "cold".
   hench.tasksPerSession    number    Tasks per session under the "batch" strategy (default: 4)
   hench.parentMaxAgeHours  number    How long a cached orientation session may be forked before it
                                      is rebuilt (default: 24). Re-analyzing the repo invalidates it
@@ -2590,7 +2611,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
                                     light tier use this model.
-                                    Falls back to gpt-5.6-luna if not set.
+                                    Falls back to gpt-6-luna if not set.
   llm.google.api_key       string    Google Gemini API key (optional; validated format)
                                     Stored in .n-dx.local.json.
                                     Preflight validates the key against the Gemini API.
@@ -2607,7 +2628,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     Must be a valid Gemini model ID starting with "gemini-".
                                     Known models: gemini-3.5-flash-lite (light),
                                     gemini-3.7-flash (standard), gemini-2.5-pro (heavy)
-                                    Validation: rejects non-Gemini model IDs (e.g. "gpt-5.6-terra")
+                                    Validation: rejects non-Gemini model IDs (e.g. "gpt-6.1-sol")
   llm.local.host           string    Hostname of the local LM Studio server (default: localhost)
   llm.local.port           number    Port of the local LM Studio server (default: 1234)
   llm.local.model          string    Model ID to request from the local server (optional)
@@ -2697,10 +2718,12 @@ Task routing (which model serves which kind of call):
   Setting a route for a class not listed here still works — it may be a glob, or a
   class a newer n-dx defines — but ndx says so, and suggests the closest match.
 
-  llm.effort.<class>       string    Thinking effort for a class: low, medium, high, xhigh, or
-                                    max. Matched with the same exact-then-glob rules as routes.
-                                    Light-tier models have no effort parameter, so an entry for
-                                    a light-routed class is inert rather than an error.
+    Effort-only: agent.review (review model comes from llm.<vendor>.reviewModel)
+
+  llm.effort.<class>       string    Thinking effort: none, minimal, low, medium, high, xhigh,
+                                    max, or ultra. Uses the same exact-then-glob rules as routes.
+                                    Support depends on the model and client. Unsupported values
+                                    warn and leave the client default unchanged.
   llm.escalation.enabled   boolean   Retry a failed light-tier call once on the standard tier,
                                     with the validation error appended (default: true).
   llm.escalation.maxSteps  number    How many escalation steps a call may take (default: 1).
@@ -3572,11 +3595,8 @@ async function handleSetProjectSection(
     current[storagePkg] = {};
   }
 
-  // Vendor-change model reset: the old vendor is captured before it is overwritten.
   const oldVendor = isVendorWrite ? current[storagePkg].vendor : undefined;
-
   setByPath(current[storagePkg], storageSettingPath, coerced, storagePkg);
-
   const warningMessages = isVendorWrite
     ? await resetStaleVendorModels(current[storagePkg], oldVendor, coerced)
     : [];
@@ -3630,7 +3650,7 @@ async function handleSetProjectSection(
 
   // Print warnings for cleared models
   for (const warning of warningMessages) {
-    console.log(`  ⚠ ${warning.split("\n").join("\n  ")}`);
+    console.warn(`  ⚠ ${warning.split("\n").join("\n  ")}`);
   }
 
   if (isVendorWrite && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
@@ -3645,15 +3665,16 @@ async function handleSetProjectSection(
  * the write is done.
  */
 async function resetStaleVendorModels(llm, oldVendor, newVendor) {
-  const { resetStaleModel, formatVendorChangeWarning, NEWEST_MODELS } =
-    await import("@n-dx/llm-client");
+  if (oldVendor === newVendor) return [];
+  const { isModelCompatibleWithVendor } = await import("@n-dx/llm-client");
   const warnings = [];
+  // Each namespaced pin belongs to its own vendor, including when inactive.
   for (const vendor of [LLM_VENDOR.CLAUDE, LLM_VENDOR.CODEX]) {
-    const reset = resetStaleModel(oldVendor, llm[vendor]?.model, newVendor);
-    if (!reset.changed) continue;
-    if (llm[vendor]) delete llm[vendor].model;
-    const warning = formatVendorChangeWarning(reset, NEWEST_MODELS[vendor]);
-    if (warning) warnings.push(warning);
+    const model = llm[vendor]?.model;
+    if (model !== undefined && (typeof model !== "string" || !isModelCompatibleWithVendor(vendor, model))) {
+      delete llm[vendor].model;
+      warnings.push(`Cleared llm.${vendor}.model: "${model}" is not compatible with ${vendor}.`);
+    }
   }
   return warnings;
 }

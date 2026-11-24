@@ -1,3 +1,4 @@
+import { ManifestSchema } from "../../../src/schema/validate.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   startRunLedger,
@@ -62,7 +63,7 @@ describe("run ledger", () => {
 
     const { byTaskClass } = snapshotRunLedger().llm;
     expect(byTaskClass["code.classify"]).toEqual({
-      calls: 2, inputTokens: 150, outputTokens: 10, durationMs: 700, vendor: "typesafe", model: "jev-1.13.0",
+      calls: 2, measuredCalls: 2, inputTokens: 150, outputTokens: 10, durationMs: 700, vendor: "typesafe", model: "jev-1.13.0",
     });
     // A CLI vendor that returns no usage still counts the call and its time.
     expect(byTaskClass["zone.enrich-scan"]).toMatchObject({ calls: 1, inputTokens: 0, outputTokens: 0, durationMs: 9000, vendor: "claude" });
@@ -193,6 +194,24 @@ describe("priceRunLedger", () => {
     expect(priceRunLedger(snapshotRunLedger())).toBeGreaterThan(0);
   });
 
+  it.each(["legacy", "both"])("reads %s per-class cache fields without double counting", (shape) => {
+    recordLLMCall({ taskClass: "a", vendor: "claude", model: "claude-haiku-4-5",
+      tokenUsage: { input: 10, output: 2, cacheCreationInput: 1000, cacheReadInput: 5000 }, durationMs: 1 });
+    const canonical = snapshotRunLedger();
+    expect(canonical.llm.byTaskClass.a).not.toHaveProperty("cacheReadInputTokens");
+    const historical = structuredClone(canonical);
+    const bucket = historical.llm.byTaskClass.a;
+    bucket.cacheCreationInputTokens = shape === "legacy" ? 1000 : 9000;
+    bucket.cacheReadInputTokens = shape === "legacy" ? 5000 : 9000;
+    if (shape === "legacy") {
+      delete bucket.cacheCreationTokens;
+      delete bucket.cacheReadTokens;
+    }
+    expect(ManifestSchema.shape.lastAnalysis.parse(historical)).toEqual(historical);
+    expect(priceRunLedger(historical)).toBe(priceRunLedger(canonical));
+    expect(formatRunLedger(historical)).toEqual(formatRunLedger(canonical));
+  });
+
   it("prices a dated model id, which is what the clients actually report", () => {
     // The regression this pins end to end: sourcevision's scan class runs on
     // haiku and reports the dated id, which used to miss the table entirely.
@@ -201,3 +220,19 @@ describe("priceRunLedger", () => {
     expect(priceRunLedger(snapshotRunLedger())).toBeGreaterThan(0);
   });
 });
+
+ it("prices cache reads separately and distinguishes missing usage from measured zero", () => {
+   recordLLMCall({ taskClass: "test", vendor: "codex", model: "gpt-5.4", durationMs: 1,
+     tokenUsage: { input: 0, output: 0, cacheReadInput: 1000000 }, usageStatus: "measured" });
+   const cached = snapshotRunLedger();
+   expect(cached.llm.byTaskClass.test.cacheReadTokens).toBe(1000000);
+   expect(ManifestSchema.shape.lastAnalysis.parse(cached)).toEqual(cached);
+   expect(cached.llm.costUsd).toBeGreaterThan(0);
+   startRunLedger();
+   recordLLMCall({ taskClass: "test", vendor: "codex", model: "gpt-5.4", durationMs: 1,
+     tokenUsage: { input: 0, output: 0 }, usageStatus: "measured" });
+   expect(snapshotRunLedger().llm.costUsd).toBe(0);
+   recordLLMCall({ taskClass: "test", vendor: "codex", model: "gpt-5.4", durationMs: 1,
+     usageStatus: "unavailable" });
+   expect(snapshotRunLedger().llm.costUsd).toBeUndefined();
+ });

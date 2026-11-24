@@ -46,10 +46,35 @@ export type {
 export const codexCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CODEX,
   parseMode: "json",
-  // `codex exec resume` exists (the batch chain and transient retries use it
-  // through their own paths), but resuming a session that ended unfinished is
-  // not enabled for Codex yet: nothing here detects that it ended waiting.
-  resumesUnfinishedSessions: false,
+  resumesUnfinishedSessions: true,
+
+  createUnfinishedSessionTracker() {
+    let turnOpen = false;
+    let failed = false;
+    const commands = new Set<string>();
+    return {
+      observe(raw: unknown) {
+        if (!raw || typeof raw !== "object") return;
+        const event = raw as Record<string, unknown>;
+        if (event.type === "turn.started") turnOpen = true;
+        if (event.type === "turn.completed") turnOpen = false;
+        if (event.type === "turn.failed" || event.type === "error") failed = true;
+        const item = event.item as Record<string, unknown> | undefined;
+        if (!item || item.type !== "command_execution" || typeof item.id !== "string") return;
+        if ((event.type === "item.started" || event.type === "item.updated") && item.status === "in_progress") {
+          commands.add(item.id);
+        } else if (event.type === "item.completed") {
+          commands.delete(item.id);
+        }
+      },
+      signal() {
+        if (failed) return undefined;
+        if (commands.size) return { tool: "command_execution", detail: "command has no completion event" };
+        if (turnOpen) return { tool: "turn.started", detail: "turn has no completion event" };
+        return undefined;
+      },
+    };
+  },
 
   buildSpawnConfig(
     envelope: PromptEnvelope,
@@ -58,36 +83,39 @@ export const codexCliAdapter: VendorAdapter = {
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
 
-    // policy.allowedGitSubcommands is intentionally not consulted — Codex has no
-    // per-command allowlist surface (its safety model is the sandbox/approval
-    // flags), so git-subcommand scoping is a Claude-CLI-only control.
+    // Hench resolution and run diagnostics report command/Git/blocked-path guards
+    // that this sandbox cannot enforce. This adapter only compiles the native
+    // filesystem, network and approval controls; it must not claim allowlists.
     //
-    // opts.permissionMode and opts.forkSession are ignored: neither has a Codex
-    // equivalent. The batch strategy's resume is a plain `exec resume`, which
-    // appends to the thread. A resumed thread does not keep its starting
-    // policy and `exec resume` rejects `--sandbox`, so the resume form
-    // re-applies the same policy as `-c` overrides; both forms end with the
-    // shell-environment overrides that hide the Codex key from the agent's
-    // commands.
-    const { binary, args, stdin } = codexSessionDriver.turnSpawn({
-      systemPrompt,
-      prompt: taskPrompt,
-      model: opts.model,
-      resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId } : undefined,
-      codex: {
-        policyFlags: compileCodexPolicyFlags(policy),
-        resumePolicyFlags: compileCodexPolicyFlags(policy, { resume: true }),
-      },
-    });
+    // Fork/resume reapply the execution policy; neither inherits permission.
+    const build = (scratchDir?: string): SpawnConfig => {
+      const { binary, args, stdin } = codexSessionDriver.turnSpawn({
+        systemPrompt,
+        prompt: taskPrompt,
+        model: opts.model,
+        resume: opts.resumeSessionId ? { sessionId: opts.resumeSessionId, fork: opts.forkSession } : undefined,
+        codex: {
+          forkSupported: opts.codexForkSupported,
+          effort: opts.effort,
+          // Orientation must not reach write-capable MCP tools outside the sandbox.
+          configFlags: opts.codexOrientationFlags,
+          policyFlags: compileCodexPolicyFlags(policy, { scratchDir }),
+          resumePolicyFlags: compileCodexPolicyFlags(policy, { resume: true, scratchDir }),
+        },
+      });
 
-    return {
-      binary,
-      args,
-      env: {},
-      // The prompt always travels on stdin; see the driver for why not argv.
-      stdinContent: stdin,
-      cwd: ".",
+      return {
+        binary,
+        usageResumeSessionId: opts.resumeSessionId,
+        args,
+        env: scratchDir ? { TMPDIR: scratchDir, TMP: scratchDir, TEMP: scratchDir } : {},
+        ...(policy.sandbox === "workspace-write" && !scratchDir ? { withScratchDir: build } : {}),
+        // The prompt always travels on stdin; see the driver for why not argv.
+        stdinContent: stdin,
+        cwd: ".",
+      };
     };
+    return build();
   },
 
   parseEvent(line: string, turn: number): RuntimeEvent | null {

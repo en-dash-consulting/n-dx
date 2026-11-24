@@ -52,7 +52,10 @@ import { dropPartialTail, renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
+import { admitCodexHub, hubCodexSnapshotPath } from "./hub-codex.js";
+import { readSidecarCodexProvider, sidecarProviderConnection, protectProviderSession, providerEvent, type SidecarCodexProvider } from "./codex-provider.js";
 import {
+  candidateCodexHubSpawn,
   hubVendorRefusal,
   sidecarCodexSpawn,
   sidecarSpawnFlags,
@@ -75,6 +78,8 @@ export interface SidecarSessionRecord {
   name: string;
   vendor: string;
   model?: string;
+  /** Non-secret selection persisted so a removed custom config cannot resume on OpenAI. */
+  codexProvider?: string;
   lens?: string;
   /** What the lens is pointed at (an item id, display id or alias); absent means no target. */
   target?: PacketTarget;
@@ -141,7 +146,7 @@ export interface UpdateSidecarSessionInput {
 }
 
 /** Session options the registry does not own: env policy, LLM config, binary. */
-type SidecarConnectionOptions = Omit<VendorSessionOptions, "vendor" | "cwd" | "model">;
+type SidecarConnectionOptions = Omit<VendorSessionOptions, "vendor" | "cwd"> & { provider?: SidecarCodexProvider };
 export type SidecarSessionConnect = (
   record: SidecarSessionRecord,
 ) => SidecarConnectionOptions | Promise<SidecarConnectionOptions>;
@@ -245,17 +250,43 @@ export function sidecarSessionConnect(
   envDir?: string,
   idleMs: SidecarRegistryOptions["ttlMs"] = DEFAULT_SIDECAR_TTL_MS,
 ): SidecarSessionConnect {
+  const admitted = new Map<string, { identity: string; spawn: ReturnType<typeof candidateCodexHubSpawn> }>();
   return async (record) => {
     // Checked again here, past the create route: a hand-edited index must not open a hub session on a vendor that can read repositories.
-    const refusal = record.scope === "hub" ? hubVendorRefusal(record.vendor) : null;
+    const hubCodex = record.scope === "hub" && record.vendor === "codex";
+    const refusal = record.scope === "hub" && !hubCodex ? hubVendorRefusal(record.vendor) : null;
     if (refusal) throw new Error(refusal);
     const endpoint = broker?.(record.id);
     const isCodex = record.vendor === "codex";
+    if (hubCodex) {
+      if (!endpoint || !envDir || record.worktree !== dir) throw new Error("Codex hub requires its host, broker and dedicated workspace");
+      const settings = await admitCodexHub(envDir);
+      const previous = admitted.get(record.id);
+      if (previous && previous.identity !== settings.identity) throw new Error("Codex hub executable identity changed; end the session before selecting another executable");
+      previous?.spawn.codex.turnConfigFlags?.();
+      const profile = candidateCodexHubSpawn(endpoint, typeof idleMs === "function" ? idleMs() : idleMs, {
+        cwd: dir, snapshot: hubCodexSnapshotPath(dir, record.id), repositories: [envDir],
+        version: settings.version, platform: process.platform,
+      });
+      const spawn = {
+        ...profile,
+        codex: { ...profile.codex, turnConfigFlags: () => {
+          settings.check();
+          return profile.codex.turnConfigFlags?.() ?? [];
+        } },
+      };
+      if (!previous) admitted.set(record.id, { identity: settings.identity, spawn: profile });
+      return sidecarProviderConnection(settings, spawn, record.worktree, record.scope, record.model);
+    }
     const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs, record.worktree);
+    const settings = await resolveSidecarSessionEnv(envDir ?? record.worktree);
+    if (isCodex) {
+      writeBrokerMcpConfig(dir, record.id);
+      return sidecarProviderConnection(settings, codex, record.worktree, record.scope, record.model);
+    }
     return {
-      ...await resolveSidecarSessionEnv(envDir ?? record.worktree),
-      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, isCodex ? undefined : endpoint), record.scope, codex.codex),
-      ...(isCodex && Object.keys(codex.env).length > 0 && { extraEnv: codex.env }),
+      ...settings,
+      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, endpoint), record.scope, codex.codex),
     };
   };
 }
@@ -372,6 +403,7 @@ export class SidecarSessionRegistry {
       worktree: input.worktree,
       name: input.name ?? "Sidecar",
       vendor: input.vendor,
+      ...(input.vendor === "codex" && { codexProvider: readSidecarCodexProvider().provider }),
       ...(input.model && { model: input.model }),
       ...(input.lens && { lens: input.lens }),
       ...(input.target && { target: { ...input.target } }),
@@ -627,6 +659,7 @@ export class SidecarSessionRegistry {
       append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
       guard.observe(event);
     };
+    if (record.scope === "hub" && record.vendor === "codex") await this.connect(record);
     const result = await live.session.sendTurn(this.context?.checkpointPrompt ?? CHECKPOINT_PROMPT);
     record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
     if (result.status !== "completed") {
@@ -784,20 +817,31 @@ export class SidecarSessionRegistry {
   /** The open vendor session, resuming the stored id when there is none — after a restart or the TTL. */
   private async liveSession(record: SidecarSessionRecord, signal: AbortSignal): Promise<LiveSession | undefined> {
     const existing = this.live.get(record.id);
-    if (existing) return existing;
+    // Every Codex turn re-resolves provider/auth/model. The hub additionally
+    // revalidates audited binary and filesystem identity. Retain the resume id,
+    // not the previous handle's captured environment or configuration.
+    if (existing && record.vendor !== "codex") return existing;
     const connection = await this.connect(record);
     if (signal.aborted) return undefined;
+    if (connection.provider) {
+      // Records predating provider selection could only have run on OpenAI.
+      if ((record.codexProvider ?? "openai") !== connection.provider.provider) {
+        throw new Error("Codex Sidecar selected provider changed; end this session and create one for the new provider. No fallback was attempted.");
+      }
+      const stored = this.records.get(record.id);
+      if (stored) stored.codexProvider = connection.provider.provider;
+    }
     const options: VendorSessionOptions = {
       ...connection,
       vendor: record.vendor,
       cwd: record.worktree,
       ...(record.model && { model: record.model }),
-      onEvent: (event) => entry.sink?.(event),
+      onEvent: (event) => entry.sink?.(providerEvent(connection.provider, event)),
     };
     const entry: LiveSession = {
-      session: record.resumeId
+      session: protectProviderSession(record.resumeId
         ? resumeVendorSession(record.resumeId, options)
-        : startVendorSession(options),
+        : startVendorSession(options), connection.provider),
     };
     this.live.set(record.id, entry);
     return entry;

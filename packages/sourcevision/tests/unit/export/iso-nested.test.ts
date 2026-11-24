@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { JSDOM } from "jsdom";
+import { ISO_MAP_URL } from "../../helpers/iso-map-url.js";
 import { buildIsoModel } from "../../../src/export/iso-model.js";
 import type { IsoFileInput, IsoModelInput, IsoZoneInput } from "../../../src/export/iso-model.js";
 import { renderIsoMap } from "../../../src/export/iso-map.js";
@@ -37,7 +38,7 @@ function input(): IsoModelInput {
   };
 }
 
-const mount = () => new JSDOM(renderIsoMap(buildIsoModel(input())), { runScripts: "dangerously", url: "file:///map.html" });
+const mount = () => new JSDOM(renderIsoMap(buildIsoModel(input())), { runScripts: "dangerously", url: ISO_MAP_URL });
 const labels = (dom: JSDOM) => [...dom.window.document.querySelectorAll("#iso .tagtext")].map((t) => t.textContent).filter((t) => t && t.length > 1);
 const block = (dom: JSDOM, name: string) =>
   [...dom.window.document.querySelectorAll('#iso g.node[role="button"]')].find((g) => (g.getAttribute("aria-label") ?? "").startsWith(`${name},`))!;

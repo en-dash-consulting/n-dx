@@ -31,6 +31,9 @@ import {
   isModelCompatibleWithVendor,
   resolveClaudeConfig,
   parseLLMConfig,
+  loadLLMConfig,
+  supportsOpenAiTurns,
+  cliAuthConflictError,
   resolveLayout,
   getNextFailoverAttempt,
   DEFAULT_LOCAL_HOST,
@@ -198,7 +201,7 @@ export interface LlmConfigResponse {
 export interface FailoverInfo {
   /** Whether automatic failover is enabled in the config. */
   enabled: boolean;
-  /** Whether failover can fire for this config (true only for Claude + API). */
+  /** Whether the provider supports failover: Claude API or a supported Codex API config. Independent of enabled. */
   applies: boolean;
   /** Why applies is false (empty when applies is true). */
   reason?: string;
@@ -570,7 +573,7 @@ export function lastActiveAgentModel(projectDir: string): ActiveAgentModel {
  * is the one the dashboard already applies on write; the model check is
  * llm-client's, skipped for `local` where any loaded model id is valid.
  */
-function findEffectiveProblems(effective: EffectiveAgentConfig): EffectiveProblem[] {
+function findEffectiveProblems(effective: EffectiveAgentConfig, llmConfig: LLMConfig): EffectiveProblem[] {
   const problems: EffectiveProblem[] = [];
   const providerError = validateProviderForVendor(effective.provider, effective.vendor);
   if (providerError) problems.push({ field: "provider", message: providerError });
@@ -582,6 +585,14 @@ function findEffectiveProblems(effective: EffectiveAgentConfig): EffectiveProble
       field: "model",
       message: `Model "${effective.model}" is not a ${effective.vendor} model.`,
     });
+  }
+  if (effective.vendor === LLM_VENDOR.CODEX && effective.provider === "api") {
+    if (llmConfig.codex?.auth === "cli") {
+      problems.push({ field: "provider", message: cliAuthConflictError(effective.vendor, "the OpenAI API").message });
+    }
+    if (problems.every(problem => problem.field !== "model") && !supportsOpenAiTurns(effective.model)) {
+      problems.push({ field: "model", message: `OpenAI model "${effective.model}" has no verified agent-turn support.` });
+    }
   }
   return problems;
 }
@@ -600,21 +611,21 @@ function readAgentModels(config: Record<string, unknown>): Partial<Record<LLMVen
 
 /**
  * Build the failover chain for the given effective vendor/provider/model.
- * Returns applies=true with a 4-model chain only for Claude + API.
- * For claude (cli), codex, and google, builds the chain even though applies=false.
+ * Applies to Claude API and supported Codex API configs, independently of the
+ * toggle. CLI and Google retain the resolver chain with applies=false.
  * For local, returns applies=false with an empty chain.
  */
 function buildFailoverInfo(
   effective: EffectiveAgentConfig,
   llmConfig: LLMConfig,
+  effectiveProblems: readonly EffectiveProblem[],
 ): FailoverInfo {
   const enabled = llmConfig.autoFailover === true;
 
-  // Failover only applies to Claude + API provider
   const isClaudeApi = effective.vendor === LLM_VENDOR.CLAUDE && effective.provider === "api";
+  const isCodexApi = effective.vendor === LLM_VENDOR.CODEX && effective.provider === "api";
 
-  // For vendors that support failover (claude, codex, google), build the chain
-  // but only apply=true for Claude + API
+  // Preserve the resolver chain even when the provider cannot execute it.
   const supportsFailover =
     effective.vendor === LLM_VENDOR.CLAUDE ||
     effective.vendor === LLM_VENDOR.CODEX ||
@@ -637,8 +648,7 @@ function buildFailoverInfo(
       chain.push(result.model);
     }
 
-    if (isClaudeApi) {
-      // Only Claude + API can actually fire failover
+    if (isClaudeApi || (isCodexApi && effectiveProblems.length === 0)) {
       return {
         enabled,
         applies: true,
@@ -646,15 +656,17 @@ function buildFailoverInfo(
       };
     }
 
-    // For claude (cli), codex, and google, return the chain but applies=false
+    // Explain the provider limitation or the existing direct API refusal.
     let reason: string;
     if (effective.vendor === LLM_VENDOR.CLAUDE) {
-      reason = "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.";
+      reason = "Failover is not available for Claude CLI. Use the API connection for failover.";
+    } else if (isCodexApi) {
+      reason = `Failover is not available for this Codex API configuration. ${effectiveProblems.map(problem => problem.message).join(" ")}`;
     } else if (effective.vendor === LLM_VENDOR.CODEX) {
-      reason = "Failover is not available for Codex. Only Claude on the API connection supports failover.";
+      reason = "Failover is not available for Codex CLI, including CLI with API-key authentication. Use the API connection with a supported OpenAI agent model for failover.";
     } else {
       // Google
-      reason = "Failover is not available for Google Gemini. Only Claude on the API connection supports failover.";
+      reason = "Failover is not available for Google Gemini. Use Claude or supported Codex models on the API connection for failover.";
     }
 
     return {
@@ -668,7 +680,7 @@ function buildFailoverInfo(
   // For local and other vendors, return applies=false with empty chain
   let reason: string;
   if (effective.vendor === LLM_VENDOR.LOCAL) {
-    reason = "Failover is not available for local models. Only Claude on the API connection supports failover.";
+    reason = "Failover is not available for local models. Use Claude or supported Codex models on the API connection for failover.";
   } else {
     reason = "Failover requires a configured vendor.";
   }
@@ -695,11 +707,12 @@ export type LlmResolution = Pick<
  */
 function resolveLlmConfig(snapshot: ConfigSnapshot): LlmResolution {
   const { effective, llmConfig } = resolveEffectiveAgentConfigFrom(snapshot);
+  const effectiveProblems = findEffectiveProblems(effective, llmConfig);
   return {
     effective,
-    effectiveProblems: findEffectiveProblems(effective),
+    effectiveProblems,
     tiers: buildTierTable(effective.vendor, llmConfig, effective),
-    failover: buildFailoverInfo(effective, llmConfig),
+    failover: buildFailoverInfo(effective, llmConfig, effectiveProblems),
     review: buildReviewInfo(effective, llmConfig, readHenchReviewSettings(snapshot)),
   };
 }
@@ -998,11 +1011,13 @@ export interface VendorCatalogEntry {
    * vendor default.
    */
   defaultModel: string;
-  /** `"live"` when `models` came from the vendor's Models API, else the built-in list. */
+  /** Live CLI client catalog or vendor API; see provenance. */
   source: "live" | "built-in";
-  /** ISO time of the live fetch; null when `source` is `"built-in"`. */
+  /** Catalog provenance is not inference entitlement. */
+  provenance?: "codex-client-catalog" | "vendor-api" | "built-in";
+  /** ISO time of the probe, including failed probes; null when not probed. */
   checkedAt: string | null;
-  /** Why the built-in list is shown. Present only when `source` is `"built-in"`. */
+  /** Why the built-in list is shown, or why live client models were excluded. */
   reason?: string;
   /** Whether the vendor can run as configured, judged for the provider it would run on. */
   readiness: VendorReadiness;
@@ -1010,7 +1025,7 @@ export interface VendorCatalogEntry {
 
 /** A vendor entry whose CLI is installed locally, with what `<binary> --version` reported. */
 export interface CliVendorCatalogEntry extends VendorCatalogEntry {
-  cli: CliInfo;
+  cli?: CliInfo;
 }
 
 /**
@@ -1037,12 +1052,25 @@ export interface LlmCatalogResponse {
 }
 
 /**
- * Every model id llm-client's catalog knows for `vendor`: the union of its
- * `TIER_MODELS` (light/standard/heavy) and every `MODEL_COSTS` entry that
- * belongs to the vendor — the same cost table the dashboard's spend views and
- * `ndx usage` price a run against. Sorted for a stable response.
+ * Codex's built-in selection catalog, independent of pricing coverage.
+ * Retain the pre-pricing-refresh set and explicitly include the new defaults
+ * introduced by this catalog change. Other ids require a successful live
+ * listing; pricing metadata alone does not establish model availability.
  */
+const BUILT_IN_CODEX_MODELS = [
+  "gpt-5.4-mini",
+  "gpt-5.5",
+  "gpt-5.6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-6-astra",
+  "gpt-6-luna",
+  "gpt-6.1-sol",
+] as const;
+
+/** Built-in selection ids, sorted; Claude and Google retain their tier/cost union. */
 function cloudVendorModels(vendor: LLMVendor): string[] {
+  if (vendor === LLM_VENDOR.CODEX) return [...BUILT_IN_CODEX_MODELS];
   const tierModels = Object.values(TIER_MODELS[vendor]).filter((m): m is string => Boolean(m));
   const catalogModels = Object.keys(MODEL_COSTS).filter((id) => isModelCompatibleWithVendor(vendor, id));
   return [...new Set([...tierModels, ...catalogModels])].sort();
@@ -1063,16 +1091,22 @@ export async function validateCatalogModel(
   projectDir: string,
   vendor: string | null,
   model: string,
+  providerOverride?: "cli" | "api",
 ): Promise<string | null> {
   if (vendor === LLM_VENDOR.LOCAL) return null;
   if (vendor !== LLM_VENDOR.CLAUDE && vendor !== LLM_VENDOR.CODEX && vendor !== LLM_VENDOR.GOOGLE) {
     return `No LLM vendor is configured (llm.vendor), so model "${model}" cannot be checked.`;
   }
   if (!isModelCompatibleWithVendor(vendor, model)) return `Model "${model}" is not a ${vendor} model.`;
+  const provider = providerOverride ?? resolveEffectiveProvider(vendor, readHenchAgentSettings(readConfigSnapshot(projectDir)).provider);
+  if (vendor === LLM_VENDOR.CODEX && provider === "api" && !supportsOpenAiTurns(model)) {
+    return `OpenAI model "${model}" has no verified agent-turn support.`;
+  }
   if (cloudVendorModels(vendor).includes(model)) return null;
   if (vendor !== LLM_VENDOR.GOOGLE) {
-    const live = await getLiveVendorProbe(vendor, projectDir);
+    const live = await getLiveVendorProbe(vendor, projectDir, { provider });
     if (live.listing.ok && live.listing.models.includes(model)) return null;
+    if (!live.listing.ok) return `Cannot check model "${model}" in the ${vendor} catalog: ${live.listing.reason}`;
   }
   return `Model "${model}" is not in the ${vendor} catalog.`;
 }
@@ -1092,11 +1126,12 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   // through the same chain as `effective`, minus the hench override rung.
   const defaultModel = (vendor: LLMVendor): string =>
     resolveEffectiveAgentModel(vendor, undefined, llmConfig).model;
+  const henchProvider = readHenchAgentSettings(snapshot).provider;
+  const codexProvider = resolveEffectiveProvider(LLM_VENDOR.CODEX, henchProvider);
   const [claudeProbe, codexProbe] = await Promise.all([
     getLiveVendorProbe(LLM_VENDOR.CLAUDE, projectDir, { refresh }),
-    getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh }),
+    getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh, provider: codexProvider }),
   ]);
-  const henchProvider = readHenchAgentSettings(snapshot).provider;
   const cliEntry = (
     vendor: ListableVendor,
     probe: LiveVendorProbe,
@@ -1104,15 +1139,26 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   ): CliVendorCatalogEntry => {
     const builtIn = cloudVendorModels(vendor);
     const live = probe.listing.ok;
+    const models = probe.listing.ok ? probe.listing.models : builtIn;
+    const directOpenAi = vendor === LLM_VENDOR.CODEX && codexProvider === "api";
+    // A client may advertise custom-provider deployment names. Keep the picker
+    // within the same vendor policy as config, saved-run and launch validation.
+    const selectableModels = vendor === LLM_VENDOR.CODEX && !directOpenAi
+      ? models.filter((model) => isModelCompatibleWithVendor(vendor, model))
+      : models;
+    const excludedClientModels = selectableModels.length !== models.length;
     return {
-      models: probe.listing.ok ? probe.listing.models : builtIn,
+      models: directOpenAi ? selectableModels.filter(supportsOpenAiTurns) : selectableModels,
       providers: [...VENDOR_PROVIDERS[vendor]],
       defaultModel: defaultModel(vendor),
       source: live ? "live" : "built-in",
-      checkedAt: live ? probe.checkedAt : null,
-      ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
+      provenance: live ? (vendor === LLM_VENDOR.CODEX && codexProvider === "cli" ? "codex-client-catalog" : "vendor-api") : "built-in",
+      checkedAt: probe.checkedAt,
+      ...(probe.listing.ok
+        ? excludedClientModels ? { reason: "Custom-provider model IDs outside gpt-*, o<number>* and codex* are excluded because n-dx cannot save them as Codex models. Configure the selected Codex CLI to list supported model IDs, then refresh." } : {}
+        : { reason: probe.listing.reason }),
       readiness,
-      cli: probe.cli,
+      ...(!directOpenAi && { cli: probe.cli }),
     };
   };
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
@@ -1132,7 +1178,7 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       claudeProbe,
       claudeReadiness(resolveEffectiveProvider(LLM_VENDOR.CLAUDE, henchProvider), claudeProbe.cli, llmConfig),
     ),
-    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe, codexReadiness(codexProbe.cli)),
+    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe, codexReadiness(codexProbe.cli, codexProvider, await loadLLMConfig(projectDir))),
     google: {
       models: cloudVendorModels(LLM_VENDOR.GOOGLE),
       providers: [...VENDOR_PROVIDERS.google],

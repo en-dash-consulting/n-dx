@@ -184,7 +184,7 @@ describe("createOpenAiApiProvider — LLMProvider interface", () => {
 
   it("uses default model when no model configured", () => {
     const provider = makeProvider();
-    expect(provider.info.model).toBe("gpt-5.6-terra");
+    expect(provider.info.model).toBe("gpt-6.1-sol");
   });
 
   it("sets info.model when model is configured", () => {
@@ -222,12 +222,7 @@ describe("createOpenAiApiProvider — complete()", () => {
   });
 
   function mockFetchResponse(body: unknown, status = 200): void {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: status >= 200 && status < 300,
-      status,
-      json: async () => body,
-      text: async () => JSON.stringify(body),
-    });
+    globalThis.fetch = vi.fn().mockImplementation(async () => Response.json(body, { status }));
   }
 
   it("sends request to /chat/completions endpoint", async () => {
@@ -380,11 +375,7 @@ describe("createOpenAiApiProvider — complete()", () => {
 
   it("retries on 429 and eventually throws rate-limit error", async () => {
     // Always return 429
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      text: async () => "Rate limited",
-    });
+    globalThis.fetch = vi.fn().mockImplementation(async () => new Response("Rate limited", { status: 429 }));
 
     const provider = createOpenAiApiProvider({
       codexConfig: { api_key: "sk-test" },

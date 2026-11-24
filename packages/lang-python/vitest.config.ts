@@ -3,8 +3,13 @@ import { defineConfig } from "vitest/config";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 import { testMaxWorkers } from "../../tests/test-max-workers.mjs";
+import { coverageConfig } from "../../tests/vitest-coverage.mjs";
 
 const packagesRoot = resolve(import.meta.dirname, "..");
+
+// Coverage floors for `test:coverage`: what this suite reached, rounded down, less one point.
+// Raise them as coverage rises. See tests/vitest-coverage.mjs.
+const COVERAGE_FLOORS = { statements: 18, branches: 10, functions: 16, lines: 19 };
 
 export default defineConfig({
   resolve: {
@@ -19,6 +24,7 @@ export default defineConfig({
     ],
   },
   test: {
+    coverage: coverageConfig({ thresholds: COVERAGE_FLOORS }),
     // NDX_TEST_MAX_WORKERS caps workers for every project; unset keeps vitest's default.
     maxWorkers: testMaxWorkers(),
     silent: "passed-only",

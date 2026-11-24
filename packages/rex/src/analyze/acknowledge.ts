@@ -132,7 +132,6 @@ export const ACK_REASON_CATEGORIES = [
   "over-engineered",
   "speculative",
 ] as const;
-export type AckReasonCategory = typeof ACK_REASON_CATEGORIES[number];
 
 // ── Fuzzy matching ────────────────────────────────────────────────────
 

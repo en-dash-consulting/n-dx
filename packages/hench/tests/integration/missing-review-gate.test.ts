@@ -224,14 +224,14 @@ describe("finalizeRun — missing-review gate", () => {
     expect(statuses).toEqual(["completed"]);
   });
 
-  it("does not refuse when the reviewer ran but lost its report", async () => {
-    // The change *was* attacked; only the transport broke. That stays a
-    // warning, as the module contract has always said.
-    const run = buildCompletedRun({ failed: "no-report", detail: "report file absent" });
+  it.each(["no-report", "malformed-report"] as const)("refuses a %s even when a reviewer process ran", async (failed) => {
+    const run = buildCompletedRun({ failed, detail: "no usable report" });
     await runFinalize(run, buildStore());
 
-    expect(run.status).toBe("completed");
-    expect(statuses).toEqual(["completed"]);
+    expect(run.status).toBe("failed");
+    expect(run.review).toMatchObject({ failed, gated: true });
+    expect(run.error).toContain("produced no usable report");
+    expect(statuses).not.toContain("completed");
   });
 
   it("does not refuse when --review was never passed", async () => {

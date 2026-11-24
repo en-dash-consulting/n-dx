@@ -14,12 +14,14 @@
  */
 
 import { EventEmitter } from "node:events";
+import { configReadChild, decodeWindowsCommandLine } from "./cli-process-fixtures.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { spawn as nodeSpawn } from "node:child_process";
 import { serializeDocument } from "@n-dx/rex";
 import { loadConfig, saveConfig } from "../../src/store/config.js";
 import { setupProjectDir, disableMemoryGuard, commitGitFixtureBaseline } from "./index.js";
+export { decodeWindowsCommandLine } from "./cli-process-fixtures.js";
 
 /** What one vendor-CLI spawn received. */
 export interface CliInvocation {
@@ -48,55 +50,6 @@ function commandBase(command: string): string {
 }
 
 const VENDOR_CLIS = ["claude", "codex"];
-
-/**
- * Split a command line built by `buildWindowsCliCommandLine` back into its
- * tokens — the binary first, then the argv.
- *
- * The inverse of `quoteWindowsToken`: every argument is wrapped in `"…"`, an
- * embedded quote is written `""`, and backslashes are doubled only where they
- * precede a quote (or the closing quote). The binary may be bare.
- *
- * @internal Exported for testing.
- */
-export function decodeWindowsCommandLine(line: string): string[] {
-  const tokens: string[] = [];
-  let i = 0;
-  const n = line.length;
-  while (i < n) {
-    while (i < n && line[i] === " ") i++;
-    if (i >= n) break;
-    if (line[i] !== '"') {
-      const start = i;
-      while (i < n && line[i] !== " ") i++;
-      tokens.push(line.slice(start, i));
-      continue;
-    }
-    i++; // opening quote
-    let token = "";
-    while (i < n) {
-      let slashes = 0;
-      while (i < n && line[i] === "\\") {
-        slashes++;
-        i++;
-      }
-      if (i < n && line[i] === '"') {
-        token += "\\".repeat(slashes / 2);
-        if (line[i + 1] === '"') {
-          token += '"'; // `""` is an embedded quote
-          i += 2;
-          continue;
-        }
-        i++; // closing quote
-        break;
-      }
-      token += "\\".repeat(slashes);
-      if (i < n) token += line[i++];
-    }
-    tokens.push(token);
-  }
-  return tokens;
-}
 
 /**
  * The vendor binary and argv behind one spawn, or undefined when the spawn is
@@ -215,6 +168,7 @@ export function createScriptedClaudeCli(actualSpawn: typeof nodeSpawn): Scripted
         return (actualSpawn as (c: string, a: string[], o: unknown) => unknown)(command, args, opts);
       }
       if (vendor.args.length === 1 && vendor.args[0] === "--version") return emptyChild();
+      if (vendor.args.includes("app-server")) return configReadChild(vendor.args);
       return cliChild(vendor.args);
     },
   };

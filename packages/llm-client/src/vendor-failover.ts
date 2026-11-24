@@ -14,7 +14,7 @@
  *
  * Chain lengths:
  * - Claude-origin: sonnet (attempt 0) → haiku (1) → codex-standard (2) → codex-light (3) → exhausted (4+)
- * - Codex-origin: gpt-5.6-terra (attempt 0) → gpt-5.6-luna (1) → sonnet (2) → haiku (3) → exhausted (4+)
+ * - Codex-origin: gpt-6.1-sol (attempt 0) → gpt-6-luna (1) → sonnet (2) → haiku (3) → exhausted (4+)
  * - Google-origin: flash (attempt 0) → google-light/flash (1) → claude-standard (2) → claude-light (3) → exhausted (4+)
  *
  * The chain terminates after 3 failover attempts (attempts 1-3), with attempt 4+ reporting exhaustion.
@@ -33,7 +33,7 @@ type FailoverStep = readonly [vendor: LLMVendor, weight: TaskWeight];
 const FAILOVER_CHAINS: ReadonlyMap<LLMVendor, readonly FailoverStep[]> = new Map([
   // haiku (light) → codex standard → codex light
   [LLM_VENDOR.CLAUDE, [[LLM_VENDOR.CLAUDE, "light"], [LLM_VENDOR.CODEX, "standard"], [LLM_VENDOR.CODEX, "light"]]],
-  // codex light (gpt-5.6-luna) → claude standard (sonnet) → claude light (haiku)
+  // codex light (gpt-6-luna) → claude standard (sonnet) → claude light (haiku)
   [LLM_VENDOR.CODEX, [[LLM_VENDOR.CODEX, "light"], [LLM_VENDOR.CLAUDE, "standard"], [LLM_VENDOR.CLAUDE, "light"]]],
   // google light (gemini-3.5-flash-lite) → claude standard (sonnet) → claude light (haiku)
   [LLM_VENDOR.GOOGLE, [[LLM_VENDOR.GOOGLE, "light"], [LLM_VENDOR.CLAUDE, "standard"], [LLM_VENDOR.CLAUDE, "light"]]],
@@ -54,12 +54,12 @@ export interface FailoverAttemptResult {
  *
  * Failover chain for Claude-origin:
  * - Attempt 1: claude (light/haiku)
- * - Attempt 2: codex (standard/gpt-5.5)
- * - Attempt 3: codex (light/gpt-5.6-luna)
+ * - Attempt 2: codex (standard/gpt-6.1-sol)
+ * - Attempt 3: codex (light/gpt-6-luna)
  * - Attempt 4+: exhausted
  *
  * Failover chain for Codex-origin:
- * - Attempt 1: codex (light/gpt-5.6-luna)
+ * - Attempt 1: codex (light/gpt-6-luna)
  * - Attempt 2: claude (standard/sonnet)
  * - Attempt 3: claude (light/haiku)
  * - Attempt 4+: exhausted
@@ -90,10 +90,12 @@ export function getNextFailoverAttempt(
     return { isExhausted: true };
   }
 
+
   const [vendor, weight] = step;
   return {
     isExhausted: false,
     vendor,
     model: resolveVendorModel(vendor, llmConfig, weight),
   };
+
 }

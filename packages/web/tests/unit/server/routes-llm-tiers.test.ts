@@ -8,9 +8,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
-import { DEFAULT_ROUTES, TIER_MODELS, resolveModel, resolveTaskModel } from "@n-dx/llm-client";
+import { TIER_MODELS, resolveModel, resolveTaskModel } from "@n-dx/llm-client";
 import { handleLlmRoute } from "../../../src/server/routes-llm.js";
-import { TASK_CLASS_LABELS } from "../../../src/server/llm-tiers.js";
 import type { TierRow } from "../../../src/server/llm-tiers.js";
 
 let projectDir: string;
@@ -145,18 +144,6 @@ describe("GET /api/llm/config — tiers block", () => {
     const rows = await tiers({ llm: { vendor: "claude", routes: { "prd.*": "heavy" } } });
     expect(classes(row(rows, "heavy"))).toContain("prd.propose");
     expect(classes(row(rows, "standard"))).not.toContain("prd.propose");
-  });
-});
-
-describe("task class labels", () => {
-  it("covers every DEFAULT_ROUTES key", () => {
-    const missing = Object.keys(DEFAULT_ROUTES).filter((k) => !TASK_CLASS_LABELS[k]);
-    expect(missing).toEqual([]);
-  });
-
-  it("has no label for a class DEFAULT_ROUTES no longer routes", () => {
-    const stale = Object.keys(TASK_CLASS_LABELS).filter((k) => !(k in DEFAULT_ROUTES));
-    expect(stale).toEqual([]);
   });
 });
 

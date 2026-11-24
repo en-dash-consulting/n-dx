@@ -328,6 +328,8 @@ describe("hench → llm-client gateway contract", () => {
   });
 
   const GATEWAY_FUNCTIONS = [
+    "createOpenAiApiProvider", "supportsOpenAiTurns",
+    "createCodexScratch", "assertCodexScratchEnvironment",
     "loadClaudeConfig",
     "loadLLMConfig",
     "compileEnvPolicy",
@@ -411,6 +413,7 @@ describe("hench → llm-client gateway contract", () => {
     "getAvailableMemory",
     "createAvailableMemoryReader",
     "resolveClaudeCliEffort",
+    "resolveCodexCliEffort",
     "vendorSessionDriver",
     "normalizeCodexResponse",
     "parseMaybeJson",
@@ -547,6 +550,7 @@ describe("web → rex gateway contract", () => {
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
     "estimateCostFromTotals",
+    "extractRexTokenEvents",
     "parseFolderTree",
     "resolveSiblingSlugs",
     "resolveStore",
@@ -672,7 +676,7 @@ describe("web → sourcevision gateway contract", () => {
  * The dashboard's per-vendor model/provider catalog (`GET /api/llm/catalog`
  * in `packages/web/src/server/routes-llm.ts`) and its hench-config save path
  * must offer exactly the providers hench itself accepts — claude cli or api,
- * codex cli only, google api, local api (`cmdRun`'s provider gates in
+ * codex cli/api, google api, local api (`cmdRun`'s provider gates in
  * `packages/hench/src/cli/commands/run.ts`, driven by `VENDOR_PROVIDERS` in
  * `packages/hench/src/cli/commands/provider-support.ts`).
  *
@@ -696,11 +700,11 @@ describe("hench ↔ web provider-support contract", () => {
     expect(webFields.VENDOR_PROVIDERS).toEqual(henchPublic.VENDOR_PROVIDERS);
   });
 
-  it("pins the exact rule set: claude cli/api, codex cli only, google api, local api", async () => {
+  it("pins the exact rule set: claude cli/api, codex cli/api, google api, local api", async () => {
     const henchPublic = await import("../../packages/hench/dist/public.js");
     expect(henchPublic.VENDOR_PROVIDERS).toEqual({
       claude: ["cli", "api"],
-      codex: ["cli"],
+      codex: ["cli", "api"],
       google: ["api"],
       local: ["api"],
     });
@@ -967,6 +971,8 @@ describe("gateway export auto-detection", () => {
         // The CLI loop's counterpart: `--effort` on a spawned Claude Code run
         // follows the same llm.effort rule as the API turn loop.
         "resolveClaudeCliEffort",
+        // Codex validates the rule against the selected client's catalog.
+        "resolveCodexCliEffort",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage", "createPromptEnvelope", "assemblePrompt", "assemblePromptText",
         // Prompt section measurement. Lives in llm-client rather than hench so
@@ -976,9 +982,10 @@ describe("gateway export auto-detection", () => {
         "dominantPromptSections", "formatPromptSectionCosts",
         "mapErrorReasonToFailureCategory", "mapRunFailureToCategory", "classifyVendorError",
         "failureCategoryLabel", "compileCodexPolicyFlags", "mapSandboxToCodexFlag",
+        "createCodexScratch", "assertCodexScratchEnvironment",
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
-        "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
+        "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry", "createOpenAiApiProvider", "supportsOpenAiTurns",
         "classifyLLMError", "isAuthError", "parseLmStudioError", "resolveLocalTimeoutMs", "fetchLocalCompletion",
         "getNextFailoverAttempt", "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli", "terminateProcessTree",
         "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor",
@@ -1059,7 +1066,7 @@ describe("gateway export auto-detection", () => {
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",
-        "estimateCostFromTotals", "validateRunSettings",
+        "estimateCostFromTotals", "extractRexTokenEvents", "validateRunSettings",
         // rex-owned project settings the Workflow page edits, validated with
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.

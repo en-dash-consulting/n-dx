@@ -118,6 +118,41 @@ describe("POST /api/llm/config/preview", () => {
     expect(await hashConfigs()).toBe(before);
   });
 
+  describe.each(["api", "cli"])("Codex %s preview", (provider) => {
+    it.each([false, true])("keeps applicability separate from autoFailover=%s without saving", async (enabled) => {
+      await writeConfigs({ llm: { vendor: "codex", codex: { model: "gpt-6-astra", auth: "api" } } });
+      const before = await hashConfigs();
+
+      const res = await preview({ provider, changes: { "llm.autoFailover": enabled } });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.effective).toMatchObject({ vendor: "codex", provider, model: "gpt-6-astra" });
+      expect(body.effectiveProblems).toEqual([]);
+      expect(body.editProblems).toEqual([]);
+      expect(body.failover).toMatchObject({ enabled, applies: provider === "api" });
+      expect(body.failover.chain[0]).toBe("gpt-6-astra");
+      if (provider === "api") expect(body.failover.reason).toBeUndefined();
+      else expect(body.failover.reason).toContain("Codex CLI");
+      expect(await hashConfigs()).toBe(before);
+    });
+  });
+
+  it("reports an unsupported effective Codex API override without replacing the explicit model", async () => {
+    await writeConfigs(
+      { llm: { vendor: "codex", codex: { model: "gpt-6-astra", auth: "api" } } },
+      { provider: "cli", models: { codex: "gpt-6.2-astra" } },
+    );
+    const before = await hashConfigs();
+
+    const body = await (await preview({ provider: "api", changes: { "llm.autoFailover": true } })).json();
+    expect(body.effective).toMatchObject({ provider: "api", model: "gpt-6.2-astra", modelSource: "hench-override" });
+    expect(body.effectiveProblems).toEqual([{ field: "model", message: expect.stringContaining("no verified agent-turn support") }]);
+    expect(body.failover).toMatchObject({ enabled: true, applies: false });
+    expect(body.failover.reason).toContain(body.effectiveProblems[0].message);
+    expect(body.failover.chain[0]).toBe("gpt-6.2-astra");
+    expect(await hashConfigs()).toBe(before);
+  });
+
   it("reports refused edits as problems and resolves the rest", async () => {
     await writeConfigs({ llm: { vendor: "claude" } });
     const before = await hashConfigs();
@@ -132,10 +167,22 @@ describe("POST /api/llm/config/preview", () => {
       editProblems: Array<{ path: string; message: string }>;
     };
 
-    expect(body.editProblems.map((p) => p.path).sort()).toEqual(["llm.codex.model", "llm.nope", "provider"]);
+    expect(body.editProblems.map((p) => p.path).sort()).toEqual(["llm.codex.model", "llm.nope"]);
     // The accepted edit still applies; the refused ones are absent.
     expect(body.effective.vendor).toBe("codex");
-    expect(body.effective.provider).toBe("cli");
+    expect(body.effective.provider).toBe("api");
+    expect(await hashConfigs()).toBe(before);
+  });
+
+  it("reports an unsupported provider edit against the newly selected vendor", async () => {
+    await writeConfigs({ llm: { vendor: "claude" } }, { provider: "api" });
+    const before = await hashConfigs();
+
+    const res = await preview({ changes: { "llm.vendor": "google" }, provider: "cli" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.editProblems).toEqual([{ path: "provider", message: expect.stringContaining("google") }]);
+    expect(body.effective).toMatchObject({ vendor: "google", provider: "api" });
     expect(await hashConfigs()).toBe(before);
   });
 

@@ -32,10 +32,10 @@
 /** @type {Record<string, ModelEntry[]>} */
 export const LLM_MODEL_CATALOG = {
   codex: [
-    { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", recommended: true },
-    { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", recommended: false },
-    { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", recommended: false },
-    { id: "gpt-5.5", label: "GPT-5.5", recommended: false },
+    { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", recommended: true },
+    { id: "gpt-6-astra", label: "GPT-6 Astra", recommended: false },
+    { id: "gpt-6-luna", label: "GPT-6 Luna", recommended: false },
+    { id: "gpt-5.5", label: "GPT-5.5 (API key only; retired from ChatGPT sign-in)", recommended: false },
   ],
   claude: [
     { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", recommended: true },

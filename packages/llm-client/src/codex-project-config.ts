@@ -48,6 +48,7 @@ const SCALAR_CHAR = /[A-Za-z0-9_+\-.:]/;
 /** What a value contributes to server names: an inline table's key paths, nested tables flattened. */
 interface ScannedValue {
   tableKeys?: string[][];
+  entries?: Array<{ path: string[]; raw: string }>;
 }
 
 /** The keys that give a Codex MCP server its transport: stdio (`command`) or Streamable HTTP (`url`). */
@@ -67,7 +68,11 @@ function isTransportKey(key: string | undefined): key is CodexMcpTransportKey {
 class Scanner {
   private i = 0;
 
-  constructor(private readonly s: string) {
+  constructor(
+    private readonly s: string,
+    private readonly assignment?: (path: string[], raw: string) => void,
+    private readonly declareTable?: (path: string[], array: boolean) => void,
+  ) {
     if (s.startsWith("﻿")) this.i = 1;
   }
 
@@ -91,6 +96,7 @@ class Scanner {
         this.i += arrayTable ? 2 : 1;
         this.skipInline();
         table = this.key();
+        this.declareTable?.(table, arrayTable);
         this.expect(arrayTable ? "]]" : "]");
         this.endOfLine();
         if (table[0] === "mcp_servers") {
@@ -102,7 +108,10 @@ class Scanner {
       const path = [...table, ...this.key()];
       this.expect("=");
       this.skipInline();
+      const start = this.i;
       const value = this.value();
+      this.assignment?.(path, this.s.slice(start, this.i));
+      value.entries?.forEach(entry => this.assignment?.([...path, ...entry.path], entry.raw));
       this.endOfLine();
       if (path[0] !== "mcp_servers") continue;
       if (path.length === 1 && !value.tableKeys) this.fail("mcp_servers is assigned something other than a table");
@@ -142,7 +151,10 @@ class Scanner {
     else if (ch === "\"") this.basicString();
     else if (ch === "'") this.literalString();
     else if (ch === "[") this.array();
-    else if (ch === "{") return { tableKeys: this.inlineTable() };
+    else if (ch === "{") {
+      const entries = this.inlineTable();
+      return { tableKeys: entries.map(entry => entry.path), entries };
+    }
     else this.scalar();
     return {};
   }
@@ -168,17 +180,19 @@ class Scanner {
    * The inline table's key paths: each entry's key, then each key path of a
    * nested inline table under it. Newlines inside are accepted (TOML 1.1).
    */
-  private inlineTable(): string[][] {
+  private inlineTable(): Array<{ path: string[]; raw: string }> {
     this.i++;
-    const keys: string[][] = [];
+    const keys: Array<{ path: string[]; raw: string }> = [];
     for (;;) {
       this.skipBlank();
       if (this.peek() === "}") break;
       const key = this.key();
-      keys.push(key);
       this.expect("=");
       this.skipInline();
-      this.value().tableKeys?.forEach((sub) => keys.push([...key, ...sub]));
+      const start = this.i;
+      const value = this.value();
+      keys.push({ path: key, raw: this.s.slice(start, this.i) });
+      value.entries?.forEach(entry => keys.push({ path: [...key, ...entry.path], raw: entry.raw }));
       this.skipBlank();
       if (this.peek() === ",") {
         this.i++;
@@ -292,6 +306,40 @@ class Scanner {
     const line = this.s.slice(0, this.i).split("\n").length;
     throw new TomlSubsetError(`line ${line}: ${message}`);
   }
+}
+
+/** Non-array assignments keyed by JSON path. Parent tables are represented by "{}"
+ * when they have no assigned literal. Unrelated arrays of tables have no single value.
+ * Callers validate selected values and must not surface parser errors containing input.
+ */
+export function codexConfigAssignments(text: string): Map<string, string> {
+  const values = new Map<string, string>();
+  const arrayRoots = new Set<string>();
+  const inArray = (path: string[]) => path.some((_, i) => arrayRoots.has(JSON.stringify(path.slice(0, i + 1))));
+  const noteParents = (path: string[]) => {
+    for (let length = 1; length <= path.length; length++) {
+      const key = JSON.stringify(path.slice(0, length));
+      const existing = values.get(key);
+      if (existing === undefined) values.set(key, "{}");
+      else if (!existing.startsWith("{")) throw new Error("Conflicting Codex config assignment");
+    }
+  };
+  new Scanner(text, (path, raw) => {
+    if (inArray(path)) return;
+    noteParents(path.slice(0, -1));
+    const key = JSON.stringify(path);
+    if (values.has(key)) throw new Error("Duplicate Codex config assignment");
+    values.set(key, raw);
+  }, (path, array) => {
+    if (array) {
+      if (["profile", "profiles", "model", "model_provider", "model_providers"].includes(path[0])) {
+        throw new Error("Array tables are unsupported for selected provider configuration");
+      }
+      arrayRoots.add(JSON.stringify(path));
+    }
+    if (!inArray(path)) noteParents(path);
+  }).servers();
+  return values;
 }
 
 /**

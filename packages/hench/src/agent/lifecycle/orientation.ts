@@ -54,6 +54,8 @@ export interface OrientationSpawnResult {
 }
 
 export interface EnsureWarmParentOptions {
+  identityHash?: string;
+  codexOrientationFlags?: readonly string[];
   adapter: VendorAdapter;
   vendor: string;
   cliBinary: string;
@@ -185,6 +187,7 @@ export function buildOrientationPrompt(primer?: string): string {
 
 /** Human-readable explanation for each rejection, used in the console line. */
 const REJECTION_DETAIL: Record<ParentRejection, string> = {
+  "identity-changed": "checkout, policy or execution identity changed",
   "no-entry": "no cached session",
   "fresh-requested": "--fresh requested",
   "sourcevision-changed": "analysis changed since it was built",
@@ -229,6 +232,7 @@ export async function ensureWarmParent(
   const svFingerprint = await sourcevisionFingerprint(opts.projectDir);
   const cached = await readSessionCache(opts.henchDir);
   const verdict = isParentUsable(cached, {
+    identityHash: opts.identityHash,
     svFingerprint,
     vendor: opts.vendor,
     model: opts.model,
@@ -265,8 +269,11 @@ export async function ensureWarmParent(
     { name: "brief" as PromptSectionName, content: buildOrientationPrompt(primer) } as PromptSection,
   ]);
 
-  const spawnConfig = opts.adapter.buildSpawnConfig(envelope, opts.policy, {
+  const spawnConfig = opts.adapter.buildSpawnConfig(envelope, opts.vendor === "codex"
+    ? { ...opts.policy, sandbox: "read-only", approvals: "never", writableRoots: [] }
+    : opts.policy, {
     model: opts.model || undefined,
+    codexOrientationFlags: opts.codexOrientationFlags,
     // Plan mode cannot edit. Orientation is the one spawn where that is
     // exactly right — and it is a third guard behind the two prompts.
     permissionMode: "plan",
@@ -290,6 +297,7 @@ export async function ensureWarmParent(
   }
 
   await writeSessionCache(opts.henchDir, {
+    identityHash: opts.identityHash,
     parentId: result.sessionId,
     svFingerprint,
     vendor: opts.vendor,

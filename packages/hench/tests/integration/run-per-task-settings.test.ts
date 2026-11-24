@@ -260,10 +260,7 @@ describe("each task in a loop runs with its own saved settings", () => {
     expect(warnings.join("\n")).toContain("gpt-5.6-terra");
   });
 
-  it("keeps the loop alive when a task saved a provider this vendor has no loop for", async () => {
-    // The whole point of a saved block being vendor-agnostic is that a task
-    // saved under one vendor runs under another. Refusing would strand every
-    // remaining task in the run over one task's saved value.
+  it("honors a saved Codex API provider without changing the next task's CLI provider", async () => {
     const warnings: string[] = [];
     vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
       warnings.push(args.map(String).join(" "));
@@ -273,10 +270,21 @@ describe("each task in a loop runs with its own saved settings", () => {
     await cmdRun(projectDir, { auto: "true", iterations: "2" });
 
     expect(calls.map((c) => [c.taskId, c.loop])).toEqual([
-      ["t-one", "cli"],
+      ["t-one", "api"],
       ["t-two", "cli"],
     ]);
-    expect(warnings.join(String.fromCharCode(10))).toContain("First");
+    expect(warnings.join("\n")).not.toContain('saved on "First"');
+  });
+
+  it("keeps the loop alive when a Google task saves the unavailable CLI provider", async () => {
+    await setup(doc({ provider: "cli" }, null), { vendor: "google" });
+
+    await cmdRun(projectDir, { auto: "true", iterations: "2" });
+
+    expect(calls.map((c) => [c.taskId, c.loop])).toEqual([
+      ["t-one", "api"],
+      ["t-two", "api"],
+    ]);
   });
 
   it("lets --no-review suppress the review every task in the loop saved", async () => {

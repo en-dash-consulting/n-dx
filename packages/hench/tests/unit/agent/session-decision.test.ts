@@ -70,7 +70,15 @@ describe("session decision", () => {
       ).toContain("cold spawns are configured");
       expect(
         formatSessionDecision({ strategy: "cold", outcome: "miss", reason: "fork-unsupported" }),
-      ).toContain("cannot resume a session by id");
+      ).toContain("this CLI or provider cannot fork an orientation session");
+    });
+
+    it.each([
+      ["identity-unavailable", "the Codex account or execution identity could not be verified"],
+      ["identity-changed", "the checkout, policy or execution identity changed"],
+    ])("explains %s", (reason, prose) => {
+      expect(formatSessionDecision(decision({ outcome: "miss", reason })))
+        .toBe(`Session: fork miss — ${prose}`);
     });
   });
 

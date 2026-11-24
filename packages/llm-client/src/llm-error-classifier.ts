@@ -271,6 +271,20 @@ function findDebugSentinel(message: string): { path: string; start: number; end:
   return null;
 }
 
+/** Preserve same-line word order without backtracking over provider-controlled text. */
+function hasChatGptModelRejection(message: string): boolean {
+  for (const line of message.toLowerCase().split("\n")) {
+    const model = line.indexOf("model");
+    const chatGpt = line.lastIndexOf("chatgpt");
+    if (model === -1 || chatGpt < model + "model".length) continue;
+    // The first model and last ChatGPT span every possible ordered match.
+    // Each fixed substring search scans this line only once.
+    const reason = line.slice(model + "model".length, chatGpt);
+    if (reason.includes("not supported") || reason.includes("unavailable") || reason.includes("not available")) return true;
+  }
+  return false;
+}
+
 /**
  * Classify an LLM error and return a user-friendly message, suggestion, and category.
  *
@@ -316,6 +330,20 @@ export function classifyLLMError(
   // Error messages may embed user text as: "…unexpected response for input: <user text>".
   const forInputIdx = cleanedMessage.search(/\bfor input:/i);
   const authCheckMessage = forInputIdx !== -1 ? cleanedMessage.slice(0, forInputIdx) : cleanedMessage;
+
+  // Use the provider's authentication-specific rejection, never a static
+  // retirement list or an inference from the presence/absence of an API key.
+  if (vendor === LLM_VENDOR.CODEX && hasChatGptModelRejection(authCheckMessage)) {
+    return {
+      message: `The pinned Codex model is unavailable with ChatGPT authentication.${suffix}`,
+      suggestion: "Keep the pin and explicitly choose API-key authentication if your API project supports it " +
+        "(n-dx config llm.codex.auth api), or choose an available model and explicitly update the originating " +
+        "model pin (llm, tier, hench, task run.models.codex or reviewModels.codex). " +
+        "No model or authentication setting was changed automatically.",
+      category: "unknown",
+      code: CLI_ERROR_CODES.INVALID_CONFIGURATION,
+    };
+  }
 
   // ── Authentication (401, invalid key, expired token, lost session) ──
   if (isAuthError(authCheckMessage)) {

@@ -17,10 +17,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   loadLLMConfig,
   resolveTaskModel,
+  resolveReviewModel,
   resolveVendorModel,
   TIER_MODELS,
   resolveModel,
@@ -56,6 +57,18 @@ afterEach(async () => {
 });
 
 describe("routing config reaches resolveTaskModel", () => {
+  it("warns that review routes have no effect but accepts review effort", async () => {
+    const route = spawnSync(process.execPath, [CLI_PATH, "config", "llm.routes.agent.review", "light", projectDir], { encoding: "utf8", timeout: 60_000 });
+    expect(route.status).toBe(0);
+    expect(route.stderr).toContain("effort-only");
+    expect(route.stderr).toContain("reviewModel");
+    const effortOutput = config("llm.effort.agent.review", "high");
+    expect(effortOutput).not.toContain("not a task class");
+    const loaded = await loadLLMConfig(projectDir);
+    expect(resolveReviewModel("claude", loaded)).toBe(resolveReviewModel("claude"));
+    expect(resolveTaskModel("agent.review", loaded).effort).toBe("high");
+  });
+
   it("a route set via the CLI changes the resolved tier and model", async () => {
     // Baseline: the agent loop is standard by registry default.
     let llmConfig = await loadLLMConfig(projectDir);

@@ -53,6 +53,10 @@ import type { PermissionMode } from "../../schema/index.js";
  *   is portable and doesn't depend on Node.js typings.
  */
 export interface SpawnConfig {
+  /** Bind a private scratch directory at spawn time. The caller owns cleanup. */
+  readonly withScratchDir?: (dir: string) => SpawnConfig;
+  /** Codex cumulative usage boundary, including inherited fork history. */
+  readonly usageResumeSessionId?: string;
   /** Path to the vendor CLI binary (e.g. "claude", "codex", or absolute path). */
   readonly binary: string;
 
@@ -98,8 +102,8 @@ export interface VendorSpawnOptions {
   /**
    * Effort level for the spawned session, already validated for this model.
    *
-   * Currently only honored by the Claude CLI adapter, which forwards it as
-   * `--effort <level>`. Other adapters silently ignore it. Undefined means no
+   * Claude forwards this as `--effort`; Codex as `model_reasoning_effort`,
+   * after the caller validates the selected client catalog. Undefined means no
    * `llm.effort` rule matched, and the vendor picks its own default.
    */
   readonly effort?: string;
@@ -123,11 +127,12 @@ export interface VendorSpawnOptions {
    * Set by the warm-parent session strategy, where one orientation session
    * is forked per task: every fork inherits the same byte-identical prefix,
    * which is both the cache-read win and the reason no task re-explores the
-   * repo. Only honored by the Claude CLI adapter (`--fork-session`), and
-   * only alongside {@link resumeSessionId}; other adapters ignore it and the
-   * strategy falls back to cold spawns for them.
+   * repo. Claude uses `--fork-session`; capability-gated Codex uses `exec fork`.
+   * Both require {@link resumeSessionId}. Unsupported binaries use cold spawns.
    */
   readonly forkSession?: boolean;
+  readonly codexForkSupported?: boolean;
+  readonly codexOrientationFlags?: readonly string[];
   /**
    * Path to a file that becomes the spawned session's only source of MCP
    * servers, naming this run's project directory absolutely.
@@ -301,6 +306,12 @@ export interface VendorAdapter {
    *
    * @param toolCall - The tool name and input from one `tool_use` event
    */
+  /** Per-spawn structured stream state; inspected only after a successful exit. */
+  createUnfinishedSessionTracker?(): {
+    observe(rawJson: unknown): void;
+    signal(): BackgroundWaitSignal | undefined;
+  };
+
   detectBackgroundWait?(toolCall: {
     tool: string;
     input: Readonly<Record<string, unknown>> | undefined;

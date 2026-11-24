@@ -162,7 +162,7 @@ export type { ItemTokenTotals, ItemTokenTuple, ItemRunTokens } from "@n-dx/rex";
 // shape does not model) but prices it through rex's arithmetic so both
 // surfaces quote the same figure. tests/unit/token-pricing-parity.test.js
 // pins that routes-token-usage.ts holds no local copy of the pricing loop.
-export { estimateCostFromTotals } from "@n-dx/rex";
+export { extractRexTokenEvents, estimateCostFromTotals } from "@n-dx/rex";
 export type { CostEstimate, ModelCostLine } from "@n-dx/rex";
 
 // ---- Rex per-item duration rollup -------------------------------------------

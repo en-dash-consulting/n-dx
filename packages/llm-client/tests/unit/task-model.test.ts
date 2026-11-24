@@ -317,3 +317,22 @@ describe("routesToTier", () => {
     expect(routesToTier("prd.migrate.judge", { routes: { "code.*": "light" } })).toBe(false);
   });
 });
+
+
+describe("Codex unpinned upgrade routes", () => {
+  it.each([
+    ["git.commit-message", "light", "gpt-6-luna"],
+    ["agent.execute", "standard", "gpt-6.1-sol"],
+    ["unknown.class", "standard", "gpt-6.1-sol"],
+  ])("routes %s without inventing task complexity", (taskClass, tier, model) => {
+    expect(resolveTaskModel(taskClass, { vendor: "codex" })).toMatchObject({ tier, model, effort: undefined });
+  });
+
+  it.each(["light", "standard", "heavy"] as const)("honors configured %s routes and literal tier pins", (tier) => {
+    const config: LLMConfig = { vendor: "codex", routes: { "agent.execute": tier } };
+    expect(resolveTaskModel("agent.execute", config).model).toBe(TIER_MODELS.codex[tier]);
+    config.tiers = { codex: { [tier]: "gpt-5.5" } };
+    expect(resolveTaskModel("agent.execute", config)).toMatchObject({ model: "gpt-5.5", source: `llm.tiers.codex.${tier}` });
+    expect(resolveTaskModel("agent.execute", config, { model: "gpt-5.4" }).model).toBe("gpt-5.4");
+  });
+});

@@ -21,6 +21,7 @@ import { handedOffSessionParam, latestContextTokens, type SidecarFrame, type Sid
 
 interface Hub {
   lensAvailable: boolean;
+  codexAvailable?: boolean;
   ceiling: number;
   /** GET /hub/session/snapshot's Δ count; null answers as with no open session. */
   changed: number | null;
@@ -59,6 +60,7 @@ function stubHub(): void {
       return json({
         lens: { id: "hub", available: hub.lensAvailable, ...(!hub.lensAvailable && { needs: "web.sidecar turned on in the project hosting the hub session" }) },
         ceiling: hub.ceiling,
+        vendors: [{ vendor: "claude", available: true }, { vendor: "codex", available: !!hub.codexAvailable, ...(!hub.codexAvailable && { reason: "Audited macOS CLI required" }) }],
       });
     }
     if (url === "/hub/session/snapshot") {
@@ -69,8 +71,13 @@ function stubHub(): void {
     if (url === "/hub/session/sessions" && method === "GET") return json({ sessions: hub.sessions });
     if (url === "/hub/session/sessions" && method === "POST") {
       const created = hubSession();
+      created.session.vendor = body.vendor;
       hub.sessions.push(created);
       return json(created, 201);
+    }
+    if (url === "/hub/session/sessions/h1/end" && method === "POST") {
+      hub.sessions[0].session.endedAt = "2026-11-18T12:00:00.000Z";
+      return json(hub.sessions[0]);
     }
     const m = /^\/hub\/session\/sessions\/([\w-]+)\/(frames|cards|turns)(?:\?after=(\d+))?$/.exec(url);
     if (m) {
@@ -117,7 +124,7 @@ async function mount({ served = true } = {}): Promise<void> {
   await settle();
 }
 
-const chips = () => [...root.querySelectorAll(".hub-session-chips .sidecar-chip")];
+const chips = () => [...root.querySelectorAll(".hub-session-chips > span.sidecar-chip")];
 
 beforeEach(() => {
   hub = { lensAvailable: true, ceiling: 40_000, changed: 3, sessions: [], frames: [], requests: [] };
@@ -135,6 +142,41 @@ afterEach(async () => {
 });
 
 describe("the hub session drawer", () => {
+  it("offers Codex only after the host's POST admission probe and creates it on the hub lens", async () => {
+    hub.codexAvailable = true;
+    await mount();
+    expect(hub.requests).toContainEqual({ method: "POST", url: "/hub/session/lens", body: undefined });
+    const picker = root.querySelector<HTMLSelectElement>("[aria-label='Hub session vendor']")!;
+    expect(picker.querySelector<HTMLOptionElement>("option[value=codex]")!.disabled).toBe(false);
+    await act(async () => { picker.value = "codex"; picker.dispatchEvent(new Event("change", { bubbles: true })); });
+    const input = root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+    await act(async () => { input.value = "summarize"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { root.querySelector<HTMLFormElement>(".sidecar-composer")!.requestSubmit(); });
+    await settle();
+    expect(hub.requests.find((r) => r.method === "POST" && r.url === "/hub/session/sessions")?.body).toEqual({ vendor: "codex", lens: "hub" });
+    expect(picker.disabled).toBe(true);
+  });
+
+  it("disables an unaudited Codex host and explains why", async () => {
+    await mount();
+    expect(root.querySelector<HTMLOptionElement>("option[value=codex]")!.disabled).toBe(true);
+    expect(root.textContent).toContain("Audited macOS CLI required");
+  });
+
+  it("lets an existing Claude hub conversation end before selecting Codex", async () => {
+    hub.codexAvailable = true;
+    hub.sessions = [hubSession()];
+    await mount();
+    const picker = root.querySelector<HTMLSelectElement>("[aria-label='Hub session vendor']")!;
+    expect(picker.disabled).toBe(true);
+    const end = [...root.querySelectorAll("button")].find((button) => button.textContent === "End session")!;
+    await act(async () => { end.click(); });
+    await settle();
+    expect(picker.disabled).toBe(false);
+    await act(async () => { picker.value = "codex"; picker.dispatchEvent(new Event("change", { bubbles: true })); });
+    await settle();
+    expect(hub.requests.find((r) => r.method === "POST" && r.url === "/hub/session/sessions")?.body).toEqual({ vendor: "codex", lens: "hub" });
+  });
   it("heads itself Hub session with the purple hub scope chip, the snapshot's Δ and the Hub lens", async () => {
     hub.sessions = [hubSession()];
     await mount();
@@ -146,7 +188,7 @@ describe("the hub session drawer", () => {
     expect(snapshot.textContent).toBe("snapshot · 3 Δ since your last turn");
     expect(lens.classList.contains("sidecar-chip-lens")).toBe(true);
     expect(lens.textContent).toBe("Hub");
-    // There is nothing to pick: Claude on the hub lens, for good.
+    expect(root.querySelector<HTMLSelectElement>("[aria-label='Hub session vendor']")?.disabled).toBe(true);
     expect(root.querySelector(".sidecar-vendor, .sidecar-model, .sidecar-lens-menu, .sidecar-sessions-toggle")).toBeNull();
   });
 

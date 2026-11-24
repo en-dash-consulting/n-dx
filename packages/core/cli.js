@@ -1408,10 +1408,13 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
   const { providerFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag } = vendorFlags;
 
   const existingVendor = readLLMVendor(dir);
-  const existingModel = readLLMModel(dir, effectiveProvider || existingVendor);
+  const existingModel = readLLMModel(dir, existingVendor);
+  const existingModels = Object.fromEntries(
+    ["claude", "codex", "google", "local"].map((vendor) => [vendor, readLLMModel(dir, vendor)]),
+  );
   const resolution = resolveInitLLMSelection({
     flags: { provider: effectiveProvider, model: effectiveModel },
-    existingConfig: { vendor: existingVendor, model: existingModel },
+    existingConfig: { vendor: existingVendor, model: existingModel, models: existingModels },
     isTTY: process.stdin.isTTY === true && !noLlm,
   });
 
@@ -1420,6 +1423,7 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
   // Read local server host/port so the live model fetch uses the right address.
   const localConfig = readLocalConfig(dir);
   const selection = await promptLLMSelection(resolution, {
+    existingModels,
     localHost: localConfig.host,
     localPort: localConfig.port,
   });
@@ -1503,6 +1507,7 @@ async function runSubInitPhase(name, work, detail, quiet) {
  */
 async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerSource, noLlm = false }) {
   if (!llmSkipped && selectedProvider) {
+    const existingModel = readLLMModel(dir, selectedProvider);
     const origLog = console.log;
     console.log = () => {};
     try {
@@ -1513,7 +1518,9 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
       if (providerSource !== "config") {
         await runConfig(["llm.vendor", selectedProvider, dir, noLlm ? "--no-preflight" : "--soft-preflight"]);
       }
-      if (selectedModel) {
+      // Confirmation needs no write. In particular, do not restore an invalid
+      // namespace pin that the vendor write just cleared with a diagnostic.
+      if (selectedModel && selectedModel !== existingModel) {
         await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
       }
       // Persist vendor-specific models independently.
@@ -1822,6 +1829,9 @@ async function handleInit(rest) {
     providerSource: providerSourceKey,  // raw key ("flag"|"config"|"prompt"), not display label
     noLlm,
   });
+
+  // Reflect any invalid namespace pin cleared by the config writer.
+  if (!llmSkipped && selectedProvider) selection.model = readLLMModel(dir, selectedProvider);
 
   recordInitIdentity(dir);
 

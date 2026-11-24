@@ -233,7 +233,7 @@ export {
 export type { VendorModelResetResult, FailoverAttemptResult } from "@n-dx/llm-client";
 
 // ---- Claude API effort ------------------------------------------------------
-export { resolveClaudeApiEffort, resolveClaudeCliEffort } from "@n-dx/llm-client";
+export { resolveCodexCliEffort, resolveClaudeApiEffort, resolveClaudeCliEffort } from "@n-dx/llm-client";
 export type { ClaudeEffort } from "@n-dx/llm-client";
 
 // ---- Usage formatting -------------------------------------------------------
@@ -290,6 +290,8 @@ export type { PromptSectionCost } from "@n-dx/llm-client";
 // ---- Codex policy compilation -----------------------------------------------
 export {
   compileCodexPolicyFlags,
+  createCodexScratch,
+  assertCodexScratchEnvironment,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
 } from "@n-dx/llm-client";
@@ -311,6 +313,8 @@ export { parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion } from 
 export {
   ProviderRegistry,
   defaultRegistry,
+  createOpenAiApiProvider,
+  supportsOpenAiTurns,
 } from "@n-dx/llm-client";
 
 // ---- Type re-exports --------------------------------------------------------

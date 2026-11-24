@@ -846,17 +846,17 @@ describe("vendor adapter contract: Codex policy flag snapshots", () => {
 
   it("standard policy compiles to deterministic Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);
-    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", ...SHELL_ENV]);
+    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never", "--strict-config", "-c", 'sandbox_workspace_write={network_access=false,writable_roots=[],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}', ...SHELL_ENV]);
   });
 
   it("read-only policy compiles to deterministic Codex flags", () => {
     const flags = compileCodexPolicyFlags(READONLY_POLICY);
-    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", ...SHELL_ENV]);
+    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request", "--strict-config", ...SHELL_ENV]);
   });
 
   it("full-access policy compiles to deterministic Codex flags", () => {
     const flags = compileCodexPolicyFlags(FULL_ACCESS_POLICY);
-    expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", ...SHELL_ENV]);
+    expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox", "--strict-config", ...SHELL_ENV]);
   });
 });
 

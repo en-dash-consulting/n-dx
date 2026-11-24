@@ -206,6 +206,10 @@ describe("cliLoop — pair review", () => {
     const { run } = await runLoop();
 
     expect(run.reviewPlan).toMatchObject({ mode: "pair", vendor: "codex", model: REVIEWER_MODEL });
+    expect(printed.join("\n")).toContain("Codex pair reviewer");
+    expect(run.diagnostics?.notes.join("\n")).toContain("Codex pair reviewer");
+    const saved = JSON.parse(readFileSync(join(henchDir, "runs", `${run.id}.json`), "utf-8"));
+    expect(saved.diagnostics.notes.join("\n")).toContain("Codex pair reviewer");
     expect(run.review).toMatchObject({
       mode: "pair",
       vendor: "codex",
@@ -362,6 +366,20 @@ describe("cliLoop — pair review", () => {
       expect(run.review).toMatchObject({ failed: "must-fix-unresolved" });
       expect(run.reviewRounds).toMatchObject([{ round: 1, findingsIn: 1, verdict: "validation-failed" }]);
     });
+  });
+
+  it("preserves a rejected reviewer pin and reports the authentication choice", async () => {
+    writeFileSync(join(projectDir, ".n-dx.json"), JSON.stringify({
+      llm: { vendor: "claude", codex: { reviewModel: "gpt-5.4" } },
+    }));
+    cli.script(workCommits, () => ({ code: 1, lines: [{ type: "error",
+      message: "The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account." }] }));
+    const { run } = await runLoop();
+    expect(cli.invocations).toHaveLength(2);
+    expect(cli.invocations[1].args).toContain("gpt-5.4");
+    expect(run.status).toBe("failed");
+    expect(run.review).toMatchObject({ failed: "spawn-failed",
+      detail: expect.stringContaining("explicitly update the originating model pin") });
   });
 
   it("skips the review with a warning when the reviewer CLI is missing, under --review-optional", async () => {

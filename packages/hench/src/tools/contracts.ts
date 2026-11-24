@@ -75,6 +75,8 @@ export interface ToolContext {
    * whatever a call changed before the next call can read it.
    */
   configBackstop?: ConfigBackstop;
+  /** Cancels an API run's in-flight shell and git children. */
+  abortSignal?: AbortSignal;
 }
 
 export interface RexUpdateStatusParams {

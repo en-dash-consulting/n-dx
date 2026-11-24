@@ -31,7 +31,16 @@ import {
 import {
   DEFAULT_CLAUDE_MODEL,
   DEFAULT_CODEX_MODEL,
+  TIER_MODELS,
+  REVIEW_MODELS,
 } from "../../packages/llm-client/dist/public.js";
+
+// These surfaces derive from the runtime registry; they must not freeze an
+// old default into a fresh project or disagree with what the dashboard shows.
+import { renderCodexConfigToml } from "../../packages/core/assistant-assets.js";
+import { buildVendorTiers } from "../../packages/web/dist/server/llm-tiers.js";
+import { buildReviewInfo } from "../../packages/web/dist/server/llm-review.js";
+import { resolveEffectiveAgentConfigFrom } from "../../packages/web/dist/server/effective-agent-config.js";
 
 describe("catalog-runtime default alignment", () => {
   it("recommended Claude model in catalog equals runtime DEFAULT_CLAUDE_MODEL", () => {
@@ -54,9 +63,9 @@ describe("catalog-runtime default alignment", () => {
     expect(recommended.id).toBe("claude-sonnet-5-5");
   });
 
-  it("catalog recommended Codex model is gpt-5.6-terra", () => {
+  it("catalog recommended Codex model is gpt-6.1-sol", () => {
     const recommended = LLM_MODEL_CATALOG.codex.find((m) => m.recommended);
-    expect(recommended.id).toBe("gpt-5.6-terra");
+    expect(recommended.id).toBe("gpt-6.1-sol");
   });
 
   it("runtime DEFAULT_CLAUDE_MODEL is claude-sonnet-5-5", () => {
@@ -64,7 +73,42 @@ describe("catalog-runtime default alignment", () => {
     expect(DEFAULT_CLAUDE_MODEL).toBe("claude-sonnet-5-5");
   });
 
-  it("runtime DEFAULT_CODEX_MODEL is gpt-5.6-terra", () => {
-    expect(DEFAULT_CODEX_MODEL).toBe("gpt-5.6-terra");
+  it("runtime DEFAULT_CODEX_MODEL is gpt-6.1-sol", () => {
+    expect(DEFAULT_CODEX_MODEL).toBe("gpt-6.1-sol");
+  });
+});
+
+
+describe("Codex catalog, template and dashboard upgrade contract", () => {
+  it("offers every execution and review default in the init picker", () => {
+    expect(TIER_MODELS.codex).toEqual({ light: "gpt-6-luna", standard: "gpt-6.1-sol", heavy: "gpt-6-astra" });
+    const ids = LLM_MODEL_CATALOG.codex.map((m) => m.id);
+    for (const model of [...Object.values(TIER_MODELS.codex), REVIEW_MODELS.codex]) expect(ids).toContain(model);
+    expect(LLM_MODEL_CATALOG.codex.find((m) => m.id === "gpt-5.5")).toMatchObject({
+      recommended: false, label: expect.stringContaining("API key only"),
+    });
+  });
+
+  it("keeps the generated Codex template free of execution and effort pins", () => {
+    const template = renderCodexConfigToml("n-dx");
+    expect(template).toContain("[mcp_servers.rex]");
+    expect(template).not.toMatch(/^\s*(model|model_reasoning_effort)\s*=/m);
+  });
+
+  it("reports the new defaults in dashboard tiers, execution and review", () => {
+    const { effective, llmConfig } = resolveEffectiveAgentConfigFrom({ ndx: { llm: { vendor: "codex" } }, hench: {} });
+    expect(effective.model).toBe(DEFAULT_CODEX_MODEL);
+    expect(Object.fromEntries(buildVendorTiers(llmConfig).codex.map(({ tier, model }) => [tier, model]))).toEqual(TIER_MODELS.codex);
+    expect(buildReviewInfo(effective, llmConfig, {}).models.codex.model).toBe(REVIEW_MODELS.codex);
+  });
+
+  it("reports explicit historical dashboard pins literally", () => {
+    const llm = { vendor: "codex", codex: { model: "gpt-5.5", reviewModel: "gpt-5.4" }, tiers: { codex: { heavy: "gpt-5.6-sol" } } };
+    const before = JSON.stringify(llm);
+    const { effective, llmConfig } = resolveEffectiveAgentConfigFrom({ ndx: { llm }, hench: {} });
+    expect(effective.model).toBe("gpt-5.5");
+    expect(buildVendorTiers(llmConfig).codex.find(({ tier }) => tier === "heavy").model).toBe("gpt-5.6-sol");
+    expect(buildReviewInfo(effective, llmConfig, {}).models.codex.model).toBe("gpt-5.4");
+    expect(JSON.stringify(llm)).toBe(before);
   });
 });

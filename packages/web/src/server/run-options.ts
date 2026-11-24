@@ -25,7 +25,7 @@ export async function validateRunOptions(projectDir: string, input: unknown): Pr
   for (const key of ["model", "reviewModel"] as const) {
     const model = options[key];
     if (model === undefined) continue;
-    const error = await validateCatalogModel(projectDir, vendor, model);
+    const error = await validateCatalogModel(projectDir, vendor, model, key === "reviewModel" ? "cli" : options.provider);
     if (error) return { ok: false, key, error: `Run option "${key}": ${error}` };
   }
   if (options.provider !== undefined) {

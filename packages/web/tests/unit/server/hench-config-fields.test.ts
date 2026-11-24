@@ -186,10 +186,8 @@ describe("validateProviderForVendor", () => {
     expect(validateProviderForVendor("api", "claude")).toBeNull();
   });
 
-  it("rejects api for codex, naming the vendor and the allowed providers", () => {
-    const error = validateProviderForVendor("api", "codex");
-    expect(error).toContain("codex");
-    expect(error).toContain("cli");
+  it("accepts direct api for codex", () => {
+    expect(validateProviderForVendor("api", "codex")).toBeNull();
   });
 
   it("accepts cli for codex", () => {
@@ -211,7 +209,7 @@ describe("validateProviderForVendor", () => {
   it("VENDOR_PROVIDERS pins the exact rule set", () => {
     expect(VENDOR_PROVIDERS).toEqual({
       claude: ["cli", "api"],
-      codex: ["cli"],
+      codex: ["cli", "api"],
       google: ["api"],
       local: ["api"],
     });
@@ -220,7 +218,7 @@ describe("validateProviderForVendor", () => {
 
 describe("validateConfigKeyValue with a vendor", () => {
   it("rejects a provider value the active vendor does not support", () => {
-    expect(validateConfigKeyValue("provider", "api", "codex")).toContain("codex");
+    expect(validateConfigKeyValue("provider", "cli", "google")).toContain("google");
   });
 
   it("still accepts a provider value the active vendor supports", () => {

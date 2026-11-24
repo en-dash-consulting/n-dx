@@ -15,7 +15,7 @@
  * - **Guard+tools → agent core**: `tools/contracts.ts` exports `ToolGuard` (a
  *   minimal interface satisfied by GuardRails) and `ToolContext`, so tool
  *   implementations never import from agent-core directly.  `tools/git.ts` and
- *   `tools/shell.ts` call `process/exec-shell.ts` for subprocess execution.
+ *   `tools/shell.ts` call `tools/exec-shell.ts` for subprocess execution.
  *
  * The `ToolGuard` interface in `./contracts.ts` is the explicit shared boundary
  * that decouples tool implementations from concrete GuardRails internals,
@@ -245,6 +245,7 @@ export async function dispatchTool(
   input: Record<string, unknown>,
   rexHandlers?: RexToolHandlers,
 ): Promise<string> {
+  ctx.abortSignal?.throwIfAborted();
   const output = await dispatchUnchecked(ctx, name, input, rexHandlers);
   const writes = ctx.configBackstop?.restore() ?? [];
   if (writes.length === 0) return output;
@@ -295,6 +296,7 @@ async function dispatchUnchecked(
           ctx.guard,
           ctx.projectDir,
           input as { command: string; cwd?: string; timeout?: number },
+          ctx.abortSignal,
         );
 
       case "git":
@@ -302,6 +304,7 @@ async function dispatchUnchecked(
           ctx.guard,
           ctx.projectDir,
           input as { subcommand: string; args?: string },
+          ctx.abortSignal,
         );
 
       case "rex_update_status":

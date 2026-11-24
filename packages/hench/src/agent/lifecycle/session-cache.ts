@@ -98,6 +98,8 @@ export type CacheDefect =
 
 /** A cached orientation session. */
 export interface SessionCacheEntry {
+  /** Checkout, policy and execution identity; absent on legacy cache entries. */
+  identityHash?: string;
   /** Vendor session id to fork from. */
   parentId: string;
   /** ISO timestamp the orientation session was created. */
@@ -112,6 +114,7 @@ export interface SessionCacheEntry {
 
 /** Why a cached parent cannot be used. */
 export type ParentRejection =
+  | "identity-changed"
   | "no-entry"
   | "fresh-requested"
   | "sourcevision-changed"
@@ -128,7 +131,7 @@ export type ParentVerdict = { usable: true } | { usable: false; reason: ParentRe
  * Where forking gives every task the same orientation prefix in isolation,
  * batching resumes the *previous task's* session so the transcript
  * accumulates. That is the right shape for a CLI whose resume appends rather
- * than branches (`codex exec resume` has no fork equivalent), and it is why
+ * than branches (`codex exec resume` appends to its parent), and it is why
  * the chain needs a bound: an unbounded shared transcript costs more on every
  * later turn and lets one task's framing bleed into the next.
  */
@@ -446,6 +449,7 @@ export async function readSessionCache(henchDir: string): Promise<SessionCacheEn
     if (typeof entry.parentId !== "string" || !entry.parentId) return undefined;
     if (typeof entry.createdAt !== "string" || !entry.createdAt) return undefined;
     return {
+      identityHash: typeof entry.identityHash === "string" ? entry.identityHash : undefined,
       parentId: entry.parentId,
       createdAt: entry.createdAt,
       svFingerprint: typeof entry.svFingerprint === "string" ? entry.svFingerprint : "",
@@ -463,6 +467,7 @@ export async function writeSessionCache(
   entry: Omit<SessionCacheEntry, "createdAt"> & { createdAt?: string },
 ): Promise<void> {
   await updateCacheFile(henchDir, (file) => {
+    file.identityHash = entry.identityHash;
     file.parentId = entry.parentId;
     file.createdAt = entry.createdAt ?? new Date().toISOString();
     file.svFingerprint = entry.svFingerprint;
@@ -490,6 +495,7 @@ export async function clearSessionCache(henchDir: string): Promise<void> {
       return;
     }
     await updateCacheFileLocked(henchDir, (next) => {
+      delete next.identityHash;
       delete next.parentId;
       delete next.createdAt;
       delete next.svFingerprint;
@@ -805,6 +811,7 @@ export function policyFingerprint(policy: PolicyFingerprintInput): string {
 }
 
 export interface ParentUsabilityInput {
+  identityHash?: string;
   /** Current sourcevision fingerprint, from {@link sourcevisionFingerprint}. */
   svFingerprint: string;
   /** Vendor this run will use. */
@@ -865,6 +872,7 @@ export function isParentUsable(
 ): ParentVerdict {
   if (!entry) return { usable: false, reason: "no-entry" };
   if (input.fresh) return { usable: false, reason: "fresh-requested" };
+  if (input.identityHash !== undefined && entry.identityHash !== input.identityHash) return { usable: false, reason: "identity-changed" };
 
   // Same two-point consultation as the batch chain: an unreadable timestamp
   // before the fingerprint checks, staleness after them.
@@ -934,6 +942,8 @@ export async function sourcevisionFingerprint(projectDir: string): Promise<strin
 }
 
 export interface SessionStrategyInput {
+  /** Result of probing this run's selected Codex binary. */
+  codexForkSupported?: boolean;
   vendor: string;
   provider: "cli" | "api" | string;
   /** `hench.sessionStrategy`, when configured. */
@@ -944,8 +954,8 @@ export interface SessionStrategyInput {
  * Resolve the session strategy actually available for this run.
  *
  * Forking needs a vendor CLI whose session driver can fork a session by id —
- * today that is the Claude CLI alone (`VendorSessionDriver.canFork`, in
- * llm-client) — and it needs hench to own the spawn, which the API
+ * Claude advertises this statically; Codex needs a successful probe of the
+ * selected binary — and it needs hench to own the spawn, which the API
  * provider does not (it manages its own conversation in-process). Both cases
  * degrade to cold rather than erroring: the strategy is an optimization, and
  * a config value that a vendor cannot honor should cost nothing but the
@@ -960,7 +970,7 @@ export function resolveSessionStrategy(input: SessionStrategyInput): SessionStra
   if (configured === "batch") return "batch";
 
   // Default (or an explicit "fork"): only a CLI whose session driver forks.
-  const canFork = input.provider === "cli" && vendorSessionDriver(input.vendor)?.canFork === true;
+  const canFork = input.provider === "cli" && (vendorSessionDriver(input.vendor)?.canFork === true || (input.vendor === "codex" && input.codexForkSupported === true));
   return canFork ? "fork" : "cold";
 }
 

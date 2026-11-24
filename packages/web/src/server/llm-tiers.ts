@@ -186,7 +186,8 @@ export interface RouteOverride {
  */
 export function buildRouteOverrides(config: LLMConfig): RouteOverride[] {
   return Object.entries(config.routes ?? {})
-    .filter(([taskClass, tier]) => DEFAULT_ROUTES[taskClass] !== tier)
+    // Review has effort rules but its model is shown in the separate review block.
+    .filter(([taskClass, tier]) => taskClass !== "agent.review" && DEFAULT_ROUTES[taskClass] !== tier)
     .map(([taskClass, tier]) => ({ taskClass, label: TASK_CLASS_LABELS[taskClass] ?? taskClass, tier }))
     .sort((a, b) => a.taskClass.localeCompare(b.taskClass));
 }

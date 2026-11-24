@@ -861,3 +861,47 @@ describe("classifyAuthError", () => {
     expect(r).toBeNull();
   });
 });
+
+describe("Codex authentication-specific model availability", () => {
+  it("offers an explicit choice without treating model availability as expired credentials", () => {
+    const result = classifyLLMError(new Error("The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account."), "codex");
+    expect(result.code).toBe("NDX_CLI_INVALID_CONFIGURATION");
+    expect(result.category).not.toBe("auth");
+    expect(result.suggestion).toContain("n-dx config llm.codex.auth api");
+    expect(result.suggestion).toContain("explicitly update");
+    expect(result.suggestion).toContain("No model or authentication setting was changed");
+  });
+  it.each(["model not found", "ChatGPT login required", "model is not supported for this API project"])("does not infer ChatGPT model retirement from %s", message => {
+    expect(classifyLLMError(new Error(message), "codex").code).not.toBe("NDX_CLI_INVALID_CONFIGURATION");
+  });
+  it.each([
+    "MODEL is unavailable with CHATGPT authentication",
+    "model is not available for ChatGPT",
+    "model chatgpt unavailable chatgpt",
+  ])("retains ordered case-insensitive rejection detection: %s", message => {
+    expect(classifyLLMError(new Error(message), "codex").code).toBe("NDX_CLI_INVALID_CONFIGURATION");
+  });
+  it.each([
+    "chatgpt model unavailable",
+    "model chatgpt not supported",
+    "model not supported\nchatgpt",
+    "model\nunavailable chatgpt",
+  ])("does not combine out-of-order or separate-line fragments: %s", message => {
+    expect(classifyLLMError(new Error(message), "codex").code).not.toBe("NDX_CLI_INVALID_CONFIGURATION");
+  });
+  describe("on CodeQL's pathological input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+    it.each([
+      "model".repeat(80_000),
+      `model${"unavailable".repeat(80_000)}`,
+    ])("finishes repeated model/reason text without a ChatGPT outcome (%#)", async message => {
+      const result = await callWithinBudget<typeof classifyLLMError>(CLASSIFIER, "classifyLLMError", new Error(message), "codex");
+      expect(result.code).not.toBe("NDX_CLI_INVALID_CONFIGURATION");
+    });
+    it("still recognizes a rejection after a long repeated prefix", async () => {
+      const message = `${"model".repeat(80_000)} unavailable with ChatGPT authentication`;
+      const result = await callWithinBudget<typeof classifyLLMError>(CLASSIFIER, "classifyLLMError", new Error(message), "codex");
+      expect(result.code).toBe("NDX_CLI_INVALID_CONFIGURATION");
+      expect(result.suggestion).toContain("No model or authentication setting was changed");
+    });
+  });
+});
