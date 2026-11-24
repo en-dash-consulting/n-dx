@@ -22,7 +22,6 @@ const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
 import { readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
 import {
   startUpdateCheck,
   formatUpdateNotice,
@@ -205,13 +204,6 @@ describe("update-check", () => {
       expect(notice).not.toContain("npm i -g");
     });
 
-    it("tells a standalone executable to download, not to run a package manager", () => {
-      const notice = formatUpdateNotice({ current: "1.0.0", latest: "2.0.0", manager: "standalone" });
-      expect(notice).toContain("Download it from");
-      expect(notice).toContain("/releases/latest");
-      expect(notice).not.toMatch(/npm i -g|pnpm add/);
-    });
-
     // Regression: a bare `@n-dx/core` re-resolves inside pnpm's recorded caret
     // range, which for 0.x versions cannot cross a minor boundary. Users stayed
     // stranded on 0.3.x while believing they had upgraded.
@@ -257,17 +249,6 @@ describe("update-check", () => {
     it("falls back to npm for a local dev checkout", () => {
       expect(detectInstallManager("/home/x/code/n-dx/packages/core/update-check.js")).toBe("npm");
     });
-
-    it("detects a standalone executable from the runtime it unpacked", () => {
-      const runtime = resolve("/cache/n-dx/runtime/0.10.4-abc");
-      const modulePath = join(runtime, "node_modules", "@n-dx", "core", "update-check.js");
-      expect(detectInstallManager(modulePath, { NDX_STANDALONE_ROOT: runtime })).toBe("standalone");
-    });
-
-    it("ignores an inherited standalone root that does not hold this module", () => {
-      const env = { NDX_STANDALONE_ROOT: resolve("/cache/n-dx/runtime/0.10.4-abc") };
-      expect(detectInstallManager(resolve("/home/x/code/n-dx/packages/core/update-check.js"), env)).toBe("npm");
-    });
   });
 
   describe("formatUpgradeCommand", () => {
@@ -275,10 +256,6 @@ describe("update-check", () => {
       expect(formatUpgradeCommand("npm")).toBe("npm i -g @n-dx/core@latest");
       expect(formatUpgradeCommand("pnpm")).toBe("pnpm add -g @n-dx/core@latest");
       expect(formatUpgradeCommand("yarn")).toBe("yarn global add @n-dx/core@latest");
-    });
-
-    it("points a standalone executable at the release downloads", () => {
-      expect(formatUpgradeCommand("standalone")).toMatch(/^https:\/\/github\.com\/.+\/releases\/latest$/);
     });
 
     it("treats an unknown manager as npm", () => {

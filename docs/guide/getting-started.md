@@ -32,11 +32,6 @@ binary is named `ndx`, which differs from the package name, so npx cannot pick i
 automatically.
 :::
 
-::: tip No Node.js? Use the standalone executable
-Each platform also has a single `ndx` executable with Node.js built in. See
-[Standalone Executable](./standalone-executable).
-:::
-
 After installing, `ndx` (or `n-dx`) is available as the primary command. See the [Quickstart](./quickstart) for a 5-minute walkthrough. To build from source (contributors only), see [Contributing](https://github.com/en-dash-consulting/n-dx#contributing). The install paths above were validated end-to-end — see [Install Path Validation](../process/install-path-validation).
 
 ## Initialize a Project

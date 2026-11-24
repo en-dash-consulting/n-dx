@@ -46,7 +46,6 @@ export default defineConfig({
             { text: "Quickstart", link: "/guide/quickstart" },
             { text: "Existing Project Onboarding", link: "/guide/existing-project" },
             { text: "Getting Started", link: "/guide/getting-started" },
-            { text: "Standalone Executable", link: "/guide/standalone-executable" },
             { text: "Workflow", link: "/guide/workflow" },
             { text: "Commands", link: "/guide/commands" },
             { text: "Configuration", link: "/guide/configuration" },

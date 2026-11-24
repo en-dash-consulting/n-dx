@@ -10,7 +10,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { resolveLayout } from "./layout.js";
 
 /** Fallback command name when no bin field (or no package.json) exists. */
@@ -22,16 +22,15 @@ export const DEFAULT_CLI_NAME = "n-dx";
  * npm semantics:
  * - `bin` object: keys are the command names — the first key wins.
  * - `bin` string: the command name is the package name (scope stripped).
- * - No usable `bin`: falls back to `fallback`.
+ * - No usable `bin`: falls back to DEFAULT_CLI_NAME.
  *
  * Pure function — no filesystem access.
  *
  * @param {object|null|undefined} pkg  Parsed package.json contents.
- * @param {string} [fallback]  Name to use without a usable `bin` (DEFAULT_CLI_NAME).
  * @returns {string} The resolved command name.
  */
-export function resolveCliName(pkg, fallback = DEFAULT_CLI_NAME) {
-  if (pkg == null || typeof pkg !== "object") return fallback;
+export function resolveCliName(pkg) {
+  if (pkg == null || typeof pkg !== "object") return DEFAULT_CLI_NAME;
   const bin = pkg.bin;
   if (typeof bin === "string" && bin.length > 0) {
     if (typeof pkg.name === "string" && pkg.name.length > 0) {
@@ -40,51 +39,29 @@ export function resolveCliName(pkg, fallback = DEFAULT_CLI_NAME) {
         : pkg.name;
       if (name.length > 0) return name;
     }
-    return fallback;
+    return DEFAULT_CLI_NAME;
   }
   if (bin != null && typeof bin === "object" && !Array.isArray(bin)) {
     const first = Object.keys(bin)[0];
     if (first) return first;
   }
-  return fallback;
-}
-
-/**
- * The command name of the standalone executable running this process
- * (scripts/build-exe.mjs), when it is a name n-dx answers to.
- *
- * An npm install puts both `ndx` and `n-dx` on PATH, so DEFAULT_CLI_NAME
- * always resolves there. A standalone executable is one file under one name,
- * usually `ndx`; a `.mcp.json` that names `n-dx` would not start. The
- * launcher exports its own path as `NDX_STANDALONE_EXE`.
- *
- * @param {Record<string, string | undefined>} [env]
- * @returns {"ndx" | "n-dx" | null}
- */
-export function standaloneCliName(env = process.env) {
-  const exe = env.NDX_STANDALONE_EXE;
-  if (!exe) return null;
-  const name = basename(exe).replace(/\.exe$/i, "").toLowerCase();
-  return name === "ndx" || name === "n-dx" ? name : null;
+  return DEFAULT_CLI_NAME;
 }
 
 /**
  * Detect the CLI command name for a project by reading its root package.json.
- * Without a usable `bin` (or a readable package.json) it is the standalone
- * executable's name when one is running, else DEFAULT_CLI_NAME.
+ * Returns DEFAULT_CLI_NAME when the file is missing or unparseable.
  *
  * @param {string} dir  Project root directory.
- * @param {Record<string, string | undefined>} [env]
  * @returns {string} The detected command name.
  */
-export function detectCliName(dir, env = process.env) {
-  const fallback = standaloneCliName(env) ?? DEFAULT_CLI_NAME;
+export function detectCliName(dir) {
   const pkgPath = join(dir, "package.json");
-  if (!existsSync(pkgPath)) return fallback;
+  if (!existsSync(pkgPath)) return DEFAULT_CLI_NAME;
   try {
-    return resolveCliName(JSON.parse(readFileSync(pkgPath, "utf-8")), fallback);
+    return resolveCliName(JSON.parse(readFileSync(pkgPath, "utf-8")));
   } catch {
-    return fallback;
+    return DEFAULT_CLI_NAME;
   }
 }
 
