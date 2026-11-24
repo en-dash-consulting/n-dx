@@ -17,10 +17,19 @@ function mockLayout(layout: "v1" | "v2") {
   })) as unknown as typeof fetch;
 }
 
+// act() holds updates until it closes, so a component mounted as it closes
+// (the row's SmartAddInput, once the layout lands) starts fetches that resolve
+// after it. Run rounds until no new fetch starts, so every response commits
+// inside act() rather than arming preact's real after-paint timer.
 async function settle() {
-  await act(async () => {
-    for (let i = 0; i < 5; i++) await new Promise<void>((r) => setTimeout(r, 0));
-  });
+  const calls = () => vi.mocked(globalThis.fetch).mock.calls.length;
+  let seen = -1;
+  while (seen !== calls()) {
+    seen = calls();
+    await act(async () => {
+      for (let i = 0; i < 5; i++) await new Promise<void>((r) => setTimeout(r, 0));
+    });
+  }
 }
 
 async function renderFull(): Promise<HTMLDivElement> {
