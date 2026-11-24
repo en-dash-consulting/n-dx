@@ -16,7 +16,9 @@
 
 import { h } from "preact";
 
-export type PixelIconName = "robot-wrangler" | "project" | "workflow" | "commands" | "settings";
+import type { PixelIconName } from "../types.js";
+
+export type { PixelIconName };
 export type PixelTileName = Exclude<PixelIconName, "settings">;
 
 const TILE_SIZE = 22;
@@ -107,6 +109,31 @@ export const PIXEL_TILES: Record<PixelTileName, readonly string[]> = {
     "......................",
     "......................",
   ],
+  // A branch: the trunk's commits, and a worktree's commit forking off it.
+  workspaces: [
+    "......................",
+    "....PPPP..............",
+    "....PPPP..............",
+    "....PPPP......TTTT....",
+    "....PPPP......TTTT....",
+    "....GGGG......TTTT....",
+    "....GGGG......TTTT....",
+    "....GGGG........GG....",
+    "....GGGG........GG....",
+    "....GGGG......GG......",
+    "....GGGG......GG......",
+    "....GGGG....GG........",
+    "....GGGG....GG........",
+    "....GGGGGGGGGG........",
+    "....GGGGGGGGGG........",
+    "....GGGG..............",
+    "....GGGG..............",
+    "....GGGG..............",
+    "....GGGG..............",
+    "....PPPP..............",
+    "....PPPP..............",
+    "......................",
+  ],
   commands: [
     "......................",
     "......................",
@@ -172,6 +199,19 @@ export const PIXEL_GLYPHS: Record<PixelIconName, readonly string[]> = {
     ".G.......G.",
     ".G.......G.",
     "...........",
+  ],
+  workspaces: [
+    "..PP.......",
+    "..PP...TT..",
+    "..GG...TT..",
+    "..GG....G..",
+    "..GG...G...",
+    "..GG..G....",
+    "..GGGG.....",
+    "..GG.......",
+    "..GG.......",
+    "..PP.......",
+    "..PP.......",
   ],
   commands: [
     "GGGGGGGGGGG",

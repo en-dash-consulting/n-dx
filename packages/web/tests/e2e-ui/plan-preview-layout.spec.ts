@@ -2,7 +2,7 @@
  * Plan page after a capture Preview — layout.
  *
  * Regression coverage for a sideways scroll: on a narrow window (the Claude
- * desktop browser pane is 1,024px) pressing Preview in Plan's capture bar made
+ * desktop browser pane is 1,024px) pressing Preview in Plan's capture made
  * the page wider than the viewport, cutting off its left edge. The page must
  * not scroll sideways, the preview card must sit inside its container, and a
  * long change title must wrap rather than run past the card.

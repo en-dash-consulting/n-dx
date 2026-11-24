@@ -11,6 +11,7 @@ import { h, render } from "preact";
 import type { VNode } from "preact";
 import { act } from "preact/test-utils";
 import {
+  BUTTON_TARGET_MAX,
   ChangePlacementSection,
   PLACEMENT_DRAFT_FEATURE,
   REFUSAL_HINTS,
@@ -18,8 +19,10 @@ import {
   draftNoteText,
   inboxPosition,
   nextCriterionId,
+  placeThenLabel,
   placedLine,
   requestPlacement,
+  shortTargetTitle,
   takePlacementRequest,
   takeTitleFocus,
 } from "../../../src/viewer/components/prd-tree/change-placement.js";
@@ -163,6 +166,8 @@ async function type(el: Element | null, value: string, event = "input"): Promise
 
 const pick = (target: string) => click($(`.cp-target[data-target="${target}"] input`));
 const button = (label: string) => $$<HTMLButtonElement>("button").find((b) => b.textContent === label) ?? null;
+/** The confirm button: "Place" until a target is chosen, then named by the action ("Touch Refunds"). */
+const placeButton = () => $<HTMLButtonElement>(".cp-place");
 
 beforeEach(() => {
   // A focus request is module state: no case may start with one pending.
@@ -232,7 +237,7 @@ describe("an Inbox change's panel", () => {
     expect($$<HTMLInputElement>('.cp-relation input[type="radio"]').map((r) => r.value)).toEqual(["touches", "amends"]);
     expect(["Place", "Place & next", "Place & add another", "Nothing fits"].map((l) => button(l) !== null)).toEqual([true, true, true, true]);
     // Nothing is chosen for the person: Place waits for a pick.
-    expect(button("Place")?.disabled).toBe(true);
+    expect(placeButton()?.disabled).toBe(true);
     expect(spies.onInboxState).toHaveBeenLastCalledWith(true);
   });
 
@@ -297,7 +302,75 @@ describe("an Inbox change's panel", () => {
     await click(button("Shipping labels"));
     expect($<HTMLInputElement>('.cp-target[data-target="cap-label"] input')?.checked).toBe(true);
     expect($(".cp-search-group")).toBeNull();
-    expect(button("Place")?.disabled).toBe(false);
+    expect(placeButton()?.disabled).toBe(false);
+  });
+
+  it("previews the pick, redraws it for another target or relation, and names the action, before anything is written", async () => {
+    serve([change("a")], [placement("a", [
+      candidate("cap-1", { statement: "Sell gift cards", criteria: [{ id: "c1", text: "x" }] }),
+      candidate("cap-2", { strength: "possible", reasons: ["path: src/pay"] }),
+    ])]);
+    await mountSection("a");
+    // No pick, no picture.
+    expect($(".pp")).toBeNull();
+    expect(placeButton()?.textContent).toBe("Place");
+
+    await pick("cap-1");
+    expect($(".pp-edge")?.getAttribute("data-relation")).toBe("touches");
+    expect($$(".pp-flow .pp-title").map((t) => t.textContent)).toEqual(["Change a", "Home cap-1"]);
+    expect($(".pp-why .inbox-strength")?.getAttribute("data-strength")).toBe("strong");
+    expect($(".pp-why")?.textContent).toContain("Shares the words gift, card");
+    expect($(".pp-why")?.textContent).toContain("Touches, by rex's rule: a rule");
+    expect($(".pp-after li.is-changed")?.textContent).toBe("Touched by Change a");
+    expect(placeButton()?.textContent).toBe("Touch Home cap-1");
+
+    await click($('.cp-relation input[value="amends"]'));
+    expect($(".pp-edge")?.getAttribute("data-relation")).toBe("amends");
+    expect(placeButton()?.textContent).toBe("Amend Home cap-1");
+    await type($(".cp-amends textarea.cp-input"), "Sell and refund gift cards");
+    expect($(".pp-after")?.textContent).toContain("Statement: Sell and refund gift cards");
+
+    await pick("cap-2");
+    expect($(".pp-why .inbox-strength")?.getAttribute("data-strength")).toBe("possible");
+    expect($(".pp-why")?.textContent).toContain("Names the path src/pay");
+    expect(placeButton()?.textContent).toBe("Amend Home cap-2");
+    expect(posts).toEqual([]);
+  });
+
+  it("notes a tie only on the rows that share the top score", async () => {
+    serve([change("a")], [placement("a", [
+      candidate("cap-1", { score: 10 }),
+      candidate("cap-2", { score: 10 }),
+      candidate("cap-3", { score: 3, strength: "weak" }),
+    ], { tied: true })]);
+    await mountSection("a");
+    const TIED = "Tied with another match: their order means nothing";
+    await pick("cap-2");
+    expect($(".pp-why")?.textContent).toContain(TIED);
+    await pick("cap-3");
+    expect($(".pp-why")?.textContent).not.toContain(TIED);
+  });
+
+  it("warns in the Amends preview when another open change already amends the target", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", { amendedBy: ["C-12"] })])]);
+    await mountSection("a");
+    await pick("cap-1");
+    // A touches is untouched by another amender.
+    expect($(".pp-after .is-caution")).toBeNull();
+    await click($('.cp-relation input[value="amends"]'));
+    expect($(".pp-why")?.textContent).toContain("Also amended by C-12");
+    expect($(".pp-after li.is-caution")?.textContent).toBe("C-12 also amends it: the first to apply wins, and the other may be refused");
+    expect($(".pp-after li.is-changed")).toBeNull();
+  });
+
+  it("says a search pick is the person's own", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    await type($(".cp-search-input"), "labels");
+    await click(button("Shipping labels"));
+    expect($(".pp-why .inbox-strength")).toBeNull();
+    expect($(".pp-why")?.textContent).toContain("Your pick: not on rex's shortlist");
+    expect(placeButton()?.textContent).toBe("Touch Shipping labels");
   });
 });
 
@@ -320,7 +393,7 @@ describe("when the product map read fails", () => {
     expect($(".cp-search")?.textContent).toContain("Could not load: PRD is locked by pid 7");
     expect(root.textContent).not.toContain("Loading the product map");
     expect($('.cp-target[data-target="cap-1"]')).not.toBeNull();
-    expect(button("Place")).not.toBeNull();
+    expect(placeButton()).not.toBeNull();
   });
 
   it("shows the error in the proposal form's area field, and a later good read restores both", async () => {
@@ -363,7 +436,7 @@ describe("an applied change's panel", () => {
     serve([applied("a")], [placement("a", [candidate("cap-1")])]);
     await mountSection("a");
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts).toEqual([{ url: "/api/rex/changes/a/place", body: { target: "cap-1", relation: "touches" } }]);
     expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
   });
@@ -377,7 +450,7 @@ describe("an applied change's panel", () => {
     const spies = await mountSection("a");
     expect($(".cp-position")?.textContent).toBe("1 of 2 · Next ›");
     await pick("cap-a");
-    await click(button("Place & next"));
+    await click($(".cp-place-next"));
     expect(spies.onOpenChange).toHaveBeenCalledWith("b");
   });
 });
@@ -388,7 +461,7 @@ describe("placing", () => {
     const spies = await mountSection("a");
     answer("a", "place", 200, { change: "a", target: "cap-1", relation: "touches", warnings: ["Another change removes Home cap-1"] });
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
 
     expect(posts).toEqual([{ url: "/api/rex/changes/a/place", body: { target: "cap-1", relation: "touches" } }]);
     expect(spies.onWritten).toHaveBeenCalledTimes(1);
@@ -407,11 +480,43 @@ describe("placing", () => {
     const spies = await mountSection("a");
     expect($(".cp-position")?.textContent).toBe("2 of 3 · Next ›");
     await pick("cap-a");
-    await click(button("Place & next"));
+    await click($(".cp-place-next"));
 
     expect(posts.map((p) => p.url)).toEqual(["/api/rex/changes/a/place"]);
     expect(spies.onOpenChange).toHaveBeenCalledWith("b");
     expect(takeTitleFocus("b")).toBe(true);
+  });
+
+  it("names the chosen relation and target on Place & next and Place & add another", async () => {
+    serve([change("a"), change("b")], [placement("a", [candidate("cap-1")]), placement("b", [candidate("cap-2", { score: 1 })])]);
+    await mountSection("a");
+    const next = () => $<HTMLButtonElement>(".cp-place-next")!;
+    const another = () => $<HTMLButtonElement>(".cp-place-another")!;
+    expect([next().textContent, another().textContent]).toEqual(["Place & next", "Place & add another"]);
+
+    await pick("cap-1");
+    expect(placeButton()?.textContent).toBe("Touch Home cap-1");
+    expect(next().textContent).toBe("Touch Home cap-1 & next");
+    expect(next().title).toBe("Touch Home cap-1, then open the next change");
+    expect(another().textContent).toBe("Touch Home cap-1 & add another");
+    expect(another().title).toBe("Touch Home cap-1, then add another place");
+    // Short enough to show whole: the visible text is the accessible name.
+    expect(next().getAttribute("aria-label")).toBeNull();
+
+    await click($('.cp-relation input[value="amends"]'));
+    expect(next().textContent).toBe("Amend Home cap-1 & next");
+    expect(another().textContent).toBe("Amend Home cap-1 & add another");
+  });
+
+  it("shortens a long target on the secondary buttons, keeping the whole name in the label and tooltip", () => {
+    const title = "Codex Multi-line Token Count Parsing Fix";
+    const next = placeThenLabel("touches", title, "next");
+    expect(next.text).toBe("Touch Codex Multi-line Token… & next");
+    expect(next.label).toBe(`Touch ${title} & next`);
+    expect(next.title).toBe(`Touch ${title}, then open the next change`);
+    expect(placeThenLabel("amends", title, "another").text).toBe("Amend Codex Multi-line Token… & add another");
+    expect(shortTargetTitle("Refunds")).toBe("Refunds");
+    expect(shortTargetTitle(title).length).toBeLessThanOrEqual(BUTTON_TARGET_MAX);
   });
 
   it("Next › moves on without writing", async () => {
@@ -428,7 +533,7 @@ describe("placing", () => {
     await mountSection("a");
     await pick("cap-1");
     await click($('.cp-relation input[value="touches"]'));
-    await click(button("Place & add another"));
+    await click($(".cp-place-another"));
 
     expect($('[data-change-placement="another"]')).not.toBeNull();
     expect($(".cp-shortlist legend")?.textContent).toBe("Add another place");
@@ -436,7 +541,7 @@ describe("placing", () => {
     expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
 
     await pick("cap-2");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts.map((p) => p.body)).toEqual([
       { target: "cap-1", relation: "touches" },
       { target: "cap-2", relation: "touches" },
@@ -463,7 +568,15 @@ describe("placing", () => {
     await type($(".cp-amends .task-criterion-add-input"), "Gift cards refund");
     await click($(".cp-amends .task-criterion-add-confirm"));
     await type($(".cp-amends textarea.cp-input"), "Refund any tender");
-    await click(button("Place"));
+    // The preview counts the form's own edits: 2 criteria, one added, one reworded, one removed.
+    expect($$(".pp-before li").map((li) => li.textContent)).toContain("2 criteria");
+    expect($$(".pp-after li").map((li) => li.textContent)).toEqual([
+      "Statement: Refund any tender",
+      "2 criteria (+1 added, 1 reworded, −1 removed)",
+      "Amended by Change a when it is applied",
+    ]);
+    expect(posts).toEqual([]);
+    await click(placeButton());
 
     expect(posts[0].body).toEqual({
       target: "cap-1",
@@ -514,20 +627,20 @@ describe("placing", () => {
     await click(button("Refunds"));
 
     expect($$(".cp-amends .task-criterion-text")).toEqual([]);
-    expect(button("Place")?.disabled).toBe(true);
-    await click(button("Place"));
+    expect(placeButton()?.disabled).toBe(true);
+    await click(placeButton());
     expect(posts).toEqual([]);
 
     release();
     await settle();
     expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
     // The new target's criteria are read but unedited: an amendment of nothing waits for an edit.
-    expect(button("Place")?.disabled).toBe(true);
+    expect(placeButton()?.disabled).toBe(true);
     await click(button("+ criterion"));
     await type($(".cp-amends .task-criterion-add-input"), "Refund in store credit");
     await click($(".cp-amends .task-criterion-add-confirm"));
-    expect(button("Place")?.disabled).toBe(false);
-    await click(button("Place"));
+    expect(placeButton()?.disabled).toBe(false);
+    await click(placeButton());
     const body = posts[0].body as { target: string; relation: string; criteria: { add: Array<{ text: string }> } };
     expect(body).toMatchObject({ target: "cap-refund", relation: "amends" });
     // Only this target's edit: the previous target's criterion never travels.
@@ -539,7 +652,7 @@ describe("placing", () => {
     await mountSection("a");
     expect($<HTMLInputElement>('.cp-relation input[value="touches"]')?.checked).toBe(true);
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts[0].body).toEqual({ target: "cap-1", relation: "touches" });
   });
 
@@ -548,14 +661,14 @@ describe("placing", () => {
     await mountSection("a");
     await pick("cap-1");
     await click($('.cp-relation input[value="amends"]'));
-    expect(button("Place")?.disabled).toBe(true);
+    expect(placeButton()?.disabled).toBe(true);
     expect($(".cp-amends-hint")?.textContent).toContain("choose Touches");
-    await click(button("Place"));
+    await click(placeButton());
     expect(posts).toEqual([]);
     // An edit is enough to place.
     await type($(".cp-amends textarea"), "A sharper statement");
     expect($(".cp-amends-hint")).toBeNull();
-    expect(button("Place")?.disabled).toBe(false);
+    expect(placeButton()?.disabled).toBe(false);
   });
 
   it("an amendment rex finds empty is refused inline in rex's words, pointing at the criteria", async () => {
@@ -567,7 +680,7 @@ describe("placing", () => {
     await click($('.cp-relation input[value="amends"]'));
     // Any edit gets past the viewer's hold; rex alone judges whether it modifies anything.
     await type($(".cp-amends textarea"), "   x");
-    await click(button("Place"));
+    await click(placeButton());
 
     expect(posts[0].body).toEqual({ target: "cap-1", relation: "amends", proposed: "x" });
     expect($('.cp-refusal[role="alert"] .cp-refusal-message')?.textContent).toBe(message);
@@ -584,7 +697,7 @@ describe("placing", () => {
     await mountSection("a");
     answer("a", "place", 422, { error: `rex says ${kind}`, kind });
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect($(".cp-refusal-message")?.textContent).toBe(`rex says ${kind}`);
     const hint = $(".cp-refusal-hint");
     expect(hint?.dataset.kind).toBe(kind);
@@ -596,7 +709,7 @@ describe("placing", () => {
     await mountSection("a");
     answer("a", "place", 409, { error: "Could not acquire PRD lock: held by PID 42" });
     await pick("cap-1");
-    await click(button("Place"));
+    await click(placeButton());
     expect($(".cp-refusal-message")?.textContent).toBe("Could not acquire PRD lock: held by PID 42");
     expect($(".cp-refusal-hint")).toBeNull();
   });
@@ -751,7 +864,11 @@ describe("Draft with the model (rex.placementDraft)", () => {
     expect(note?.dataset.draftSource).toBe("model");
     expect(note?.textContent).toContain("Picked by the model (claude-haiku): Home cap-2.");
     expect(note?.textContent).toContain("rules and model disagree");
-    expect(button("Place")?.disabled).toBe(false);
+    expect(placeButton()?.disabled).toBe(false);
+    // The preview says who suggested the target; picking another row by hand drops it.
+    expect($$(".pp-why li").map((li) => li.textContent)).toContain("Picked by the model");
+    await pick("cap-1");
+    expect($$(".pp-why li").map((li) => li.textContent)).not.toContain("Picked by the model");
   });
 
   it("opens the proposal form filled with the model's proposal", async () => {
@@ -853,7 +970,7 @@ describe("the change detail panel", () => {
     }));
     await show("a");
     await pick("cap-1");
-    await click(button("Place & next"));
+    await click($(".cp-place-next"));
     // The host opens the item it was asked for, as the tree's selection does.
     expect(onNavigateToItem).toHaveBeenCalledWith("b");
     await show("b");

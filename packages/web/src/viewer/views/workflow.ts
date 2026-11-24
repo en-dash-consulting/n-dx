@@ -13,6 +13,10 @@
  * immediate actions outside that model, disabled while the page is dirty;
  * applying one reloads the work settings so the form shows what was written.
  *
+ * The agent prompt section is the exception to the one-Save model: it keeps
+ * its own Save and Discard (it is also placed on the Work page, which has no
+ * frame), so its edits neither dirty this page nor save with it.
+ *
  * Provider and model are not edited here — Robot Wrangler owns them, and the
  * work-settings section links there in their place.
  */
@@ -27,6 +31,7 @@ import { CliTimeoutsSection, useCliTimeoutsForm } from "./cli-timeout.js";
 import { HenchTemplatesSection } from "./hench-templates.js";
 import { SidecarSettingsSection, useSidecarSettingsForm } from "./sidecar-settings.js";
 import { RexSettingsSection, useRexSettingsForm } from "./rex-settings.js";
+import { AgentPromptSection } from "./agent-prompt.js";
 
 export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
   const cliName = useCliName();
@@ -115,6 +120,11 @@ export function WorkflowView({ navigateTo }: { navigateTo: NavigateTo }) {
       h("section", { class: "workflow-section", "aria-labelledby": "workflow-work-title" },
         h("h2", { id: "workflow-work-title", class: "workflow-section-title" }, "Work settings"),
         h(HenchConfigSection, { form: work, robotWranglerLink }),
+      ),
+
+      h("section", { class: "workflow-section", "aria-labelledby": "workflow-agent-prompt-title" },
+        h("h2", { id: "workflow-agent-prompt-title", class: "workflow-section-title" }, "Agent prompt"),
+        h(AgentPromptSection, { compact: false }),
       ),
 
       h("section", { class: "workflow-section", "aria-labelledby": "workflow-prd-title" },

@@ -110,6 +110,8 @@ export interface LiveRunFull extends LiveRunSummary {
   model: string | null;
   vendor: string | null;
   criteriaTotal: number | null;
+  /** Who the task is assigned to (its own assignee, else its nearest assigned ancestor's). Absent from an older server. */
+  assignee?: string | null;
   /** Milliseconds since the last heartbeat, or null when none was recorded. */
   heartbeatAgeMs: number | null;
   /**

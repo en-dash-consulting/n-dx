@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -46,6 +47,19 @@ async function register(hub: HubHandle, id: string, repoRoot: string): Promise<P
   });
   expect([200, 201], JSON.stringify(body)).toContain(status);
   return body.project as ProjectView;
+}
+
+/** A loopback port nothing is listening on right now. */
+function freePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const addr = probe.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      probe.close(() => resolvePort(port));
+    });
+  });
 }
 
 async function waitForExit(pid: number, timeoutMs = 10_000): Promise<void> {
@@ -152,6 +166,43 @@ describe("hub daemon", () => {
     hubs.pop();
     await waitForExit(respawned.pid!);
   }, 180_000);
+
+  it("a registration that arrives while the hub is still respawning the project waits for it to be healthy", async () => {
+    const first = await startHub({ ...HUB_OPTS, homeDir: home });
+    hubs.push(first);
+    const { pid } = await register(first, "beta", repoB);
+    await first.close({ stopChildren: false });
+    hubs.pop();
+    process.kill(pid!, "SIGKILL");
+    await waitForExit(pid!);
+
+    // The hub listens before attachAll() has respawned beta. `ndx start`
+    // registers as soon as /api/hub/health answers, so do the same: that
+    // registration used to come back "starting" and make the CLI give up.
+    const port = await freePort();
+    const starting = startHub({ ...HUB_OPTS, port, homeDir: home });
+    const base = `http://127.0.0.1:${port}`;
+    for (;;) {
+      try {
+        if ((await fetch(`${base}/api/hub/health`)).ok) break;
+      } catch { /* not listening yet */ }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const res = await fetch(`${base}/api/hub/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "beta", repoRoot: repoB, ndxBin: NDX_BIN }),
+    });
+    const project = (await res.json()).project as ProjectView;
+    const second = await starting;
+    hubs.push(second);
+    expect(project.status.state, JSON.stringify(project.status)).toBe("healthy");
+    expect(project.pid).not.toBe(pid);
+
+    await second.close();
+    hubs.pop();
+    await waitForExit(project.pid!);
+  }, 120_000);
 
   it("rejects malformed registrations and unknown routes", async () => {
     const hub = await startHub({ ...HUB_OPTS, homeDir: mkdtempSync(join(tmpdir(), "ndx-hub-home-2-")) });

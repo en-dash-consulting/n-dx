@@ -38,6 +38,7 @@ import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktr
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
 import { handleLiveTaskRoute } from "./routes-live-task.js";
 import { handleHenchPrepRoute } from "./routes-hench-prep.js";
+import { handleHenchQueueRoute } from "./routes-hench-queue.js";
 import { handleLiveAnalyzeRoute } from "./routes-live-analyze.js";
 import { watchAnalyzeProgress } from "./analyze-progress-watcher.js";
 import { stopRunTailWatches } from "./run-tail.js";
@@ -54,6 +55,7 @@ import { handleTrustRoute } from "./routes-trust.js";
 import { evaluateRepoTrust, formatRepoTrustReport } from "@n-dx/llm-client";
 import { enforceRouteFeatureGate, featureDisabledUpgradeResponse } from "./route-feature-gates.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
+import { handleAgentPromptRoute } from "./routes-agent-prompt.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
@@ -888,6 +890,7 @@ async function handleApiRoutes(
   if (await handleTrustRoute(req, res, ctx)) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
+  if (await handleAgentPromptRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
   // Before the generic /api/rex/ router below, which would answer its own 404
@@ -914,6 +917,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchPrepRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchQueueRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;

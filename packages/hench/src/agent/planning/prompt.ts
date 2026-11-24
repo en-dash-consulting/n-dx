@@ -259,7 +259,16 @@ export function buildSystemPrompt(
     lines.push("- If a tool returns [ERROR], something failed. Check your inputs and retry or adjust.");
   }
 
-  return lines.join("\n");
+  return appendAgentPrompt(lines.join("\n"), project.agentPrompt);
+}
+
+/**
+ * Append the project's agent prompt section to a system prompt. Last, so the
+ * operator's instructions are the final thing the agent reads before the
+ * brief; a missing or empty section leaves the prompt exactly as it was.
+ */
+export function appendAgentPrompt(systemPrompt: string, section: string | undefined): string {
+  return section ? `${systemPrompt}\n\n${section}` : systemPrompt;
 }
 
 // ---------------------------------------------------------------------------

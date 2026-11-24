@@ -23,7 +23,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
 import { isRecord } from "../shared/index.js";
-import type { ProjectView } from "./hub.js";
+import type { ProjectView } from "./project-view.js";
 import { loopbackUrl, tokenHeaders } from "./loopback.js";
 
 /** How often a project with a rule on is ticked. */

@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import type { OrderSummary } from "./index.js";
+import type { OrderSummary } from "./types.js";
 
 const ORDERS: OrderSummary[] = [];
 

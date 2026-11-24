@@ -23,13 +23,7 @@ import type { JobTray } from "../hooks/index.js";
 import {
   Overview,
   AnalysisStatus,
-  CodebaseStats,
-  HealthDetail,
   MapPanel,
-  LanguagesPanel,
-  NextStepsPanel,
-  DeliveryPanel,
-  deliveryAnalysisStamp,
   Graph,
   IsoMapView,
   ZonesView,
@@ -67,16 +61,28 @@ import {
 import { WorkspacesView } from "./domain-workspaces.js";
 import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
-import { HomeView, StagePage } from "./stage-pages.js";
-import { LifecycleStrip } from "./lifecycle-strip.js";
+import { HomeView, StagePage, type StagePageProps } from "./stage-pages.js";
+import { RunningNow, UpNext } from "./work-now.js";
+import { RunQueuePanel } from "./run-queue.js";
+import { AgentSettingsPanel } from "./agent-settings.js";
 import { ChangesGlance } from "./changes-glance.js";
 import { ChangesSummaryProvider } from "./changes-summary-context.js";
 import { PlanHealth } from "./plan-health.js";
 import { SpecGapsPanel } from "./spec-gaps.js";
 import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
-import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
-import { analyzeTileSummary } from "./tile-summaries.js";
+import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageSidePanel, type StageTile } from "./stages.js";
+import { GlancePanel } from "./glance.js";
+import { RecommendationsPanel } from "./recommendations-panel.js";
+import { AnalyzeActionsProvider } from "./analyze-actions-context.js";
 import { SpendSummary } from "./spend-summary.js";
+import { PlanGlance } from "./plan-glance.js";
+import { PlanAreas } from "./plan-areas.js";
+import { PlanFlow } from "./plan-flow.js";
+import { PlanInbox, planSidePanelTitle } from "./plan-inbox.js";
+import { usePlanView } from "./plan-view-state.js";
+import { PlanHeadControls } from "./plan-tour.js";
+import { PrdTools, WorkStats } from "./work-stats.js";
+import { SettingsDisclosure } from "./settings-disclosure.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 import { areaCapabilityOfTab, areaSlugOfTab, placeChangeOfTab } from "../route-state.js";
@@ -87,7 +93,6 @@ import {
   CommandReferenceView,
   RobotWranglerView,
   ProjectView,
-  ToolingPanel,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -95,6 +100,8 @@ import {
 /** Props available to any view render function. */
 export interface ViewRenderContext {
   data: LoadedData;
+  /** The analysis modules read after the first paint are still on their way (`useAppData`). */
+  analysisLoading?: boolean;
   setDetail: (item: DetailItem | null) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setPrdDetailContent: (content: VNode<any> | null) => void;
@@ -160,55 +167,112 @@ function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
   return ctx.validViews ?? buildValidViewsForScope(null);
 }
 
-/** Tune's folded tiles: Spend shows its essentials; the rest preview their view. */
-function tuneTileSummary(tile: StageTile): ComponentChild | null {
+/** Work's folded tiles: Spend (on Tune) shows its essentials; the rest preview their view. */
+function workTileSummary(tile: StageTile): ComponentChild | null {
   return tile.view === "token-usage" && !tile.panel ? h(SpendSummary, null) : null;
 }
 
-/** A stage page, rendering each of its sections and tiles through this registry. */
-function stage(id: StageId): ViewRenderer {
-  const page: ViewRenderer = (ctx) => h(StagePage, {
+/**
+ * A stage page, rendering each of its sections and tiles through this registry.
+ * `route` is the view that opened it when that is one of the stage's modes
+ * (`tune` opens Work on Tune).
+ */
+/**
+ * Plan's stage page: its side-panel headings follow Solo / Team (the Inbox is
+ * "Your inbox" in Solo), so the shared side-panel component reads no Plan state.
+ */
+export function PlanStagePage(props: StagePageProps) {
+  const mode = usePlanView().mode;
+  return h(StagePage, { ...props, sidePanelTitle: (panel) => planSidePanelTitle(panel, mode) });
+}
+
+function stage(id: StageId, route: ViewId = id): ViewRenderer {
+  const page: ViewRenderer = (ctx) => h(id === "plan" ? PlanStagePage : StagePage, {
     stage: id,
+    view: route,
     validViews: validViewsOf(ctx),
     navigateTo: ctx.navigateTo,
     // On a tiled stage the lead Overview drops what its tiles show.
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
-      ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
-      // A stage's own lead is its question, not a view the registry could render.
-      : view === id
-        ? h("p", { class: "stage-lead" }, "How should this project's workflow change?")
-        : renderActiveView(view, { ...ctx, inSection: true })),
+      ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead", loading: ctx.analysisLoading })
+      : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
-    renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data)
-      : id === "tune" ? tuneTileSummary
-      : undefined,
+    renderSummary: id === "work" ? workTileSummary : undefined,
+    // A side panel shows its panel opened, or its view; the capture panel's
+    // More would open a tile, and a side panel has none, so it gets a grid
+    // that opens nothing.
+    renderSidePanel: (side: StageSidePanel) => side.panel
+      ? renderPanel(side.panel, true, NO_GRID, ctx)
+      : renderActiveView(side.view, { ...ctx, inSection: true }),
     detailOpen: ctx.detailOpen ?? false,
     headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
-    headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
+    headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs })
+      : id === "plan" ? h(PlanHeadControls, null)
+      : null,
   });
-  // Plan's lifecycle strip and open-changes glance share one summary read.
+  // Plan's glance cards, product areas and open-changes panel share one
+  // summary read (its capture draft is shared from main.ts, above the
+  // router); Analyze's tiles and map share what to do, and the item hovered.
   return id === "plan"
     ? (ctx) => h(ChangesSummaryProvider, null, page(ctx))
-    : page;
+    : id === "analyze"
+      ? (ctx) => h(AnalyzeActionsProvider, { data: ctx.data }, page(ctx))
+      : page;
 }
+
+/** A tile grid that opens nothing: what a side panel's content is given. */
+const NO_GRID: TileGridApi = { openTile: () => {}, focus: null };
 
 /** The parts of a stage page that are not views of their own. */
 function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ctx: ViewRenderContext): ComponentChild {
   switch (panel) {
+    // The tile is the capture row; its modal (More, or the header) is the whole view.
+    case "capture": return opened
+      ? h(AnalysisView, { navigateTo: ctx.navigateTo })
+      : h(AnalysisView, { navigateTo: ctx.navigateTo, onMore: () => grid.openTile("capture") });
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
-    case "health": return opened
-      ? h(HealthDetail, { data: ctx.data, openTile: grid.openTile, setDetail: ctx.setDetail })
-      : h(CodebaseStats, { data: ctx.data });
-    case "next-steps": return h(NextStepsPanel, { embedded: true });
-    case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
-    case "delivery": return h(DeliveryPanel, { stamp: deliveryAnalysisStamp(ctx.data.manifest), opened });
-    case "flow": return h(LifecycleStrip, { navigateTo: ctx.navigateTo });
+    case "glance": return h(GlancePanel, { data: ctx.data, opened, setDetail: ctx.setDetail, loading: ctx.analysisLoading });
+    case "recommendations": return h(RecommendationsPanel, { data: ctx.data, opened, navigateTo: ctx.navigateTo });
     case "changes-glance": return h(ChangesGlance, { navigateTo: ctx.navigateTo });
     case "spec-gaps": return h(SpecGapsPanel, { navigateTo: ctx.navigateTo });
     case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);
     case "outcomes": return h(OutcomesPanel, null);
-    case "tooling": return h(ToolingPanel, { navigateTo: ctx.navigateTo });
+    case "running": return h(RunningNow, { navigateTo: ctx.navigateTo });
+    case "up-next": return h(UpNext, { navigateTo: ctx.navigateTo });
+    case "run-queue": return h(RunQueuePanel, { navigateTo: ctx.navigateTo });
+    case "agent-settings": return h(AgentSettingsPanel, { navigateTo: ctx.navigateTo });
+    case "plan-glance": return h(PlanGlance, { navigateTo: ctx.navigateTo });
+    case "plan-flow": return h(PlanFlow, null);
+    // Full-screen and "Open" show the whole Product page.
+    case "plan-areas": return opened
+      ? h(ProductPage, { key: "product", onCapabilityChange: ctx.setOpenCapability, navigateTo: ctx.navigateTo })
+      : h(PlanAreas, { navigateTo: ctx.navigateTo });
+    // The whole Inbox, not the section's first rows (the side panel scrolls),
+    // under Plan's For me / Everyone and Solo / Team, its rows draggable onto
+    // the product areas.
+    case "inbox": return h(PlanInbox, { navigateTo: ctx.navigateTo });
+    // Full-screen and "Open" show the whole Rex dashboard.
+    case "work-stats": return opened ? h(RexDashboard, { navigateTo: ctx.navigateTo }) : h(WorkStats, null);
+    case "prd-tools": return h(PrdTools, { navigateTo: ctx.navigateTo });
   }
+}
+
+/**
+ * A Work page (Now at `/work`, Tune at `/tune`) with the Prepare task modal
+ * open over it while the route names a task; closing returns to the same page.
+ */
+function withPrepare(route: "work" | "tune", page: ViewRenderer): ViewRenderer {
+  return (ctx) => h(Fragment, null,
+    page(ctx),
+    ctx.selectedTaskId
+      ? h(PrepareTaskModal, {
+          key: ctx.selectedTaskId,
+          taskId: ctx.selectedTaskId,
+          onClose: () => ctx.navigateTo(route),
+          onOpenLive: (taskId: string) => ctx.navigateTo("live-task", { taskId }),
+        })
+      : null,
+  );
 }
 
 const REGISTRY: Record<string, ViewRenderer> = {
@@ -217,23 +281,22 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "analyze": stage("analyze"),
   "plan": stage("plan"),
-  "tune": stage("tune"),
+  // Work's Tune mode: the Work page, opened on Tune. `/tune/prep/<taskId>` opens
+  // the Prepare task modal over it (Ready to run is on Tune), closing to `/tune`.
+  "tune": withPrepare("tune", stage("work", "tune")),
   // `/work/prep/<taskId>` is the Work page with the Prepare task modal open
   // over it; closing returns to `/work`, a start hands off to Live.
-  "work": (ctx) => h(Fragment, null,
-    stage("work")(ctx),
-    ctx.selectedTaskId
-      ? h(PrepareTaskModal, {
-          key: ctx.selectedTaskId,
-          taskId: ctx.selectedTaskId,
-          onClose: () => ctx.navigateTo("work"),
-          onOpenLive: (taskId: string) => ctx.navigateTo("live-task", { taskId }),
-        })
-      : null,
-  ),
+  "work": withPrepare("work", stage("work")),
 
+  // A Settings page: the worktree list behind a dropdown that expands it.
   "workspaces": ({ attachWorktree, attachedWorktree }) =>
-    h(WorkspacesView, { onAttachSidecar: attachWorktree, attachedWorktree: attachedWorktree ?? null }),
+    h(SettingsDisclosure, {
+      id: "workspaces",
+      title: "Workspaces",
+      blurb: "Every worktree of this repository, its branch, and what is uncommitted or unmerged.",
+    },
+      h(WorkspacesView, { onAttachSidecar: attachWorktree, attachedWorktree: attachedWorktree ?? null }),
+    ),
 
   "live": ({ data, navigateTo, jobs }) =>
     h(LiveView, { navigateTo, analyzedAt: data.manifest?.analyzedAt ?? null, jobs }),
@@ -249,8 +312,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   // navigateTo is what lets the iso hero offer "Options" (→ the map's form);
   // without it the Overview hero had Rebuild and Expand but no way there.
-  "overview": ({ data, jobs, navigateTo }) =>
-    h(Overview, { data, jobs, navigateTo }),
+  "overview": ({ data, jobs, navigateTo, analysisLoading }) =>
+    h(Overview, { data, jobs, navigateTo, loading: analysisLoading }),
 
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),

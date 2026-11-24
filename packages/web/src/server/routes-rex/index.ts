@@ -10,6 +10,7 @@
  *   impact.ts       — Per-item impact tags (size, file kinds, security, essential)
  *   product.ts      — v2 product reads (product, changes, capability) and the capability edit POST
  *   placement.ts    — v2 Inbox placement: a change's shortlist, place and propose
+ *   people.ts       — Known people (git authors, stewards) and the current user, for the assignee picker
  *   apply.ts        — v2 Apply of a change awaiting apply: preview, then apply
  *   items.ts        — Item CRUD (add, get, patch, bulk, merge, delete)
  *   requirements.ts — Requirements CRUD, coverage, traceability
@@ -30,6 +31,7 @@ import { routePrdReads } from "./reads.js";
 import { routeImpact } from "./impact.js";
 import { routeProductReads, routeProductEdit } from "./product.js";
 import { routePlacement } from "./placement.js";
+import { routePeople } from "./people.js";
 import { routeApply } from "./apply.js";
 import { routeItems } from "./items.js";
 import { routeItemRequirements, routeRequirementsAnalytics } from "./requirements.js";
@@ -79,6 +81,9 @@ export function handleRexRoute(
 
   const productResult = routeProductReads(path, method, res, ctx);
   if (productResult !== false) return productResult;
+
+  const peopleResult = routePeople(path, method, res, ctx);
+  if (peopleResult !== false) return peopleResult;
 
   const productEditResult = routeProductEdit(path, method, req, res, ctx, broadcast);
   if (productEditResult !== false) return productEditResult;

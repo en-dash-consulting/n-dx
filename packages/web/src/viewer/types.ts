@@ -97,3 +97,10 @@ export interface PRDDetail {
 }
 
 export type DetailItem = FileDetail | ZoneDetail | GenericDetail | PRDDetail;
+
+/**
+ * The pixel-art icons a view can carry (components/pixel-icons.ts draws them).
+ * Here so the navigation model (views/view-meta.ts) names one without
+ * importing a component.
+ */
+export type PixelIconName = "robot-wrangler" | "project" | "workflow" | "workspaces" | "commands" | "settings";

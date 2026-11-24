@@ -451,6 +451,22 @@
 .settings-overlay-density-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .settings-overlay-content { flex: 1; min-width: 0; overflow-y: auto; padding: var(--space-6); }
 
+/* ── Settings dropdown ─ a page whose content expands from its header (settings-disclosure.ts) ── */
+
+.settings-disclosure { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-surface); }
+.settings-disclosure-toggle {
+  display: flex; align-items: flex-start; gap: var(--space-2-5); width: 100%;
+  padding: var(--space-4); border: 0; border-radius: var(--radius-lg);
+  background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.settings-disclosure-toggle:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.settings-disclosure-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-disclosure-caret { width: 14px; flex-shrink: 0; color: var(--text-dim); }
+.settings-disclosure-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.settings-disclosure-title { font-size: var(--font-lg); font-weight: 600; }
+.settings-disclosure-blurb { font-size: var(--font-base); color: var(--text-dim); }
+.settings-disclosure-body { padding: var(--space-4); border-top: 1px solid var(--border); }
+
 /* ── Settings frame ─ shared Save/dirty chrome for consolidated settings pages ── */
 
 .settings-frame { display: flex; flex-direction: column; gap: var(--space-5); }

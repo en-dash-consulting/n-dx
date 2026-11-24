@@ -19,7 +19,9 @@
  * A working tile (`opensPage`, Plan's Inbox) is neither: its body takes
  * clicks, and its header goes to its view's own page.
  * A chromeless tile (the codebase map) is its panel alone: the panel
- * brings its own header, controls and full-screen.
+ * brings its own header, controls and full-screen. A panel can open its own
+ * tile through `TileGridApi.openTile` (Plan capture's More); focus returns to
+ * whatever had it when the modal opened.
  *
  * Views render through `renderView` and panels through `renderPanel`, both
  * passed in by the registry — nothing is re-implemented here, and this module
@@ -56,6 +58,11 @@ export interface TileGridApi {
 export type RenderPanel = (panel: StagePanelId, opened: boolean, grid: TileGridApi) => ComponentChild;
 /** A tile's summary, or null to show its panel or its view cut to the tile. */
 export type RenderSummary = (tile: StageTile) => ComponentChild | null;
+
+/** Whether the tile's title differs between a v1 and a v2 project (it names its view, whose label does). */
+export function titleVariesByLayout(tile: StageTile): boolean {
+  return !tile.title && viewLabelFor(tile.view, "v1") !== viewLabelFor(tile.view, "v2");
+}
 
 /** Key of a tile: its panel, else its view. */
 export function tileKey(tile: StageTile): string {
@@ -94,13 +101,19 @@ function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex
   list?.querySelector<HTMLButtonElement>(`[data-tab="${view}"]`)?.focus();
 }
 
+/** The tab key of a tile's own panel, ahead of its views (`StageTile.panelTab`). */
+const PANEL_TAB = "@panel" as ViewId;
+
 /** A tile's whole content: its panel, or its view with the tile's tabs. */
-function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase }: TileContentProps) {
+function TileContent({ grid, tile, opened, tabs: viewTabs, renderView, renderPanel, idBase }: TileContentProps) {
   const layout = useStatusLayout();
-  const [active, setActive] = useState<ViewId>(tile.view);
+  const panelFirst = opened && !!tile.panel && !!tile.panelTab;
+  const [active, setActive] = useState<ViewId>(panelFirst ? PANEL_TAB : tile.view);
   // An opened panel tile that lists tabs (Open changes: List, Tree) shows them.
-  if (tile.panel && !(opened && tile.tabs?.length)) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
-  const shown = tabs.some((t) => t.view === active) ? active : tile.view;
+  if (tile.panel && !(opened && (tile.tabs?.length || tile.panelTab))) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
+  // Opened with `panelTab`, the panel is the first tab and the views follow.
+  const tabs: readonly StageTab[] = panelFirst ? [{ view: PANEL_TAB, label: tile.panelTab }, ...viewTabs] : viewTabs;
+  const shown = tabs.some((t) => t.view === active) ? active : tabs[0]?.view ?? tile.view;
   return h("div", { class: "stage-tile-content" },
     tabs.length > 1
       ? h("div", { class: "stage-section-tablist stage-tile-tablist", role: "tablist", "aria-label": `${tileTitle(tile, layout)} views` },
@@ -123,7 +136,7 @@ function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase
         )
       : null,
     h("div", tabs.length > 1 ? { id: `${idBase}-panel`, role: "tabpanel", "aria-labelledby": `${idBase}-tab-${shown}` } : {},
-      renderView(shown),
+      shown === PANEL_TAB && tile.panel ? renderPanel(tile.panel, true, grid) : renderView(shown),
     ),
   );
 }
@@ -211,9 +224,9 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, navigateTo, ...con
 
 /** The fine grid's track (`--tile-unit`) and the gap each tile keeps below itself, in px. */
 export const TILE_UNIT_PX = 4;
-export const TILE_GAP_PX = 16;
+export const TILE_GAP_PX = 20;
 /** Tracks one configured row takes: 232px of tile plus the gap. */
-export const TRACKS_PER_ROW = 62;
+export const TRACKS_PER_ROW = 63;
 
 /**
  * Tracks a tile needs to show `contentPx` of body content under `chromePx` of
@@ -300,6 +313,34 @@ export function useOverflowing(ref: { current: HTMLElement | null }): boolean {
   return overflowing;
 }
 
+/**
+ * A tile whose content cannot be drawn yet (Plan's v2 tiles before project
+ * status names the layout): it holds the tile's slot, title and size, so the
+ * grid has its final order from the first paint, and draws nothing that
+ * reads. A band holds its slot empty, as its panel does while it loads.
+ */
+function PendingTile({ tile, stage }: { tile: StageTile; stage: StageId }) {
+  const key = tileKey(tile);
+  // A title that depends on the layout (Describe a change / Add Items) is not
+  // known yet: the head says "Loading..." rather than guess the v1 one.
+  const title = tile.title ?? (titleVariesByLayout(tile) ? "Loading..." : viewLabelFor(tile.view, "v2"));
+  if (tile.band) return h("section", { class: "stage-band", "data-tile": key, "data-pending": "true", "aria-label": title });
+  const idBase = `stage-tile-${stage}-${key}`;
+  return h("section", {
+    class: `stage-tile stage-tile--pending stage-tile--c${tile.cols ?? 4} stage-tile--r${tile.rows ?? 1}`,
+    "data-tile": key,
+    "data-pending": "true",
+    "aria-labelledby": `${idBase}-title`,
+    "aria-busy": "true",
+  },
+    h("div", { class: "stage-tile-head" },
+      h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
+      h("span", { class: "stage-tile-title", id: `${idBase}-title` }, title),
+    ),
+    h("div", { class: "stage-tile-body" }, h("p", { class: "stage-tile-empty", role: "status" }, "Loading...")),
+  );
+}
+
 interface TileProps {
   grid: TileGridApi;
   stage: StageId;
@@ -321,7 +362,8 @@ function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummar
   const tileRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const overflowing = useOverflowing(bodyRef);
-  const fit = useFitTracks(tileRef, bodyRef, TRACKS_PER_ROW * (tile.rows ?? 1));
+  // A growing tile has no ceiling: it always spans what its content needs.
+  const fit = useFitTracks(tileRef, bodyRef, tile.grow ? Number.POSITIVE_INFINITY : TRACKS_PER_ROW * (tile.rows ?? 1));
 
   if (tile.band && tile.panel) {
     return h("section", { class: "stage-band", "data-tile": key, "aria-label": title },
@@ -393,9 +435,11 @@ export interface TileGridProps {
   besideDetail?: boolean;
   /** Gives each full-screen tile an Open ↗ to its own page. */
   navigateTo?: NavigateTo;
+  /** Keys of tiles drawn as placeholders in their slots (`PendingTile`) until their content can load. */
+  pending?: ReadonlySet<string>;
 }
 
-export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false, navigateTo }: TileGridProps) {
+export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false, navigateTo, pending }: TileGridProps) {
   const [fullScreen, setFullScreen] = useState<{ key: string; focus: TileFocus | null } | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
@@ -421,6 +465,8 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
   // Bands sit above the grid: its rows are one fixed height, a strip is not.
   const tileOf = (tile: StageTile) => {
     const key = tileKey(tile);
+    // A different component under the same key: the real tile mounts fresh (and measures its fit) in the placeholder's slot.
+    if (pending?.has(key)) return h(PendingTile, { key, tile, stage });
     return h(Tile, {
       key,
       grid,

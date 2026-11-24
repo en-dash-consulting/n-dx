@@ -237,10 +237,67 @@ describe("Rex item routes on a v2 project", () => {
     expect(saved.acceptanceCriteria ?? []).toEqual([]);
   });
 
+  it("PATCH shortTitle sets it trimmed, and an empty one removes it", async () => {
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { shortTitle: "  Apple Pay " })).status).toBe(200);
+    const store = await resolveStore(rexDir);
+    expect((await store.getItem(CHANGE_ID))?.shortTitle).toBe("Apple Pay");
+    expect((await store.getItem(CHANGE_ID))?.title).toBe("Add Apple Pay");
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { shortTitle: "" })).status).toBe(200);
+    expect(await store.getItem(CHANGE_ID)).not.toHaveProperty("shortTitle");
+  });
+
+  it("PATCH shortTitle refuses another open item's name, naming it, and writes nothing", async () => {
+    const res = await send("PATCH", `items/${CHANGE_ID}`, { shortTitle: "wire the button" });
+    expect(res.status).toBe(400);
+    const { error } = await res.json() as { error: string };
+    expect(error).toContain("Wire the button");
+    expect(error).toContain(TASK_ID);
+    expect(await (await resolveStore(rexDir)).getItem(CHANGE_ID)).not.toHaveProperty("shortTitle");
+  });
+
+  it("PATCH shortTitle accepts a name only a completed item shows", async () => {
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { shortTitle: "Wire the button" })).status).toBe(200);
+    expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.shortTitle).toBe("Wire the button");
+  });
+
+  it("PATCH refuses a shortTitle that is not a string", async () => {
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { shortTitle: 3 })).status).toBe(400);
+  });
+
   it("PATCH status in_progress goes through the change-layer store", async () => {
     const res = await send("PATCH", `items/${TASK_ID}`, { status: "in_progress" });
     expect(res.status).toBe(200);
     expect((await (await resolveStore(rexDir)).getItem(TASK_ID))?.status).toBe("in_progress");
+  });
+
+  it("PATCH assignee saves a free-form id, trimmed, and an empty one clears it", async () => {
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { assignee: "  new.person@shop.io " })).status).toBe(200);
+    // A fresh store reads what is on disk: the write survives a reload.
+    expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.assignee).toBe("new.person@shop.io");
+    expect(frames).toContainEqual(expect.objectContaining({ type: "rex:item-updated", itemId: CHANGE_ID }));
+
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { assignee: "" })).status).toBe(200);
+    expect(await (await resolveStore(rexDir)).getItem(CHANGE_ID)).not.toHaveProperty("assignee");
+  });
+
+  it("GET /changes carries the assignees of a change's open tasks, and drops a completed one's", async () => {
+    // Only the task is assigned: `ndx work --mine` would select it, so the row must say so.
+    expect((await send("PATCH", `items/${TASK_ID}`, { assignee: "Ann Lee <ann@shop.io>" })).status).toBe(200);
+    const rowOf = async () => ((await (await fetch(`${base}/changes`)).json()).changes as Array<{ id: string; assignee?: string; taskAssignees?: string[] }>)
+      .find((c) => c.id === CHANGE_ID)!;
+    const row = await rowOf();
+    expect(row.assignee).toBeUndefined();
+    expect(row.taskAssignees).toEqual(["Ann Lee <ann@shop.io>"]);
+
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "in_progress" })).status).toBe(200);
+    expect((await rowOf()).taskAssignees).toEqual(["Ann Lee <ann@shop.io>"]);
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
+    expect(await rowOf()).not.toHaveProperty("taskAssignees");
+  });
+
+  it("PATCH refuses an assignee that is not a string", async () => {
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { assignee: 7 })).status).toBe(400);
   });
 
   it("PATCH status completed completes a task, then its change, through rex", async () => {
@@ -271,6 +328,19 @@ describe("Rex item routes on a v2 project", () => {
     expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
     const body = await (await send("PATCH", `items/${CHANGE_ID}`, { status: "completed" })).json();
     expect(body).toEqual({ ok: true });
+  });
+
+  it("bulk PATCH refuses shortTitle, naming it, and writes nothing", async () => {
+    for (const shortTitle of ["  Same  ", ""]) {
+      const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID, TASK_ID], updates: { shortTitle } });
+      expect(res.status).toBe(400);
+      const { error } = await res.json() as { error: string };
+      expect(error).toContain("shortTitle");
+      expect(error).toContain("per item");
+    }
+    const store = await resolveStore(rexDir);
+    expect(await store.getItem(CHANGE_ID)).not.toHaveProperty("shortTitle");
+    expect(await store.getItem(TASK_ID)).not.toHaveProperty("shortTitle");
   });
 
   it("bulk PATCH completed applies the change's amendments through rex", async () => {

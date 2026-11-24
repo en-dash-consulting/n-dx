@@ -371,6 +371,10 @@ export { extractKeywords, scoreMatch } from "./core/keywords.js";
 export { findDuplicateItem } from "./core/duplicate-match.js";
 export type { DuplicateItemMatch, DuplicateCandidateText } from "./core/duplicate-match.js";
 
+// ---- Core: short titles -----------------------------------------------------
+
+export { assertShortTitleAvailable, findNameCollision, shownName, ShortTitleCollisionError, NAME_HOLDING_STATUSES } from "./core/short-title.js";
+
 // ---- Core: fix (structural auto-repair) -------------------------------------
 
 export {

@@ -30,10 +30,11 @@ function show(opened: boolean): HTMLElement {
 afterEach(() => { if (root) act(() => { render(null, root!); }); });
 
 describe("LanguagesPanel", () => {
-  it("shows the top languages as bars in the tile, with no table", () => {
+  it("shows the languages as a pie in the tile, with no table", () => {
     const el = show(false);
     expect(el.querySelector("table")).toBeNull();
-    expect(el.textContent).toContain("C#");
+    expect(el.querySelectorAll(".lang-pie-chart circle[stroke-dasharray]")).toHaveLength(3);
+    expect(el.querySelector(".lang-pie-legend")?.textContent).toContain("C#");
   });
 
   it("opens to every language with files, lines, share and import analysis, plus skipped extensions", () => {

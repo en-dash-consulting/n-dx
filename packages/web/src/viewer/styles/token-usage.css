@@ -56,8 +56,19 @@
 
 .btn:hover { opacity: 0.85; }
 
-.btn-small {
-  padding: 4px 10px;
+/* The primary action (Inbox Accept and Place best guesses, Agent settings' Save):
+   the accent fill, named so it holds where a call site's own rule restyles `.btn`. */
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* The small button: `btn-sm` (and its older spelling `btn-small`) on compact
+   controls — Inbox and placement actions, the assignee picker, Apply. A
+   rule a call site loads later (.inbox-place) still sets its own size. */
+.btn-small,
+.btn-sm {
+  padding: var(--space-1) var(--space-2-5);
   font-size: var(--font-sm);
 }
 

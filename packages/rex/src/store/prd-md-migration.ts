@@ -5,7 +5,7 @@ import type { PRDDocument } from "../schema/index.js";
 import { validateDocument } from "../schema/validate.js";
 import { parseDocument } from "./markdown-parser.js";
 import { serializeDocument } from "./markdown-serializer.js";
-import { PRD_FILENAME } from "./file-adapter.js";
+import { PRD_FILENAME } from "./paths.js";
 
 export const PRD_MARKDOWN_FILENAME = "prd.md";
 
@@ -55,10 +55,11 @@ export function toMarkdownSourcePath(jsonFilename: string): string {
  * the two agreed only by eye.
  *
  * Composed from this module's own constants rather than by calling
- * `toMarkdownSourcePath(PRD_FILENAME)`: `file-adapter.ts` imports from here, so
- * evaluating `PRD_FILENAME` at module scope hits its temporal dead zone and
- * every `rex` command dies on import. `prd-md-migration.test.ts` asserts the
- * two agree, which is the check that call would have been.
+ * `toMarkdownSourcePath(PRD_FILENAME)`. That call once had to be avoided:
+ * `PRD_FILENAME` lived in `file-adapter.ts`, which imports from here, so
+ * evaluating it at module scope hit its temporal dead zone and every `rex`
+ * command died on import. It now lives in `paths.ts` and the cycle is gone;
+ * `prd-md-migration.test.ts` still asserts the two agree.
  */
 export const CANONICAL_MARKDOWN_SOURCE_PATH =
   `${LEGACY_SOURCE_FILE_PREFIX}${PRD_MARKDOWN_FILENAME}`;

@@ -1891,7 +1891,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // briefForRun): the commit trailers it adds name the run.
   const { brief, taskId, briefText: selectionBriefText, systemPrompt } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );

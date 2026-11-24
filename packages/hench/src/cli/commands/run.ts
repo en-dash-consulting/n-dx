@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock, prdLayout } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
-import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry } from "../../agent/planning/brief.js";
+import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry, TaskNotActionableError } from "../../agent/planning/brief.js";
 import type { EscalationConfig, PermissionMode, RunEscalation, RunLoopPosition, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
@@ -33,7 +33,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
-import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, v2RefPriority, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
+import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, TaskNotFoundError, v2RefPriority, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -44,6 +44,10 @@ import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failur
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
+import { readRunQueue, takeFromRunQueue } from "../../queue/run-queue.js";
+
+/** Statuses a queued task never leaves by itself: the queue drops it. Blocked and deferred keep it queued. */
+const QUEUE_FINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "cancelled", "deleted"]);
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { section, detail, formatDuration } from "../../types/output.js";
@@ -1556,6 +1560,44 @@ async function runOne(
   // Its "No actionable tasks" error is the sentinel `--loop` reads as "done",
   // and is deliberately left to propagate exactly as it did from the brief.
   const selectionTree = await loadV2Tree(store);
+  // The planned run queue (the dashboard's Queue panel) steers plain
+  // autoselection: its first item that can run goes next, before rex's own
+  // pick. A filter the person asked for (--task, --epic, --tags, --mine) wins
+  // over it. Each item is taken as an explicit --task would be. Only a final
+  // refusal takes an item off: one that is finished (or otherwise not
+  // actionable) or no longer in the PRD. One that is blocked, still in the
+  // Inbox or held by another worktree may run later, so it is passed over and
+  // kept. The PRD is read once, before the queue is touched: a read that fails
+  // throws here, as rex's own pick would, and leaves the queue as it was.
+  if (!taskId && !epicId && !tags?.length && !assignee && (await readRunQueue(henchDir)).length > 0) {
+    const queueItems = (await store.loadDocument()).items;
+    const queued = await takeFromRunQueue(
+      henchDir,
+      async (id) => selectTaskEntry(queueItems, {
+        ...(selectionTree ? { tree: selectionTree } : {}),
+        taskId: id,
+        requireUnblocked: true,
+        ...(wouldResetIds ? { wouldResetIds } : {}),
+        claims,
+      }),
+      {
+        dryRun,
+        // Finished or gone is final; blocked and deferred are statuses a task leaves again, so it waits.
+        final: (_id, err) =>
+          (err instanceof TaskNotActionableError && QUEUE_FINAL_STATUSES.has(err.status)) || err instanceof TaskNotFoundError,
+        ...(excludeTaskIds ? { skip: excludeTaskIds } : {}),
+      },
+    );
+    for (const skip of queued.skipped) {
+      const off = skip.dropped ? (dryRun ? " and would take it off the queue" : " and took it off the queue") : "";
+      info(`Run queue: passed over ${skip.taskId} (${skip.reason})${off}.`);
+    }
+    if (queued.removalError) warn(`Run queue: could not update the queue (${queued.removalError}); it is tidied on a later run.`);
+    if (queued.picked) {
+      info(`Run queue: running ${queued.picked.taskId}, next in the queue.`);
+      taskId = queued.picked.value.item.id;
+    }
+  }
   const selected = await selectTaskEntry((await store.loadDocument()).items, {
     ...(selectionTree ? { tree: selectionTree } : {}),
     ...(taskId ? { taskId } : {}),

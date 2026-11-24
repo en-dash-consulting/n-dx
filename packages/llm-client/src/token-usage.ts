@@ -20,7 +20,7 @@
  */
 
 import type { TokenUsage } from "./types.js";
-import type { TokenDiagnosticStatus } from "./runtime-contract.js";
+import type { TokenCacheProvenance, TokenDiagnosticStatus } from "./runtime-contract.js";
 import { asRecord } from "./json.js";
 
 // ── Diagnostic-aware result type ──────────────────────────────────────────
@@ -40,25 +40,7 @@ export interface TokenParseResult {
   readonly cacheProvenance: TokenCacheProvenance;
 }
 
-/**
- * Where a run's cache token counts came from.
- *
- * The distinction this exists to draw is between a vendor that accounted for
- * caching and reported nothing cached, and a vendor that did not account for
- * it at all. Both leave `cacheReadInput` absent, and reporting either as a
- * plain `0` says "this run used no cache" — a claim only the first one
- * supports. A Codex CLI run scraped from `Tokens used: N in, N out` has no
- * cache accounting whatsoever, and for months read as a run that cached
- * nothing while its JSONL was reporting 35k cached input tokens a turn.
- *
- * - `measured` — the vendor reported cache fields; the counts are its own.
- * - `estimated` — the counts were derived rather than reported. No parser
- *   produces this today; it exists so a future estimator cannot be mistaken
- *   for a measurement.
- * - `unavailable` — no cache accounting was present. Read the counts as
- *   unknown, not as zero.
- */
-export type TokenCacheProvenance = "measured" | "estimated" | "unavailable";
+export type { TokenCacheProvenance } from "./runtime-contract.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 

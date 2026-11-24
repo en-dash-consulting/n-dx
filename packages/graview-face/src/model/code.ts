@@ -18,6 +18,21 @@ export function fragileZones(store: Reader): readonly Of<"zone">[] {
     .sort((a, b) => (b.coupling ?? 0) - (b.cohesion ?? 0) - ((a.coupling ?? 0) - (a.cohesion ?? 0)));
 }
 
+/**
+ * The Analysis page's two treatments, carried on the record by the
+ * projection: a zone one of its recommended next steps names needs work; one
+ * it only counts among the zones needing attention is highlighted. Read off
+ * any record, so a kind without the fields reads as neither.
+ */
+export type Mark = "needs-work" | "highlighted";
+
+export function markOf(node: { readonly kind: string }): Mark | undefined {
+  const flags = node as { readonly needsWork?: unknown; readonly highlighted?: unknown };
+  if (flags.needsWork === true) return "needs-work";
+  if (flags.highlighted === true) return "highlighted";
+  return undefined;
+}
+
 /** Top-level zones only: those inside no other zone. */
 export function topZones(store: Reader): readonly Of<"zone">[] {
   return nodesOf(store, "zone").filter((z) => out(store, z.id, "under").length === 0);

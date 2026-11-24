@@ -26,22 +26,15 @@
  */
 
 import { laneSteps, stepRunOptions, isRecord } from "../../shared/index.js";
-import type { QueuePlan, SidecarChangeSet, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet, SidecarHeldBy, SidecarItemEdit, SidecarLink, SidecarPlacement, SidecarStatusChange } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import { choiceResultText } from "./choice-card.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
+import type { CarryOutResult } from "./carry-out-result.js";
+import { heldByText } from "./active-work.js";
 
-/** One effect's result, as the tool result states it. */
-export interface CarryOutResult {
-  ok: boolean;
-  text: string;
-  /** The PRD items the effect wrote, in order. */
-  ids?: string[];
-  /** True when rex recorded the effect without writing it: a hench run applies it after its test gate. Never set with `ok: false`. */
-  held?: boolean;
-  /** A started run's end, for an effect that outlives its tool result: a failed end revises the card. */
-  ended?: Promise<CarryOutResult>;
-}
+/** One effect's result, as the tool result states it: in carry-out-result.ts, which the card handlers read. */
+export type { CarryOutResult } from "./carry-out-result.js";
 
 /** The effects an approved call can have, wired to the server's job model and execute route. */
 export interface SidecarActions {
@@ -90,6 +83,13 @@ export interface SidecarActions {
   projectRepoRoot?(project: string, signal?: AbortSignal): Promise<{ ok: true; repoRoot: string } | { ok: false; error: string }>;
   /** An approved draft file, written at the path its card showed. Never throws. */
   saveDraft?(path: string, content: string): CarryOutResult;
+  /**
+   * The first of `itemIds` that active work (a run or a claim in any
+   * worktree) holds right now, or null (`active-work.ts`). Read when a PRD
+   * card is raised and again on its approval. Never throws; absent where no
+   * PRD card is offered (the hub).
+   */
+  heldItem?(itemIds: string[]): Promise<SidecarHeldBy | null>;
 }
 
 /** `pr`: the worktree a workspace key names, its PR and checks. `check`: one check's newest run on a base branch. */
@@ -151,7 +151,10 @@ export async function carryOutDecision(
     ? "Allowed by the Sidecar allow-list."
     : outcome.decidedBy === "project-allowance"
       ? `Allowed for this project by ${outcome.setting}.`
-      : `The operator approved card ${outcome.card.id}.${outcome.card.reason ? ` Operator's note: ${outcome.card.reason}` : ""}`;
+      : `The operator approved card ${outcome.card.id}.${outcome.card.reason ? ` Operator's note: ${outcome.card.reason}` : ""}` +
+        (outcome.card.heldAcknowledged && outcome.card.heldBy
+          ? ` The operator confirmed it over the card's warning that ${outcome.card.heldBy.itemId} is ${heldByText(outcome.card.heldBy)}; that work may see the change mid-run.`
+          : "");
   const effect = await carryOut(tool, input, outcome, actions, signal);
   return { ...effect, text: `${decided} ${effect.text}` };
 }

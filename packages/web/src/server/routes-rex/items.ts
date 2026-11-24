@@ -16,7 +16,7 @@ import {
   appendLog, API_SETTABLE_STATUSES, loadPRDOr404, broadcastPrdChanged,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache, summaryField } from "../prd-io.js";
-import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode, attachImages, AttachmentError, assertShortTitleAvailable } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -143,9 +143,12 @@ export function routeItems(
  * added and changed by `move_item`, never by an edit.
  */
 const PATCHABLE_FIELDS = new Set([
-  "status", "failureReason", "priority", "tags", "title",
-  "summary", "description", "acceptanceCriteria", "requirements",
+  "status", "failureReason", "priority", "prioritized", "tags", "title", "shortTitle",
+  "summary", "description", "acceptanceCriteria", "requirements", "assignee",
 ]);
+
+/** The types that carry `prioritized`, as rex's `canBePrioritized`: a v2 change, a v1 epic. */
+const PRIORITIZABLE_TYPES: ReadonlySet<ItemType> = new Set(["change", "epic"]);
 
 const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((s) => typeof s === "string");
@@ -169,7 +172,8 @@ function validateItemPatch(body: unknown): string | null {
     && !(typeof patch.priority === "string" && isPriority(patch.priority))) {
     return `Invalid priority: ${String(patch.priority)}`;
   }
-  for (const key of ["title", "summary", "description", "failureReason"] as const) {
+  if (patch.prioritized !== undefined && typeof patch.prioritized !== "boolean") return `"prioritized" must be a boolean`;
+  for (const key of ["title", "shortTitle", "summary", "description", "failureReason", "assignee"] as const) {
     if (patch[key] !== undefined && typeof patch[key] !== "string") return `"${key}" must be a string`;
   }
   if (patch.title !== undefined && (patch.title as string).trim() === "") return `"title" must not be empty`;
@@ -260,12 +264,28 @@ async function handleItemPatch(
     if (completing) delete fieldUpdates.status;
     // A cleared summary is removed, as `rex update --summary=` and edit_item remove it.
     if (typeof fieldUpdates.summary === "string" && !fieldUpdates.summary.trim()) fieldUpdates.summary = undefined;
+    // Stored only as true; false removes it, as `rex update --prioritized=false` does.
+    if (fieldUpdates.prioritized === false) fieldUpdates.prioritized = undefined;
+    // A short title is kept trimmed, and a cleared one removed, as `rex update --short-title=` and edit_item do.
+    if (typeof fieldUpdates.shortTitle === "string") fieldUpdates.shortTitle = fieldUpdates.shortTitle.trim() || undefined;
+    // An assignee is matched exactly by `ndx work --mine`: trimmed, and empty
+    // removes it, as `rex update --assignee=` and edit_item do.
+    if (typeof fieldUpdates.assignee === "string") fieldUpdates.assignee = fieldUpdates.assignee.trim() || undefined;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
     const completion = completing ? await completeV2Work(store, itemId) : undefined;
     if (Object.keys(fieldUpdates).length > 0 || !completing) {
       try {
         await store.withTransaction(async (doc) => {
+          const target = "prioritized" in fieldUpdates ? findItemById(doc.items, itemId) : null;
+          if (target && !PRIORITIZABLE_TYPES.has(itemTypeOf(target))) {
+            throw new Error(`Only a change (an epic on a v1 PRD) can be prioritized; "${target.title}" is a ${itemTypeOf(target)}`);
+          }
+          if (typeof fieldUpdates.shortTitle === "string") {
+            const self = findItemById(doc.items, itemId);
+            // Refused naming the open item that already shows the name; checked under the lock the write holds.
+            if (self) assertShortTitleAvailable(doc.items, fieldUpdates.shortTitle, { id: itemId, status: (updates.status as string | undefined) ?? self.status });
+          }
           if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
             throw new ItemNotFoundError(`Item "${itemId}" not found`);
           }
@@ -812,9 +832,16 @@ async function handleBulkUpdate(
 
     // The same field rules as the single PATCH, so the bulk route cannot write
     // what that one refuses (`run`, ids, timestamps, an empty title).
-    const problem = validateItemPatch(input.updates);
+    const problem = validateItemPatch(input.updates)
+      ?? ("prioritized" in input.updates ? `"prioritized" is set per change, through PATCH /api/rex/items/:id` : null);
     if (problem) {
       errorResponse(res, 400, problem);
+      return true;
+    }
+    // A short title is unique among open items, so one value set on several
+    // ids always collides: it has no valid bulk use.
+    if ("shortTitle" in input.updates) {
+      errorResponse(res, 400, `Field "shortTitle" cannot be changed through the bulk route: a short title is unique among open items, so edit it per item (PATCH /api/rex/items/:id).`);
       return true;
     }
 
@@ -831,6 +858,8 @@ async function handleBulkUpdate(
     const completing = input.updates.status === "completed" && isChangeLayerStore(store);
     const fieldUpdates = { ...input.updates };
     if (completing) delete fieldUpdates.status;
+    // As the single PATCH: trimmed, and empty removes it.
+    if (typeof fieldUpdates.assignee === "string") fieldUpdates.assignee = fieldUpdates.assignee.trim() || undefined;
     const writeFields = !completing || Object.keys(fieldUpdates).length > 0;
     let updatedDoc: Awaited<ReturnType<typeof store.loadDocument>>;
     let autoCompleteError: string | undefined;

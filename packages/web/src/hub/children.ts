@@ -247,6 +247,14 @@ export class ProjectSupervisor {
     return next;
   }
 
+  /**
+   * Resolves once the lifecycle operation in flight now (a start, an attach,
+   * a stop or a health tick) has finished. Never rejects.
+   */
+  settled(): Promise<void> {
+    return this.inFlight;
+  }
+
   /** Spawn the project server and wait for it to publish its port. */
   start(): Promise<void> {
     return this.serialize(() => this.spawnAndWait());

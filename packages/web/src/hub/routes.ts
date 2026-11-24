@@ -64,7 +64,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute } from "node:path";
 import { detectBasePath, projectIdFromBasePath, requestAccess, safeDecodeSegment, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
-import type { Hub, RegisterProjectInput } from "./hub.js";
+import type { HubHost } from "./hub-host.js";
+import type { RegisterProjectInput } from "./project-view.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
 import { deriveProjectId, isDirectory, isReservedProjectId, planNewProject, suggestedParentDir, writeHubMarkerFiles } from "./new-project.js";
@@ -250,7 +251,7 @@ function newProjectAnswer(plan: NewProjectPlan, defaultParent: string): Record<s
  * be noise in the console on every keystroke. Creation is the POST below, and
  * it re-plans rather than trusting this answer.
  */
-function handleNewProjectPreview(res: ServerResponse, hub: Hub, query: URLSearchParams): boolean {
+function handleNewProjectPreview(res: ServerResponse, hub: HubHost, query: URLSearchParams): boolean {
   const defaultParent = suggestedParentDir(hub.listProjects());
   const parent = query.get("parent") ?? "";
   const name = query.get("name") ?? "";
@@ -267,7 +268,7 @@ function handleNewProjectPreview(res: ServerResponse, hub: Hub, query: URLSearch
  * setup wizard does the initializing — one path into init, the one that
  * already asks about assistants, the LLM vendor and git.
  */
-async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
+async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: HubHost): Promise<boolean> {
   const body = await readJsonBodyOr400(req, res);
   if (body === undefined) return true;
   const b = (body ?? {}) as Record<string, unknown>;
@@ -351,7 +352,7 @@ async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: 
  * the running sidecars. A project id (the query, else the `/p/<id>/` prefix)
  * adds each extension's links resolved for that project; an unknown one is 404.
  */
-async function handleExtensions(res: ServerResponse, hub: Hub, projectId: string | null): Promise<boolean> {
+async function handleExtensions(res: ServerResponse, hub: HubHost, projectId: string | null): Promise<boolean> {
   const project = projectId !== null ? hub.getProject(projectId) : null;
   if (projectId !== null && !project) {
     noSuchProject(res, projectId);
@@ -372,7 +373,7 @@ async function handleExtensions(res: ServerResponse, hub: Hub, projectId: string
  * client builds one. 404 unless the project is registered and the extension
  * is enabled (approved and compatible) with a sidecar and a `sidecarTab`.
  */
-async function handleFrameKey(res: ServerResponse, hub: Hub, name: string, projectId: string | null): Promise<boolean> {
+async function handleFrameKey(res: ServerResponse, hub: HubHost, name: string, projectId: string | null): Promise<boolean> {
   if (projectId === null) {
     error(res, 400, "project is required: ?project=<id>, or address /p/<id>/api/hub/…");
     return true;
@@ -418,7 +419,7 @@ async function handleFrameKey(res: ServerResponse, hub: Hub, name: string, proje
 }
 
 /** Handle a `/api/hub/*` request. Returns false when the path is not the hub's. */
-export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
+export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, hub: HubHost): Promise<boolean> {
   const [rawUrl, rawQuery = ""] = (req.url || "/").split("?");
 
   // A viewer's fetch arrives under its own base path; the hub's API is the

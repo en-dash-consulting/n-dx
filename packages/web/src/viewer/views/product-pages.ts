@@ -20,7 +20,7 @@ import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { failureMessage, useCliName, useProductRead, useRefetchableProductRead } from "../hooks/index.js";
-import type { Load } from "../hooks/index.js";
+import { Pending, StaleNotice } from "./product-notices.js";
 import type { NavigateTo } from "../types.js";
 import { ProductView } from "./product.js";
 import { CapabilityPage } from "./capability.js";
@@ -45,19 +45,6 @@ export function NoProductLayer({ title }: { title: string }) {
       " to move it to areas, capabilities and changes.",
     ),
   );
-}
-
-export function Pending<T>({ load }: { load: Exclude<Load<T>, { state: "ready" | "v1" }> }) {
-  return load.state === "loading"
-    ? h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...")
-    : h("div", { class: "empty-state", role: "alert" }, `Could not load: ${load.message}`);
-}
-
-/** Shown above a page whose latest refetch failed; the page is the last good read. */
-export function StaleNotice({ message }: { message?: string }) {
-  return message
-    ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not refresh: ${message}. Showing the last loaded data.`)
-    : null;
 }
 
 /** Post a spec edit; resolves on success, rejects with the server's reason. */
@@ -218,13 +205,14 @@ function ProductMapPage({ onCapabilityChange, initialTab = "map", navigateTo }: 
  * the route's `?area=` slug, and clearing it navigates to the bare page.
  */
 export function ChangesPage({ navigateTo, area = null }: { navigateTo?: NavigateTo; area?: string | null }) {
-  const load = useProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
+  const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
   if (load.state === "v1") return h(NoProductLayer, { title: "Changes" });
   if (load.state !== "ready") return h(Pending, { load });
   return h("div", null,
     h(StaleNotice, { message: load.refreshError }),
     h(ChangesView, {
       changes: load.data,
+      onAssigned: refetch,
       onSelectChange: navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined,
       area,
       onClearArea: navigateTo ? () => navigateTo("changes") : undefined,

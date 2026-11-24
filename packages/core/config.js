@@ -210,6 +210,9 @@ const PROJECT_SECTIONS = new Set([
   // The Graview projection's settings (`graview.bin`, `graview.allowNpx`, …),
   // read by packages/graview/src/graview-bin.ts.
   "graview",
+  // Settings every n-dx agent shares (`agent.promptFile`, the agent prompt
+  // file's location), read by packages/llm-client/src/agent-prompt.ts.
+  "agent",
   // Per-extension sections, `extensions.<name>`. Unlike the others it is also
   // read from the user config and set through its own handler (see
   // "Extension config sections" below).
@@ -2796,6 +2799,15 @@ Self-heal settings (.n-dx.json):
                                     '(bypassed prompt via selfHeal.autoConfirm
                                     config)' so the source is auditable.
                                     Example: n-dx config selfHeal.autoConfirm true
+
+Agent settings (.n-dx.json):
+  agent.promptFile         string    Markdown file whose text is appended to the
+                                    system prompt of every n-dx agent ('work' runs,
+                                    their reviewers, the Sidecar), relative to the
+                                    project root and inside it (default:
+                                    .ndx/agent-prompt.md, or .n-dx-agent-prompt.md
+                                    on the legacy layout). Absent or empty: no
+                                    change. Agents receive at most 32 KB of it
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)

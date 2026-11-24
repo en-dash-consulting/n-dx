@@ -5,20 +5,28 @@
  * is a presentation of `plannedRelease` rather than a tree walk. Releases run
  * newest first, with the unscheduled group on top while it holds open work.
  * Within a release, open stages lead in lifecycle order and applied/shipped
- * changes collapse behind a count; long intents clamp to two lines.
+ * changes collapse behind a count; long intents clamp to two lines. An open
+ * change's row carries its assignee picker, and the assignee filter (Mine by
+ * default when the current user has open work assigned) hides rows only.
  *
  * Driven entirely by its `changes` prop: `product-pages.ts` fetches it from
  * `GET /api/rex/changes`, and tests render it from a fixture.
  */
 
 import { h, Fragment } from "preact";
-import { useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import { ApplyAllBar } from "./apply-all.js";
 import type { NavigateTo } from "../types.js";
-import { BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle, useItemImpacts, type ItemImpact } from "../components/index.js";
+import type { KnownPerson } from "../external.js";
+import {
+  AssigneeFilter, AssigneeFilterPending, AssigneePicker, BrandedHeader, DescribeInSidecarButton, ImpactTags, displayTitle,
+  pickerChoices, saveAssignee, titleTooltip, useAssigneeFilter, useItemImpacts, usePeople,
+  type AssignableRow, type ItemImpact,
+} from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
   CHANGE_STAGE_ORDER,
+  changeAssignees,
   groupChangesByRelease,
   isAppliedStage,
   type ChangeRow,
@@ -26,6 +34,7 @@ import {
   type ReleaseGroup,
   type StageGroup,
 } from "./product-model.js";
+import { PrioritizedTag } from "./prioritized-tag.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -104,10 +113,32 @@ function Intent({ intent }: { intent: string }) {
   );
 }
 
-function Change({ change, onSelect, impact }: {
+/** What a row needs to assign its change: the picker's suggestions, the current user, and a save. */
+interface Assigning {
+  people: readonly KnownPerson[];
+  me: string | null;
+  onAssign: (id: string, assignee: string) => Promise<void>;
+}
+
+function Assignee({ change, assigning }: { change: ChangeRow; assigning: Assigning }) {
+  // Applied work is history: its assignee shows, and is not reassigned here.
+  if (isAppliedStage(change.stage)) {
+    return change.assignee ? h("span", { class: "ch-assignee" }, change.assignee) : null;
+  }
+  return h(AssigneePicker, {
+    itemId: change.id,
+    assignee: change.assignee,
+    people: assigning.people,
+    me: assigning.me,
+    onSave: (assignee: string) => assigning.onAssign(change.id, assignee),
+  });
+}
+
+function Change({ change, onSelect, impact, assigning }: {
   change: ChangeRow;
   onSelect?: (id: string) => void;
   impact?: ItemImpact;
+  assigning: Assigning;
 }) {
   return h("li", {
     class: "ch-change",
@@ -116,15 +147,16 @@ function Change({ change, onSelect, impact }: {
   },
     h("div", { class: "ch-change-head" },
       change.displayId ? h("span", { class: "ch-display-id" }, change.displayId) : null,
-      // The plain-language summary leads; the technical title is the tooltip and the detail panel's heading.
+      // The short title or plain-language summary leads; the full title is the tooltip and the detail panel's heading.
       onSelect
         ? h("button", {
             type: "button",
             class: "ch-change-link",
-            title: change.summary ? change.title : undefined,
+            title: titleTooltip(change),
             onClick: () => onSelect(change.id),
           }, displayTitle(change))
-        : h("span", { class: "ch-change-title", title: change.summary ? change.title : undefined }, displayTitle(change)),
+        : h("span", { class: "ch-change-title", title: titleTooltip(change) }, displayTitle(change)),
+      h(PrioritizedTag, { prioritized: change.prioritized }),
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       isAppliedStage(change.stage) ? null : h(DescribeInSidecarButton, { changeId: change.id }),
@@ -136,15 +168,16 @@ function Change({ change, onSelect, impact }: {
       h(TaskProgress, { change }),
       h(ImpactTags, { impact, full: true }),
       change.loe !== undefined ? h("span", { class: "ch-loe" }, `${change.loe}w`) : null,
-      change.assignee ? h("span", { class: "ch-assignee" }, change.assignee) : null,
+      h(Assignee, { change, assigning }),
       change.shippedIn ? h("span", { class: "tag ch-shipped-in" }, `shipped in ${change.shippedIn}`) : null,
     ),
   );
 }
 
-function Stage({ stage, onSelectChange }: {
+function Stage({ stage, onSelectChange, assigning }: {
   stage: StageGroup;
   onSelectChange?: (id: string) => void;
+  assigning: Assigning;
 }) {
   const impacts = useItemImpacts();
   return h("div", { class: "ch-stage", "data-stage": stage.stage },
@@ -154,7 +187,7 @@ function Stage({ stage, onSelectChange }: {
     ),
     h("ul", { class: "ch-change-list" },
       stage.changes.map((change) =>
-        h(Change, { key: change.id, change, onSelect: onSelectChange, impact: impacts[change.id] })),
+        h(Change, { key: change.id, change, onSelect: onSelectChange, impact: impacts[change.id], assigning })),
     ),
   );
 }
@@ -166,10 +199,11 @@ type GroupMode = "open" | "applied" | "all";
  * One release. Applied history is a collapsed section whose rows mount only
  * once it is expanded, so a group of 1,241 applied changes costs a button.
  */
-function Release({ group, mode, onSelectChange }: {
+function Release({ group, mode, onSelectChange, assigning }: {
   group: ReleaseGroup;
   mode: GroupMode;
   onSelectChange?: (id: string) => void;
+  assigning: Assigning;
 }) {
   const [showApplied, setShowApplied] = useState(false);
   const open = mode === "applied" ? [] : group.stages.filter((s) => !isAppliedStage(s.stage));
@@ -186,7 +220,7 @@ function Release({ group, mode, onSelectChange }: {
       group.label,
       h("span", { class: "ch-release-count" }, `${count}`),
     ),
-    open.map((stage) => h(Stage, { key: stage.stage, stage, onSelectChange })),
+    open.map((stage) => h(Stage, { key: stage.stage, stage, onSelectChange, assigning })),
     applied.length > 0
       ? h("button", {
           type: "button",
@@ -196,7 +230,7 @@ function Release({ group, mode, onSelectChange }: {
         }, `${group.appliedCount} applied ${showApplied ? "▾" : "▸"}`)
       : null,
     showApplied
-      ? applied.map((stage) => h(Stage, { key: stage.stage, stage, onSelectChange }))
+      ? applied.map((stage) => h(Stage, { key: stage.stage, stage, onSelectChange, assigning }))
       : null,
   );
 }
@@ -309,7 +343,12 @@ function AreaChip({ title, count, onRemove }: { title: string; count: number; on
 
 // ── View ─────────────────────────────────────────────────────────────
 
-export function ChangesView({ changes, onSelectChange, area = null, onClearArea, navigateTo }: {
+/** The assignee filter's view of the backlog: open unless applied or shipped. */
+export function assignableChanges(changes: readonly ChangeRow[]): AssignableRow[] {
+  return changes.map((c) => ({ assignees: changeAssignees(c), open: !isAppliedStage(c.stage) }));
+}
+
+export function ChangesView({ changes: allChanges, onSelectChange, area = null, onClearArea, navigateTo, onAssigned }: {
   changes: ChangeRow[];
   /** Reaches Settings → Workflow from the Apply all bar. */
   navigateTo?: NavigateTo;
@@ -319,14 +358,26 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea,
   area?: string | null;
   /** Clears the area filter; the chip's remove button and every other chip call it. */
   onClearArea?: () => void;
+  /** Reads the changes again after a row's assignee is saved. */
+  onAssigned?: () => void;
 }) {
   const [stored, setStored] = useState(readStoredFilter);
+  const peopleRead = usePeople();
+  const assignable = useMemo(() => assignableChanges(allChanges), [allChanges]);
+  const assigneeFilter = useAssigneeFilter(assignable, peopleRead);
+  const assigning: Assigning = {
+    people: useMemo(() => pickerChoices(peopleRead?.people ?? [], allChanges.map((c) => c.assignee)), [peopleRead, allChanges]),
+    me: peopleRead?.me ?? null,
+    onAssign: async (id, assignee) => { await saveAssignee(id, assignee); onAssigned?.(); },
+  };
+  // The assignee filter hides rows only: every count and group below is of what it shows.
+  const changes = allChanges.filter((c) => assigneeFilter.shows(changeAssignees(c)));
   const groups = groupChangesByRelease(changes);
   const appliedTotal = groups.reduce((n, g) => n + g.appliedCount, 0);
   const openTotal = changes.length - appliedTotal;
 
   // A remembered release that no longer exists falls back to the default.
-  const known = new Set(groups.map(filterOf));
+  const known = new Set(groupChangesByRelease(allChanges).map(filterOf));
   const inArea = area ? changesInArea(changes, area) : null;
   // The area filter outranks the remembered one; it lives in the address, not storage.
   const stage = inArea ? null : stageOfFilter(stored);
@@ -360,13 +411,18 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea,
 
     // Done and waiting to apply: one step for all of them, and the way to make it automatic.
     // Held in the Inbox, a change is placed before it applies: Apply all leaves it out.
-    h(ApplyAllBar, { waiting: changes.filter((c) => c.stage === "awaiting-apply" && !c.awaitsPlacement).length, navigateTo }),
+    // Apply all applies every waiting change, whoever it is assigned to.
+    h(ApplyAllBar, { waiting: allChanges.filter((c) => c.stage === "awaiting-apply" && !c.awaitsPlacement).length, navigateTo }),
 
-    groups.length === 0
+    allChanges.length === 0
       ? h("div", { class: "empty-state", role: "status" },
           "No changes yet. Captured work appears here, grouped by the release it is planned for.")
+      // Held until the people list is read: the default (Mine or All) depends on it.
+      : assigneeFilter.pending
+        ? h(AssigneeFilterPending, null)
       : h(Fragment, null,
           h("div", { class: "ch-filters", role: "group", "aria-label": "Filter changes" },
+            h(AssigneeFilter, { state: assigneeFilter }),
             h(FilterChip, { value: "open", label: "Open", count: openTotal, active: filter === "open", onPick: pick }),
             h(FilterChip, { value: "applied", label: "Applied", count: appliedTotal, active: filter === "applied", onPick: pick }),
             inArea && areaTitle ? h(AreaChip, { title: areaTitle, count: inArea.length, onRemove: removeArea }) : null,
@@ -381,7 +437,7 @@ export function ChangesView({ changes, onSelectChange, area = null, onClearArea,
           shown.length === 0
             ? h("div", { class: "empty-state", role: "status" }, "Nothing matches this filter.")
             : shown.map((group) =>
-                h(Release, { key: `${filter}:${filterOf(group)}`, group, mode, onSelectChange })),
+                h(Release, { key: `${filter}:${filterOf(group)}`, group, mode, onSelectChange, assigning })),
         ),
   );
 }

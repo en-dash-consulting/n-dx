@@ -20,8 +20,10 @@ import { act } from "preact/test-utils";
 import { AskView, ASK_ENDPOINT } from "../../../src/viewer/views/ask.js";
 import {
   REFINEMENT_APPLY_ENDPOINT,
+  RefinementCard,
   describeProposal,
   outcomeStates,
+  reparentPreview,
   type RefinementProposal,
 } from "../../../src/viewer/views/ask-refinements.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -451,6 +453,56 @@ describe("describeProposal", () => {
     expect(describeProposal(editProposal({ op: "reparent" }))).toContain("different parent");
     expect(describeProposal(editProposal({ op: "merge", intoTitle: "Other task" })))
       .toContain('into "Other task"');
+  });
+});
+
+describe("a reparent card", () => {
+  const move = (overrides: Partial<RefinementProposal> = {}) => editProposal({
+    op: "reparent",
+    rationale: "It is checkout work, not search work.",
+    diffs: [{ field: "parent", before: ["Search"], after: ["Checkout"] }],
+    ...overrides,
+  });
+
+  function card(proposal: RefinementProposal): HTMLDivElement {
+    const root = document.createElement("div");
+    act(() => {
+      render(h(RefinementCard, { proposal, state: { status: "pending" }, onAccept: vi.fn(), onReject: vi.fn() }), root);
+    });
+    return root;
+  }
+
+  it("models the move from the parent diff, with the rationale as the reason", () => {
+    expect(reparentPreview(move())).toMatchObject({
+      relation: "move",
+      source: { title: "Add the Ask panel", kind: "task" },
+      from: { title: "Search" },
+      target: { title: "Checkout" },
+      why: ["It is checkout work, not search work."],
+      action: "Move to Checkout",
+    });
+    expect(reparentPreview(editProposal())).toBeNull();
+  });
+
+  it("draws the move and names it on the accept button", () => {
+    const root = card(move());
+    expect(root.querySelector<HTMLElement>(".pp")?.dataset.relation).toBe("move");
+    expect([...root.querySelectorAll(".pp-flow .pp-title")].map((t) => t.textContent)).toEqual(["Add the Ask panel", "Search", "Checkout"]);
+    expect(root.querySelector(".pp-why")?.textContent).toContain("It is checkout work, not search work.");
+    expect(root.querySelector(".pp-before")?.textContent).toContain("Under Search");
+    expect(root.querySelector(".pp-after")?.textContent).toContain("Under Checkout");
+    // The picture replaces the bare Parent diff and carries the rationale, so neither is drawn twice.
+    expect(root.querySelector(".sv-ask-diff")).toBeNull();
+    expect(root.querySelector(".sv-ask-proposal-rationale")).toBeNull();
+    expect(root.querySelector("button.sv-ask-proposal-accept")?.textContent).toBe("Move to Checkout");
+    act(() => { render(null, root); });
+  });
+
+  it("keeps Accept, and no picture, for an edit", () => {
+    const root = card(editProposal());
+    expect(root.querySelector(".pp")).toBeNull();
+    expect(root.querySelector("button.sv-ask-proposal-accept")?.textContent).toBe("Accept");
+    act(() => { render(null, root); });
   });
 });
 

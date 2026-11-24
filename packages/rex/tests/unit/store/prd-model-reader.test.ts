@@ -22,6 +22,7 @@ import {
 import { parseFolderTree } from "../../../src/store/folder-tree-parser.js";
 import { FolderTreeStore } from "../../../src/store/folder-tree-store.js";
 import { withLock } from "../../../src/store/file-lock.js";
+import { withPrdModelTransaction } from "../../../src/store/prd-model-transaction.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "../../../src/store/paths.js";
 import { loadStateFile, saveStateFile } from "../../../src/store/state-writer.js";
 import { specHash, type RuleNode } from "../../../src/schema/v2-rules.js";
@@ -223,6 +224,51 @@ describe.each(EOLS)("v2 trees (%s)", (eol) => {
       expect(find(model, CHANGE).status).toBe("completed");
       expect(find(model, TASK).title).toBe("Wire the button");
       expect(() => assertPrdModelWritable(model)).not.toThrow();
+    });
+  });
+
+  describe("a hand-edited prioritized that is not a boolean", () => {
+    const CHANGE_FILE = "changes/add-apple-pay/index.md";
+
+    async function withPrioritized(line: string): Promise<string> {
+      const rexDir = await copyFixture(eol);
+      await editText(join(rexDir, CHANGE_FILE), (text) => text.replace('priority: "high"\n', `priority: "high"\n${line}`));
+      return rexDir;
+    }
+
+    it.each([
+      ["True, a YAML string", "prioritized: True\n"],
+      ["a quoted string", 'prioritized: "true"\n'],
+      ["a number", "prioritized: 1\n"],
+      ["an empty value", "prioritized:\n"],
+    ])("drops %s with a warning naming the file, keeping the change and its task", async (_label, line) => {
+      const model = await loadPrdModel(await withPrioritized(line), quiet);
+      expect(model.warnings).toHaveLength(1);
+      expect(model.warnings[0]).toMatchObject({ path: expect.stringContaining("index.md") });
+      expect(model.warnings[0]!.message).toMatch(new RegExp(`^Ignoring prioritized on item id=${CHANGE}: expected true or false`));
+      expect(model.warnings[0]).not.toHaveProperty("skipped");
+      const change = find(model, CHANGE);
+      expect(change).toMatchObject({ title: "Add Apple Pay", priority: "high" });
+      expect(change).not.toHaveProperty("prioritized");
+      expect(find(model, TASK).title).toBe("Wire the button");
+    });
+
+    it("keeps a boolean as it is", async () => {
+      const model = await loadPrdModel(await withPrioritized("prioritized: true\n"), quiet);
+      expect(model.warnings).toEqual([]);
+      expect(find(model, CHANGE).prioritized).toBe(true);
+    });
+
+    it("leaves the tree writable", async () => {
+      const rexDir = await withPrioritized("prioritized: True\n");
+      await withPrdModelTransaction(rexDir, (model) => {
+        const tree = structuredClone(model.tree);
+        flatten(tree.changes).find(({ node }) => node.id === TASK)!.node.title = "Wire the Apple Pay button";
+        return { tree, result: undefined };
+      });
+      const model = await loadPrdModel(rexDir, quiet);
+      expect(find(model, TASK).title).toBe("Wire the Apple Pay button");
+      expect(find(model, CHANGE).title).toBe("Add Apple Pay");
     });
   });
 

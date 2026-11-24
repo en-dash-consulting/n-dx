@@ -108,6 +108,12 @@ interface SingletonSource {
   label: string;
   /** Where this job's output lands — the tray's result-card link target. */
   result: { view: ViewId; label: string };
+  /**
+   * The feature toggle the status route is gated by (route-feature-gates.ts).
+   * While it is off the route answers 403, so the tray does not ask: every
+   * refused poll would log a failed request in the browser console.
+   */
+  feature?: "web.sidecar";
   detail: (wire: SingletonWire) => string | undefined;
 }
 
@@ -166,6 +172,8 @@ const SINGLETON_SOURCES: SingletonSource[] = [
     stopUrl: "/api/commands/sidecar-command/stop",
     label: "Sidecar command",
     result: { view: "live", label: "View Live" },
+    // Only an approved Sidecar call starts this job; with web.sidecar off the route refuses.
+    feature: "web.sidecar",
     detail: (w) => lastLine(w.output as string | undefined) ?? (typeof w.command === "string" ? w.command : undefined),
   },
   {
@@ -269,7 +277,13 @@ function parseHenchExecution(wire: HenchExecutionWire): ActiveOperation {
 
 // ── Hook ────────────────────────────────────────────────────────────────
 
-export function useActiveOperations(): JobTray {
+/**
+ * `enabled` names the feature toggles that gate a source (`web.sidecar` gates
+ * the Sidecar command's status). The caller reads them — main.ts, through
+ * `useFeatureToggle` — because that hook stays contained to its zone
+ * (boundary-check.test.ts). A toggle not named is off.
+ */
+export function useActiveOperations(enabled: Readonly<Record<string, boolean>> = {}): JobTray {
   const [bySingleton, setBySingleton] = useState<Map<string, ActiveOperation>>(new Map());
   const [byHench, setByHench] = useState<Map<string, ActiveOperation>>(new Map());
   // Remembers (kind → startedAt) pairs already shown to completion, so a
@@ -284,10 +298,14 @@ export function useActiveOperations(): JobTray {
   const cliName = useCliName();
   const cliNameRef = useRef(cliName);
   cliNameRef.current = cliName;
+  // Toggles that gate a source, read the same way (off until the caller says otherwise).
+  const enabledRef = useRef<Readonly<Record<string, boolean>>>(enabled);
+  enabledRef.current = enabled;
 
   const pollSingletons = useCallback(async () => {
     const results = await Promise.all(
       SINGLETON_SOURCES.map(async (source) => {
+        if (source.feature && !enabledRef.current[source.feature]) return null;
         try {
           const res = await fetch(source.url);
           if (!res.ok) return null;

@@ -28,7 +28,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import { appendLog } from "./rex-route-helpers.js";
-import { summaryField } from "../prd-io.js";
+import { shortTitleField, summaryField } from "../prd-io.js";
 import {
   prdLayout,
   loadPrdModel,
@@ -49,8 +49,12 @@ import {
   resolveClaimHolder,
   computeEdges,
   suggestPlacements,
+  DEFAULT_APPLY_ON,
+  parseApplyOn,
 } from "../rex-gateway.js";
-import type { ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
+import type { ApplyOn, ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
+import { readNdxConfig } from "../ndx-config-file.js";
+import { isRecord } from "../../shared/index.js";
 
 // ── Wire types (mirror viewer/views/product-model.ts) ────────────────
 
@@ -116,14 +120,24 @@ export interface ChangeRowWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Short name shown in place of the title, when the change has one. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders, when the change has one. */
   summary?: string;
   intent?: string;
   stage: ChangeStageWire;
   priority?: string;
+  /** Leads the Inbox and Open changes, ahead of every unflagged change. */
+  prioritized?: boolean;
   loe?: number;
   spike?: boolean;
   assignee?: string;
+  /**
+   * Distinct assignees of the change's open tasks and subtasks, in tree order.
+   * `ndx work --mine` selects a task by its own assignee, so the assignee
+   * filter counts these as well as the change's. Absent when there are none.
+   */
+  taskAssignees?: string[];
   plannedRelease?: string;
   shippedIn?: string;
   /** When the change was applied; set on applied history. */
@@ -165,11 +179,17 @@ export interface GlanceChangeWire {
   id: string;
   displayId?: string;
   title: string;
+  /** Short name shown in place of the title, when the change has one. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders; the viewer shows it in place of the title when present. */
   summary?: string;
   stage: OpenChangeStageWire;
   priority?: string;
+  prioritized?: boolean;
   plannedRelease?: string;
+  /** As on `ChangeRowWire`: who the change is for, and who holds its open tasks. Plan's glance cards read them. */
+  assignee?: string;
+  taskAssignees?: string[];
   taskCount: number;
   completedTaskCount: number;
   /** As on `ChangeRowWire`: the glance's gap chips read these two. */
@@ -208,6 +228,13 @@ export interface ChangeSummaryWire {
   next: NextPickWire | null;
   /** Automated and metric requirements on open changes and their tasks, where `rex ready` reads them, and the open changes that hold none. */
   requirements: { total: number; uncovered: number };
+  /**
+   * The project's `rex.applyOn`: whether an Awaiting apply change waits for a
+   * steward (`complete`, where only a refused apply leaves one, and `review`)
+   * or for the next `rex release` (`release`). Always sent; optional because
+   * the viewer reads its absence as the default, `complete`.
+   */
+  applyOn?: ApplyOn;
 }
 
 export interface CapabilityDetailWire extends Omit<CapabilityRowWire, "criteriaCount"> {
@@ -375,6 +402,7 @@ export interface AwaitingApplyRef {
   id: string;
   displayId?: string;
   title: string;
+  shortTitle?: string;
   summary?: string;
 }
 
@@ -388,6 +416,7 @@ export function awaitingApplyChanges(tree: V2Tree): AwaitingApplyRef[] {
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
       title: change.title,
+      ...shortTitleField(change),
       ...summaryField(change),
     }));
 }
@@ -567,7 +596,7 @@ const tasksOf = (change: ChangeRuleNode): RuleNode[] =>
  * open changes and rex's next pick. `excludeIds` are units another worktree
  * has claimed, passed over as `ndx work` passes over them.
  */
-export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string> = new Set()): ChangeSummaryWire {
+export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string> = new Set(), applyOn: ApplyOn = DEFAULT_APPLY_ON): ChangeSummaryWire {
   const index = indexTree(tree);
   const stages: Record<OpenChangeStageWire, number> = { proposed: 0, ready: 0, "in-progress": 0, "awaiting-apply": 0 };
   const open: GlanceChangeWire[] = [];
@@ -584,14 +613,19 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
     stages[stage]++;
     if (isInboxChange(change)) inboxInStage++;
     const tasks = tasksOf(change);
+    const taskAssignees = openTaskAssignees(change);
     open.push({
       id: change.id,
       ...(change.displayId ? { displayId: change.displayId } : {}),
       title: change.title,
+      ...shortTitleField(change),
       ...summaryField(change),
       stage,
       ...(change.priority ? { priority: change.priority } : {}),
+      ...(change.prioritized ? { prioritized: true } : {}),
       ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
+      ...(change.assignee ? { assignee: change.assignee } : {}),
+      ...(taskAssignees.length ? { taskAssignees } : {}),
       taskCount: tasks.length,
       completedTaskCount: tasks.filter((t) => t.status === "completed").length,
       ...gapOf(index, change, tasks),
@@ -612,7 +646,13 @@ export function buildChangeSummary(tree: V2Tree, excludeIds: ReadonlySet<string>
       summary: pick.explanation.summary,
     }
     : null;
-  return { inbox, inboxInStage, stages, open, next, requirements: requirementCoverage(index) };
+  return { inbox, inboxInStage, stages, open, next, requirements: requirementCoverage(index), applyOn };
+}
+
+/** `rex.applyOn` as the Workflow page reads it from the project config: unset or invalid is the default. */
+function applyOnOf(projectDir: string): ApplyOn {
+  const rex = readNdxConfig(projectDir)["rex"];
+  return parseApplyOn(isRecord(rex) ? rex : {}).applyOn;
 }
 
 /**
@@ -641,6 +681,16 @@ function gapOf(index: TreeIndex, change: ChangeRuleNode, tasks: RuleNode[]): { c
   };
 }
 
+/** The distinct assignees of a change's open tasks and subtasks (not completed, cancelled or deleted). */
+function openTaskAssignees(change: ChangeRuleNode): string[] {
+  const seen = new Set<string>();
+  for (const node of liveWorkUnder(change)) {
+    const assignee = typeof node.assignee === "string" ? node.assignee.trim() : "";
+    if (assignee && node.status !== "completed") seen.add(assignee);
+  }
+  return [...seen];
+}
+
 /** Every live, not cancelled change: open ones and applied ones. */
 export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
   const index = indexTree(tree);
@@ -652,17 +702,21 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
     .map((change) => {
       const tasks = tasksOf(change);
       const areas = areasOf.get(change.id);
+      const taskAssignees = openTaskAssignees(change);
       return {
         id: change.id,
         ...(change.displayId ? { displayId: change.displayId } : {}),
         title: change.title,
+        ...shortTitleField(change),
         ...summaryField(change),
         ...(change.intent ? { intent: change.intent } : {}),
         stage: stageOf(change),
         ...(change.priority ? { priority: change.priority } : {}),
+        ...(change.prioritized ? { prioritized: true } : {}),
         ...(change.loe !== undefined ? { loe: change.loe } : {}),
         ...(change.spike ? { spike: true } : {}),
         ...(change.assignee ? { assignee: change.assignee } : {}),
+        ...(taskAssignees.length ? { taskAssignees } : {}),
         ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
         ...(change.shippedIn ? { shippedIn: change.shippedIn } : {}),
         ...(change.appliedAt ? { appliedAt: change.appliedAt } : {}),
@@ -956,7 +1010,7 @@ export function routeProductReads(
     } else if (path === "changes/summary") {
       const holder = resolveClaimHolder(ctx.projectDir);
       const claimed = await openClaimsStore(ctx.projectDir).claimedElsewhere(holder.worktreeRoot);
-      jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys())) });
+      jsonResponse(res, 200, { layout: "v2", summary: buildChangeSummary(model.tree, new Set(claimed.keys()), applyOnOf(ctx.projectDir)) });
     } else if (areaRef) {
       const area = buildAreaDetail(model.tree, areaRef);
       if (area) jsonResponse(res, 200, { layout: "v2", area });

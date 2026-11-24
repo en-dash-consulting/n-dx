@@ -7,7 +7,7 @@
  */
 
 import { h } from "preact";
-import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { RexTaskLink } from "../components/index.js";
@@ -189,6 +189,156 @@ function StatChip({ value, label, color, accent }: {
   return h("div", { class: `rex-dash-stat${accent ? " rex-dash-stat-accent" : ""}` },
     h("span", { class: "rex-dash-stat-value", style: color ? `color: ${color}` : "" }, String(value)),
     h("span", { class: "rex-dash-stat-label" }, label),
+  );
+}
+
+/** Total, done, active and pending, then blocked and deferred when there are any. */
+export function StatsRow({ stats }: { stats: TreeStats }) {
+  return h("div", { class: "rex-dash-stats" },
+    h(StatChip, { value: stats.total, label: "Total" }),
+    h(StatChip, { value: stats.completed, label: "Done", color: "var(--green)", accent: true }),
+    h(StatChip, { value: stats.inProgress, label: "Active", color: "var(--accent)" }),
+    h(StatChip, { value: stats.pending, label: "Pending" }),
+    stats.blocked > 0
+      ? h(StatChip, { value: stats.blocked, label: "Blocked", color: "var(--red)" })
+      : null,
+    stats.deferred > 0
+      ? h(StatChip, { value: stats.deferred, label: "Deferred", color: "var(--orange)" })
+      : null,
+  );
+}
+
+export { StatusProgressBar };
+
+/** Priority distribution over the status breakdown, one panel. */
+export function BreakdownPanel({ stats, priorities }: { stats: TreeStats; priorities: PriorityDistribution }) {
+  const priorityEntries = [
+    { label: "Critical", count: priorities.critical, cls: "critical" },
+    { label: "High", count: priorities.high, cls: "high" },
+    { label: "Medium", count: priorities.medium, cls: "medium" },
+    { label: "Low", count: priorities.low, cls: "low" },
+  ].filter((p) => p.count > 0);
+  const totalPrioritized = priorityEntries.reduce((s, p) => s + p.count, 0) + priorities.unset;
+  const status = (key: string, label: string, count: number) =>
+    h("div", { class: "rex-dash-status-item" },
+      h("span", { class: `prd-status-dot prd-status-${key}` }),
+      h("span", { class: "rex-dash-status-label" }, label),
+      h("span", { class: "rex-dash-status-count" }, String(count)),
+    );
+  return h("div", { class: "rex-dash-panel rex-dash-panel-breakdown" },
+    priorityEntries.length > 0
+      ? h("div", { class: "rex-dash-breakdown-part" },
+          h("h3", { class: "rex-dash-panel-title" }, "Priority Distribution"),
+          h("div", { class: "rex-dash-priority-bars" },
+            priorityEntries.map((p) =>
+              h("div", { key: p.label, class: "rex-dash-priority-row" },
+                h("span", { class: `rex-dash-priority-label rex-dash-priority-${p.cls}` }, p.label),
+                h("div", { class: "rex-dash-priority-track" },
+                  h("div", {
+                    class: `rex-dash-priority-fill rex-dash-priority-fill-${p.cls}`,
+                    style: `width: ${totalPrioritized > 0 ? (p.count / totalPrioritized) * 100 : 0}%`,
+                  }),
+                ),
+                h("span", { class: "rex-dash-priority-count" }, String(p.count)),
+              ),
+            ),
+          ),
+        )
+      : null,
+    h("div", { class: "rex-dash-breakdown-part" },
+      h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
+      h("div", { class: "rex-dash-status-grid" },
+        status("completed", "Completed", stats.completed),
+        status("in-progress", "In Progress", stats.inProgress),
+        status("pending", "Pending", stats.pending),
+        stats.blocked > 0 ? status("blocked", "Blocked", stats.blocked) : null,
+        stats.deferred > 0 ? status("deferred", "Deferred", stats.deferred) : null,
+      ),
+    ),
+  );
+}
+
+/** The structure health gauge, its five dimensions, and up to three suggestions. */
+export function StructureHealthPanel({ health }: { health: HealthData }) {
+  return h("div", { class: "rex-dash-panel" },
+    h("h3", { class: "rex-dash-panel-title" }, "Structure Health"),
+    h("div", { class: "rex-dash-health" },
+      h("div", { class: "rex-dash-health-gauge" },
+        h(HealthGauge, { value: health.overall / 100, label: "Overall", size: 80 }),
+      ),
+      h("div", { class: "rex-dash-health-dims" },
+        ...(["depth", "balance", "granularity", "completeness", "staleness"] as const).map((dim) =>
+          h("div", { key: dim, class: "rex-dash-health-dim" },
+            h("span", { class: "rex-dash-health-dim-label" },
+              dim.charAt(0).toUpperCase() + dim.slice(1),
+            ),
+            h("div", { class: "rex-dash-health-dim-track" },
+              h("div", {
+                class: `rex-dash-health-dim-fill${health.dimensions[dim] >= 70 ? " good" : health.dimensions[dim] >= 40 ? " mid" : " low"}`,
+                style: `width: ${health.dimensions[dim]}%`,
+              }),
+            ),
+            h("span", { class: "rex-dash-health-dim-val" }, String(Math.round(health.dimensions[dim]))),
+          ),
+        ),
+      ),
+      health.suggestions.length > 0
+        ? h("ul", { class: "rex-dash-health-suggestions" },
+            health.suggestions.slice(0, 3).map((s, i) =>
+              h("li", { key: i }, s),
+            ),
+          )
+        : null,
+    ),
+  );
+}
+
+/**
+ * Browse, validate, reorganize and restore: the dashboard's quick actions,
+ * with the Reorganize and Restore slide-outs they open. `onChanged` runs after
+ * a reorganize or a restore changes the PRD.
+ */
+export function PrdQuickActions({ navigateTo, onChanged }: { navigateTo: NavigateTo; onChanged?: () => void }) {
+  const [reorgOpen, setReorgOpen] = useState(false);
+  const [reorgCount, setReorgCount] = useState(0);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const fetchReorgCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/rex/reorganize?mode=fast");
+      if (res.ok) {
+        const data = await res.json();
+        setReorgCount(data.proposals?.length ?? 0);
+      }
+    } catch {
+      // Non-critical
+    }
+  }, []);
+  // Non-critical and can be slow, so nothing waits on it.
+  useEffect(() => { void fetchReorgCount(); }, [fetchReorgCount]);
+  const changed = () => { onChanged?.(); void fetchReorgCount(); };
+
+  return h("div", { class: "rex-dash-actions" },
+    h("button", {
+      class: "rex-dash-action-btn",
+      onClick: () => navigateTo("prd" as ViewId),
+    }, "Browse Tasks"),
+    h("button", {
+      class: "rex-dash-action-btn",
+      onClick: () => navigateTo("validation" as ViewId),
+    }, "Validate PRD"),
+    h("button", {
+      class: `rex-dash-action-btn${reorgCount > 0 ? " rex-dash-action-btn-accent" : ""}`,
+      onClick: () => setReorgOpen(true),
+    }, reorgCount > 0 ? `Reorganize (${reorgCount})` : "Reorganize"),
+    h("button", {
+      class: "rex-dash-action-btn",
+      onClick: () => setRestoreOpen(true),
+      title: "Undo reorganize, prune, reshape, or fix by restoring a PRD snapshot",
+    }, "Restore Snapshot"),
+    // Reorganize slide-out panel
+    h(ReorganizePanel, { open: reorgOpen, onClose: () => setReorgOpen(false), onApplied: changed }),
+    // Restore slide-out panel — undo for reorganize/prune/reshape/fix
+    h(RestorePanel, { open: restoreOpen, onClose: () => setRestoreOpen(false), onRestored: changed }),
   );
 }
 
@@ -410,14 +560,23 @@ function EpicProgress({ epics, rootLabel, rootPlural, navigateTo }: EpicProgress
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function RexDashboard({ navigateTo }: RexDashboardProps) {
+/** Numbers each dashboard reader's polling key: two may be mounted at once. */
+let readerSeq = 0;
+
+/**
+ * The dashboard's reads: `/api/rex/dashboard` (polled) and `/api/rex/health`.
+ * Shared by the dashboard and Work's Statistics section, which are mounted
+ * together while the Statistics tile is open full-screen. Pollers are keyed
+ * by name and unregistering removes the key, so each reader polls under its
+ * own key: closing the full-screen dashboard must not stop the tile's poll.
+ */
+export function useDashboardData() {
+  const pollKey = useRef<string | null>(null);
+  pollKey.current ??= `rex-dashboard:${++readerSeq}`;
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthData | null>(null);
-  const [reorgOpen, setReorgOpen] = useState(false);
-  const [reorgCount, setReorgCount] = useState(0);
-  const [restoreOpen, setRestoreOpen] = useState(false);
   const fetchDashboard = useCallback(async () => {
     try {
       const res = await fetch("/api/rex/dashboard");
@@ -448,27 +607,19 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
     }
   }, []);
 
-  const fetchReorgCount = useCallback(async () => {
-    try {
-      const res = await fetch("/api/rex/reorganize?mode=fast");
-      if (res.ok) {
-        const data = await res.json();
-        setReorgCount(data.proposals?.length ?? 0);
-      }
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
   useEffect(() => {
     Promise.all([fetchDashboard(), fetchHealth()])
       .then(() => setLoading(false));
-    // Reorg count is non-critical and can be slow — don't block initial render
-    fetchReorgCount();
-  }, [fetchDashboard, fetchHealth, fetchReorgCount]);
+  }, [fetchDashboard, fetchHealth]);
 
   // Visibility-aware polling via polling manager
-  usePolling("rex-dashboard", fetchDashboard, 10_000);
+  usePolling(pollKey.current, fetchDashboard, 10_000);
+
+  return { data, loading, error, health, fetchDashboard, fetchHealth };
+}
+
+export function RexDashboard({ navigateTo }: RexDashboardProps) {
+  const { data, loading, error, health, fetchDashboard, fetchHealth } = useDashboardData();
 
   if (loading) {
     return h("div", { class: "loading" }, "Loading PRD dashboard...");
@@ -511,18 +662,6 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
     });
   }, [epics]);
 
-  // Priority data for the distribution chart
-  const priorityEntries = useMemo(() => {
-    return [
-      { label: "Critical", count: priorities.critical, color: "var(--red)", cls: "critical" },
-      { label: "High", count: priorities.high, color: "var(--orange)", cls: "high" },
-      { label: "Medium", count: priorities.medium, color: "var(--text-dim)", cls: "medium" },
-      { label: "Low", count: priorities.low, color: "var(--text-dim)", cls: "low" },
-    ].filter((p) => p.count > 0);
-  }, [priorities]);
-
-  const totalPrioritized = priorityEntries.reduce((s, p) => s + p.count, 0) + priorities.unset;
-
   // Active epics count for summary
   const activeEpics = epics.filter((e) => e.status === "in_progress").length;
 
@@ -545,18 +684,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
     ),
 
     // ── Stats row ───────────────────────────────────────────────────
-    h("div", { class: "rex-dash-stats" },
-      h(StatChip, { value: stats.total, label: "Total" }),
-      h(StatChip, { value: stats.completed, label: "Done", color: "var(--green)", accent: true }),
-      h(StatChip, { value: stats.inProgress, label: "Active", color: "var(--accent)" }),
-      h(StatChip, { value: stats.pending, label: "Pending" }),
-      stats.blocked > 0
-        ? h(StatChip, { value: stats.blocked, label: "Blocked", color: "var(--red)" })
-        : null,
-      stats.deferred > 0
-        ? h(StatChip, { value: stats.deferred, label: "Deferred", color: "var(--orange)" })
-        : null,
-    ),
+    h(StatsRow, { stats }),
 
     // ── Progress bar ────────────────────────────────────────────────
     h(StatusProgressBar, { stats, percentComplete }),
@@ -643,122 +771,12 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
 
       // ── Panels: a row of blocks under Up Next ─────────────────────
       h("div", { class: "rex-dash-sidebar" },
-
-        // Priority distribution over the status breakdown, one panel
-        h("div", { class: "rex-dash-panel rex-dash-panel-breakdown" },
-          priorityEntries.length > 0
-            ? h("div", { class: "rex-dash-breakdown-part" },
-                h("h3", { class: "rex-dash-panel-title" }, "Priority Distribution"),
-                h("div", { class: "rex-dash-priority-bars" },
-                  priorityEntries.map((p) =>
-                    h("div", { key: p.label, class: "rex-dash-priority-row" },
-                      h("span", { class: `rex-dash-priority-label rex-dash-priority-${p.cls}` }, p.label),
-                      h("div", { class: "rex-dash-priority-track" },
-                        h("div", {
-                          class: `rex-dash-priority-fill rex-dash-priority-fill-${p.cls}`,
-                          style: `width: ${totalPrioritized > 0 ? (p.count / totalPrioritized) * 100 : 0}%`,
-                        }),
-                      ),
-                      h("span", { class: "rex-dash-priority-count" }, String(p.count)),
-                    ),
-                  ),
-                ),
-              )
-            : null,
-          h("div", { class: "rex-dash-breakdown-part" },
-            h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
-            h("div", { class: "rex-dash-status-grid" },
-              h("div", { class: "rex-dash-status-item" },
-                h("span", { class: "prd-status-dot prd-status-completed" }),
-                h("span", { class: "rex-dash-status-label" }, "Completed"),
-                h("span", { class: "rex-dash-status-count" }, String(stats.completed)),
-              ),
-              h("div", { class: "rex-dash-status-item" },
-                h("span", { class: "prd-status-dot prd-status-in-progress" }),
-                h("span", { class: "rex-dash-status-label" }, "In Progress"),
-                h("span", { class: "rex-dash-status-count" }, String(stats.inProgress)),
-              ),
-              h("div", { class: "rex-dash-status-item" },
-                h("span", { class: "prd-status-dot prd-status-pending" }),
-                h("span", { class: "rex-dash-status-label" }, "Pending"),
-                h("span", { class: "rex-dash-status-count" }, String(stats.pending)),
-              ),
-              stats.blocked > 0
-                ? h("div", { class: "rex-dash-status-item" },
-                    h("span", { class: "prd-status-dot prd-status-blocked" }),
-                    h("span", { class: "rex-dash-status-label" }, "Blocked"),
-                    h("span", { class: "rex-dash-status-count" }, String(stats.blocked)),
-                  )
-                : null,
-              stats.deferred > 0
-                ? h("div", { class: "rex-dash-status-item" },
-                    h("span", { class: "prd-status-dot prd-status-deferred" }),
-                    h("span", { class: "rex-dash-status-label" }, "Deferred"),
-                    h("span", { class: "rex-dash-status-count" }, String(stats.deferred)),
-                  )
-                : null,
-            ),
-          ),
-        ),
-
-        // Structure health card
-        health
-          ? h("div", { class: "rex-dash-panel" },
-              h("h3", { class: "rex-dash-panel-title" }, "Structure Health"),
-              h("div", { class: "rex-dash-health" },
-                h("div", { class: "rex-dash-health-gauge" },
-                  h(HealthGauge, { value: health.overall / 100, label: "Overall", size: 80 }),
-                ),
-                h("div", { class: "rex-dash-health-dims" },
-                  ...(["depth", "balance", "granularity", "completeness", "staleness"] as const).map((dim) =>
-                    h("div", { key: dim, class: "rex-dash-health-dim" },
-                      h("span", { class: "rex-dash-health-dim-label" },
-                        dim.charAt(0).toUpperCase() + dim.slice(1),
-                      ),
-                      h("div", { class: "rex-dash-health-dim-track" },
-                        h("div", {
-                          class: `rex-dash-health-dim-fill${health.dimensions[dim] >= 70 ? " good" : health.dimensions[dim] >= 40 ? " mid" : " low"}`,
-                          style: `width: ${health.dimensions[dim]}%`,
-                        }),
-                      ),
-                      h("span", { class: "rex-dash-health-dim-val" }, String(Math.round(health.dimensions[dim]))),
-                    ),
-                  ),
-                ),
-                health.suggestions.length > 0
-                  ? h("ul", { class: "rex-dash-health-suggestions" },
-                      health.suggestions.slice(0, 3).map((s, i) =>
-                        h("li", { key: i }, s),
-                      ),
-                    )
-                  : null,
-              ),
-            )
-          : null,
-
-        // Quick nav to PRD tree
+        h(BreakdownPanel, { stats, priorities }),
+        health ? h(StructureHealthPanel, { health }) : null,
         navigateTo
           ? h("div", { class: "rex-dash-panel rex-dash-panel-actions" },
               h("h3", { class: "rex-dash-panel-title" }, "Quick Actions"),
-              h("div", { class: "rex-dash-actions" },
-                h("button", {
-                  class: "rex-dash-action-btn",
-                  onClick: () => navigateTo("prd" as ViewId),
-                }, "Browse Tasks"),
-                h("button", {
-                  class: "rex-dash-action-btn",
-                  onClick: () => navigateTo("validation" as ViewId),
-                }, "Validate PRD"),
-                h("button", {
-                  class: `rex-dash-action-btn${reorgCount > 0 ? " rex-dash-action-btn-accent" : ""}`,
-                  onClick: () => setReorgOpen(true),
-                }, reorgCount > 0 ? `Reorganize (${reorgCount})` : "Reorganize"),
-                h("button", {
-                  class: "rex-dash-action-btn",
-                  onClick: () => setRestoreOpen(true),
-                  title: "Undo reorganize, prune, reshape, or fix by restoring a PRD snapshot",
-                }, "Restore Snapshot"),
-              ),
+              h(PrdQuickActions, { navigateTo, onChanged: () => { fetchDashboard(); fetchHealth(); } }),
             )
           : null,
       ),
@@ -766,27 +784,5 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
       // Full width under the panels, so no column runs on past the other.
       h(EpicProgress, { epics: sortedEpics, rootLabel, rootPlural, navigateTo }),
     ),
-
-    // Reorganize slide-out panel
-    h(ReorganizePanel, {
-      open: reorgOpen,
-      onClose: () => setReorgOpen(false),
-      onApplied: () => {
-        fetchDashboard();
-        fetchHealth();
-        fetchReorgCount();
-      },
-    }),
-
-    // Restore slide-out panel — undo for reorganize/prune/reshape/fix
-    h(RestorePanel, {
-      open: restoreOpen,
-      onClose: () => setRestoreOpen(false),
-      onRestored: () => {
-        fetchDashboard();
-        fetchHealth();
-        fetchReorgCount();
-      },
-    }),
   );
 }

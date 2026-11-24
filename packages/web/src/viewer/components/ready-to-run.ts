@@ -1,5 +1,11 @@
 /**
- * Ready to run — the tasks `ndx work --auto` would pick next, at the top of Work.
+ * Ready to run — the tasks `ndx work --auto` would pick next: Work's Up next.
+ *
+ * Each row says who it is assigned to and, given `estimates`, what a run of it
+ * typically takes (`run-estimate.ts`), so the queue answers who and how much
+ * before anything starts. Given `split`, the list is two sections: the tasks
+ * assigned to the current user, then the unassigned ones grouped by product
+ * area (`splitReady`), each in the agent's pick order.
  *
  * Fed by `GET /api/hench/ready`, shown in the order returned: the top rows, then
  * "Show all N", with a text search and priority, change and tag filters over
@@ -18,8 +24,10 @@ import { appUrl } from "../base-path.js";
 import { itemTypeLabel, workCommandArgs } from "../external.js";
 import { shellWord } from "./prepare-task-model.js";
 import { QueuedNotice } from "./queued-notice.js";
-import { ImpactTags, displayTitle, useItemImpacts } from "./impact-tags.js";
+import { ImpactTags, displayTitle, titleTooltip, useItemImpacts } from "./impact-tags.js";
 import type { QueuedReply } from "./prepare-task-model.js";
+import { isMine, personLabel } from "./assignee-model.js";
+import { EstimateChip, type RunEstimates } from "./run-estimate.js";
 
 /** Rows shown before "Show all N": the next few picks, not the whole queue. */
 export const READY_TOP_ROWS = 3;
@@ -31,6 +39,8 @@ const TOAST_MS = 8000;
 export interface ReadyTask {
   id: string;
   title: string;
+  /** Short name, shown in place of the title when present. */
+  shortTitle?: string;
   /** Plain-language summary, shown in place of the title when present. */
   summary?: string;
   /** The start of the description, already cut short by the server. */
@@ -51,6 +61,10 @@ export interface ReadyTask {
    * defaults. Absent from a server that predates them.
    */
   saved?: boolean;
+  /** Who it is assigned to (its own assignee, else its nearest assigned ancestor's). Absent from an older server. */
+  assignee?: string | null;
+  /** The task's saved run tier; null runs on the project default. Absent from an older server. */
+  tier?: string | null;
 }
 
 interface ReadyReply {
@@ -78,7 +92,7 @@ export function filterReady(tasks: ReadyTask[], f: ReadyFilters): ReadyTask[] {
     if (f.change && changeKey(t) !== f.change) return false;
     if (f.tag && !(t.tags ?? []).includes(f.tag)) return false;
     if (!q) return true;
-    return [t.summary ?? "", t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
+    return [t.shortTitle ?? "", t.summary ?? "", t.title, t.change?.title ?? "", ...t.parentChain, ...(t.tags ?? [])].some((s) => s.toLowerCase().includes(q));
   });
 }
 
@@ -100,6 +114,64 @@ export interface ReadyToRunProps {
   onOpenLive: (taskId: string) => void;
   /** Open the PRD, for the empty state's link. */
   onOpenPrd: () => void;
+  /** What a run typically takes; each row shows its tier's figure. Absent shows none. */
+  estimates?: RunEstimates | null;
+  /** Draw the list's own "Ready to run" heading. False inside a tile that names it. Default true. */
+  heading?: boolean;
+  /**
+   * Split the queue: the tasks assigned to the current user, then the
+   * unassigned ones grouped by product area. Tasks assigned to someone else
+   * are counted, not listed. The whole queue is read, since a group's rows can
+   * sit anywhere in it.
+   */
+  split?: ReadySplit;
+  /**
+   * The planned run queue: each card's menu offers "Add to run queue", and a
+   * card already on it says "Queued". Absent, the list has no queue actions.
+   */
+  queue?: ReadyQueue;
+}
+
+export interface ReadyQueue {
+  has: (taskId: string) => boolean;
+  add: (taskId: string) => void;
+}
+
+export interface ReadySplit {
+  /** The current user as `ndx work --mine` resolves them; null when unknown. */
+  me: string | null;
+  /** The product area (v2) or top-level section (v1) a task's work belongs to; null for none. */
+  areaOf: (task: ReadyTask) => string | null;
+}
+
+/** The heading of the unassigned tasks no area claims. */
+export const NO_AREA_LABEL = "No product area";
+
+export interface ReadyGroups {
+  mine: ReadyTask[];
+  /** In queue order of each area's first task; tasks with no area last. */
+  unassigned: Array<{ area: string | null; tasks: ReadyTask[] }>;
+  /** Assigned to someone other than the current user. */
+  others: number;
+}
+
+/** The split Ready to run shows, every group in the agent's pick order. */
+export function splitReady(tasks: readonly ReadyTask[], me: string | null, areaOf: (task: ReadyTask) => string | null): ReadyGroups {
+  const mine: ReadyTask[] = [];
+  const byArea = new Map<string | null, ReadyTask[]>();
+  let others = 0;
+  for (const task of tasks) {
+    const assignee = task.assignee?.trim() ?? "";
+    if (!assignee) {
+      const area = areaOf(task);
+      byArea.set(area, [...(byArea.get(area) ?? []), task]);
+    } else if (isMine(assignee, me)) mine.push(task);
+    else others++;
+  }
+  const unassigned = [...byArea.entries()]
+    .sort(([a], [b]) => Number(a === null) - Number(b === null))
+    .map(([area, rows]) => ({ area, tasks: rows }));
+  return { mine, unassigned, others };
 }
 
 const STATUS_ICON: Record<string, { icon: string; label: string }> = {
@@ -107,7 +179,7 @@ const STATUS_ICON: Record<string, { icon: string; label: string }> = {
   in_progress: { icon: "◐", label: "In progress" },
 };
 
-export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps) {
+export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd, estimates = null, heading = true, split, queue }: ReadyToRunProps) {
   const [tasks, setTasks] = useState<ReadyTask[] | null>(null);
   const [dir, setDir] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +200,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const loading = useRef(0);
   const [filters, setFilters] = useState<ReadyFilters>(NO_FILTERS);
   const filtering = isFiltering(filters);
-  const needAll = expanded || engaged || filtering;
+  const needAll = expanded || engaged || filtering || !!split;
   const needAllRef = useRef(needAll);
   needAllRef.current = needAll;
 
@@ -231,6 +303,19 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
   const loaded = tasks ?? [];
   const matches = filtering ? filterReady(loaded, filters) : loaded;
   const shown = filtering || expanded ? matches : matches.slice(0, READY_TOP_ROWS);
+  const cap = (rows: ReadyTask[]) => (filtering || expanded ? rows : rows.slice(0, READY_TOP_ROWS));
+  const groups = split ? splitReady(matches, split.me, split.areaOf) : null;
+  const listedIn = (g: ReadyGroups) => g.mine.length + g.unassigned.reduce((n, a) => n + a.tasks.length, 0);
+  // Split, the list never shows someone else's task, so its counts leave them out.
+  const listable = split ? listedIn(splitReady(loaded, split.me, split.areaOf)) : total;
+  const matchCount = groups ? listedIn(groups) : matches.length;
+  const shownCount = groups
+    ? cap(groups.mine).length + groups.unassigned.reduce((n, a) => n + cap(a.tasks).length, 0)
+    : shown.length;
+  /** Some group holds more than it shows, so "Show all" has something to show. */
+  const truncated = groups
+    ? groups.mine.length > READY_TOP_ROWS || groups.unassigned.some((g) => g.tasks.length > READY_TOP_ROWS)
+    : total > READY_TOP_ROWS;
   const engage = () => {
     // Engagement stays latched for refreshes; an incomplete snapshot still needs
     // another attempt when a control is used after a transient load failure.
@@ -257,7 +342,7 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
       onChange: (e: Event) => setFilter({ [key]: (e.target as HTMLSelectElement).value }),
     }, h("option", { value: "" }, label), options.map(([v, text]) => h("option", { value: v, key: v }, text)));
 
-  const controls = total > READY_TOP_ROWS || filtering
+  const controls = listable > READY_TOP_ROWS || filtering
     ? h("div", { class: "ready-controls" },
         h("input", {
           type: "search",
@@ -276,50 +361,34 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
           ? h("button", { type: "button", class: "ready-clear", onClick: () => setFilters(NO_FILTERS) }, "Clear")
           : null,
         h("span", { class: "ready-count", role: "status" },
-          filtering ? `${matches.length} of ${total} match` : `${shown.length} of ${total}`),
+          filtering ? `${matchCount} of ${listable} match` : `${shownCount} of ${listable}`),
       )
     : null;
 
-  const more = !filtering && total > READY_TOP_ROWS
-    ? h("button", {
-        type: "button",
-        class: "ready-more",
-        "aria-expanded": String(expanded),
-        "aria-controls": "ready-to-run-list",
-        onClick: () => { if (!expanded) engage(); setExpanded(!expanded); },
-      },
-        expanded ? `Show top ${READY_TOP_ROWS}` : `Show all ${total}`)
-    : null;
-
-  const body = tasks === null
-    ? h("p", { class: "ready-empty" }, "Loading…")
-    : tasks.length === 0
-      ? h("p", { class: "ready-empty" },
-          error ?? "Nothing ready to run. ",
-          error ? null : h("a", {
-            href: appUrl("/prd"),
-            onClick: (e: MouseEvent) => { e.preventDefault(); onOpenPrd(); },
-          }, "Open the PRD"),
-        )
-      : shown.length === 0
-        ? h("p", { class: "ready-empty" }, "No ready task matches.")
-        // Each task is a card in the Up next format (the card Work used to show
-        // below this list for the same first task): badges and the run button
-        // on top, the title, where it sits, the start of its description, then
-        // its tags. The first card is the pick and leads; the rest follow it.
-        : h("ul", { class: "ready-list", id: "ready-to-run-list" }, shown.map((task, index) => {
+  // Each task is a card in the Up next format (the card Work used to show
+  // below this list for the same first task): badges and the run button on
+  // top, the title, where it sits, the start of its description, then its
+  // tags. The queue's first card is the pick and leads; the rest follow it.
+  const pickId = loaded[0]?.id;
+  const row = (task: ReadyTask) => {
           const status = STATUS_ICON[task.status] ?? { icon: "○", label: task.status };
           const menuId = `ready-menu-${task.id}`;
           const emphasis = task.priority === "critical" ? " rex-dash-next-critical" : task.priority === "high" ? " rex-dash-next-high" : "";
           const tags = task.tags ?? [];
-          return h("li", { key: task.id, class: `ready-row rex-dash-next-card${emphasis}${index === 0 ? " ready-row--lead" : ""}`, "data-task-id": task.id },
+          return h("li", { key: task.id, class: `ready-row rex-dash-next-card${emphasis}${task.id === pickId && !filtering ? " ready-row--lead" : ""}`, "data-task-id": task.id },
             h("div", { class: "rex-dash-next-top" },
               h("div", { class: "rex-dash-next-badges ready-meta" },
                 h("span", { class: `prd-status-icon prd-status-${task.status}`, title: status.label, "aria-label": status.label }, status.icon),
                 task.itemType ? h("span", { class: `prd-level-badge prd-level-${task.itemType}` }, itemTypeLabel(task.itemType)) : null,
                 task.priority ? h("span", { class: `prd-priority-badge prd-priority-${task.priority}` }, task.priority) : null,
+                task.assignee !== undefined
+                  ? h("span", { class: task.assignee ? "ready-assignee" : "ready-assignee ready-assignee-none", title: task.assignee ?? "Nobody is assigned" },
+                      task.assignee ? personLabel(task.assignee) : "Unassigned")
+                  : null,
                 h("span", { class: "ready-criteria" }, `${task.criteriaCount} ${task.criteriaCount === 1 ? "criterion" : "criteria"}`),
+                h(EstimateChip, { estimates, tier: task.tier, ownTier: true, class: "ready-estimate" }),
                 task.resume ? h("span", { class: "ready-resume" }, "in progress · no live run") : null,
+                queue?.has(task.id) ? h("span", { class: "ready-queued" }, "Queued") : null,
               ),
               h("div", { class: "ready-split" },
                 h("button", {
@@ -341,15 +410,23 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
                   ? h("div", { class: "ready-menu", id: menuId, role: "menu" },
                       h("button", { type: "button", role: "menuitem", onClick: () => void startNow(task) }, "Start now"),
                       h("button", { type: "button", role: "menuitem", onClick: () => void copyCommand(task) }, "Copy terminal command"),
+                      queue
+                        ? h("button", {
+                            type: "button",
+                            role: "menuitem",
+                            disabled: queue.has(task.id),
+                            onClick: () => { setMenuFor(null); queue.add(task.id); },
+                          }, queue.has(task.id) ? "In the run queue" : "Add to run queue")
+                        : null,
                     )
                   : null,
               ),
             ),
-            // The plain-language summary leads; the technical title is the tooltip and the modal's heading.
+            // The short title or plain-language summary leads; the full title is the tooltip and the modal's heading.
             h("button", {
               type: "button",
               class: "ready-title rex-dash-next-link",
-              title: task.summary ? task.title : undefined,
+              title: titleTooltip(task),
               onClick: () => onPrepare(task.id),
             },
               displayTitle(task),
@@ -375,17 +452,69 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
                 )
               : null,
           );
-        }));
+  };
+
+  const splitBody = (g: ReadyGroups) => h("div", { class: "ready-groups", id: "ready-to-run-list" },
+    h("section", { class: "ready-group", "aria-labelledby": "ready-group-mine" },
+      h("h3", { class: "ready-group-title", id: "ready-group-mine" },
+        "Assigned to you", h("span", { class: "ready-group-count" }, String(g.mine.length))),
+      g.mine.length > 0
+        ? h("ul", { class: "ready-list" }, cap(g.mine).map(row))
+        : h("p", { class: "ready-empty" }, split!.me ? "Nothing ready is assigned to you." : "n-dx could not tell who you are; set your git user to see your tasks."),
+    ),
+    h("section", { class: "ready-group", "aria-labelledby": "ready-group-unassigned" },
+      h("h3", { class: "ready-group-title", id: "ready-group-unassigned" },
+        "Unassigned", h("span", { class: "ready-group-count" }, String(g.unassigned.reduce((n, a) => n + a.tasks.length, 0)))),
+      g.unassigned.length > 0
+        ? g.unassigned.map((a) => h("div", { key: a.area ?? "", class: "ready-area" },
+            h("h4", { class: "ready-area-title" }, a.area ?? NO_AREA_LABEL, h("span", { class: "ready-group-count" }, String(a.tasks.length))),
+            h("ul", { class: "ready-list" }, cap(a.tasks).map(row)),
+          ))
+        : h("p", { class: "ready-empty" }, "Every ready task has someone assigned."),
+    ),
+    g.others > 0
+      ? h("p", { class: "ready-others" }, `${g.others} more ready ${g.others === 1 ? "task is" : "tasks are"} assigned to someone else.`)
+      : null,
+  );
+
+  const more = !filtering && truncated
+    ? h("button", {
+        type: "button",
+        class: "ready-more",
+        "aria-expanded": String(expanded),
+        "aria-controls": "ready-to-run-list",
+        onClick: () => { if (!expanded) engage(); setExpanded(!expanded); },
+      },
+        expanded ? `Show top ${READY_TOP_ROWS}${groups ? " of each" : ""}` : `Show all ${listable}`)
+    : null;
+
+  const body = tasks === null
+    ? h("p", { class: "ready-empty" }, "Loading…")
+    : tasks.length === 0
+      ? h("p", { class: "ready-empty" },
+          error ?? "Nothing ready to run. ",
+          error ? null : h("a", {
+            href: appUrl("/prd"),
+            onClick: (e: MouseEvent) => { e.preventDefault(); onOpenPrd(); },
+          }, "Open the PRD"),
+        )
+      : (groups ? matches.length === 0 : shown.length === 0)
+        ? h("p", { class: "ready-empty" }, "No ready task matches.")
+        : groups
+          ? splitBody(groups)
+          : h("ul", { class: "ready-list", id: "ready-to-run-list" }, shown.map(row));
 
   // The Up next panel (styled as .rex-dash-next, without that class: the
   // scroll reveal fades .rex-dash-next in, and this list must never wait on it).
-  return h("section", { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" },
-    h("div", { class: "rex-dash-section-header" },
-      h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
-      total > 0
-        ? h("span", { class: "rex-dash-section-meta" }, `${total} ready · in the order the agent picks them`)
-        : null,
-    ),
+  return h("section", heading ? { class: "ready-to-run", "aria-labelledby": "ready-to-run-title" } : { class: "ready-to-run", "aria-label": "Up next" },
+    heading
+      ? h("div", { class: "rex-dash-section-header" },
+          h("h2", { id: "ready-to-run-title", class: "ready-title-head" }, "Ready to run"),
+          total > 0
+            ? h("span", { class: "rex-dash-section-meta" }, `${total} ready · in the order the agent picks them`)
+            : null,
+        )
+      : null,
     controls,
     body,
     more,

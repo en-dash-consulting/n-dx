@@ -25,7 +25,7 @@
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
  * | POST | `/api/sidecar/sessions/:id/end` | end the session |
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
- * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane?, path?, arguments?, answer? }`; `answer` (`{ selected: string[], other? }`), only on a choice-card approval and required there; `arguments`, the edited call arguments, only on an external-call approval; `edits` only on a change-set approval (a list of item edits), an item-edit approval (an object of the card's fields) or a placement approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
+ * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane?, path?, arguments?, answer?, acknowledgeHeld? }`; an approval of a PRD card whose item a run or claim holds now answers 409 `{ code: "held", heldBy }` unless `acknowledgeHeld` is true; `answer` (`{ selected: string[], other? }`), only on a choice-card approval and required there; `arguments`, the edited call arguments, only on an external-call approval; `edits` only on a change-set approval (a list of item edits), an item-edit approval (an object of the card's fields) or a placement approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | GET  | `/api/sidecar/ledger/latest` | each open session's latest `unfinished` and `decision` notes, which the hub snapshot shows per worktree |
  * | POST | `/api/sidecar/handoff` | the hub's drill-down (`{ question, vendor }`): resume the latest open session or create one, leave a `handoff` entry naming the question, carry the ledger on its next turn |
@@ -92,6 +92,7 @@ import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { readLinkCall, writeLinkCard } from "./tracker/link-card.js";
 import { readItemEditCall, writeItemEditCard } from "./sidecar/item-edit-card.js";
 import { readStatusCall, writeStatusCard } from "./sidecar/status-card.js";
+import { activeWorkReads, cardItemIds, firstHeld, heldByText, heldWorkSection, readActiveWork, type HeldItems } from "./sidecar/active-work.js";
 import { readPlacementCall,readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
 import { describeRunnable, judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution, STARTING_PHASE_MS } from "./routes-hench.js";
@@ -385,20 +386,39 @@ export function prepareReads(
 }
 
 /**
+ * The items active work holds in `ctx`'s repository right now: live runs
+ * across its worktrees (the run-slot count's own read) and rex claims, each
+ * with the items above its task. Never throws.
+ */
+export function readHeldItems(ctx: ServerContext): Promise<HeldItems> {
+  return readActiveWork(activeWorkReads(ctx, async () => (await repositoryRunSlotUsage(ctx)).holders));
+}
+
+/**
  * Checkpoint wiring for `ctx`'s workspace: the project's ceiling for the
  * session's scope (read per turn), its ledger, and its lens's packet rebuilt
  * from disk. The two reads that spawn `ndx` go through the Prepare route's
  * seams ({@link prepareReads}).
  */
-export function sidecarContextOptions(ctx: ServerContext, reads: SpawnedReads = prepareReads(ctx)): SidecarContextOptions {
+export function sidecarContextOptions(
+  ctx: ServerContext,
+  reads: SpawnedReads = prepareReads(ctx),
+  heldItems: () => Promise<HeldItems> = () => readHeldItems(ctx),
+): SidecarContextOptions {
   const dir = worktreeSidecarDir(ctx.projectDir);
   return {
     ceiling: (record) => resolveContextCeiling(ctx.projectDir, record.scope),
     ledger: (record) => readLedger(dir, record.id),
     packet: async (record, signal) => {
       const sources = createPacketSources(ctx, reads);
-      const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString(), signal);
-      return built.status === "ready" ? built.packet.text : undefined;
+      const now = new Date().toISOString();
+      const [built, held] = await Promise.all([
+        buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, now, signal),
+        heldItems().catch((): HeldItems => new Map()),
+      ]);
+      // Every lens, General too, opens with what active work holds, so the agent leaves it alone.
+      const parts = [built.status === "ready" ? built.packet.text : "", heldWorkSection(held, now)].filter(Boolean);
+      return parts.length > 0 ? parts.join("\n\n") : undefined;
     },
   };
 }
@@ -507,6 +527,9 @@ export function sidecarActions(
       const written = await writeStatusCard(ctx, change);
       if (written.ok) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
       return written;
+    },
+    async heldItem(itemIds) {
+      return firstHeld(await readHeldItems(ctx), itemIds);
     },
     async startWork(taskId, options) {
       const { inUse, max, holders, here } = await repositoryRunSlotUsage(ctx);
@@ -1552,6 +1575,9 @@ async function handleSessionRoutes(
       if (body.answer !== undefined && (typeof body.answer !== "object" || body.answer === null || Array.isArray(body.answer))) {
         return refuse(res, 400, `"answer" must be an object`);
       }
+      if (body.acknowledgeHeld !== undefined && typeof body.acknowledgeHeld !== "boolean") {
+        return refuse(res, 400, `"acknowledgeHeld" must be a boolean`);
+      }
       // A placement card's edit is a placement: dry-run it, against the dry run the operator reviewed, before the card is touched.
       const waiting = broker.cards(id).find((c) => c.id === cardId);
       let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, PlacementEditRefusal> | undefined;
@@ -1559,6 +1585,21 @@ async function handleSessionRoutes(
         const read = await scope.readPlacementEdit(waiting.placement, body.edits, body.reviewed);
         if ("error" in read) return refuse(res, read.status, read.error);
         placementEdit = read;
+      }
+      // Re-read what active work holds: a card raised before a run started is warned about now. An approval
+      // over held work writes only when it acknowledges it; otherwise 409, and the card carries the warning.
+      const itemIds = waiting?.status === "pending" && body.decision === "approve" ? cardItemIds(waiting) : [];
+      const heldBy = itemIds.length > 0 ? await scope.actions().heldItem?.(itemIds).catch(() => null) ?? null : null;
+      if (heldBy) {
+        broker.markHeld(id, cardId, heldBy);
+        if (body.acknowledgeHeld !== true) {
+          jsonResponse(res, 409, {
+            error: `Not approved yet: ${heldBy.itemId} is ${heldByText(heldBy)}. Approve again, acknowledging it, to write anyway.`,
+            code: "held",
+            heldBy,
+          });
+          return true;
+        }
       }
       try {
         const card = broker.decide(id, cardId, {
@@ -1570,6 +1611,7 @@ async function handleSessionRoutes(
           ...(body.path !== undefined && { path: body.path }),
           ...(body.arguments !== undefined && { arguments: body.arguments }),
           ...(body.answer !== undefined && { answer: body.answer }),
+          ...(body.acknowledgeHeld === true && { acknowledgeHeld: true }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {

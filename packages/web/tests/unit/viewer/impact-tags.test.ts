@@ -12,7 +12,10 @@ import {
   ImpactDetail,
   ImpactTags,
   displayTitle,
+  itemName,
   kindsText,
+  nameTooltip,
+  titleTooltip,
   resetImpactCacheForTests,
   sizeText,
   useItemImpacts,
@@ -55,6 +58,30 @@ describe("displayTitle", () => {
     expect(displayTitle({ title: "Refactor x.ts", summary: "  Faster checkout  " })).toBe("Faster checkout");
     expect(displayTitle({ title: "Refactor x.ts", summary: "  " })).toBe("Refactor x.ts");
     expect(displayTitle({ title: "Refactor x.ts" })).toBe("Refactor x.ts");
+  });
+
+  it("puts the short title first, then the summary, then the title", () => {
+    expect(displayTitle({ title: "Refactor x.ts", shortTitle: " Checkout ", summary: "Faster checkout" })).toBe("Checkout");
+    expect(displayTitle({ title: "Refactor x.ts", shortTitle: "  ", summary: "Faster checkout" })).toBe("Faster checkout");
+    expect(displayTitle({ title: "Refactor x.ts", shortTitle: null })).toBe("Refactor x.ts");
+  });
+});
+
+describe("itemName", () => {
+  it("is the short title, else the title, never the summary", () => {
+    expect(itemName({ title: "Refactor x.ts", shortTitle: " Checkout " })).toBe("Checkout");
+    expect(itemName({ title: "Refactor x.ts", summary: "Faster checkout" } as { title: string })).toBe("Refactor x.ts");
+    expect(nameTooltip({ title: "Refactor x.ts", shortTitle: "Checkout" })).toBe("Refactor x.ts");
+    expect(nameTooltip({ title: "Refactor x.ts" })).toBeUndefined();
+  });
+});
+
+describe("titleTooltip", () => {
+  it("is the full title wherever a row shows something else, and absent otherwise", () => {
+    expect(titleTooltip({ title: "Refactor x.ts", shortTitle: "Checkout" })).toBe("Refactor x.ts");
+    expect(titleTooltip({ title: "Refactor x.ts", summary: "Faster checkout" })).toBe("Refactor x.ts");
+    expect(titleTooltip({ title: "Refactor x.ts" })).toBeUndefined();
+    expect(titleTooltip({ title: "Checkout", shortTitle: "Checkout" })).toBeUndefined();
   });
 });
 

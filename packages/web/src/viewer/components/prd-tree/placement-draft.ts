@@ -12,7 +12,7 @@
  */
 
 import type { PlacementRelation } from "../../views/product-model.js";
-import type { CriterionDraft, PlacementTarget } from "./change-placement.js";
+import type { CriterionDraft, PlacementTarget } from "./placement-types.js";
 
 /** The place form as it was left: the chosen target, relation and amendment edits. */
 export interface PlaceStepDraft {

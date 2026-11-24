@@ -23,7 +23,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { FEATURE_DISABLED_HEADER, HUB_SESSION_ROUTES, HUB_SIDECAR_API_PREFIX, HUB_SIDECAR_HOST_LOCK_SEGMENTS } from "../shared/index.js";
-import type { ProjectView } from "./hub.js";
+import type { ProjectView } from "./project-view.js";
 import { isPidAlive } from "./registry.js";
 import { loopbackUrl, tokenHeaders } from "./loopback.js";
 

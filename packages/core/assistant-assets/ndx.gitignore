@@ -30,6 +30,9 @@
 .hench/mcp/
 # Warm-parent session cache, rewritten on every orientation. Machine-local.
 .hench/session-cache.json
+# The planned run queue the dashboard saves and `ndx work` takes from. Per checkout.
+.hench/run-queue.json
+.hench/run-queue.json.lock
 # Dashboard Sidecar session index and transcripts (self-ignoring; listed for clarity).
 .hench/sidecar/
 .hench-commit-msg.txt

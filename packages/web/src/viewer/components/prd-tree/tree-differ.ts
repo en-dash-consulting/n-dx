@@ -30,7 +30,8 @@ import type { PRDItemData, PRDDocumentData } from "./types.js";
 const SCALAR_KEYS: ReadonlyArray<keyof PRDItemData> = [
   "status",
   "title",
-  // Rows show it in place of the title (impact-tags.ts `displayTitle`).
+  // Rows show these in place of the title (impact-tags.ts `displayTitle`).
+  "shortTitle",
   "summary",
   "priority",
   "description",

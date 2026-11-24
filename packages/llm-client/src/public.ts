@@ -68,6 +68,7 @@
  * - `project-dirs.ts` — project directory constants (`PROJECT_DIRS`)
  * - `layout.ts` — folder-layout resolver (`.ndx/` first, legacy fallback)
  * - `project-config.ts` — `.n-dx.json` override loading and merging
+ * - `agent-prompt.ts` — the project's agent prompt file, appended to every agent's system prompt
  * - `json.ts` — canonical JSON serialization
  * - `repo-trust.ts` — repository execution-config trust (baseline, digest, per-user trust store)
  * - `repo-command-env.ts` — the sanitized environment for repository-owned commands
@@ -471,6 +472,19 @@ export type {
   ResolveLayoutOptions,
   ResolveNdxHomeOptions,
 } from "./layout.js";
+
+// The project's agent prompt file (`.ndx/agent-prompt.md`, or `agent.promptFile`),
+// appended to the system prompt of every n-dx agent process
+export {
+  AGENT_PROMPT_MAX_BYTES,
+  AGENT_PROMPT_CONFIG_KEY,
+  resolveAgentPromptPath,
+  readAgentPrompt,
+  formatAgentPromptSection,
+  agentPromptSection,
+  writeAgentPrompt,
+} from "./agent-prompt.js";
+export type { AgentPrompt, AgentPromptLocation, AgentPromptSection } from "./agent-prompt.js";
 
 // Canonical JSON serialization
 export { toCanonicalJSON } from "./json.js";

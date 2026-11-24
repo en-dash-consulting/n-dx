@@ -10,10 +10,12 @@ import { h } from "preact";
 import { act } from "preact/test-utils";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 import { ChangesView, changesInArea } from "../../../src/viewer/views/changes.js";
+import { _primePeopleForTests, _resetPeopleForTests } from "../../../src/viewer/components/assignee.js";
 import { areaBlock } from "../../../src/viewer/views/product-area-map.js";
 import {
   CHANGE_STAGE_ORDER,
   UNSCHEDULED_RELEASE_LABEL,
+  compareChangeOrder,
   groupChangesByRelease,
   type AreaSection,
   type ChangeRow,
@@ -27,9 +29,14 @@ function mount(vnode: ReturnType<typeof h>): HTMLDivElement {
   return root;
 }
 
+// The view holds its rows until the people list is read; these cases render
+// synchronously, as a page that has read it already does. Nobody is assigned.
+beforeEach(() => { _primePeopleForTests({ me: null, people: [] }); });
+
 afterEach(() => {
   if (root) cleanupRenderedDiv(root);
   root = null;
+  _resetPeopleForTests();
 });
 
 function releaseHeadings(el: HTMLElement): string[] {
@@ -625,5 +632,44 @@ describe("groupChangesByRelease", () => {
 
   it("returns no groups for no changes", () => {
     expect(groupChangesByRelease([])).toEqual([]);
+  });
+
+  it("lists a stage's changes prioritized first, then by priority, a missing one as medium, ties in the given order", () => {
+    const [group] = groupChangesByRelease([
+      change({ id: "low", priority: "low" }),
+      change({ id: "none-1" }),
+      change({ id: "high", priority: "high" }),
+      change({ id: "flag-low", priority: "low", prioritized: true }),
+      change({ id: "medium", priority: "medium" }),
+      change({ id: "none-2" }),
+      change({ id: "critical", priority: "critical" }),
+      change({ id: "flag-none", prioritized: true }),
+    ]);
+    expect(group!.stages[0]!.changes.map((c) => c.id))
+      .toEqual(["flag-none", "flag-low", "critical", "high", "none-1", "medium", "none-2", "low"]);
+  });
+});
+
+describe("compareChangeOrder", () => {
+  it("is zero for a tie, so a stable sort keeps the caller's order", () => {
+    expect(compareChangeOrder({ priority: "medium" }, {})).toBe(0);
+    expect(compareChangeOrder({ prioritized: true, priority: "low" }, { prioritized: true, priority: "low" })).toBe(0);
+    expect(compareChangeOrder({ prioritized: true, priority: "low" }, { priority: "critical" })).toBeLessThan(0);
+    expect(compareChangeOrder({ priority: "unknown" }, { priority: "medium" })).toBe(0);
+  });
+});
+
+describe("ChangesView: Prioritized tag", () => {
+  it("marks a prioritized change and no other", () => {
+    const base = { stage: "proposed" as const, amends: [], touches: [], taskCount: 0, completedTaskCount: 0, criteriaGap: false, openBlockers: 0 };
+    const el = mount(h(ChangesView, {
+      changes: [
+        { ...base, id: "plain", title: "Plain" },
+        { ...base, id: "flag", title: "Flagged", prioritized: true },
+      ],
+    }));
+    const rows = [...el.querySelectorAll(".ch-change")];
+    expect(rows.map((r) => r.getAttribute("data-change-id"))).toEqual(["flag", "plain"]);
+    expect(rows.map((r) => r.querySelector(".ch-prioritized")?.textContent ?? null)).toEqual(["Prioritized", null]);
   });
 });

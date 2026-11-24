@@ -36,6 +36,8 @@ function mount() {
 }
 
 const tiles = () => [...root.querySelectorAll("[data-tile]")].map((e) => e.getAttribute("data-tile"));
+/** Tiles drawing their content: not the placeholders that hold a slot before the layout is known. */
+const live = () => [...root.querySelectorAll("[data-tile]:not([data-pending])")].map((e) => e.getAttribute("data-tile"));
 
 beforeEach(() => {
   status = null;
@@ -51,22 +53,29 @@ afterEach(() => {
 });
 
 describe("Plan tiles before the first status", () => {
-  // Tiles are keyed by panel when they have one (Open changes glance).
-  const V2_ONLY = ["inbox", "changes-glance"];
+  // Tiles are keyed by panel when they have one: Create's glance band and product areas.
+  const V2_ONLY = ["plan-glance", "plan-flow", "plan-areas"];
 
-  it("mounts no v2-only tile with null status, then a v1 status", () => {
+  it("mounts no v2-only tile with null status, only its placeholder, then a v1 status", () => {
     status = null;
     mount();
-    // Validation sits on Plan as the Plan health panel tile.
-    expect(tiles()).toContain("plan-health");
-    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
+    // Every Create part is v2-only now that the lifecycle band is gone: only placeholders draw.
+    expect(live()).toEqual([]);
+    for (const v of V2_ONLY) {
+      expect(live()).not.toContain(v);
+      expect(root.querySelector(`[data-tile="${v}"][data-pending]`)).not.toBeNull();
+    }
+    // The tile's placeholder says it is loading; a band's holds its slot empty.
+    expect(root.querySelector('[data-tile="plan-areas"][data-pending] [role=status]')?.textContent).toBe("Loading...");
+    expect(root.querySelector('[data-tile="plan-glance"][data-pending]')?.textContent).toBe("");
+    expect(root.querySelector(".view-product, .view-changes")).toBeNull();
 
     status = withLayout("v1");
     mount();
     expect(tiles()).toContain("prd");
-    // v1 keeps a Product tile (its tabs lead to Requirements), not the v2 Inbox or changes.
+    // v1 keeps a Product tile (its tabs lead to Requirements), not the v2 glance or areas.
     expect(tiles()).toContain("product");
-    for (const v of ["inbox", "changes"]) expect(tiles()).not.toContain(v);
+    for (const v of V2_ONLY) expect(tiles()).not.toContain(v);
   });
 
   it("brings the v2 tiles in once status says v2", () => {
@@ -74,7 +83,31 @@ describe("Plan tiles before the first status", () => {
     mount();
     status = withLayout("v2");
     mount();
-    for (const v of V2_ONLY) expect(tiles()).toContain(v);
+    for (const v of V2_ONLY) expect(live()).toContain(v);
+    expect(root.querySelector("[data-pending]")).toBeNull();
+  });
+
+  it("holds the product areas slot under its own title until the layout is known", () => {
+    status = null;
+    mount();
+    const areas = root.querySelector('[data-tile="plan-areas"]')!;
+    expect(areas.hasAttribute("data-pending")).toBe(true);
+    expect(areas.querySelector(".stage-tile-title")?.textContent).toBe("Product areas");
+
+    status = withLayout("v2");
+    mount();
+    expect(root.querySelector('[data-tile="plan-areas"]')?.hasAttribute("data-pending")).toBe(false);
+  });
+
+  it("draws the tiles in their v2 order while the layout loads, so nothing moves when it lands", () => {
+    status = null;
+    mount();
+    const loading = tiles();
+    status = withLayout("v2");
+    mount();
+    expect(loading).toEqual(tiles());
+    // The glance, How work moves, then the product areas.
+    expect(loading).toEqual(["plan-glance", "plan-flow", "plan-areas"]);
   });
 
   it("shows Tasks, and no tile that says to migrate, when status arrives with no PRD", () => {
@@ -133,7 +166,7 @@ describe("Plan tiles across a failed status poll", () => {
     mount();
     const v1 = tiles();
     expect(v1).toContain("prd");
-    expect(v1).not.toContain("inbox");
+    expect(v1).not.toContain("plan-areas");
 
     status = null;
     mount();
@@ -144,7 +177,7 @@ describe("Plan tiles across a failed status poll", () => {
     status = withLayout("v2");
     mount();
     const v2 = tiles();
-    expect(v2).toContain("inbox");
+    expect(v2).toContain("plan-areas");
 
     status = null;
     mount();

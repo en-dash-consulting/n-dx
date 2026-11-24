@@ -53,6 +53,8 @@ import { ndxCliLister } from "./extensions.js";
 import type { ListExtensions } from "./extensions.js";
 import type { SidecarManagerOptions } from "./sidecars.js";
 import { HubSessionHostPicker } from "./session-host.js";
+import type { ProjectView, RegisterProjectInput, WorktreeRemoval } from "./project-view.js";
+import type { HubHost } from "./hub-host.js";
 import { proxiedTickPost, TrackerSyncClock } from "./tracker-sync.js";
 import type { TrackerSyncClockOptions } from "./tracker-sync.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
@@ -149,37 +151,10 @@ export interface HubHandle {
   close(options?: CloseOptions): Promise<void>;
 }
 
-/** What `POST /api/hub/projects` accepts. */
-export interface RegisterProjectInput {
-  id: string;
-  repoRoot: string;
-  /** A worktree of the repository to record under the project; `repoRoot` is always recorded. */
-  worktree?: string;
-  name?: string;
-}
-
-/** A registry record joined with its supervisor's live status. */
-export interface ProjectView extends ProjectRecord {
-  /** Informational only: always the hub's own binary, never persisted. */
-  ndxBin: string;
-  status: ChildStatus;
-}
-
-/** Outcome of unregistering one worktree from a project. */
-export interface WorktreeRemoval {
-  /** False when no project carries that id — the caller's marker files are stale. */
-  projectKnown: boolean;
-  /** False when the project is known but never had that worktree registered. */
-  worktreeKnown: boolean;
-  /** The project was unregistered and its server stopped: that was the last worktree. */
-  projectRemoved: boolean;
-  /** Worktrees still registered under the project, after the removal. */
-  remaining: string[];
-  /** The project as it now stands, or null once removed. */
-  project: ProjectView | null;
-  /** The hub has nothing left to serve and will exit (keepAlive is off). */
-  hubExiting: boolean;
-}
+// Registration's input, the project view and a worktree's removal are in
+// project-view.ts, so the modules this one imports can read them; re-exported
+// here for every caller that always had them.
+export type { ProjectView, RegisterProjectInput, WorktreeRemoval } from "./project-view.js";
 
 /**
  * Trailing separators are the only difference worth absorbing: both sides
@@ -280,7 +255,7 @@ export function resolveNdxCli(explicit: string | null | undefined, webRoot: stri
  * Hub state and operations, independent of HTTP so the routes stay thin and
  * the lifecycle is testable without a socket.
  */
-export class Hub {
+export class Hub implements HubHost {
   readonly hubHome: string;
   readonly registryPath: string;
   readonly startedAt = new Date().toISOString();
@@ -627,6 +602,10 @@ export class Hub {
     }
     this.persist();
 
+    // A hub that has just started listens before attachAll() has finished
+    // spawning its registered projects; answering mid-spawn would report
+    // "starting" to a caller that is waiting for the server. Wait for it.
+    await sup.settled();
     if (sup.status().state === "stopped") {
       await sup.start();
       this.persist();

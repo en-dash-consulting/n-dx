@@ -115,29 +115,37 @@ afterEach(() => {
 
 // ── Placement on Plan ────────────────────────────────────────────────
 
-describe("the Plan tile", () => {
-  it("leads the grid, server-backed, with the Inbox badge", () => {
-    // The lifecycle strip leads, above the grid; it is a band, not a view tile.
-    expect(STAGES.plan.tiles!.filter((t) => !t.band).map((t) => t.view)).toEqual(["inbox", "changes", "validation", "changes"]);
-    expect(STAGES.plan.tiles!.find((t) => t.view === "inbox")).toEqual({ view: "inbox", cols: 4, rows: 2, badge: "inbox", opensPage: true, v2Only: true, requiresServer: true });
+describe("the Plan side panel", () => {
+  it("is the third of Plan's side panels, after New change and From analysis, server-backed, with the Inbox badge", () => {
+    expect(STAGES.plan.sidePanels!.filter((p) => !p.transitional).map((p) => p.id)).toEqual(["new-change", "from-analysis", "inbox"]);
+    expect(STAGES.plan.sidePanels!.find((p) => p.id === "inbox")).toEqual({
+      id: "inbox", label: "Inbox", title: "Inbox", blurb: "Waiting to be placed on the map.",
+      view: "inbox", panel: "inbox", badge: "inbox", v2Only: true, requiresServer: true,
+    });
+    // It places no view: the route stays Plan's through `alsoOwns`.
+    expect(STAGES.plan.alsoOwns).toContain("inbox");
     expect(buildValidViews("rex").has("inbox")).toBe(true);
     expect(viewLabel("inbox")).toBe("Inbox");
     expect(viewBlurb("inbox")).toBe("Changes with no place on the product map yet. {cli} work skips their tasks until each is placed.");
   });
 
-  it("shows the open Inbox count and its blurb, with the CLI name, in the tile header", async () => {
+  it("shows the open Inbox count on its tab, and opens the panel from it", async () => {
     serveInbox([], [], { open: 19, appliedUnplaced: 156 });
-    routes["/api/project"] = { cliName: "ndx" };
     await mount(h(StagePage, {
       stage: "plan", validViews: buildValidViews(null), navigateTo: vi.fn(),
       renderView: (view) => h("div", { "data-rendered": view }),
+      renderSidePanel: (panel) => h("div", { "data-side": panel.id }),
     }));
-    const tile = root.querySelector<HTMLElement>('.stage-tile[data-tile="inbox"]')!;
-    expect(tile.classList.contains("stage-tile--c4")).toBe(true);
-    expect(tile.classList.contains("stage-tile--r2")).toBe(true);
-    expect(tile.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
-    expect(tile.querySelector(".stage-tile-blurb")?.textContent).toBe("Changes with no place on the product map yet. ndx work skips their tasks until each is placed.");
-    expect(tile.nextElementSibling?.getAttribute("data-tile")).toBe("changes-glance");
+    const tab = root.querySelector<HTMLButtonElement>('.stage-side-tab[data-panel="inbox"]')!;
+    expect(tab.querySelector<HTMLElement>(".stage-section-badge")?.dataset.count).toBe("19");
+    expect(tab.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => { tab.click(); });
+    await settle();
+    const panel = root.querySelector<HTMLElement>(".stage-side-panel")!;
+    expect(panel.querySelector(".stage-side-title")?.textContent).toBe("Inbox");
+    expect(panel.querySelector(".stage-side-blurb")?.textContent).toBe("Waiting to be placed on the map.");
+    expect(panel.querySelector('[data-side="inbox"]')).not.toBeNull();
+    expect(tab.getAttribute("aria-expanded")).toBe("true");
   });
 });
 
@@ -167,6 +175,56 @@ describe("sortInbox", () => {
     ];
     expect(sortInbox(rows).map((r) => r.change.id)).toEqual(["b", "a", "c"]);
   });
+
+  const ranked = (id: string, extra: Partial<ChangeRow>, strength: PlacementStrength | null = "possible"): InboxRow =>
+    ({ change: change(id, extra), shortlist: { placement: placement(id, strength) } });
+
+  it("puts prioritized changes first, then critical, high, medium, low, before the guess", () => {
+    const rows = [
+      ranked("low", { priority: "low" }, "strong"),
+      ranked("medium", { priority: "medium" }, "strong"),
+      ranked("high", { priority: "high" }, "weak"),
+      ranked("flagged-low", { priority: "low", prioritized: true }, "weak"),
+      ranked("critical", { priority: "critical" }, "weak"),
+      ranked("flagged-high", { priority: "high", prioritized: true }, "weak"),
+    ];
+    expect(sortInbox(rows).map((r) => r.change.id))
+      .toEqual(["flagged-high", "flagged-low", "critical", "high", "medium", "low"]);
+  });
+
+  it("reads a missing priority as medium", () => {
+    const rows = [
+      ranked("low", { priority: "low" }, "strong"),
+      ranked("none", {}, "weak"),
+      ranked("high", { priority: "high" }, "weak"),
+    ];
+    expect(sortInbox(rows).map((r) => r.change.id)).toEqual(["high", "none", "low"]);
+  });
+
+  it("breaks a tie on flag and priority by the guess, then by the read's order", () => {
+    const rows = [
+      ranked("weak", { prioritized: true }, "weak"),
+      ranked("a", { priority: "medium" }, "strong"),
+      ranked("b", {}, "strong"),
+      ranked("strong", { prioritized: true }, "strong"),
+    ];
+    expect(sortInbox(rows).map((r) => r.change.id)).toEqual(["strong", "weak", "a", "b"]);
+  });
+});
+
+describe("the Prioritized tag", () => {
+  it("marks a prioritized row and no other", async () => {
+    await mount(h(InboxView, {
+      rows: [
+        { change: change("flag", { prioritized: true }) },
+        { change: change("plain") },
+      ],
+      appliedUnplaced: 0,
+      onOpenChange: vi.fn(),
+    }));
+    const tags = [...root.querySelectorAll(".inbox-row")].map((row) => row.querySelector(".ch-prioritized")?.textContent ?? null);
+    expect(tags).toEqual(["Prioritized", null]);
+  });
 });
 
 // ── The page ─────────────────────────────────────────────────────────
@@ -174,7 +232,8 @@ describe("sortInbox", () => {
 describe("InboxPage on a v2 project", () => {
   it("lists only changes awaiting placement, strongest guess first, with guess and strength", async () => {
     serveInbox(
-      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined, inbox: undefined }), change("s")],
+      // Equal priority, so the guess decides the order.
+      [change("w", { priority: "high", displayId: "CH-1" }), change("placed", { awaitsPlacement: undefined, inbox: undefined }), change("s", { priority: "high" })],
       [placement("w", "weak", { tags: ["web"] }), placement("s", "strong")],
     );
     await mount(h(InboxPage, { navigateTo: vi.fn() }));

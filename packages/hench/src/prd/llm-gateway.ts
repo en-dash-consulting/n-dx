@@ -24,6 +24,7 @@
  * - Model resolution (resolve model names)
  * - Shared constants (PROJECT_DIRS)
  * - Folder layout resolution (resolveLayout, detectLayoutMode, relativeToRoot)
+ * - The project's agent prompt file (agentPromptSection)
  * - Canonical JSON serialization
  * - Repository trust (guard baseline, execution-config evaluation, trust store)
  * - Credential redaction (redactDeep, redactSecrets)
@@ -75,6 +76,11 @@ export {
   resolveNdxHome,
 } from "@n-dx/llm-client";
 export type { Layout, LayoutMode, ResolveLayoutOptions } from "@n-dx/llm-client";
+
+// ---- Agent prompt file ------------------------------------------------------
+// The operator's `.ndx/agent-prompt.md` (or `agent.promptFile`), appended to the
+// system prompt of every run; llm-client reads it so the Sidecar appends the same.
+export { agentPromptSection } from "@n-dx/llm-client";
 
 // ---- Canonical JSON ---------------------------------------------------------
 export { toCanonicalJSON } from "@n-dx/llm-client";

@@ -96,8 +96,8 @@ const ALL = buildValidViews(null);
 // ── The layout as data ─────────────────────────────────────────
 
 describe("stages.ts", () => {
-  it("orders the loop Analysis → Plan → Work → Tune", () => {
-    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work", "Tune"]);
+  it("orders the loop Analysis → Plan → Work", () => {
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
   });
 
   it("lists only real views, each with a registry renderer", () => {
@@ -117,13 +117,21 @@ describe("stages.ts", () => {
     }
     expect(isKnownViewPath("home")).toBe(true);
     expect(SETTINGS_ENTRIES.map((e) => e.view)).toEqual([
-      "robot-wrangler", "project", "workflow", "commands",
+      "robot-wrangler", "project", "workflow", "workspaces", "commands",
     ]);
   });
 
-  it("puts PRD items and the audit at the top of Work", () => {
-    const work = STAGES.work.sections.map((s) => s.view);
-    expect(work.slice(0, 2)).toEqual(["rex-dashboard", "hench-audit"]);
+  it("opens Work on what is running, what is next and the PRD's numbers; its old sections moved", () => {
+    // Running now beside the run queue; Ready to run moved to the top of Tune.
+    expect(STAGES.work.modes?.[0]?.tiles.map((t) => t.panel)).toEqual(["running", "run-queue", "work-stats"]);
+    expect(STAGES.work.modes?.[1]?.tiles[0]?.panel).toBe("up-next");
+    // The dashboard's numbers are the Statistics tile; the audit is a Tune tile.
+    expect(STAGES.work.modes![0]!.tiles.find((t) => t.panel === "work-stats")?.view).toBe("rex-dashboard");
+    expect(STAGES.work.modes![1]!.tiles.some((t) => t.view === "hench-audit")).toBe(true);
+    for (const view of ["rex-dashboard", "hench-audit"] as const) expect(stageForView(view), view).toBe("work");
+    // Workspaces is a Settings page, in no stage.
+    expect(stageForView("workspaces")).toBeNull();
+    expect(isSettingsView("workspaces")).toBe(true);
     expect(STAGES.analyze.sections.map((s) => s.view)).not.toContain("rex-dashboard");
   });
 
@@ -136,23 +144,24 @@ describe("stages.ts", () => {
     expect(stageForView("zones")).toBe("analyze");
     expect(stageForView("iso-map")).toBe("analyze"); // the dashboard's hero tile
     expect(stageForView("graph")).toBe("analyze"); // off the page, still the stage's
-    expect(stageForView("hench-runs")).toBe("tune");
+    expect(stageForView("hench-runs")).toBe("work");
     expect(stageForView("rex-dashboard")).toBe("work");
     expect(stageForView("work")).toBe("work");
+    // Tune is Work's second mode.
+    expect(stageForView("tune")).toBe("work");
     expect(stageForView("home")).toBeNull();
     expect(stageForView("robot-wrangler")).toBeNull();
-    // Token Usage is on Tune only; a Rex viewer's borrowed Tune does not show
-    // global views, so there it lights no stage.
-    expect(stageForView("token-usage")).toBe("tune");
+    expect(stageForView("token-usage")).toBe("work");
+    // A Rex viewer has no Work stage, so Spend lights none there.
     expect(stageForView("token-usage", buildValidViews("rex"))).toBeNull();
-    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("tune");
+    expect(stageForView("token-usage", buildValidViews("hench"))).toBe("work");
   });
 
-  it("places the PRD Graph and Execution Log on Tune in a Rex viewer", () => {
+  it("keeps the PRD Graph and Execution Log valid in a Rex viewer, which has no Work stage", () => {
     const rex = buildValidViews("rex");
-    expect(stageForView("merge-graph", rex)).toBe("tune");
-    expect(stageForView("activity", rex)).toBe("tune");
-    // Hench's own Tune views are not in a Rex viewer at all.
+    expect(rex.has("merge-graph")).toBe(true);
+    expect(rex.has("activity")).toBe(true);
+    expect(stageForView("merge-graph", rex)).toBeNull();
     expect(stageForView("hench-runs", rex)).toBeNull();
   });
 
@@ -169,11 +178,10 @@ describe("stages.ts", () => {
   });
 
   it("gives a scoped viewer only its own stage", () => {
-    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work", "tune"]);
+    expect(visibleStages(ALL)).toEqual(["analyze", "plan", "work"]);
     expect(visibleStages(buildValidViews("sourcevision"))).toEqual(["analyze"]);
-    // Rex borrows Tune for the PRD Graph and Execution Log.
-    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan", "tune"]);
-    expect(visibleStages(buildValidViews("hench"))).toEqual(["work", "tune"]);
+    expect(visibleStages(buildValidViews("rex"))).toEqual(["plan"]);
+    expect(visibleStages(buildValidViews("hench"))).toEqual(["work"]);
   });
 });
 
@@ -187,10 +195,10 @@ describe("TopNav", () => {
   const tabLabels = () => Array.from(root.querySelectorAll(".topnav-tab[data-stage] .topnav-tab-label")).map((el) => el.textContent);
   const activeTab = () => root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent ?? null;
 
-  it("shows exactly the four stages, under the View navigation landmark", async () => {
+  it("shows exactly the three stages, under the View navigation landmark", async () => {
     await mount(nav("home"));
     expect(root.querySelector('nav[aria-label="View navigation"]')).not.toBeNull();
-    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work", "Tune"]);
+    expect(tabLabels()).toEqual(["Analysis", "Plan", "Work"]);
     expect(activeTab()).toBeNull();
     expect(root.querySelector(".topnav-brand")?.getAttribute("aria-current")).toBe("page");
   });
@@ -350,11 +358,9 @@ describe("StageLinks", () => {
 
   it("points each stage at its neighbours, wrapping around the loop", async () => {
     await mount(h(StageLinks, { stage: "analyze", validViews: ALL, onNavigate: vi.fn() }));
-    expect(links()).toEqual(["tune", "plan"]);
+    expect(links()).toEqual(["work", "plan"]);
     await act(async () => { render(h(StageLinks, { stage: "work", validViews: ALL, onNavigate: vi.fn() }), root); });
-    expect(links()).toEqual(["plan", "tune"]);
-    await act(async () => { render(h(StageLinks, { stage: "tune", validViews: ALL, onNavigate: vi.fn() }), root); });
-    expect(links()).toEqual(["work", "analyze"]);
+    expect(links()).toEqual(["plan", "analyze"]);
   });
 
   it("navigates on click and labels both directions", async () => {
@@ -385,15 +391,38 @@ describe("StagePage", () => {
 
   beforeEach(() => { rendered.length = 0; });
 
-  it("stacks the stage's sections in order and mounts only the open ones", async () => {
+  /**
+   * Every stage draws tiles now, so no page stacks collapsible sections. The
+   * stacked layout stays for a stage that lists sections and no tiles; these
+   * tests give Work such a layout and put its modes back afterwards.
+   */
+  const STACKED = [
+    { view: "rex-dashboard", plain: true },
+    { view: "hench-audit" },
+    { view: "workspaces", requiresServer: true },
+  ];
+  let savedWork: { sections: unknown; modes: unknown } | null = null;
+  const stackWork = () => {
+    const work = STAGES.work as { sections: unknown; modes: unknown };
+    savedWork = { sections: work.sections, modes: work.modes };
+    Object.assign(work, { sections: STACKED.map((s) => ({ ...s })), modes: undefined });
+  };
+  afterEach(() => {
+    if (savedWork) Object.assign(STAGES.work, savedWork);
+    savedWork = null;
+  });
+
+  it("stacks a stage's sections in order and mounts only the open ones", async () => {
+    stackWork();
     await mount(page("work"));
-    expect(sectionViews()).toEqual(STAGES.work.sections.map((s) => s.view));
-    // Only "Up next" opens on arrival, so only it has rendered.
+    expect(sectionViews()).toEqual(STACKED.map((s) => s.view));
+    // Only the plain lead is shown on arrival, so only it has rendered.
     expect([...new Set(rendered)]).toEqual(["rex-dashboard"]);
   });
 
   it("shows each stage's lead section in the page itself, with no dropdown", async () => {
-    for (const stage of STAGE_ORDER) {
+    // Plan and Work have no lead: they open on their modes' tiles.
+    for (const stage of STAGE_ORDER.filter((s) => !STAGES[s].modes)) {
       const lead = STAGES[stage].sections[0];
       expect(lead.plain, `${stage} lead is plain`).toBe(true);
       expect(STAGES[stage].sections.filter((s) => s.plain)).toHaveLength(1);
@@ -409,6 +438,7 @@ describe("StagePage", () => {
   });
 
   it("opens and closes a section, remembering the choice", async () => {
+    stackWork();
     await mount(page("work"));
     const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="hench-audit"] .stage-section-toggle')!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
@@ -427,6 +457,7 @@ describe("StagePage", () => {
   // No stage section sets `scroll` now that the run history and log are Tune
   // tabs, so the option is exercised on a section given it for this test.
   it("keeps a scroll section a bounded region until Expand, remembering the choice", async () => {
+    stackWork();
     const audit = STAGES.work.sections.find((s) => s.view === "hench-audit")!;
     Object.assign(audit, { scroll: true });
     try {
@@ -459,8 +490,10 @@ describe("StagePage", () => {
     await mount(page("analyze"));
     expect(sectionViews()).toEqual(["overview"]);
     const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["map", "health", "next-steps", "delivery", "problems", "suggestions", "zones", "architecture", "files", "languages"]);
-    expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--c8 stage-tile--r3");
+    expect(tiles).toEqual(["glance", "recommendations", "map"]);
+    expect(root.querySelector('.stage-tile[data-tile="glance"]')?.className).toContain("stage-tile--c6 stage-tile--r2");
+    expect(root.querySelector('.stage-tile[data-tile="recommendations"]')?.className).toContain("stage-tile--c6 stage-tile--r2");
+    expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--c12 stage-tile--r3");
   });
 
   it("drops the codebase map tile in deployed mode", async () => {
@@ -468,24 +501,43 @@ describe("StagePage", () => {
     try {
       await mount(page("analyze"));
       expect(root.querySelector('.stage-tile[data-tile="map"]')).toBeNull();
-      expect(root.querySelector('.stage-tile[data-tile="zones"]')).not.toBeNull();
+      expect(root.querySelector('.stage-tile[data-tile="glance"]')).not.toBeNull();
     } finally {
       delete window.__NDX_DEPLOYED__;
     }
   });
 
-  it("opens a tile full-screen with its tabs: Architecture and Routes", async () => {
-    await mount(page("analyze"));
-    const arch = root.querySelector('.stage-tile[data-tile="architecture"]')!;
-    expect(arch.querySelector(".stage-tile-title")?.textContent).toBe("Architecture");
-    // The preview shows the tile's own view, without tabs.
-    expect(arch.querySelector('[role="tab"]')).toBeNull();
-    act(() => { arch.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
+  it("opens the visuals tile full-screen with its panel first, then Zones, Files, Architecture and Routes", async () => {
+    await mount(h(StagePage, {
+      stage: "analyze", validViews: ALL, navigateTo: vi.fn(), renderView,
+      renderPanel: (panel, opened) => h("div", { "data-panel": panel, "data-opened": String(opened) }),
+    }));
+    const tile = root.querySelector('.stage-tile[data-tile="glance"]')!;
+    expect(tile.querySelector(".stage-tile-title")?.textContent).toBe("Codebase at a glance");
+    // The preview shows the panel, without tabs.
+    expect(tile.querySelector('[role="tab"]')).toBeNull();
+    expect(tile.querySelector('[data-panel="glance"]')?.getAttribute("data-opened")).toBe("false");
+    act(() => { tile.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
     const full = root.querySelector(".stage-tile-fullscreen")!;
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(["Architecture", "Routes"]);
-    act(() => { tabs[1]!.click(); });
+    expect(tabs.map((t) => t.textContent)).toEqual(["Overview", "Zones", "Files", "Architecture", "Routes"]);
+    expect(full.querySelector('[data-panel="glance"]')?.getAttribute("data-opened")).toBe("true");
+    act(() => { tabs[4]!.click(); });
     expect(full.querySelector('[data-rendered="routes"]')).not.toBeNull();
+    expect(full.querySelector('[data-panel="glance"]')).toBeNull();
+  });
+
+  it("opens the Recommended fixes tile full-screen as its panel alone", async () => {
+    await mount(h(StagePage, {
+      stage: "analyze", validViews: ALL, navigateTo: vi.fn(), renderView,
+      renderPanel: (panel, opened) => h("div", { "data-panel": panel, "data-opened": String(opened) }),
+    }));
+    const tile = root.querySelector('.stage-tile[data-tile="recommendations"]')!;
+    expect(tile.querySelector(".stage-tile-title")?.textContent).toBe("Recommended fixes");
+    act(() => { tile.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
+    const full = root.querySelector(".stage-tile-fullscreen")!;
+    expect(full.querySelector('[role="tab"]')).toBeNull();
+    expect(full.querySelector('[data-panel="recommendations"]')?.getAttribute("data-opened")).toBe("true");
   });
 
   it("renders the map tile as its panel alone, with no tile header", async () => {
@@ -502,66 +554,135 @@ describe("StagePage", () => {
 
   const planTiles = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
 
-  it("renders Plan as the capture bar, then Inbox, Open changes, Plan health and Specs to tighten tiles", async () => {
-    await mount(page("plan"));
-    expect(sectionViews()).toEqual(["analysis"]);
-    expect(planTiles()).toEqual(["inbox", "changes-glance", "plan-health", "spec-gaps"]);
-    const spans = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.className.match(/stage-tile--c\d+ stage-tile--r\d+/)?.[0]);
-    expect(spans).toEqual(["stage-tile--c4 stage-tile--r2", "stage-tile--c8 stage-tile--r2", "stage-tile--c4 stage-tile--r2", "stage-tile--c4 stage-tile--r1"]);
-    expect(root.querySelector('.stage-tile[data-tile="changes-glance"] .stage-tile-title')?.textContent).toBe("Open changes");
+  const bands = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-band")).map((el) => el.dataset.tile);
+  const sideTabs = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-side-tab")).map((el) => el.querySelector(".stage-side-tab-label")?.textContent);
+
+  it("renders Create as the glance cards, How work moves and the product areas, with the rest in side panels", async () => {
+    stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v2" } });
+    await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo: vi.fn(), renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
+    expect(sectionViews()).toEqual([]);
+    // The glance cards, then How work moves: the stages that focus the page.
+    expect(bands()).toEqual(["plan-glance", "plan-flow"]);
+    expect(planTiles()).toEqual(["plan-areas"]);
+    expect(root.querySelector('.stage-tile[data-tile="plan-areas"]')?.className).toContain("stage-tile--c12 stage-tile--r3");
+    expect(root.querySelector('.stage-tile[data-tile="plan-areas"] .stage-tile-title')?.textContent).toBe("Product areas");
+    // The design's panels lead; the tiles Create no longer places follow a divider.
+    expect(sideTabs()).toEqual(["New change", "From analysis", "Inbox", "Open changes", "Plan health", "Specs to tighten"]);
+    expect(root.querySelectorAll(".stage-side-divider")).toHaveLength(1);
+    // "Add to the plan" in the head opens New change.
+    const add = root.querySelector<HTMLButtonElement>(".stage-side-action")!;
+    expect(add.textContent).toContain("Add to the plan");
+    act(() => { add.click(); });
+    expect(root.querySelector(".stage-side-panel .stage-side-title")?.textContent).toBe("Add to the plan");
+    expect(root.querySelector('.stage-side-panel [data-side="new-change"]')).not.toBeNull();
+    expect(add.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("opens Open changes full-screen with List, Tree and Product tabs", async () => {
+  it("closes a side panel on Escape and on its close button, returning focus to the tab", async () => {
+    stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v2" } });
+    const navigateTo = vi.fn();
+    await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo, renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
+    const tab = root.querySelector<HTMLButtonElement>('.stage-side-tab[data-panel="plan-health"]')!;
+    tab.focus();
+    act(() => { tab.click(); });
+    expect(document.activeElement?.classList.contains("stage-side-title")).toBe(true);
+    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(root.querySelector(".stage-side-panel")).toBeNull();
+    expect(document.activeElement).toBe(tab);
+
+    act(() => { tab.click(); });
+    act(() => { root.querySelector<HTMLButtonElement>(".stage-side-close")!.click(); });
+    expect(root.querySelector(".stage-side-panel")).toBeNull();
+    expect(document.activeElement).toBe(tab);
+
+    // "Open ↗" closes the panel and goes to the view it belongs to.
+    act(() => { tab.click(); });
+    act(() => { root.querySelector<HTMLButtonElement>(".stage-side-open")!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("validation");
+    expect(root.querySelector(".stage-side-panel")).toBeNull();
+  });
+
+  it("opens Preparation's Assign and schedule full-screen with List and Tree tabs", async () => {
+    localStorage.setItem("ndx.stage-mode", JSON.stringify({ plan: "prepare" }));
     await mount(page("plan"));
-    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes-glance"] .stage-tile-head')!.click(); });
+    // Preparation is Assign and schedule alone: no Lifecycle band above it.
+    expect(bands()).toEqual([]);
+    act(() => { root.querySelector<HTMLButtonElement>('.stage-tile[data-tile="changes"] .stage-tile-head')!.click(); });
     const full = root.querySelector(".stage-tile-fullscreen")!;
     const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree", "Product"]);
+    expect(tabs.map((t) => t.textContent)).toEqual(["List", "Tree"]);
     act(() => { tabs[1]!.click(); });
     // Directly inside the tab panel: stage-tiles.css bounds the tree through `.stage-tile-content > div > .prd-view`.
     expect(full.querySelector('.stage-tile-content > div > [data-rendered="prd"]')).not.toBeNull();
   });
 
-  it("a v1 project shows Tasks and Product tiles in place of the Inbox and Open changes tiles", async () => {
+  it("a v1 project shows Tasks and Product tiles in place of the product areas, and no v2-only side panel", async () => {
     stubApi([], { ...STATUS, rex: { ...STATUS.rex, layout: "v1" } });
-    await mount(page("plan"));
-    expect(planTiles()).toEqual(["prd", "product", "plan-health"]);
+    await mount(h(StagePage, { stage: "plan", validViews: ALL, navigateTo: vi.fn(), renderView, renderSidePanel: (p) => h("div", { "data-side": p.id }) }));
+    expect(planTiles()).toEqual(["prd", "product"]);
+    expect(bands()).toEqual([]);
     const tasks = root.querySelector<HTMLElement>('.stage-tile[data-tile="prd"]')!;
     expect(tasks.className).toContain("stage-tile--c8 stage-tile--r2");
     expect(tasks.querySelector(".stage-tile-title")?.textContent).toBe("Tasks");
+    // No Inbox, Open changes or spec gaps on a v1 tree.
+    expect(sideTabs()).toEqual(["New change", "From analysis", "Plan health"]);
   });
 
   it("keeps Tasks under Plan though Plan lists it only as a tab", () => {
     expect(stageForView("prd")).toBe("plan");
   });
 
-  it("renders Tune as a tile grid after its lead, with Spend, Shipped and Outcomes beside Runs", async () => {
-    await mount(page("tune"));
-    expect(sectionViews()).toEqual(["tune"]);
-    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["hench-runs", "token-usage", "hench-optimization", "merge-graph", "outcomes", "tooling"]);
+  const tileKeys = () => Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+  const modeTabs = () => Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-modes [role="tab"]'));
+
+  it("opens Work on Now: what is running and what is next, under a Now / Tune toggle", async () => {
+    await mount(page("work"));
+    expect(sectionViews()).toEqual([]);
+    expect(modeTabs().map((t) => t.querySelector(".stage-mode-label")?.textContent)).toEqual(["Now", "Tune"]);
+    expect(modeTabs()[0]!.getAttribute("aria-selected")).toBe("true");
+    expect(tileKeys()).toEqual(["running", "run-queue", "work-stats"]);
   });
 
-  it("a Rex viewer's Tune draws the Execution Log (promoted from Runs' tab) and the PRD Graph, and no Spend", async () => {
-    await mount(page("tune", buildValidViews("rex")));
-    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["activity", "merge-graph"]);
+  it("opens Work on Tune from the tune route, and the toggle navigates between the two", async () => {
+    const navigateTo = vi.fn();
+    await mount(h(StagePage, { stage: "work", view: "tune", validViews: ALL, navigateTo, renderView }));
+    expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(tileKeys()).toEqual(["up-next", "agent-settings", "hench-runs", "token-usage", "hench-audit", "hench-optimization", "merge-graph", "outcomes"]);
+    act(() => { modeTabs()[0]!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("work");
   });
 
-  it("gives a Rex viewer a Tune tab that lights on the PRD Graph and Execution Log", async () => {
-    const rex = buildValidViews("rex");
-    for (const view of ["merge-graph", "activity"] as const) {
-      await mount(h(TopNav, { view, validViews: rex, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
-      expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
-    }
+  it("splits Plan into Create and Preparation, remembering the mode picked", async () => {
+    stubApi([], STATUS);
+    await mount(page("plan"));
+    expect(modeTabs().map((t) => [t.querySelector(".stage-mode-label")?.textContent, t.querySelector(".stage-mode-focus")?.textContent])).toEqual([
+      ["Create", "How, why and what"],
+      ["Preparation", "Who and when"],
+    ]);
+    act(() => { modeTabs()[1]!.click(); });
+    await act(async () => {});
+    expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector('.stage-tile[data-tile="changes"]')).not.toBeNull();
+    expect(root.querySelector('.stage-tile[data-tile="capture"]')).toBeNull();
+    expect(JSON.parse(localStorage.getItem("ndx.stage-mode")!)).toMatchObject({ plan: "prepare" });
+
+    render(null, root);
+    root.remove();
+    await mount(page("plan"));
+    expect(modeTabs()[1]!.getAttribute("aria-selected")).toBe("true");
   });
 
-  it("keeps Tune lit on the pages of its tiles", async () => {
+  it("keeps Work lit on the pages of its Tune tiles", async () => {
     await mount(h(TopNav, { view: "token-usage", validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
-    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Tune");
+    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Work");
+    render(null, root);
+    root.remove();
+    await mount(h(TopNav, { view: "tune", validViews: ALL, onNavigate: vi.fn(), onOpenSearch: vi.fn() }));
+    expect(root.querySelector(".topnav-tab.active .topnav-tab-label")?.textContent).toBe("Work");
   });
 
   it("drops sections outside the viewer's scope", async () => {
+    stackWork();
     await mount(page("work", buildValidViews("hench")));
     // Up next is Rex's dashboard: not in a Hench-only viewer.
     expect(sectionViews()).not.toContain("rex-dashboard");
@@ -572,11 +693,11 @@ describe("StagePage", () => {
 // ── Landing ────────────────────────────────────────────────────
 
 describe("HomeView", () => {
-  it("shows the four stages as columns in loop order, each going to its stage", async () => {
+  it("shows the three stages as columns in loop order, each going to its stage", async () => {
     const navigateTo = vi.fn();
     await mount(h(HomeView, { validViews: ALL, navigateTo }));
     const cards = Array.from(root.querySelectorAll<HTMLButtonElement>(".stage-card"));
-    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work", "Tune"]);
+    expect(cards.map((c) => c.querySelector(".stage-card-name")?.textContent)).toEqual(["Analysis", "Plan", "Work"]);
     expect(cards.every((c) => c.querySelector(".stage-card-mark img"))).toBe(true);
     act(() => { cards[1].click(); });
     expect(navigateTo).toHaveBeenCalledWith("plan");
@@ -609,14 +730,14 @@ describe("HomeView next-step panel", () => {
     rex: { ...STATUS.rex, exists: true, stats: { ...STATUS.rex.stats, total: 0 }, nextTaskTitle: null },
   };
 
-  it("names `init` on a never-touched project, above the four stage cards", async () => {
+  it("names `init` on a never-touched project, above the three stage cards", async () => {
     stubApi([], NOT_INITIALIZED);
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     const panel = root.querySelector(".next-step-panel");
     expect(panel?.getAttribute("data-state")).toBe("not-initialized");
     expect(panel?.querySelector(".next-step-command")?.textContent).toBe("n-dx init");
-    // The panel replaces no stage content — all four cards are still there.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
+    // The panel replaces no stage content — all three cards are still there.
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
     const panelIndex = Array.from(root.querySelector(".home")!.children).indexOf(panel!);
     const stagesIndex = Array.from(root.querySelector(".home")!.children).findIndex((el) => el.classList.contains("home-stages"));
     expect(panelIndex).toBeLessThan(stagesIndex);
@@ -689,7 +810,7 @@ describe("HomeView next-step panel", () => {
     await mount(h(HomeView, { validViews: ALL, navigateTo: vi.fn() }));
     expect(root.querySelector(".next-step-panel")).toBeNull();
     // Home itself still renders — the cards just carry no numbers.
-    expect(root.querySelectorAll(".stage-card")).toHaveLength(4);
+    expect(root.querySelectorAll(".stage-card")).toHaveLength(3);
   });
 });
 
@@ -764,7 +885,7 @@ describe("SettingsOverlay", () => {
     const dialog = root.querySelector(".settings-overlay")!;
     expect(dialog.getAttribute("role")).toBe("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
+    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Workspaces", "Commands"]);
     expect(root.querySelector(".fake-settings")).not.toBeNull();
     expect(root.querySelector(".settings-overlay-crumbs")?.textContent).toContain("Robot Wrangler");
   });
@@ -772,7 +893,7 @@ describe("SettingsOverlay", () => {
   it("draws each page's pixel glyph, and the gear in the header", async () => {
     await mount(overlay("robot-wrangler"));
     const spans = root.querySelectorAll(".settings-overlay-item-glyph");
-    expect(spans).toHaveLength(4);
+    expect(spans).toHaveLength(5);
     for (const span of spans) {
       const svg = span.querySelector("svg");
       expect(svg?.getAttribute("shape-rendering")).toBe("crispEdges");
@@ -788,7 +909,7 @@ describe("SettingsOverlay", () => {
   it("lists the same pages whatever the feature toggles are — no toggle adds or removes a settings page", async () => {
     stubApi(["sourcevision.ask", "rex.placementDraft"]);
     await mount(overlay("robot-wrangler"));
-    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Commands"]);
+    expect(items()).toEqual(["Robot Wrangler", "Project", "Workflow", "Workspaces", "Commands"]);
   });
 
   it("switches pages and closes with the ✕ or Escape", async () => {

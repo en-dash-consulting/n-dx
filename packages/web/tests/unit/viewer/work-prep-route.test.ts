@@ -86,3 +86,45 @@ describe("the work renderer", () => {
     expect(children(renderActiveView("work", ctx(null)) as VNode).some((c) => c?.type === PrepareTaskModal)).toBe(false);
   });
 });
+
+describe("the /tune/prep/<taskId> route", () => {
+  // Ready to run is on Tune, so its Prepare… opens the modal over Tune, not Now.
+  it("parses to Tune with the task id and builds back to the same path", () => {
+    expect(parsePathnameRoute("/tune/prep/task-1", ALL)).toEqual({ view: "tune", subId: "task-1" });
+    expect(parsePathnameRoute("/p/app/tune/prep/task-1", ALL, "/p/app")).toEqual({ view: "tune", subId: "task-1" });
+    expect(parsePathnameRoute("/tune", ALL)).toEqual({ view: "tune", subId: null });
+    expect(parsePathnameRoute("/tune/other", ALL)).toEqual({ view: "tune", subId: null });
+    expect(viewPathname("tune", "task-1")).toBe("/tune/prep/task-1");
+    expect(viewPathname("tune", null)).toBe("/tune");
+  });
+
+  it("navigating to Tune with a task keeps Tune, and closing returns to /tune", async () => {
+    window.history.replaceState(null, "", "/tune");
+    let route: ReturnType<typeof useRouteState> | undefined;
+    function Harness() {
+      route = useRouteState(ALL);
+      return null;
+    }
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    await act(async () => { render(h(Harness, null), root); });
+    await act(async () => { route!.navigateTo("tune", { taskId: "task-1" }); });
+    expect(route!.view).toBe("tune");
+    expect(route!.selectedTaskId).toBe("task-1");
+    expect(location.pathname).toBe("/tune/prep/task-1");
+    await act(async () => { route!.navigateTo("tune"); });
+    expect(route!.selectedTaskId).toBeNull();
+    expect(location.pathname).toBe("/tune");
+    await act(async () => { render(null, root); });
+  });
+
+  it("the tune renderer opens the modal over Tune, closing back to Tune", () => {
+    const calls: unknown[][] = [];
+    const ctx = { selectedTaskId: "task-1", navigateTo: (...a: unknown[]) => calls.push(a), validViews: ALL } as unknown as ViewRenderContext;
+    const vnode = renderActiveView("tune", ctx) as VNode;
+    const modal = ([vnode.props.children].flat() as Array<VNode | null>).find((c) => c?.type === PrepareTaskModal);
+    expect(modal?.props).toMatchObject({ taskId: "task-1" });
+    (modal!.props as unknown as { onClose: () => void }).onClose();
+    expect(calls).toEqual([["tune"]]);
+  });
+});

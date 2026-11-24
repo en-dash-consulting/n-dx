@@ -24,7 +24,7 @@ import { refreshPRDCache } from "../prd-io.js";
 import { errorMessage } from "../response-utils.js";
 import { findItemByRef } from "../tracker/item-links.js";
 import type { SidecarStatusChange } from "../../shared/index.js";
-import type { CarryOutResult } from "./carry-out.js";
+import type { CarryOutResult } from "./carry-out-result.js";
 
 /** Ordinary status moves only: rex's `deleted` removes the item's whole subtree. */
 export const PROPOSABLE_STATUSES = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "cancelled"] as const;

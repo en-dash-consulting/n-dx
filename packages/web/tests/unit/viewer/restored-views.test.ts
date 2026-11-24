@@ -20,7 +20,7 @@ import {
   REX_SCOPE_VIEWS,
   buildValidViews,
 } from "../../../src/shared/index.js";
-import { STAGES, viewLabel, stageForView } from "../../../src/viewer/views/index.js";
+import { STAGES, viewLabel, stageForView, stageTiles, tilePlacesView } from "../../../src/viewer/views/index.js";
 import { tileTitle } from "../../../src/viewer/views/stage-tiles.js";
 
 const emptyData: LoadedData = {
@@ -87,46 +87,54 @@ describe("restored views: navigation entries", () => {
   // The Analysis stage is the only place SourceVision's views are arranged,
   // so it is where the "zones is reachable, and sits after the map" guard
   // belongs. On the dashboard zones is a tile of its own, after the map.
-  it("zones is a tile of the Analysis dashboard, after the codebase map", () => {
-    const keys = STAGES.analyze.tiles!.map((t) => t.panel ?? t.view);
-    expect(keys).toContain("zones");
-    expect(keys.indexOf("map")).toBeLessThan(keys.indexOf("zones"));
+  it("zones is the view the Analysis dashboard's visuals tile opens to", () => {
+    const glance = STAGES.analyze.tiles!.find((t) => t.panel === "glance");
+    expect(glance).toMatchObject({ view: "zones", embedsView: true });
   });
 
   it("zones is named by the navigation model", () => {
     expect(viewLabel("zones")).toBe("Zones");
   });
 
-  it("analysis is a section of the Plan stage", () => {
-    expect(STAGES.plan.sections.map((s) => s.view)).toContain("analysis");
+  it("analysis is Plan's New change side panel, and the stage owns its route", () => {
+    expect(STAGES.plan.sidePanels?.find((p) => p.id === "new-change")).toMatchObject({ view: "analysis", panel: "capture" });
+    expect(stageForView("analysis")).toBe("plan");
   });
 });
 
-describe("views moved into Tune", () => {
+describe("views on Work's Tune mode", () => {
   const MOVED: ViewId[] = ["hench-runs", "activity", "token-usage", "hench-optimization", "hench-adaptive", "merge-graph"];
+  const tune = () => STAGES.work.modes!.find((m) => m.id === "tune")!;
 
-  it.each(MOVED)("%s still resolves, renders, and sits under Tune", (view) => {
+  it.each(MOVED)("%s still resolves, renders, and sits under Work", (view) => {
     expect(buildValidViews(null).has(view)).toBe(true);
     expect(renderActiveView(view, makeCtx())).toBeTruthy();
-    expect(stageForView(view)).toBe("tune");
+    expect(stageForView(view)).toBe("work");
     expect(viewLabel("tune")).toBe("Tune");
   });
 
-  it("Plan and Work no longer list them", () => {
-    const listed = [...STAGES.plan.sections, ...STAGES.work.sections].map((s) => s.view);
-    for (const view of MOVED) expect(listed).not.toContain(view);
+  it("Plan and Work's Now mode do not place them", () => {
+    // Now's panels open the Runs view through "Open" without placing it.
+    const placed = [...stageTiles("plan"), ...STAGES.work.modes![0]!.tiles]
+      .flatMap((t) => [...(tilePlacesView(t) ? [t.view] : []), ...(t.tabs ?? []).map((x) => x.view)]);
+    for (const view of MOVED) expect(placed).not.toContain(view);
   });
 
-  it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Shipped, Outcomes by tier and Your tooling", () => {
-    const tiles = STAGES.tune.tiles!;
-    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier", "Your tooling"]);
-    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([["activity"], [], ["hench-adaptive"], [], [], []]);
-    expect(tiles[0]).toMatchObject({ cols: 8, rows: 2 });
+  it("Tune's tiles are Ready to run, Agent settings, Runs (Execution Log tab), Spend, Audit, Suggestions (Adaptive), Shipped and Outcomes by tier", () => {
+    const all = tune().tiles;
+    expect(all.map((t) => tileTitle(t, "v1"))).toEqual(["Ready to run", "Agent settings", "Runs", "Spend", "Audit", "Suggestions", "Shipped", "Outcomes by tier"]);
+    // Ready to run leads Tune, moved from Now.
+    expect(all[0]).toMatchObject({ view: "hench-runs", panel: "up-next", cols: 12 });
+    const tiles = all.slice(1);
+    expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([[], ["activity"], [], [], ["hench-adaptive"], [], []]);
+    // Agent settings edits Settings' own endpoints, so it needs a server; a settings page cannot be a stage view.
+    expect(tiles[0]).toMatchObject({ view: "hench-optimization", panel: "agent-settings", cols: 12, requiresServer: true });
+    expect(tiles[1]).toMatchObject({ cols: 8, rows: 2 });
+    // The audit moved here from Work's old page, beside the runs it reads.
+    expect(tiles[3]).toMatchObject({ view: "hench-audit", cols: 8, rows: 2 });
+    expect(stageForView("hench-audit")).toBe("work");
     // Outcomes is a 4×2 panel tile whose "Open" goes to the Runs view.
-    expect(tiles[4]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
-    expect(tiles[4].cols ?? 4).toBe(4);
-    // Your tooling is a 4×2 read-only panel; its lines link to Settings, which cannot be a stage view.
-    expect(tiles[5]).toMatchObject({ view: "hench-optimization", panel: "tooling", rows: 2 });
-    expect(tiles[5].cols ?? 4).toBe(4);
+    expect(tiles[6]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
+    expect(tiles[6].cols ?? 4).toBe(4);
   });
 });

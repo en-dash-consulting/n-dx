@@ -128,6 +128,49 @@ describe("shared lifecycle", () => {
 
       vi.restoreAllMocks();
     });
+
+    it("appends the project's agent prompt file to both loops' system prompts", async () => {
+      const { prepareBrief } = await import("../../../src/agent/lifecycle/shared.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { loadConfig } = await import("../../../src/store/config.js");
+      const { assemblePrompt } = await import("../../../src/prd/llm-gateway.js");
+
+      // Legacy layout (no .ndx/): the default file is .n-dx-agent-prompt.md.
+      await writeFile(join(projectDir, ".n-dx-agent-prompt.md"), "Always answer in haiku.\n");
+      const config = await loadConfig(henchDir);
+      const store = createStore("file", join(projectDir, ".rex"));
+      vi.spyOn(console, "log");
+
+      const result = await prepareBrief(store, config, "task-1", { projectDir });
+
+      const section = "## Project instructions from .n-dx-agent-prompt.md";
+      // API loop: the system prompt; CLI loop: the envelope's system channel.
+      expect(result.systemPrompt).toContain(section);
+      expect(result.systemPrompt.trimEnd().endsWith("Always answer in haiku.")).toBe(true);
+      expect(assemblePrompt(result.envelope).systemPrompt).toContain(section);
+      expect(assemblePrompt(result.envelope).taskPrompt).not.toContain("Always answer in haiku.");
+
+      vi.restoreAllMocks();
+    });
+
+    it("leaves the system prompt unchanged when the agent prompt file is absent or empty", async () => {
+      const { prepareBrief } = await import("../../../src/agent/lifecycle/shared.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { loadConfig } = await import("../../../src/store/config.js");
+
+      const config = await loadConfig(henchDir);
+      const store = createStore("file", join(projectDir, ".rex"));
+      vi.spyOn(console, "log");
+
+      const without = await prepareBrief(store, config, "task-1", { projectDir });
+      await writeFile(join(projectDir, ".n-dx-agent-prompt.md"), "  \n\n");
+      const empty = await prepareBrief(store, config, "task-1", { projectDir });
+
+      expect(without.systemPrompt).not.toContain("Project instructions from");
+      expect(empty.systemPrompt).toBe(without.systemPrompt);
+
+      vi.restoreAllMocks();
+    });
   });
 
   describe("executeDryRun", () => {

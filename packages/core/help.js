@@ -1147,7 +1147,7 @@ const ORCHESTRATOR_HELP_DEFS = {
           "project servers require a per-user token. 'ndx start'\n" +
           "creates it at <ndx home>/auth.token (mode 0600) and passes it to every\n" +
           "server it starts. The URL it prints carries a one-time sign-in nonce,\n" +
-          "never the token: valid once, for about a minute, it signs that browser\n" +
+          "never the token: valid once, for 30 minutes, it signs that browser\n" +
           "tab in (run 'ndx start' again for a fresh link). Scripts and MCP\n" +
           "clients send it as 'X-Ndx-Token: <token>' or 'Authorization: Bearer\n" +
           "<token>'; the printed 'claude mcp add' lines include the header.\n" +

@@ -9,8 +9,10 @@
  * Proposals can be sent to the ProposalEditor for review or accepted directly.
  *
  * The `bar` layout is a single input row (no header, scope or examples) for
- * a stage page's lead section, where the full form crowded out the PRD.
- * Switching `bar` on an already-mounted instance keeps what has been typed.
+ * Plan's capture tile, whose More… opens the full form in the tile's modal.
+ * The two are separate instances sharing one draft (`draft`, `images`,
+ * `captureCount`). Switching `bar` on an already-mounted instance keeps what
+ * has been typed.
  *
  * On a v2 PRD (`layout: "v2"`) there is no LLM breakdown: `rex add` makes one
  * change per text, titled from its first line, with the full text as its
@@ -20,7 +22,8 @@
 
 import { h, Fragment } from "preact";
 import type { ComponentChildren } from "preact";
-import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "preact/hooks";
+import type { Dispatch, StateUpdater } from "preact/hooks";
 import { ProposalEditor, ProposalStats, proposalCounts } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
@@ -60,6 +63,26 @@ export interface SmartAddInputProps {
    * chosen still lands the change in the Inbox.
    */
   area?: CaptureArea;
+  /**
+   * The description, held by the caller: two instances given the same draft
+   * (Plan's capture tile and its More modal) show one text. Without it the
+   * instance keeps its own.
+   */
+  draft?: string;
+  /** Called with the new description; required with `draft`. */
+  onDraftChange?: (text: string) => void;
+  /** The images waiting to be attached, held by the caller like `draft`. */
+  images?: PendingImage[];
+  /** Updates `images`; required with it. Takes a value or an updater, like a state setter. */
+  onImagesChange?: Dispatch<StateUpdater<PendingImage[]>>;
+  /**
+   * Counts captures among the instances sharing a draft. When it moves and
+   * this instance did not capture, its preview is dropped: the change it
+   * shows was added elsewhere.
+   */
+  captureCount?: number;
+  /** Called when this instance adds to the PRD, before `onPrdChanged`; it should move `captureCount`. */
+  onCaptured?: () => void;
 }
 
 /** The area a capture is limited to, as the area read gives it. */
@@ -281,11 +304,44 @@ function areaCopy(area: CaptureArea): PanelCopy {
   };
 }
 
+/**
+ * Fit a one-row field to its text: once the description wraps, the field
+ * grows a line at a time, so the wrapped lines keep the field's padding
+ * instead of scrolling flush against its border. Rechecked when the text
+ * changes and when the field's width does (the tile resizes); a height the
+ * stylesheet caps scrolls past that.
+ */
+export function useAutoGrow(ref: { current: HTMLTextAreaElement | null }, enabled: boolean, text: string): void {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    if (!enabled) { el.style.height = ""; return undefined; }
+    const fit = () => {
+      el.style.height = "auto";
+      // scrollHeight holds the text and the padding; the border is the rest of offsetHeight.
+      if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    let width = el.clientWidth;
+    const resize = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    resize.observe(el);
+    return () => resize.disconnect();
+  }, [ref, enabled, text]);
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange, area, draft, onDraftChange, images: sharedImages, onImagesChange, captureCount, onCaptured }: SmartAddInputProps) {
   const copy = area ? areaCopy(area) : layout === "v2" ? V2_COPY : V1_COPY;
-  const [input, setInput] = useState("");
+  const [ownInput, setOwnInput] = useState("");
+  const shared = draft !== undefined && onDraftChange !== undefined;
+  const input = shared ? draft : ownInput;
+  const setInput = shared ? onDraftChange : setOwnInput;
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
   const [changes, setChanges] = useState<PreviewChange[]>([]);
@@ -299,9 +355,14 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
 
   // v2 only: images attached to the change on Add, offered when the agent's model takes images.
   const imagesSupported = useImageInputSupport(layout === "v2");
-  const [images, setImages] = useState<PendingImage[]>([]);
+  const [ownImages, setOwnImages] = useState<PendingImage[]>([]);
+  const imagesShared = sharedImages !== undefined && onImagesChange !== undefined;
+  const images = imagesShared ? sharedImages : ownImages;
+  const setImages = imagesShared ? onImagesChange : setOwnImages;
   const imageCountRef = useRef(0);
   imageCountRef.current = images.length;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(textareaRef, !!bar, input);
 
   const addImageFiles = useCallback(async (files: File[]) => {
     const { accepted, problems } = checkImageFiles(files, imageCountRef.current);
@@ -312,11 +373,11 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, []);
+  }, [setImages]);
 
   const removeImage = useCallback((key: string) => {
     setImages((prev) => prev.filter((image) => image.key !== key));
-  }, []);
+  }, [setImages]);
 
   // Context selection state
   const [scopeOptions, setScopeOptions] = useState<ScopeOption[]>([]);
@@ -439,7 +500,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
 
   const handleInput = useCallback((text: string) => {
     setInput(text);
-  }, []);
+  }, [setInput]);
 
   /** Explicit submit — only way to trigger proposal generation. */
   const handleSubmit = useCallback(() => {
@@ -460,6 +521,40 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       if (abortRef.current) abortRef.current.abort();
     };
   }, []);
+
+  // A capture this instance made resets it as it lands; one made by another
+  // instance sharing the draft (the tile's modal) resets it here, so a preview
+  // left on screen cannot add the same change a second time.
+  const capturedHereRef = useRef(false);
+  const seenCaptureRef = useRef(captureCount);
+  useEffect(() => {
+    if (captureCount === seenCaptureRef.current) return;
+    seenCaptureRef.current = captureCount;
+    if (capturedHereRef.current) {
+      capturedHereRef.current = false;
+      return;
+    }
+    abortRef.current?.abort();
+    requestIdRef.current++;
+    previewedRef.current = null;
+    setState("idle");
+    setProposals([]);
+    setChanges([]);
+    setChoices([]);
+    setConfidence(0);
+    setQualityIssues([]);
+    setEditing(false);
+    setError(null);
+  }, [captureCount]);
+
+  /** A capture landed: tell the caller, and through it every instance sharing the draft. */
+  const captured = useCallback(() => {
+    if (onCaptured) {
+      capturedHereRef.current = true;
+      onCaptured();
+    }
+    onPrdChanged();
+  }, [onCaptured, onPrdChanged]);
 
   // ── Accept proposals ─────────────────────────────────────────────
 
@@ -517,13 +612,13 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       setConfidence(0);
       setState("idle");
       refreshScopes();
-      onPrdChanged();
+      captured();
     } catch (err) {
       setError(String(err));
     } finally {
       setAccepting(false);
     }
-  }, [proposals, onPrdChanged, refreshScopes]);
+  }, [proposals, captured, refreshScopes, setInput]);
 
   // ── Accept changes (v2 PRD) ──────────────────────────────────────
 
@@ -584,7 +679,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
       previewedRef.current = null;
       if (attachError) setError(attachError);
       refreshScopes();
-      onPrdChanged();
+      captured();
 
       // Amends…: the change is in the Inbox; its panel opens on the amendment.
       const amend = effects.indexOf("amend");
@@ -598,7 +693,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     } finally {
       setAccepting(false);
     }
-  }, [changes, choices, images, onPrdChanged, onOpenChange, refreshScopes]);
+  }, [changes, choices, images, captured, onOpenChange, refreshScopes, setInput, setImages]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
@@ -609,8 +704,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     setConfidence(0);
     setState("idle");
     refreshScopes();
-    onPrdChanged();
-  }, [onPrdChanged, refreshScopes]);
+    captured();
+  }, [captured, refreshScopes, setInput]);
 
   // Scope label for display. Read before the editor's early return, so the
   // hooks run in the same order on every render.
@@ -700,6 +795,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChan
     // Input area
     h("div", { class: "smart-add-input-area" },
       h("textarea", {
+        ref: textareaRef,
         class: "smart-add-textarea",
         value: input,
         placeholder: bar ? copy.barPlaceholder : copy.placeholder,

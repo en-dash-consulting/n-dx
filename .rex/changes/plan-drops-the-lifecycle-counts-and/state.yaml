@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "3e63dc6a-0686-4785-af01-914d4d1df344":
+    status: "completed"
+    startedAt: "2026-11-23T19:13:06.082Z"
+    completedAt: "2026-11-23T19:13:06.082Z"
+    endedAt: "2026-11-23T19:13:06.082Z"
+    activeIntervals: [{"end":"2026-11-23T19:13:06.082Z","start":"2026-11-23T19:13:06.082Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Area boxes stretch to one height per row, open their area on click or Enter (change titles still open the change), and clamp the summary to three lines with a fade and a full-text tooltip; stylesheet and unit tests."
+    lastModified: "2026-11-23T19:13:06.082Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "546f2519-2451-44b7-a579-2580cc1d7f14":
+    status: "completed"
+    startedAt: "2026-11-23T19:12:58.801Z"
+    completedAt: "2026-11-23T19:12:58.801Z"
+    endedAt: "2026-11-23T19:12:58.801Z"
+    activeIntervals: [{"end":"2026-11-23T19:12:58.801Z","start":"2026-11-23T19:12:58.801Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Removed the flow band from Create and Preparation, deleted LifecycleStrip, its CSS, ghostStripCounts and their tests; layout tests assert Plan's bands."
+    lastModified: "2026-11-23T19:12:58.801Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "9b482f7e-2536-4060-a709-66ba43c4cbb6":
+    status: "completed"
+    startedAt: "2026-11-23T19:13:06.082Z"
+    completedAt: "2026-11-23T19:13:06.082Z"
+    endedAt: "2026-11-23T19:13:06.082Z"
+    activeIntervals: [{"end":"2026-11-23T19:13:06.082Z","start":"2026-11-23T19:13:06.082Z"}]
+    appliedAt: "2026-11-23T19:13:06.082Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-23T18:44:43.103Z"
+    lastModified: "2026-11-23T19:13:06.082Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

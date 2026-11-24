@@ -33,6 +33,10 @@ import { ClaudeClientError } from "./types.js";
 import type { TokenUsage } from "./types.js";
 import { isJudgmentCacheConfigured, lookupJudgments, storeJudgments } from "./judgment-cache.js";
 import { asRecord } from "./json.js";
+import type { JsonValue, ChoiceQuestion, NoulQuestion, ScoreQuestion, JevQuestion, ChoiceAnswer, NoulAnswer, ScoreAnswer, JevAnswer } from "./jev-types.js";
+
+// The question and answer shapes are in jev-types.ts, which the judgment cache reads.
+export type { JsonValue, ChoiceQuestion, NoulQuestion, ScoreQuestion, JevQuestion, ChoiceAnswer, NoulAnswer, ScoreAnswer, JevAnswer } from "./jev-types.js";
 
 export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 export const JEV_MODEL = "jev-latest";
@@ -97,50 +101,6 @@ export function setJevObserver(observer: JevObserver | null): void {
 
 // ── Questions ────────────────────────────────────────────────────────────────
 
-/** JSON-serialisable value, for state and criteria payloads. */
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
-
-/**
- * A Choice: pick one option from a fixed set. `criteria` maps each option to
- * a description — a string, or an object such as `{ what, not_for, examples }`
- * when neighbouring options are easy to confuse.
- */
-export interface ChoiceQuestion {
-  type: "choice";
-  instructions: string;
-  criteria: Record<string, JsonValue>;
-}
-
-/**
- * A Noul: does a condition hold? Answered as the probability of yes. Optional
- * `criteria` sharpens the boundary when yes/no is subtle.
- */
-export interface NoulQuestion {
-  type: "noul";
-  instructions: string;
-  criteria?: Record<string, JsonValue>;
-}
-
-/**
- * A Score: where on an ordered scale does the content sit? `criteria` is 2–10
- * level descriptions, lowest first; each must describe a concrete situation
- * that stands on its own, because the model rates every level independently.
- */
-export interface ScoreQuestion {
-  type: "score";
-  instructions: string;
-  criteria: JsonValue[];
-}
-
-/** The question types this client sends. */
-export type JevQuestion = ChoiceQuestion | NoulQuestion | ScoreQuestion;
-
 /** Build a Choice question. */
 export function choice(
   instructions: string,
@@ -163,34 +123,6 @@ export function score(instructions: string, levels: JsonValue[]): ScoreQuestion 
 }
 
 // ── Answers ──────────────────────────────────────────────────────────────────
-
-export interface ChoiceAnswer {
-  type: "choice";
-  /** The highest-probability option. */
-  choice: string;
-  /** Distribution across every option; sums to 1. */
-  probabilities: Record<string, number>;
-  /** 0–1, from the spread of the distribution — not the probability of `choice`. */
-  confidence: number;
-}
-
-export interface NoulAnswer {
-  type: "noul";
-  /** Probability that the answer is yes. Near 0.5 means undecided, not "medium". */
-  noul: number;
-}
-
-export interface ScoreAnswer {
-  type: "score";
-  /** Probability-weighted mean of the level indexes; fractional. */
-  score: number;
-  /** Distribution across the levels, in level order. */
-  probabilities: number[];
-  /** 0–1, from the spread of the distribution. */
-  confidence: number;
-}
-
-export type JevAnswer = ChoiceAnswer | NoulAnswer | ScoreAnswer;
 
 export interface JevRequest {
   /** What the questions are about. Prefer named fields; reference them in instructions as `path.to.field`. */

@@ -31,6 +31,13 @@ import { resolveLayout, type ResolveLayoutOptions } from "@n-dx/llm-client";
 export const PRD_TREE_DIRNAME = "prd_tree";
 
 /**
+ * Canonical filename for the consolidated (legacy JSON) PRD document. Here,
+ * beside the other PRD path names, so prd-md-migration.ts can read it without
+ * importing file-adapter.ts, which imports it; file-adapter.ts re-exports it.
+ */
+export const PRD_FILENAME = "prd.json";
+
+/**
  * Name of the folder tree's sidecar file inside `.rex/`.
  *
  * It sits *beside* `.rex/<PRD_TREE_DIRNAME>/`, not inside it, but it is part of

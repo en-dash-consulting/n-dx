@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "675b30df-e80b-47db-b8fb-9d739ea57cc8":
+    status: "completed"
+    startedAt: "2026-11-23T19:45:30.334Z"
+    completedAt: "2026-11-23T19:45:30.334Z"
+    endedAt: "2026-11-23T19:45:30.334Z"
+    activeIntervals: [{"end":"2026-11-23T19:45:30.334Z","start":"2026-11-23T19:45:30.334Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Run queue saved as .hench/run-queue.json via GET/PUT /api/hench/queue; ndx work autoselection takes its first runnable item first; RunQueuePanel beside Running now, Add to run queue on Ready to run cards."
+    lastModified: "2026-11-23T19:45:30.334Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "b04e4bec-3324-4e29-b383-9266c8a9c939":
+    status: "completed"
+    startedAt: "2026-11-23T19:45:21.750Z"
+    completedAt: "2026-11-23T19:45:21.750Z"
+    endedAt: "2026-11-23T19:45:21.750Z"
+    activeIntervals: [{"end":"2026-11-23T19:45:21.750Z","start":"2026-11-23T19:45:21.750Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ready to run moved to the top of Work › Tune; Now shows Running now beside the Run queue, then Statistics."
+    lastModified: "2026-11-23T19:45:21.750Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "b780be58-2ac3-4893-a12d-abc58bd7c24c":
+    status: "completed"
+    startedAt: "2026-11-23T19:45:38.403Z"
+    completedAt: "2026-11-23T19:45:38.403Z"
+    endedAt: "2026-11-23T19:45:38.403Z"
+    activeIntervals: [{"end":"2026-11-23T19:45:38.403Z","start":"2026-11-23T19:45:38.403Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Plan › Preparation shows the same Run queue panel (4 × 3) beside Assign and schedule."
+    lastModified: "2026-11-23T19:45:38.403Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "f9674fd9-5721-4da7-b9f5-891b633b352a":
+    status: "completed"
+    startedAt: "2026-11-23T19:45:38.403Z"
+    completedAt: "2026-11-23T19:45:38.403Z"
+    endedAt: "2026-11-23T19:45:38.403Z"
+    activeIntervals: [{"end":"2026-11-23T19:45:38.403Z","start":"2026-11-23T19:45:38.403Z"}]
+    appliedAt: "2026-11-23T19:45:38.403Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-23T19:27:18.359Z"
+    lastModified: "2026-11-23T19:45:38.403Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

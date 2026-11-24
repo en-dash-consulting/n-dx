@@ -42,18 +42,6 @@ export { useFeatureToggle } from "./hooks/index.js";
 export { useProjectStatus, useStatusLayout } from "./hooks/index.js";
 export { useLive, isAnalysisJob } from "./hooks/index.js";
 
-// --- Status indicator components (bottom-bar badges) ---
-export {
-  SvFreshnessIndicator,
-  RexCompletionIndicator,
-  InboxIndicator,
-  openInboxCount,
-  inboxCountLabel,
-  HenchActivityIndicator,
-  INDICATOR_VIEWS,
-  LIVE_INDICATOR_VIEWS,
-} from "./components/index.js";
-
 // --- Layout: stages, their sections, and the settings list (shell components) ---
 export {
   STAGES,

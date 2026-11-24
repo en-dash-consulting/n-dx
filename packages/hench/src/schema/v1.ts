@@ -2423,6 +2423,12 @@ export interface TaskBriefProject {
    * one before the work it covers — it cannot invoke a skill by name.
    */
   skills?: TaskBriefProjectSkill[];
+  /**
+   * The project's agent prompt file as a system-prompt section (heading
+   * naming the file, then its text), read by `agentPromptSection` from
+   * `@n-dx/llm-client`. Absent when the file is absent or empty.
+   */
+  agentPrompt?: string;
 }
 
 /** One entry of {@link TaskBriefProject.skills}. */

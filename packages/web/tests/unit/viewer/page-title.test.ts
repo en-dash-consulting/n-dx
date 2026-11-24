@@ -22,8 +22,9 @@ describe("PageTitle", () => {
     expect(el.querySelector(".page-title-blurb")?.textContent).toBe(viewBlurb("problems"));
   });
 
-  it("renders nothing on stage pages, Home, Live pages and unknown views", () => {
-    for (const view of ["analyze", "plan", "work", "home", "live", "a-removed-view"] as ViewId[]) {
+  it("renders nothing on stage pages, a stage's mode route, Home, Live pages and unknown views", () => {
+    // `tune` opens Work on its Tune mode, which carries the stage's own head.
+    for (const view of ["analyze", "plan", "work", "tune", "home", "live", "a-removed-view"] as ViewId[]) {
       expect(show(view).innerHTML, view).toBe("");
     }
   });

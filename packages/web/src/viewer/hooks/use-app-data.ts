@@ -48,6 +48,12 @@ export interface ServerUnavailable {
 export interface AppDataState {
   data: LoadedData;
   loading: boolean;
+  /**
+   * True until the background modules (inventory, imports, components, call
+   * graph) have been read once, after `loading` clears. A view that would
+   * read their absence as "no analysis" shows a loading state meanwhile.
+   */
+  analysisLoading: boolean;
   mode: ViewerMode;
   /** Set while `mode` is `unavailable`, null otherwise. */
   serverError: ServerUnavailable | null;
@@ -85,6 +91,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
   const { pausePolling = false } = options;
   const [data, setData] = useState<LoadedData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
+  const [analysisLoading, setAnalysisLoading] = useState(true);
   const [mode, setMode] = useState<ViewerMode>("static");
   const [serverError, setServerError] = useState<ServerUnavailable | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
@@ -144,7 +151,10 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
         ? requestIdleCallback
         : (cb: () => void) => setTimeout(cb, 50);
       scheduleDeferred(() => {
-        if (!cancelled) loadModules(DEFERRED_MODULES);
+        if (cancelled) return;
+        void loadModules(DEFERRED_MODULES).finally(() => {
+          if (!cancelled) setAnalysisLoading(false);
+        });
       });
     };
 
@@ -172,6 +182,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
         return;
       }
       setLoading(false);
+      setAnalysisLoading(false);
       if (probe.mode === "static") {
         setMode("static");
         setShowDrop(true);
@@ -226,6 +237,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
         setLoading(true);
         await loadFromFiles(e.dataTransfer.files);
         setLoading(false);
+        setAnalysisLoading(false);
       }
     };
 
@@ -244,5 +256,5 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
     };
   }, [mode]);
 
-  return { data, loading, mode, serverError, refreshToast, showDrop, setLoading };
+  return { data, loading, analysisLoading, mode, serverError, refreshToast, showDrop, setLoading };
 }

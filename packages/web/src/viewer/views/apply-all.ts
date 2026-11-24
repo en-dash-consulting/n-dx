@@ -19,10 +19,10 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
 import type { AppliedAmendment } from "./product-model.js";
-import { displayTitle } from "../components/index.js";
+import { displayTitle, titleTooltip } from "../components/index.js";
 import { errorMessage, plural } from "../utils/format.js";
 
-interface WaitingRef { id: string; displayId?: string; title: string; summary?: string }
+interface WaitingRef { id: string; displayId?: string; title: string; shortTitle?: string; summary?: string }
 
 /** One waiting change in the preview. Mirrors `ApplyAllPreviewWire` in server/routes-rex/apply.ts. */
 export type ApplyAllPreview = WaitingRef & (
@@ -157,7 +157,7 @@ export function ApplyAllBar({ waiting, navigateTo, onApplied }: {
         h("ul", { class: "aa-list" },
           state.changes.map((c) =>
             h("li", { key: c.id, class: c.ok ? "aa-ok" : "aa-refused", title: c.ok ? undefined : c.error },
-              h("span", { class: "aa-name", title: c.summary ? c.title : undefined }, displayTitle(c)),
+              h("span", { class: "aa-name", title: titleTooltip(c) }, displayTitle(c)),
               h("span", { class: "aa-effect" }, c.ok ? effectText(c.applied) : `can't apply: ${c.problems[0] ?? c.error}`),
             ))),
         h("div", { class: "aa-row" },
@@ -179,7 +179,7 @@ export function ApplyAllBar({ waiting, navigateTo, onApplied }: {
         skipped.length > 0
           ? h("ul", { class: "aa-list" }, skipped.map((r) =>
               h("li", { key: r.id, class: "aa-refused" },
-                h("span", { class: "aa-name" }, displayTitle(r)),
+                h("span", { class: "aa-name", title: titleTooltip(r) }, displayTitle(r)),
                 h("span", { class: "aa-effect" }, r.ok ? "" : r.moved ? movedText(r, state.results) : r.error))))
           : null,
         h("div", { class: "aa-row" }, close),

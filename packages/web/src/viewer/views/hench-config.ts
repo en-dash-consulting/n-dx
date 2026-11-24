@@ -16,10 +16,11 @@
 
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
-import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { GlossaryLine } from "../components/index.js";
 import { responseError } from "../utils/response-error.js";
 import { errorMessage } from "../utils/format.js";
+import { announceSettingsSaved, useSettingsSaved } from "./settings-sync.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -350,7 +351,8 @@ function FieldControl({ field, value, onChange, error }: {
 
 // ── Field editor component ──────────────────────────────────────────
 
-function FieldEditor({ field, editValue, error, onFieldChange }: {
+/** One field's editor: label, control, saved-vs-edited state and impact. Work › Tune reuses it. */
+export function FieldEditor({ field, editValue, error, onFieldChange }: {
   field: ConfigField;
   editValue: string;
   error: string | null;
@@ -474,7 +476,12 @@ export interface HenchConfigForm {
   reload: () => Promise<void>;
 }
 
-export function useHenchConfigForm(): HenchConfigForm {
+/**
+ * `source` names the surface (Workflow, Work › Tune) so a save there makes the
+ * other re-read (`settings-sync.ts`); an untouched form re-reads, an edited one
+ * keeps its edits.
+ */
+export function useHenchConfigForm(source = "workflow"): HenchConfigForm {
   const [data, setData] = useState<ConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -548,8 +555,14 @@ export function useHenchConfigForm(): HenchConfigForm {
     }
     // Re-read so `isDefault`, `impact` and the values reflect what was written.
     await reload();
+    announceSettingsSaved("hench", source);
     return true;
-  }, [dirtyFields, editValues, reload]);
+  }, [dirtyFields, editValues, reload, source]);
+
+  // Another surface saved: re-read, unless this one holds edits of its own.
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirtyFields.length > 0;
+  useSettingsSaved(["hench"], source, () => { if (!dirtyRef.current) void reload(); });
 
   const discard = useCallback(() => {
     setEditValues({});

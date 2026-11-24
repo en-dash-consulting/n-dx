@@ -1,0 +1,53 @@
+schema: "rex/v2"
+items:
+  "059f9fbe-4b29-4c29-8597-c701c30bc994":
+    status: "completed"
+    startedAt: "2026-11-23T20:45:15.010Z"
+    completedAt: "2026-11-23T20:45:15.010Z"
+    endedAt: "2026-11-23T20:45:15.010Z"
+    activeIntervals: [{"end":"2026-11-23T20:45:15.010Z","start":"2026-11-23T20:45:15.010Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "HowWorkMoves takes an error line; PlanFlow names a failed summary or change-list read; test."
+    lastModified: "2026-11-23T20:45:15.010Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "21360996-d2b1-447e-8d07-34e9786c76a0":
+    status: "completed"
+    startedAt: "2026-11-23T20:45:07.654Z"
+    completedAt: "2026-11-23T20:45:07.654Z"
+    endedAt: "2026-11-23T20:45:07.654Z"
+    activeIntervals: [{"end":"2026-11-23T20:45:07.654Z","start":"2026-11-23T20:45:07.654Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "/tune/prep/<id> route (parse, build, isTaskRouteView), withPrepare on the tune renderer closing to /tune, Ready to run prepares on tune; route and renderer tests."
+    lastModified: "2026-11-23T20:45:07.654Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "288fa978-d96a-419e-bd44-aa58cbc24ff6":
+    status: "completed"
+    startedAt: "2026-11-23T20:44:52.713Z"
+    completedAt: "2026-11-23T20:44:52.713Z"
+    endedAt: "2026-11-23T20:44:52.713Z"
+    activeIntervals: [{"end":"2026-11-23T20:44:52.713Z","start":"2026-11-23T20:44:52.713Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "takeFromRunQueue drops only on `final` (TaskNotActionableError, new TaskNotFoundError); the PRD is read once before the queue is touched and only when the queue is non-empty; dry-run log says \"would take it off\"; unit + integration tests."
+    lastModified: "2026-11-23T20:44:52.713Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "87e443e0-0366-4005-9dfc-4a98397cd364":
+    status: "completed"
+    startedAt: "2026-11-23T20:45:00.171Z"
+    completedAt: "2026-11-23T20:45:00.171Z"
+    endedAt: "2026-11-23T20:45:00.171Z"
+    activeIntervals: [{"end":"2026-11-23T20:45:00.171Z","start":"2026-11-23T20:45:00.171Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PUT carries base; server answers 409 with the current queue when it differs; the store reads before changing, keeps an unread queue unknown, and shows the queue as it stands with a note on 409; route + viewer tests."
+    lastModified: "2026-11-23T20:45:00.171Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "9e87cb29-be37-4d69-b4b5-5f771e520424":
+    status: "completed"
+    startedAt: "2026-11-23T20:45:15.010Z"
+    completedAt: "2026-11-23T20:45:15.010Z"
+    endedAt: "2026-11-23T20:45:15.010Z"
+    activeIntervals: [{"end":"2026-11-23T20:45:15.010Z","start":"2026-11-23T20:45:15.010Z"}]
+    appliedAt: "2026-11-23T20:45:15.010Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-23T20:30:04.920Z"
+    lastModified: "2026-11-23T20:45:15.010Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

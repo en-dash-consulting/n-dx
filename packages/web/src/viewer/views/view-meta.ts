@@ -18,7 +18,7 @@
  */
 
 import type { ViewId } from "../types.js";
-import type { PixelIconName } from "../components/index.js";
+import type { PixelIconName } from "../types.js";
 
 /** The package a view belongs to; `global` for views no single package owns. */
 export type ViewProduct = "sourcevision" | "rex" | "hench" | "global";
@@ -67,7 +67,7 @@ export const VIEW_META = {
     label: "Home",
     glyph: "⌂",
     product: "global",
-    blurb: "The four stages of the loop, side by side, each with its headline numbers.",
+    blurb: "The three stages of the loop, side by side, each with its headline numbers.",
   },
 
   // ── Live ─────────────────────────────────────────────────────
@@ -109,13 +109,13 @@ export const VIEW_META = {
     label: "Work",
     glyph: "▶",
     product: "hench",
-    blurb: "Get it done: hand the next task to the agent, pick a run mode, see what each worktree is running.",
+    blurb: "Get it done: who is working on what, what is up next and what it will take, and the settings that steer the agent.",
   },
   tune: {
     label: "Tune",
     glyph: "◑",
     product: "hench",
-    blurb: "Fit the {cli} workflow to this project and the tools you have.",
+    blurb: "How the agent runs: its models, rules and prompt, and what its runs produced and cost.",
   },
 
   // ── SourceVision ─────────────────────────────────────────────
@@ -190,6 +190,10 @@ export const VIEW_META = {
     glyph: "✚",
     product: "rex",
     blurb: "Describe work, import a document, or turn analysis into proposals.",
+    v2: {
+      label: "Describe a change",
+      blurb: "Describe a change for the Inbox, import a document, or scan the project.",
+    },
   },
   prd: {
     label: "Tasks",
@@ -293,9 +297,11 @@ export const VIEW_META = {
     product: "global",
     blurb: "Tokens and estimated cost by period and package.",
   },
+  // A Settings page: the worktree list, behind a dropdown.
   workspaces: {
     label: "Workspaces",
     glyph: "⌗",
+    pixelIcon: "workspaces",
     product: "global",
     blurb: "Every worktree of this repository and what each is running.",
   },

@@ -14,7 +14,7 @@ import {
   type PixelTileName,
 } from "../../../src/viewer/components/pixel-icons.js";
 
-const TILE_NAMES: PixelTileName[] = ["robot-wrangler", "project", "workflow", "commands"];
+const TILE_NAMES: PixelTileName[] = ["robot-wrangler", "project", "workflow", "workspaces", "commands"];
 const GLYPH_NAMES: PixelIconName[] = [...TILE_NAMES, "settings"];
 
 let root: HTMLDivElement;
@@ -50,7 +50,7 @@ describe("pixel maps", () => {
     for (const row of map) expect(row).toMatch(/^[.PTGWNK]{11}$/);
   });
 
-  it("has a tile for the four pages only", () => {
+  it("has a tile for the five settings pages only", () => {
     expect(Object.keys(TILES).sort()).toEqual([...TILE_NAMES].sort());
     expect(Object.keys(GLYPHS).sort()).toEqual([...GLYPH_NAMES].sort());
   });

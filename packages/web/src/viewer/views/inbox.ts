@@ -2,10 +2,13 @@
  * Inbox view — open changes with no place on the product map yet.
  *
  * `ndx work` skips an Inbox change's tasks until it is placed, so this lists
- * each one with rex's best guess for its home, strongest guesses first (IB7):
- * those are the quickest to confirm. A row opens the change's detail panel in
- * the Tasks tree; its Accept places it on that guess as a touches, and its
- * Place opens the Inbox page on it, where the shortlist and relation are.
+ * each one with rex's best guess for its home: prioritized changes first, then
+ * by priority, and within those the strongest guesses first (IB7), the
+ * quickest to confirm. A row opens the change's detail panel in the Tasks
+ * tree; its Accept places it on that guess as a touches, and its Place opens
+ * the Inbox page on it, where the shortlist and relation are. A row's assignee
+ * picker saves who it is for, and the assignee filter (Mine by default when the
+ * current user has a row) hides rows.
  *
  * "Place best guesses" reviews every guess at once: each change with its best
  * guess and a checkbox, weak guesses left unticked, then one write
@@ -27,16 +30,37 @@
 
 import { h, Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { PlaceWithSidecarButton, StrengthChip, useProjectStatus } from "../components/index.js";
-import type { GuessStrength } from "../components/index.js";
-import { placementDraftNote, prunePlacementDrafts } from "../components/prd-tree/placement-draft.js";
-import { resolveCliLabel, useCliName, useRefetchableProductRead } from "../hooks/index.js";
-import type { Load } from "../hooks/index.js";
+import {
+  AssigneeFilter, AssigneeFilterPending, AssigneePicker, PlaceWithSidecarButton, StrengthChip,
+  isMine, pickerChoices, saveAssignee, useAssigneeFilter, usePeople, useProjectStatus,
+} from "../components/index.js";
+import type { AssignableRow } from "../components/index.js";
+import type { KnownPerson } from "../external.js";
+import { placementDraftNote } from "../components/prd-tree/placement-draft.js";
+import { resolveCliLabel, useCliName } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { Pending, StaleNotice } from "./product-pages.js";
-import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
-import { shortChangeId } from "./product-model.js";
+import { placementTab } from "../route-state.js";
+import { Pending, StaleNotice } from "./product-notices.js";
+import type { ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
+import { changeAssignees, shortChangeId } from "./product-model.js";
+import { PrioritizedTag } from "./prioritized-tag.js";
+import { bestGuess, guessOf, sortInbox, useInbox, type Guess, type InboxRow } from "./inbox-read.js";
 import { errorMessage } from "../utils/format.js";
+import { endPlanDrag, startPlanDrag } from "./plan-placement.js";
+
+// The Inbox's data — its read, order and guesses — is in inbox-read.ts, which
+// the detail panel's placement section and placement mode read without
+// importing this page; re-exported here for the callers that always had it.
+export {
+  bestGuess,
+  isAppliedUnplaced,
+  sortInbox,
+  useInbox,
+  type Guess,
+  type InboxRead,
+  type InboxRow,
+  type ShortlistRead,
+} from "./inbox-read.js";
 
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
@@ -47,48 +71,6 @@ export const INBOX_SECTION_ROWS = 5;
  */
 export const HELD_EXPLANATION =
   "A change held in the Inbox cannot close, and {cli} work skips its tasks until it is placed.";
-
-/** IB7: strongest first, then possible, tied, weak. */
-const STRENGTH_RANK: Record<GuessStrength, number> = { strong: 0, possible: 1, tied: 2, weak: 3 };
-/** A row with no guess yet (loading, failed, or an empty shortlist) sorts last. */
-const NO_GUESS_RANK = 4;
-
-/**
- * A shortlist read: the answer, or why it failed. Absent from the map while
- * the read is in flight.
- */
-export type ShortlistRead = { placement: ChangePlacement } | { error: string };
-
-export interface InboxRow {
-  change: ChangeRow;
-  shortlist?: ShortlistRead;
-}
-
-export interface Guess {
-  candidate: PlacementCandidate;
-  strength: GuessStrength;
-}
-
-/** The best guess on a shortlist, or null when it has none. */
-export function bestGuess(placement: ChangePlacement): Guess | null {
-  const candidate = placement.shortlist[0];
-  if (!candidate) return null;
-  return { candidate, strength: placement.tied ? "tied" : candidate.strength };
-}
-
-function guessOf(row: InboxRow): Guess | null {
-  return row.shortlist && "placement" in row.shortlist ? bestGuess(row.shortlist.placement) : null;
-}
-
-/** Strongest guess first; within a strength the higher score, then the read's order. */
-export function sortInbox(rows: readonly InboxRow[]): InboxRow[] {
-  const keyed = rows.map((row, index) => {
-    const guess = guessOf(row);
-    return { row, index, rank: guess ? STRENGTH_RANK[guess.strength] : NO_GUESS_RANK, score: guess?.candidate.score ?? 0 };
-  });
-  keyed.sort((a, b) => a.rank - b.rank || b.score - a.score || a.index - b.index);
-  return keyed.map((k) => k.row);
-}
 
 // ── Best-guess placement ─────────────────────────────────────────────
 
@@ -307,12 +289,32 @@ function ageOf(row: InboxRow): string | null {
   return row.shortlist && "placement" in row.shortlist ? ageLabel(row.shortlist.placement.change.ageDays) : null;
 }
 
-function Row({ row, onOpen, onPlace, onAccepted }: {
+/** What the best-guess button says it does: an owner accepts the change into the area (Team), or you plan it there (Solo). */
+export type PlanInVerb = "accept" | "plan";
+
+/** The best-guess button's text and its accessible name. */
+export function planInLabels(verb: PlanInVerb, title: string, area: string): { text: string; aria: string } {
+  return verb === "accept"
+    ? { text: `Accept → ${area}`, aria: `Accept ${title} into ${area}` }
+    : { text: `Plan in ${area}`, aria: `Plan ${title} in ${area}` };
+}
+
+function Row({ row, onOpen, onPlace, people, me, onAssigned, onAccepted, hideAssignee = false, dragToPlan = false, onPlanIn, planInVerb = "plan" }: {
   row: InboxRow;
   onOpen: (id: string) => void;
   onPlace?: (id: string) => void;
+  people: readonly KnownPerson[];
+  me: string | null;
+  onAssigned?: () => void;
   /** After Accept wrote: read the Inbox again. Absent, no Accept. */
   onAccepted?: () => void;
+  /** Solo mode: nobody else to assign to, so no picker. */
+  hideAssignee?: boolean;
+  /** Plan's Inbox panel: the row can be dragged onto a product area. */
+  dragToPlan?: boolean;
+  /** Plan's Inbox panel: "Plan in <area>" (or "Accept → <area>") places the change on its best guess, in place of Accept. */
+  onPlanIn?: (row: InboxRow, candidate: PlacementCandidate) => void;
+  planInVerb?: PlanInVerb;
 }) {
   const { change } = row;
   const guess = guessOf(row);
@@ -333,21 +335,46 @@ function Row({ row, onOpen, onPlace, onAccepted }: {
   // An unsaved placement left in placement mode (WF10).
   const draftNote = placementDraftNote(change.id);
   const age = ageOf(row);
+  const planIn = guess?.candidate.area ? planInLabels(planInVerb, change.title, guess.candidate.area) : null;
   // The row is the target; the title button gives it keyboard reach, and its
   // click bubbles here. Place opens placement mode when the page can, and
   // otherwise bubbles to the row too.
-  return h("li", { class: "inbox-row", "data-change-id": change.id, onClick: () => onOpen(change.id) },
+  return h("li", {
+    class: dragToPlan ? "inbox-row inbox-row--draggable" : "inbox-row",
+    "data-change-id": change.id,
+    onClick: () => onOpen(change.id),
+    ...(dragToPlan
+      ? {
+          draggable: true,
+          title: "Drag onto a product area to plan it there",
+          onDragStart: (e: DragEvent) => startPlanDrag(row, e),
+          onDragEnd: () => endPlanDrag(),
+        }
+      : {}),
+  },
     h("div", { class: "inbox-row-head" },
+      dragToPlan ? h("span", { class: "inbox-grip", "aria-hidden": "true" }, "⠿") : null,
       h("span", { class: "ch-display-id" }, shortChangeId(change)),
       h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
+      h(PrioritizedTag, { prioritized: change.prioritized }),
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
       tags.map((tag) => h("span", { key: tag, class: "tag inbox-tag" }, tag)),
       age ? h("span", { class: "inbox-age", title: "Time in the Inbox" }, age) : null,
+      hideAssignee
+        ? null
+        : h(AssigneePicker, {
+            itemId: change.id,
+            assignee: change.assignee,
+            people,
+            me,
+            onSave: async (assignee: string) => { await saveAssignee(change.id, assignee); onAssigned?.(); },
+          }),
     ),
     h("div", { class: "inbox-row-foot" },
       h(GuessLine, { row }),
       draftNote ? h("span", { class: "tag inbox-draft", "data-draft": "placement" }, draftNote) : null,
-      guess && onAccepted
+      // Plan's panel names the step and the area ("Accept → <area>", "Plan in <area>"), so it does not also offer Accept.
+      guess && onAccepted && !onPlanIn
         ? h("button", {
             type: "button",
             class: "btn btn-sm btn-primary inbox-accept",
@@ -356,6 +383,14 @@ function Row({ row, onOpen, onPlace, onAccepted }: {
             disabled: accepting,
             onClick: accept,
           }, accepting ? "Placing…" : "Accept")
+        : null,
+      onPlanIn && guess && planIn
+        ? h("button", {
+            type: "button",
+            class: "btn btn-sm inbox-plan-in",
+            "aria-label": planIn.aria,
+            onClick: (e: MouseEvent) => { e.stopPropagation(); onPlanIn(row, guess.candidate); },
+          }, planIn.text)
         : null,
       h("button", {
         type: "button",
@@ -391,36 +426,79 @@ export interface InboxViewProps {
   onOpenAll?: () => void;
   /** After a row's Accept or "Place best guesses" wrote: read again. Absent, neither is offered. */
   onPlaced?: () => void;
+  /** Reads the Inbox again after a row's assignee is saved. */
+  onAssigned?: () => void;
+  /**
+   * Plan's For me / Everyone, which replaces the Inbox's own assignee filter:
+   * "me" shows only the rows assigned to the current user.
+   */
+  scope?: "me" | "all";
+  /** Solo mode: no assignee pickers and no assignee filter. */
+  hideAssignees?: boolean;
+  /** Rows can be dragged onto Plan's product areas. */
+  dragToPlan?: boolean;
+  /** Each row with a guessed area offers "Plan in <area>". */
+  onPlanIn?: (row: InboxRow, candidate: PlacementCandidate) => void;
+  /** How that button names the step: "Accept → <area>" or "Plan in <area>" (the default). */
+  planInVerb?: PlanInVerb;
 }
 
-export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced }: InboxViewProps) {
+/** The filter's view of Inbox rows: every one is open work, assigned by the change or its open tasks. */
+export function assignableInboxRows(rows: readonly InboxRow[]): AssignableRow[] {
+  return rows.map((r) => ({ assignees: changeAssignees(r.change), open: true }));
+}
+
+/** Plan's Inbox panel with nothing in it for the view. */
+export const PLAN_INBOX_EMPTY = "Nothing waiting on you. Nice.";
+
+export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onPlace, onOpenAll, onPlaced, onAssigned, scope, hideAssignees = false, dragToPlan = false, onPlanIn, planInVerb }: InboxViewProps) {
   const cliName = useCliName();
+  const peopleRead = usePeople();
+  const assignable = useMemo(() => assignableInboxRows(rows), [rows]);
+  const filter = useAssigneeFilter(assignable, peopleRead);
+  const people = useMemo(
+    () => pickerChoices(peopleRead?.people ?? [], rows.map((r) => r.change.assignee)),
+    [peopleRead, rows],
+  );
+  const me = peopleRead?.me ?? null;
   const sorted = sortInbox(rows);
-  const shown = limit === undefined ? sorted : sorted.slice(0, limit);
-  const hidden = sorted.length - shown.length;
+  // Plan's scope, when given, replaces the Inbox's own filter (and Solo drops both).
+  const planScoped = scope !== undefined || hideAssignees;
+  const shows = (row: InboxRow) => planScoped
+    ? hideAssignees || scope !== "me" || changeAssignees(row.change).some((a) => isMine(a, me))
+    : filter.shows(changeAssignees(row.change));
+  // The filter hides rows only; All shows every one.
+  const visible = sorted.filter(shows);
+  const shown = limit === undefined ? visible : visible.slice(0, limit);
+  const hidden = visible.length - shown.length;
+  const pending = !planScoped && filter.pending;
 
   return h("div", { class: "inbox-container" },
     onPlaced
       ? h(PlaceBestGuesses, { rows: sorted, applied: appliedRows, onPlaced, onOpenReview: onOpenAll })
       : null,
-    sorted.length === 0
+    sorted.length > 0 && !planScoped && !filter.pending ? h("div", { class: "inbox-filters" }, h(AssigneeFilter, { state: filter })) : null,
+    sorted.length === 0 && planScoped
+      ? h("div", { class: "empty-state inbox-empty", role: "status" }, h("p", null, PLAN_INBOX_EMPTY))
+      : sorted.length === 0
       ? h("div", { class: "empty-state inbox-empty", role: "status" },
           h("p", null, "Inbox is empty"),
           h("p", { class: "section-sub" }, resolveCliLabel(HELD_EXPLANATION, cliName)))
-      : h("ul", { class: "inbox-list" },
-          shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, onAccepted: onPlaced })),
-        ),
+      // Held until the people list is read: the default (Mine or All) depends on it.
+      : pending
+        ? h(AssigneeFilterPending, null)
+      : visible.length === 0
+        ? h("div", { class: "empty-state inbox-empty inbox-filtered-empty", role: "status" },
+            h("p", null, planScoped ? PLAN_INBOX_EMPTY : "No Inbox changes match this filter."))
+        : h("ul", { class: "inbox-list" },
+            shown.map((row) => h(Row, { key: row.change.id, row, onOpen: onOpenChange, onPlace, people, me, onAssigned, onAccepted: onPlaced, hideAssignee: hideAssignees, dragToPlan, onPlanIn, planInVerb })),
+          ),
     hidden > 0 && onOpenAll
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
           `${hidden} more · Open ↗`)
       : null,
     h(AppliedHistory, { count: appliedUnplaced, rows: appliedRows, onOpen: onOpenChange }),
   );
-}
-
-/** An applied change still flagged for placement: history that can take a touches. */
-export function isAppliedUnplaced(change: Pick<ChangeRow, "appliedAt" | "needsPlacement">): boolean {
-  return !!change.appliedAt && !!change.needsPlacement;
 }
 
 /** The day of an ISO timestamp, or the text itself when it is not a date. */
@@ -468,84 +546,16 @@ export function AppliedHistory({ count, rows = [], onOpen }: {
 
 // ── Page ─────────────────────────────────────────────────────────────
 
-export interface InboxRead {
-  /** Every change, as `GET /api/rex/changes` answers. */
-  load: Load<ChangeRow[]>;
-  /** Open changes awaiting placement, with their shortlists, in the section's order. */
-  rows: InboxRow[];
-  /** Applied changes never placed, with their shortlists, strongest guess first. */
-  applied: InboxRow[];
-  /** Read again now, rather than on the next `rex:prd-changed`. */
-  refetch: () => void;
-}
-
-/**
- * The Inbox as the Plan section orders it. The detail panel's placement
- * reads it too, so "N of M" and "Place & next" follow the same order.
- */
-export function useInbox(): InboxRead {
-  const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
-  const waiting = useMemo(
-    () => (load.state === "ready" ? load.data.filter((c) => c.inbox || isAppliedUnplaced(c)) : null),
-    [load],
-  );
-  // A change placed by any route (here, the CLI, another session) no longer waits: its draft goes (WF10).
-  useEffect(() => {
-    if (waiting) prunePlacementDrafts(new Set(waiting.map((c) => c.id)));
-  }, [waiting]);
-  const shortlists = useShortlists(waiting);
-  const { rows, applied } = useMemo(() => {
-    const all = (waiting ?? []).map((change) => ({ change, shortlist: shortlists.get(change.id) }));
-    return {
-      rows: sortInbox(all.filter((r) => !isAppliedUnplaced(r.change))),
-      applied: sortInbox(all.filter((r) => isAppliedUnplaced(r.change))),
-    };
-  }, [waiting, shortlists]);
-  return { load, rows, applied, refetch };
-}
-
-/** Read every row's shortlist in one request, each time the change list is read. */
-function useShortlists(changes: readonly ChangeRow[] | null): ReadonlyMap<string, ShortlistRead> {
-  const [reads, setReads] = useState<ReadonlyMap<string, ShortlistRead>>(new Map());
-  useEffect(() => {
-    if (!changes) return;
-    let live = true;
-    readShortlists(changes.map((c) => c.id)).then((next) => {
-      if (live) setReads(next);
-    });
-    return () => { live = false; };
-  }, [changes]);
-  return reads;
-}
-
-/** `GET /api/rex/changes/placements`: one model load on the server, however many rows. */
-async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<string, ShortlistRead>> {
-  const reads = new Map<string, ShortlistRead>();
-  const failAll = (error: string) => ids.forEach((id) => reads.set(id, { error }));
-  try {
-    const res = await fetch("/api/rex/changes/placements");
-    const body = await res.json() as Partial<ChangePlacements> & { error?: unknown };
-    if (!res.ok || !body.placements) {
-      failAll(typeof body.error === "string" ? body.error : `HTTP ${res.status}`);
-      return reads;
-    }
-    for (const id of ids) {
-      const read = body.placements[id];
-      if (!read) reads.set(id, { error: "No shortlist for this change" });
-      else if ("error" in read) reads.set(id, { error: read.error });
-      else reads.set(id, { placement: read });
-    }
-  } catch (err) {
-    failAll(errorMessage(err));
-  }
-  return reads;
-}
-
 /**
  * The Inbox in its Plan section: `limit` rows, each opening its change in
  * the Tasks tree. Its own page is `InboxTriagePage` (inbox-triage.ts).
  */
-export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limit?: number }) {
+export function InboxPage({ navigateTo, limit, plan }: {
+  navigateTo?: NavigateTo;
+  limit?: number;
+  /** Plan's Inbox panel: its scope, Solo mode, dragging and "Plan in" / "Accept →". */
+  plan?: Pick<InboxViewProps, "scope" | "hideAssignees" | "dragToPlan" | "onPlanIn" | "planInVerb">;
+}) {
   const { load, rows, applied, refetch } = useInbox();
   const status = useProjectStatus();
   if (load.state === "v1") return null;
@@ -562,6 +572,8 @@ export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limi
       onPlace: navigateTo ? (id) => { requestInboxSelection(id); navigateTo("inbox"); } : undefined,
       onOpenAll: navigateTo ? () => navigateTo("inbox") : undefined,
       onPlaced: refetch,
+      onAssigned: refetch,
+      ...plan,
     }),
   );
 }

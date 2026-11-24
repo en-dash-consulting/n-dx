@@ -335,6 +335,16 @@ Pair review needs a CLI on both sides: the executor and the reviewer must each b
 
 **Per task.** A task can save its own `reviewMode` and `reviewVendor` in its `run` block, so one task is pair-reviewed by a chosen vendor whatever the project default is. A saved value that cannot be honoured is skipped with a warning and never stops a loop: a `reviewVendor` equal to the executor's vendor falls back to `hench.review.vendor`, then the executor's other vendor; a `reviewMode` of `pair` on an executor with no CLI counterpart, or on the API provider, falls back to the task's `run.review`, then the project. A reviewer or mode typed on the command line is refused instead.
 
+### Agent prompt file
+
+Instructions every n-dx agent should follow go in one Markdown file: `.ndx/agent-prompt.md` (on the legacy layout, `.n-dx-agent-prompt.md` at the project root). Its text is appended, under a `## Project instructions from <path>` heading, to the system prompt of every `ndx work` run (CLI and API providers), the run's reviewer, and the dashboard Sidecar. An absent or empty file changes nothing.
+
+```sh
+ndx config agent.promptFile docs/agent-instructions.md .   # use another file, relative to the project root
+```
+
+The path must stay inside the project; one that escapes it (`..`, an absolute path, a symlink out) is ignored with a warning and the default is used. Agents receive at most 32 KB of the file: a longer one is truncated and `ndx work` warns. Edit it from the dashboard under Settings › Workflow › Agent prompt, which reads and writes `GET`/`PUT /api/agent-prompt`. rex and sourcevision's one-shot model calls (`ndx plan`, `ndx analyze`) do not read it: they have no system prompt, and their output is a fixed JSON shape.
+
 ## Web Server
 
 ```sh
@@ -415,6 +425,7 @@ ndx config --help .       # show all available keys
 | `.hench/config.json` | Hench | Agent configuration (provider, max turns, budget) |
 | `.sourcevision/manifest.json` | SourceVision | Analysis metadata and version |
 | `.n-dx.json` | n-dx | Project-level overrides (LLM vendor/model, web port, etc.) |
+| `.ndx/agent-prompt.md` | n-dx | Instructions appended to every agent's system prompt (see [Agent prompt file](#agent-prompt-file)) |
 
 ### Assistant Artifacts
 

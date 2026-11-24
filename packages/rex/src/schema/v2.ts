@@ -32,13 +32,14 @@
  * |                                                  | appliedAt, appliedAmendsHash, shippedIn,     |
  * | constraint: statement, requirements, appliesTo   |   prs, issues (changes)                      |
  * |                                                  | links*                                       |
- * | change: summary, intent, acceptanceCriteria,     | assignee, ready, needsPlacement, createdAt   |
- * |   amends, touches, plannedRelease, spike, fix,   | lastModified, lastModifiedBy                 |
- * |   priority,                                      |                                              |
+ * | change: shortTitle, summary, intent,             | assignee, ready, needsPlacement, createdAt   |
+ * |   acceptanceCriteria, amends, touches,           | lastModified, lastModifiedBy                 |
+ * |   plannedRelease, spike, fix,                    |                                              |
+ * |   priority, prioritized,                         |                                              |
  * |   requirements, loe, loeRationale,               |                                              |
  * |   loeConfidence, effort*,                        |                                              |
  * |   discoveredFrom { item?, run? }, run            |                                              |
- * | task/subtask: summary, description,              |                                              |
+ * | task/subtask: shortTitle, summary, description,  |                                              |
  * |   acceptanceCriteria;                            |                                              |
  * |   task also requirements, priority, loe,         |                                              |
  * |   loeRationale, loeConfidence, effort*, run      |                                              |
@@ -47,6 +48,11 @@
  * for a reader who does not write code: what the work does and why it is
  * worth doing. The dashboard shows it in place of the title when present.
  * It adds to the title and description and replaces neither.
+ *
+ * A change's, task's or subtask's optional `shortTitle` is the name the
+ * dashboard shows in place of the title, which stays the full name. The
+ * shown name (short title, else title) is unique among open items
+ * (`core/short-title.ts`).
  *
  * `*` reserved with no shape: `hypotheses` waits for the Hypothesis Layer,
  * `links` for the tracker bridge, `effort` for the task-prep recommender's
@@ -344,6 +350,8 @@ export interface ConstraintIntent extends BaseIntent {
 
 /** Plain-language summary carried by every change-layer node; see the module doc. */
 interface SummaryIntent {
+  /** Optional short name the dashboard shows in place of the title; unique among open items (`core/short-title.ts`). */
+  shortTitle?: string;
   /** One or two sentences for a non-coder: what the work does and why it is worth doing. */
   summary?: string;
 }
@@ -377,6 +385,12 @@ export interface ChangeIntent extends BaseIntent, EffortIntent, SummaryIntent {
    */
   fix?: boolean;
   priority?: Priority;
+  /**
+   * Marks the change to lead the Inbox and the Open changes list, ahead of
+   * every unflagged change whatever its priority. Written only as `true`;
+   * clearing it removes the key. Ordering only: `get_next_task` does not read it.
+   */
+  prioritized?: boolean;
   requirements?: Requirement[];
   discoveredFrom?: DiscoveredFrom;
   /** A change with no tasks is itself the unit of work `ndx work` runs. */
@@ -447,6 +461,7 @@ export const ChangeIntentSchema = z
   .object({
     ...baseIntentShape,
     type: z.literal("change"),
+    shortTitle: z.string().optional(),
     summary: z.string().optional(),
     intent: z.string().optional(),
     acceptanceCriteria: z.array(z.string()).optional(),
@@ -456,6 +471,7 @@ export const ChangeIntentSchema = z
     spike: z.boolean().optional(),
     fix: z.boolean().optional(),
     priority: PrioritySchema.optional(),
+    prioritized: z.boolean().optional(),
     requirements: z.array(RequirementSchema).optional(),
     discoveredFrom: DiscoveredFromSchema.optional(),
     run: SavedRunSettingsSchema.optional(),
@@ -467,6 +483,7 @@ export const TaskIntentSchema = z
   .object({
     ...baseIntentShape,
     type: z.literal("task"),
+    shortTitle: z.string().optional(),
     summary: z.string().optional(),
     description: z.string().optional(),
     acceptanceCriteria: z.array(z.string()).optional(),
@@ -481,6 +498,7 @@ export const SubtaskIntentSchema = z
   .object({
     ...baseIntentShape,
     type: z.literal("subtask"),
+    shortTitle: z.string().optional(),
     summary: z.string().optional(),
     description: z.string().optional(),
     acceptanceCriteria: z.array(z.string()).optional(),

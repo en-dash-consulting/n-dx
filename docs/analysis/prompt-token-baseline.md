@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-11-12T16:42:45.076Z
-- **Commit** — `d340697c8081`
-- **Content hash** — `e53962bc0b723f47` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-11-24T00:46:03.374Z
+- **Commit** — `cc26ce1e63d3`
+- **Content hash** — `2baa003b3a85433d` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
-- **Per-call total** — 24,246 tokens (what every surface costs, summed)
-- **Unique fixed text** — 15,199 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 24,247 tokens (what every surface costs, summed)
+- **Unique fixed text** — 15,200 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -115,11 +115,11 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 27 | 119 | — | 119 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 4,810 per-call / 4,809 unique, 9 surfaces
+## hench — 4,811 per-call / 4,810 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 84 | 1,280 | — | 1,280 |
+| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 84 | 1,280 | 1 | 1,281 |
 | `buildGoLanguageContext` | `packages/hench/src/agent/planning/prompt.ts` | Go toolchain and convention context, added when the project is Go. | 26 | 278 | — | 278 |
 | `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 40 | 184 | 115 | 299 |
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
@@ -168,6 +168,7 @@ it. This is the leverage ordering for a rewrite.
 | `inboxClause` | hench | 11 | 1 | 11 |
 | `workflowBlock` | hench | 6 | 1 | 6 |
 | `formatChangeBrief` | hench | 5 | 1 | 5 |
+| `appendAgentPrompt` | hench | 1 | 1 | 1 |
 
 ## Assembled prompts (fixed representative input)
 
@@ -178,7 +179,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 |---|---|---|---:|---:|---:|
 | rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
-| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,579 | n/a — 621 of the fixed text is on another branch | 958 |
+| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,580 | n/a — 622 of the fixed text is on another branch | 958 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
 A `fixed` figure above the assembled length is not an error: the fixed column counts

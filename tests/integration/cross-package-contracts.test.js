@@ -407,6 +407,7 @@ describe("hench → llm-client gateway contract", () => {
     "resolveLayout",
     "detectLayoutMode",
     "relativeToRoot",
+    "agentPromptSection",
     "readAvailableMemory",
     "getAvailableMemory",
     "createAvailableMemoryReader",
@@ -574,6 +575,10 @@ describe("web → rex gateway contract", () => {
     // Quick Add's image attachments, stored in the new change's folder
     "attachImages",
     "AttachmentError",
+    // The detail panel's short-title edit, refused by rex's name rule
+    "assertShortTitleAvailable",
+    // The assignee filter's "me": the identity `ndx work --mine` selects by
+    "resolveActor",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -992,6 +997,9 @@ describe("gateway export auto-detection", () => {
         // (`.ndx/hench` → the project, not the container), which is the
         // resolver's knowledge of its own layout.
         "resolveLayout", "detectLayoutMode", "relativeToRoot", "projectRootOf",
+        // The operator's agent prompt file: llm-client reads it once so a hench
+        // run and the Sidecar append the same text.
+        "agentPromptSection",
         // The per-user home, under which the host-wide validation slot lives.
         "resolveNdxHome",
         // Available-memory reading. One reading for hench, the dashboard and
@@ -1069,6 +1077,10 @@ describe("gateway export auto-detection", () => {
         "findDuplicateItem",
         // Quick Add's image attachments, stored in the new change's folder.
         "attachImages", "AttachmentError",
+        // The detail panel's short-title edit, refused by rex's name rule.
+        "assertShortTitleAvailable",
+        // The assignee filter's "me", resolved as `ndx work --mine` resolves it.
+        "resolveActor",
         // Ready to run shows a change with no tasks as one task.
         "changeWorkShape"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",

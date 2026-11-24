@@ -33,7 +33,9 @@ import {
   isLiveView,
   ENRICHMENT_THRESHOLDS,
   stageForView,
+  stageTiles,
   stageViews,
+  modeForView,
   tilePlacesView,
   type StageId,
 } from "../../../src/viewer/views/index.js";
@@ -95,11 +97,11 @@ function placementsOf(view: ViewId): string[] {
   if ((STAGE_ORDER as readonly string[]).includes(view)) places.push(`stage:${view}`);
   for (const stage of STAGE_ORDER) {
     for (const section of STAGES[stage].sections) {
-      // A stage's lead may be its own question (Tune): that is the stage page
-      // itself, already counted above, not a second placement.
       if (section.view === view && view !== stage) places.push(`section:${stage}`);
     }
-    for (const tile of STAGES[stage].tiles ?? []) {
+    // A mode's route (Tune) opens the stage page on that mode: a placement.
+    if ((STAGES[stage].modes ?? []).some((m) => m.view === view && view !== stage)) places.push(`mode:${stage}`);
+    for (const tile of stageTiles(stage)) {
       if (tile.view === view && tilePlacesView(tile)) places.push(`tile:${stage}`);
       if (tile.tabs?.some((t) => t.view === view)) places.push(`tab:${stage}`);
     }
@@ -118,22 +120,35 @@ describe("navigation model: placement", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("loops through four stages: Analysis, Plan, Work, Tune", () => {
-    expect([...STAGE_ORDER]).toEqual(["analyze", "plan", "work", "tune"]);
-    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work", "Tune"]);
-    expect(resolveCliLabel(viewBlurb("tune"), "ndx")).toBe("Fit the ndx workflow to this project and the tools you have.");
+  it("loops through three stages: Analysis, Plan, Work", () => {
+    expect([...STAGE_ORDER]).toEqual(["analyze", "plan", "work"]);
+    expect(STAGE_ORDER.map((id) => viewLabel(id))).toEqual(["Analysis", "Plan", "Work"]);
   });
 
-  it("renders Tune as a lead plus a tile grid, with no stacked sections", () => {
-    expect(STAGES.tune.sections.map((s) => s.view)).toEqual(["tune"]);
-    expect((STAGES.tune.tiles ?? []).length).toBeGreaterThan(0);
+  it("splits Plan into Create and Preparation, and Work into Now and Tune", () => {
+    expect((STAGES.plan.modes ?? []).map((m) => [m.id, m.label, m.focus])).toEqual([
+      ["create", "Create", "How, why and what"],
+      ["prepare", "Preparation", "Who and when"],
+    ]);
+    expect((STAGES.work.modes ?? []).map((m) => [m.id, m.label, m.view])).toEqual([
+      ["now", "Now", "work"],
+      ["tune", "Tune", "tune"],
+    ]);
+    // Tune is a mode of Work, not a stage: its route opens Work on it.
+    expect(stageForView("tune")).toBe("work");
+    expect(modeForView("work", "tune")).toBe("tune");
+    expect(modeForView("work", "work")).toBe("now");
+    for (const mode of [...(STAGES.plan.modes ?? []), ...(STAGES.work.modes ?? [])]) {
+      expect(mode.tiles.length, mode.id).toBeGreaterThan(0);
+    }
   });
 
-  it("gives each stage exactly one lead section, first", () => {
+  it("gives each stage at most one lead section, first; Plan and Work, split into modes, have none", () => {
     for (const stage of STAGE_ORDER) {
       const sections = STAGES[stage].sections;
-      expect(sections.filter((s) => s.plain), stage).toHaveLength(1);
-      expect(sections[0].plain, stage).toBe(true);
+      const leads = sections.filter((s) => s.plain);
+      expect(leads.length, stage).toBe(STAGES[stage].modes ? 0 : 1);
+      if (leads.length) expect(sections[0].plain, stage).toBe(true);
     }
   });
 });
@@ -159,19 +174,17 @@ describe("navigation model: labels", () => {
     expect(viewLabel("activity")).toBe("Execution Log");
   });
 
-  // Spend lives on Tune and the command list in Settings › Commands; a stage
-  // blurb that still offers them sends users to the wrong stage (#961).
-  it("stage blurbs do not advertise what moved to Tune and Settings", () => {
+  // The command list lives in Settings › Commands; a stage blurb that still
+  // offers it sends users to the wrong place (#961).
+  it("stage blurbs do not advertise what moved to Settings", () => {
     expect(viewBlurb("plan")).not.toMatch(/planning commands/i);
-    expect(viewBlurb("work")).not.toMatch(/costs?|spend/i);
-    // The Runs list is a Tune tile.
-    expect(stageViews("tune")).toContain("hench-runs");
-    expect(viewBlurb("work")).not.toMatch(/\bruns\b/i);
+    // The Runs list is a tile of Work's Tune mode.
+    expect(stageViews("work")).toContain("hench-runs");
   });
 
-  it("the home blurb counts the four stages", () => {
-    expect(viewBlurb("home")).toMatch(/four stages/i);
-    expect(viewBlurb("home")).not.toMatch(/three/i);
+  it("the home blurb counts the three stages", () => {
+    expect(viewBlurb("home")).toMatch(/three stages/i);
+    expect(viewBlurb("home")).not.toMatch(/four/i);
   });
 
   // No label carries the placeholder today (the settings pages that did were
@@ -360,7 +373,10 @@ describe("rendered surfaces take their labels from the model", () => {
         const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(".stage-tile-fullscreen .stage-section-tab")];
         act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
         // A tab is named by its view unless the model gives it a label (Open changes: List, Tree).
-        const expectedNames = [{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].map((t) => t.label ?? viewLabel(t.view));
+        const expectedNames = [
+          ...(tile.panelTab ? [tile.panelTab] : []),
+          ...[{ view: tile.view, label: tile.tabLabel }, ...tile.tabs!].map((t) => t.label ?? viewLabel(t.view)),
+        ];
         // A tile that did not open renders no tabs, so this comparison also
         // fails loudly rather than passing having checked nothing.
         if (tabButtons.map((b) => b.textContent).join("|") !== expectedNames.join("|")) {
@@ -380,7 +396,8 @@ describe("rendered surfaces take their labels from the model", () => {
     });
     await settle();
     // The lifecycle band has no full-screen; every other tile opens by its key (panel, else view).
-    const tiles = (STAGES.plan.tiles ?? []).filter((t) => !t.band);
+    // The page opens on Create, its first mode.
+    const tiles = (STAGES.plan.modes?.[0]?.tiles ?? []).filter((t) => !t.band);
     const views = tiles.map((t) => t.view);
     for (const tile of tiles) {
       act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${tile.panel ?? tile.view}"] .stage-tile-head`)?.click(); });
@@ -390,17 +407,18 @@ describe("rendered surfaces take their labels from the model", () => {
       act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
     }
     expect(opened).toEqual(views);
-    expect(opened).toEqual(expect.arrayContaining(["changes", "validation"]));
+    // Create's grid is the product areas; the rest of Plan is bands and side panels.
+    expect(opened).toEqual(["product"]);
   });
 
-  it("Tune shows the Your tooling tile on a server and omits it from a static export", async () => {
-    // The tile reads /api/llm/* and /api/commands/auth, none of which an export
-    // writes, so deployed it would only ever report a read error.
-    const tooling = () => root.querySelector('.stage-tile[data-tile="tooling"]');
+  it("Tune shows the Agent settings tile on a server and omits it from a static export", async () => {
+    // The tile reads and writes /api/llm/config, /api/hench/config and the
+    // agent prompt, none of which an export serves.
+    const tooling = () => root.querySelector('.stage-tile[data-tile="agent-settings"]');
     const mountTune = async () => {
       act(() => {
         render(h(StagePage, {
-          stage: "tune", validViews: buildValidViews(null), navigateTo: () => {}, renderView: () => null,
+          stage: "work", view: "tune", validViews: buildValidViews(null), navigateTo: () => {}, renderView: () => null,
         }), root);
       });
       await settle();
@@ -481,31 +499,36 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("leads with Overview and lays every SourceVision view out as tiles", () => {
     expect(STAGES.analyze.sections.map((s) => s.view)).toEqual(["overview"]);
-    expect(tiles.map((t) => t.panel ?? t.view)).toEqual([
-      "map", "health", "next-steps", "delivery", "problems", "suggestions", "zones",
-      "architecture", "files", "languages", "ask",
-    ]);
-    expect(placed).toEqual([
-      "iso-map", "problems", "suggestions", "zones",
-      "architecture", "routes", "files", "ask",
-    ]);
+    expect(tiles.map((t) => t.panel ?? t.view)).toEqual(["glance", "recommendations", "map", "ask"]);
+    expect(placed).toEqual(["zones", "files", "architecture", "routes", "iso-map", "ask"]);
   });
 
-  it("puts the codebase map in the top rows, two thirds wide, chromeless, dropped in a static export", () => {
-    const map = tiles[0]!;
-    expect(map).toMatchObject({ view: "iso-map", panel: "map", cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true });
-    // The column beside it holds health and next steps, three rows together.
-    expect(tiles.slice(1, 3).map((t) => [t.panel, t.cols ?? 4, t.rows ?? 1])).toEqual([["health", 4, 1], ["next-steps", 4, 2]]);
+  it("puts two tiles across the top row: visuals on the left, recommended fixes on the right", () => {
+    expect(tiles.slice(0, 2).map((t) => [t.panel, t.title, t.cols, t.rows])).toEqual([
+      ["glance", "Codebase at a glance", 6, 2],
+      ["recommendations", "Recommended fixes", 6, 2],
+    ]);
+    // Opened, the visuals tile leads with its own panel, then the views it holds.
+    expect(tiles[0]).toMatchObject({
+      view: "zones", panelTab: "Overview",
+      tabs: [{ view: "files" }, { view: "architecture" }, { view: "routes" }],
+    });
+    // The fixes tile links to Suggestions through "Open" but does not place it.
+    expect(tilePlacesView(tiles[1]!)).toBe(false);
+  });
+
+  it("puts the codebase map across the full row below, chromeless, dropped in a static export", () => {
+    expect(tiles[2]).toMatchObject({ view: "iso-map", panel: "map", cols: 12, rows: 3, chromeless: true, hiddenWhenDeployed: true });
   });
 
   it("drops the flat repository map from the page but keeps it in the stage", () => {
     expect(tiles.some((t) => t.view === "graph")).toBe(false);
-    expect(STAGES.analyze.alsoOwns).toEqual(["graph"]);
+    expect(STAGES.analyze.alsoOwns).toEqual(["graph", "problems", "suggestions"]);
     expect(stageForView("graph")).toBe("analyze");
   });
 
-  it("shows Routes as a tab of the Architecture tile", () => {
-    expect(tile("architecture").tabs?.map((t) => t.view)).toEqual(["routes"]);
+  it("shows Architecture and Routes as tabs of the visuals tile", () => {
+    expect(tiles[0]!.tabs?.map((t) => t.view)).toEqual(expect.arrayContaining(["architecture", "routes"]));
   });
 
   it("names the repository map and isometric map as the navigation model has them", () => {
@@ -519,9 +542,10 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("keeps thresholds for the enrichment-gated views", () => {
     // The views gate themselves on these constants (architecture.ts,
-    // problems.ts, suggestions.ts).
+    // problems.ts, suggestions.ts); the health tile's list keeps the same
+    // gates for the problems and suggestions it shows (health-actions.ts).
     for (const view of ["architecture", "problems", "suggestions"] as const) {
-      expect(placed, view).toContain(view);
+      expect(stageForView(view), view).toBe("analyze");
       expect(ENRICHMENT_THRESHOLDS[view], view).toBeGreaterThan(0);
     }
   });
@@ -535,15 +559,18 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("marks the server-built views so static exports hide them", () => {
     // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Changes, Inbox
-    // and Workspaces by `requiresServer` (Changes and Inbox read rex's v2 model
-    // per request; Product, a tab of Open changes, goes with its tile). A panel
-    // that only links to its view (the lifecycle strip) is not that view's
-    // placement.
+    // and Product by `requiresServer` (they read rex's v2 model per request;
+    // Product is Plan's product areas tile), and Plan's capture panel (Add
+    // Items), since an export cannot add. A panel that only links to its view
+    // (the lifecycle strip) is not that view's placement.
+    // Plan's capture and Inbox are side panels now, which an export hides the same way.
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
       ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
-      ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
+      ...stageTiles(stage).filter((t) => t.requiresServer && tilePlacesView(t)).map((t) => t.view),
+      ...(STAGES[stage].sidePanels ?? []).filter((p) => p.requiresServer).map((p) => p.view),
     ]);
-    expect(serverBuilt.sort()).toEqual(["ask", "changes", "inbox", "workspaces"]);
+    // Workspaces is a Settings page now; its route opens it there.
+    expect([...new Set(serverBuilt)].sort()).toEqual(["analysis", "ask", "changes", "inbox", "product"]);
   });
 });
 

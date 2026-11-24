@@ -39,6 +39,7 @@
 @import "./commands.css";
 @import "./robot-wrangler.css";
 @import "./workflow.css";
+@import "./agent-prompt.css";
 @import "./project-settings.css";
 @import "./setting-row.css";
 @import "./project.css";
@@ -66,4 +67,5 @@
 @import "./deployed.css";
 @import "./merge-graph.css";
 @import "./product.css";
+@import "./assignee.css";
 @import "./responsive.css";

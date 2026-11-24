@@ -16,6 +16,8 @@ import { getAllLevels } from "../../schema/index.js";
 import { validateDAG } from "../../core/dag.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { addChangeNode } from "../../core/change-add.js";
+import { prioritizedRefusal } from "../../core/prioritized.js";
+import { assertShortTitleAvailable } from "../../core/short-title.js";
 import { FileStore, resolvePRDFile } from "../../store/index.js";
 import { prdLayout } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
@@ -37,10 +39,14 @@ export interface AddItemArgs {
   /** v2; on v1 only a type with a v1 level. */
   type?: string;
   parentId?: string;
+  /** Short name the dashboard shows in place of the title; unique among open items. */
+  shortTitle?: string;
   /** Plain-language summary for a non-coder: what the work does and why it is worth doing. */
   summary?: string;
   description?: string;
   priority?: string;
+  /** A change (a v1 epic) only; false is the default and stores nothing. */
+  prioritized?: boolean;
   acceptanceCriteria?: string[];
   tags?: string[];
   source?: string;
@@ -114,6 +120,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
         type,
         title: args.title,
         parentId: args.parentId,
+        shortTitle: args.shortTitle,
         summary: args.summary,
         description: args.description,
         acceptanceCriteria: args.acceptanceCriteria,
@@ -122,6 +129,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
         assignee: args.assignee?.trim() || undefined,
         blockedBy: args.blockedBy,
         priority: args.priority as Priority | undefined,
+        prioritized: args.prioritized ? true : undefined,
         run,
         amends: args.amends,
         touches: args.touches,
@@ -162,9 +170,15 @@ async function addV1(
     level: args.level,
     status: "pending",
   };
+  if (args.shortTitle?.trim()) item.shortTitle = args.shortTitle.trim();
   if (args.summary?.trim()) item.summary = args.summary.trim();
   if (args.description) item.description = args.description;
   if (args.priority) item.priority = args.priority as Priority;
+  if (args.prioritized) {
+    const refusal = prioritizedRefusal(item);
+    if (refusal) return textResult(refusal, true);
+    item.prioritized = true;
+  }
   if (args.acceptanceCriteria) item.acceptanceCriteria = args.acceptanceCriteria;
   if (args.tags) item.tags = args.tags;
   if (args.source) item.source = args.source;
@@ -185,7 +199,12 @@ async function addV1(
     }
   }
 
-  await store.addItem(item, args.parentId, { applyAttribution: true, projectDir });
+  await store.addItem(item, args.parentId, {
+    applyAttribution: true,
+    projectDir,
+    // Checked under the lock the write holds, so two writers cannot both take a name.
+    assertBeforeWrite: item.shortTitle ? (items) => assertShortTitleAvailable(items, item.shortTitle, item) : undefined,
+  });
 
   // Reset completed ancestors when adding under a completed parent
   const { resetItems } = await cascadeParentReset(store, args.parentId, {
@@ -214,9 +233,11 @@ export const addItemTool = defineTool({
     type: z.enum(ADD_TYPES).optional().describe("v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level"),
     level: z.enum(getAllLevels() as [string, ...string[]]).optional().describe("v1 only: item level. Refused on a v2 PRD, which takes type"),
     parentId: z.string().optional().describe("Parent item ID"),
+    shortTitle: z.string().optional().describe("Optional short name the dashboard shows in place of the title, which stays the full name. Refused when an open item (pending, in_progress, failing, blocked, deferred) already shows that name; completed items may share it"),
     summary: z.string().optional().describe("Plain-language summary for a product owner or team lead who does not write code: 1-2 sentences on what the work does and why it is worth doing. No file paths or code identifiers. Shown in place of the title on the dashboard"),
     description: z.string().optional().describe("Item description (a v2 change's intent)"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("Priority"),
+    prioritized: z.boolean().optional().describe("v2: a change only, listed first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. v1: an epic only, and only stored; nothing orders by it. Does not change task selection"),
     acceptanceCriteria: z.array(z.string()).optional().describe("Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"),
     tags: z.array(z.string()).optional().describe("Tags"),
     source: z.string().optional().describe("Source of this item"),

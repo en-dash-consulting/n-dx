@@ -216,7 +216,7 @@ describe("WorkflowView", () => {
 
     expect(root.querySelectorAll(".settings-frame")).toHaveLength(1);
     const titles = [...root.querySelectorAll(".workflow-section-title")].map((t) => t.textContent);
-    expect(titles).toEqual(["Work settings", "PRD settings", "CLI timeouts", "Templates"]);
+    expect(titles).toEqual(["Work settings", "Agent prompt", "PRD settings", "CLI timeouts", "Templates"]);
     expect(root.querySelector(".workflow-header-title")!.textContent).toBe("Workflow");
     // The frame owns Save: none of the sections' old save bars or toasts remain.
     expect(root.querySelector(".hench-config-changes-panel")).toBeNull();

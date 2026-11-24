@@ -28,7 +28,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { addTokenUsage, isLLMVendor, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
+import { addTokenUsage, agentPromptSection, isLLMVendor, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
 import type {
   RuntimeEvent,
   SessionTurnResult,
@@ -252,8 +252,13 @@ export function sidecarSessionConnect(
     const endpoint = broker?.(record.id);
     const isCodex = record.vendor === "codex";
     const codex = sidecarCodexSpawn(isCodex ? endpoint : undefined, typeof idleMs === "function" ? idleMs() : idleMs, record.worktree);
+    // The operator's agent prompt file, as every hench run gets it; a hub
+    // session takes its host project's. Read per connect, so an edit applies
+    // to the next session opened. Absent or empty: no system prompt at all.
+    const agentPrompt = agentPromptSection(envDir ?? record.worktree).text;
     return {
       ...await resolveSidecarSessionEnv(envDir ?? record.worktree),
+      ...(agentPrompt && { systemPrompt: agentPrompt }),
       ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, isCodex ? undefined : endpoint), record.scope, codex.codex),
       ...(isCodex && Object.keys(codex.env).length > 0 && { extraEnv: codex.env }),
     };

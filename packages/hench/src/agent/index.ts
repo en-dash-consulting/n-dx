@@ -81,6 +81,7 @@ export {
   collectEpicTaskIds,
   TaskNotActionableError,
 } from "./planning/brief.js";
+export { TaskNotFoundError } from "./planning/work-selection.js";
 export type { AssembleBriefOptions, ActionableTask } from "./planning/brief.js";
 
 // System prompt + prompt envelope

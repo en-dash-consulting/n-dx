@@ -21,6 +21,7 @@ import {
   nextV2Entry,
   readTreeAsReset,
   resolveV2Entry,
+  TaskNotFoundError,
   V2_HAS_NO_EPICS,
 } from "./work-selection.js";
 import { isAbsolute, relative, sep } from "node:path";
@@ -333,7 +334,7 @@ export async function selectTaskEntry(
     // the claim below is on that task, never on the change.
     const foreign = tree && claims ? await claims.foreignClaims() : undefined;
     const entry = tree ? resolveV2Entry(tree, items, taskId, foreign, cliName) : findItem(items, taskId);
-    if (!entry) throw new Error(`Task not found: ${taskId}`);
+    if (!entry) throw new TaskNotFoundError(taskId);
     const inbox = tree ? inboxRefusal(tree, taskId, cliName) : undefined;
     if (inbox) throw inbox;
     const notActionable = explicitTaskRefusal(entry.item, cliName);

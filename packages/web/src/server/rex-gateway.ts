@@ -65,6 +65,9 @@ export { applyChange } from "@n-dx/rex";
 // Quick Add's image attachments: rex stores them in the new change's folder,
 // under the PRD lock, and refuses a file that is not an accepted image.
 export { attachImages, AttachmentError } from "@n-dx/rex";
+// The assignee picker's "me": the identity `ndx work --mine` selects by, so the
+// Mine filter and the CLI agree on who the current user is (routes-rex/people.ts).
+export { resolveActor } from "@n-dx/rex";
 
 // ---- Rex trailer-commit evidence ---------------------------------------------
 // The commits whose `N-DX-Item` trailer names an item, and the files each
@@ -92,6 +95,12 @@ export { draftChangePlacement } from "@n-dx/rex";
 // one by the rule smart add flags duplicates by.
 export { findDuplicateItem } from "@n-dx/rex";
 export type { DuplicateItemMatch } from "@n-dx/rex";
+
+// ---- Rex short-title rule ---------------------------------------------------
+// The detail panel's short-title edit is refused, naming the item, when an
+// open item already shows that name: the rule add_item, edit_item and the rex
+// CLI refuse by.
+export { assertShortTitleAvailable } from "@n-dx/rex";
 
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it

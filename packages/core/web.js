@@ -2792,6 +2792,27 @@ function openBrowser(url) {
 }
 
 /**
+ * Poll the hub for project `id` while its server is still `starting`, until it
+ * settles or `deadline` passes. Returns the last answer, shaped like the
+ * registration's (`{ project }`); a failed poll keeps the previous answer.
+ *
+ * @param {number} port
+ * @param {string} id
+ * @param {{ project?: { status?: { state?: string } } } | null} body The registration's answer.
+ * @param {number} deadline Epoch milliseconds.
+ * @param {string} home
+ */
+async function awaitHubProjectStartup(port, id, body, deadline, home) {
+  let latest = body;
+  while (latest?.project?.status?.state === "starting" && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 500));
+    const res = await credentialedHubRequest(port, "GET", `/api/hub/projects/${encodeURIComponent(id)}`, undefined, PROBE_TIMEOUT_MS, { home });
+    if (res.status === 200 && res.body?.project) latest = res.body;
+  }
+  return latest;
+}
+
+/**
  * `ndx start --hub`: register this repository with the per-user hub and print
  * where it is served. Returns an exit code.
  */
@@ -2837,7 +2858,8 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
 
   // `ndxBin` is still sent for older hubs; a current hub ignores it and
   // spawns its own CLI entry point.
-  const { status, body } = await credentialedHubRequest(
+  const registerDeadline = Date.now() + HUB_REGISTER_TIMEOUT_MS;
+  const { status, body: registered } = await credentialedHubRequest(
     hubPort,
     "POST",
     "/api/hub/projects",
@@ -2846,9 +2868,13 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
     { home },
   );
   if (status !== 200 && status !== 201) {
-    console.error(`Registering with the n-dx hub failed (${status || "unreachable"})${body?.error ? `: ${body.error}` : ""}`);
+    console.error(`Registering with the n-dx hub failed (${status || "unreachable"})${registered?.error ? `: ${registered.error}` : ""}`);
     return 1;
   }
+  // A hub that answers while the server is still coming up (one that has just
+  // started and is still attaching its projects, or one predating the hub-side
+  // wait) is polled until the server is healthy or the deadline passes.
+  const body = await awaitHubProjectStartup(hubPort, id, registered, registerDeadline, home);
   const state = body?.project?.status?.state;
   if (state !== "healthy") {
     console.error(`Project "${id}" registered but its server is ${state ?? "in an unknown state"}${body?.project?.status?.lastError ? `: ${body.project.status.lastError}` : ""}`);
@@ -2884,7 +2910,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex${headerFlag}`);
   log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision${headerFlag}`);
   if (token) {
-    log(`  Token:   ${tokenFile} (for MCP and scripts; the dashboard URL above is a one-time sign-in link valid for about a minute — run 'ndx start' again for a fresh one; disable with --no-auth or web.auth=false in .n-dx.local.json)`);
+    log(`  Token:   ${tokenFile} (for MCP and scripts; the dashboard URL above is a one-time sign-in link valid for 30 minutes — run 'ndx start' again for a fresh one; disable with --no-auth or web.auth=false in .n-dx.local.json)`);
   }
   log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   log("");

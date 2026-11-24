@@ -47,7 +47,7 @@ import { loadHenchConfig } from "./hench-config-fields.js";
 import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { PAIR_REVIEW_SUPPORTED } from "./llm-review.js";
-import { isV2Tree, loadPRDSync, summaryField } from "./prd-io.js";
+import { isV2Tree, loadPRDSync, shortTitleField, summaryField } from "./prd-io.js";
 import { checkSavedRun, savedRunVersion, writeTaskRun } from "./task-run-settings.js";
 import { indexedUnitRefusal, unitRefusal } from "./runnable-units.js";
 import { isRecord, itemTypeOf } from "../shared/index.js";
@@ -121,6 +121,8 @@ export interface PrepWorkspace {
 export interface ReadyTask {
   id: string;
   title: string;
+  /** Short name the row shows in place of the title when present. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders; the row shows it in place of the title when present. */
   summary?: string;
   /**
@@ -142,6 +144,10 @@ export interface ReadyTask {
   resume: boolean;
   /** A run of this task is live (or cannot be confirmed dead) in some worktree. */
   liveRun: boolean;
+  /** Who it is assigned to: the task's own assignee, else its nearest assigned ancestor's. Null when nobody is. */
+  assignee: string | null;
+  /** The task's saved run tier, when it carries one; null runs on the project default. */
+  tier: string | null;
   /** The task carries its own run settings, which `ndx work` applies. */
   saved: boolean;
 }
@@ -644,6 +650,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
     return {
       id: item.id,
       title: item.title,
+      ...shortTitleField(item),
       ...summaryField(item),
       ...descriptionField(item),
       status: item.status,
@@ -655,6 +662,8 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
       tags: item.tags ?? [],
       resume: item.status === "in_progress" && !liveRun,
       liveRun,
+      assignee: [item, ...[...parents].reverse()].find((i) => typeof i.assignee === "string" && i.assignee.trim() !== "")?.assignee ?? null,
+      tier: typeof (item.run as RunSettings | undefined)?.tier === "string" ? (item.run as RunSettings).tier as string : null,
       saved: savedRunVersion(item.run as RunSettings | undefined) !== "none",
     };
   });

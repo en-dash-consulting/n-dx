@@ -390,6 +390,12 @@ export interface PRDItem {
   /** PRD source file the item originated from or was last written to. */
   sourceFile?: string;
   /**
+   * Optional short name the dashboard shows in place of the title, which stays
+   * the full name. The shown name (short title, else title) is unique among
+   * open items (`core/short-title.ts`). Intent on v2 change-layer nodes.
+   */
+  shortTitle?: string;
+  /**
    * One or two plain sentences for a reader who does not write code: what the
    * work does and why it is worth doing. Shown in place of the title when
    * present; replaces neither the title nor the description. Stored as intent
@@ -399,6 +405,12 @@ export interface PRDItem {
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;
+  /**
+   * Leads the Inbox and the Open changes list ahead of unflagged items, on top
+   * of `priority`. Carried by a v2 change (intent) or a v1 epic (an unknown
+   * field there); see `core/prioritized.ts`. Written only as `true`.
+   */
+  prioritized?: boolean;
   tags?: string[];
   source?: string;
   blockedBy?: string[];

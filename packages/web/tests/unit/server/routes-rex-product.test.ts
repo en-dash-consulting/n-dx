@@ -288,6 +288,14 @@ describe("v2 product reads", () => {
     });
   });
 
+  it("GET /changes and /changes/summary carry a change's prioritized flag, and only when set", async () => {
+    expect((await get("changes")).body.changes[0]).not.toHaveProperty("prioritized");
+    const indexPath = join(rexDir, "changes", "add-apple-pay", "index.md");
+    writeFileSync(indexPath, readFileSync(indexPath, "utf-8").replace('priority: "high"\n', 'priority: "high"\nprioritized: true\n'));
+    expect((await get("changes")).body.changes[0]).toMatchObject({ prioritized: true });
+    expect((await get("changes/summary")).body.summary.open[0]).toMatchObject({ prioritized: true });
+  });
+
   it("GET /changes marks a change runsAsOneTask only once it has no tasks", async () => {
     const before = (await get("changes")).body.changes[0] as ChangeRowWire;
     expect(before).not.toHaveProperty("runsAsOneTask");
@@ -478,10 +486,19 @@ describe("v2 product reads", () => {
           },
           // The fixture's one open change and its task hold no requirement.
           requirements: { total: 0, uncovered: 1 },
+          // No rex.applyOn in the project config: the default.
+          applyOn: "complete",
         },
       });
       const summary = (body as { summary: ChangeSummary }).summary;
       expect(["in_progress", "ready_to_finalize", "priority"]).toContain(summary.next!.reason);
+    });
+
+    it("carries the project's rex.applyOn, and the default for an invalid one", async () => {
+      writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "release" } }));
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).applyOn).toBe("release");
+      writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "later" } }));
+      expect(((await get("changes/summary")).body.summary as ChangeSummary).applyOn).toBe("complete");
     });
 
     it("counts an Inbox change apart from the stages and leaves it out of the open list", async () => {
@@ -952,5 +969,29 @@ describe("buildChangeSummary: Inbox changes also counted in a stage", () => {
     expect(summary.inbox).toBe(1);
     expect(summary.inboxInStage).toBe(0);
     expect(staged(summary)).toBe(0);
+  });
+});
+
+describe("buildChangeSummary: who an open change is for", () => {
+  it("carries the change's assignee and its open tasks' distinct assignees, and neither when nobody is", () => {
+    const summary = buildChangeSummary({
+      product: [],
+      changes: [
+        {
+          id: "a", type: "change", title: "a", slug: "a", assignee: "Ann <ann@x.io>",
+          children: [
+            { id: "t1", type: "task", title: "t1", slug: "t1", status: "pending", assignee: "Bo <bo@x.io>" },
+            { id: "t2", type: "task", title: "t2", slug: "t2", status: "pending", assignee: "Bo <bo@x.io>" },
+            // Done work holds nobody.
+            { id: "t3", type: "task", title: "t3", slug: "t3", status: "completed", assignee: "Cy <cy@x.io>" },
+          ],
+        } as RuleNode,
+        { id: "b", type: "change", title: "b", slug: "b" },
+      ],
+    });
+    const byId = Object.fromEntries(summary.open.map((c) => [c.id, c]));
+    expect(byId["a"]).toMatchObject({ assignee: "Ann <ann@x.io>", taskAssignees: ["Bo <bo@x.io>"] });
+    expect(byId["b"]).not.toHaveProperty("assignee");
+    expect(byId["b"]).not.toHaveProperty("taskAssignees");
   });
 });

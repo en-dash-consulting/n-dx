@@ -15,6 +15,7 @@
  * GET    /api/hench/runs/:id/log          — run log from a byte cursor (?from=N); any worktree
  * GET    /api/hench/runs/:id/events       — progress events after a seq cursor (?after=N); any worktree
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
+ * GET    /api/hench/estimates             — median time, tokens and cost of a recent run, per tier (every worktree)
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
  * GET    /api/hench/metrics              — concurrent execution metrics and resource utilization
  * GET    /api/hench/metrics/snapshots    — time-series execution metrics snapshots
@@ -124,7 +125,9 @@ import {
   resolveStore,
   PRD_TREE_DIRNAME,
   walkTree,
+  estimateCostFromTotals,
 } from "./rex-gateway.js";
+import { summarizeEstimates, type EstimateRun } from "./run-estimates.js";
 import type { V2Tree } from "./rex-gateway.js";
 import { runsAsOneTask, unitRefusal } from "./runnable-units.js";
 import { runnableRowText, withPlannedRowText } from "./runnable-row.js";
@@ -581,6 +584,35 @@ function paginate<T>(items: T[], query: RunsListQuery): T[] {
   return items.slice(query.offset, query.limit > 0 ? query.offset + query.limit : undefined);
 }
 
+/** Price a run's tokens at its model's rates; NaN when the model has none. */
+function priceRun(run: EstimateRun): number {
+  const billable = {
+    inputTokens: run.tokenUsage.input,
+    outputTokens: run.tokenUsage.output,
+    cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
+    cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
+  };
+  try {
+    return estimateCostFromTotals(billable, { [run.model || "unknown"]: billable }).totalRaw;
+  } catch {
+    return Number.NaN;
+  }
+}
+
+/**
+ * GET /api/hench/estimates — what a run typically takes: the median wall time,
+ * tokens and cost of the finished runs in every worktree over the last 30 days,
+ * overall and per tier (`run-estimates.ts`).
+ */
+async function handleRunEstimates(rc: RouteContext): Promise<boolean> {
+  const sources = await resolveRunSources(rc.ctx);
+  const runs: RunSummary[] = sources.length === 0
+    ? loadRunSummaries(rc.runsDir, null)
+    : sources.flatMap((source) => loadRunSummaries(source.runsDir, null));
+  jsonResponse(rc.res, 200, summarizeEstimates(runs, priceRun));
+  return true;
+}
+
 /** GET /api/hench/runs/:id?scope=repo — find the run in whichever worktree holds it. */
 async function handleRunDetailRepoScope(rc: RouteContext, runId: string): Promise<boolean> {
   const sources = await resolveRunSources(rc.ctx);
@@ -787,8 +819,9 @@ function routeUsage(rc: RouteContext): boolean | Promise<boolean> | null {
   return null;
 }
 
-/** Routes: metrics, metrics/snapshots */
-function routeMetrics(rc: RouteContext): boolean | null {
+/** Routes: metrics, metrics/snapshots, estimates */
+function routeMetrics(rc: RouteContext): boolean | Promise<boolean> | null {
+  if (rc.path === "estimates" && rc.method === "GET") return handleRunEstimates(rc);
   if (rc.path === "metrics/snapshots" && rc.method === "GET") {
     return handleMetricsSnapshots(rc.res, rc.runsDir);
   }

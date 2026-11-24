@@ -98,12 +98,18 @@ export interface PRDItemData {
   type?: string;
   /** @deprecated v1 spelling of {@link PRDItemData.type}; read via `itemTypeOf`. */
   level?: ItemLevel;
+  /** Short name rows show in place of the title; unique among open items. */
+  shortTitle?: string;
   /** Plain-language summary for non-coders; rows show it in place of the title. */
   summary?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;
+  /** A v2 change or v1 epic listed first in the Inbox and Open changes. @see packages/rex/src/core/prioritized.ts */
+  prioritized?: boolean;
   tags?: string[];
+  /** Who the item belongs to; `ndx work --mine` selects by it. Inherited by descendants. */
+  assignee?: string;
   blockedBy?: string[];
   /** @see packages/rex/src/schema/v1.ts — PRDItem.requirements */
   requirements?: RequirementData[];

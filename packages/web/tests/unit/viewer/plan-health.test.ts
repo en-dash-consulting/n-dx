@@ -47,9 +47,9 @@ describe("healthLights", () => {
   });
 });
 
-it("is the Plan stage's Validation tile, which still opens the Validation view", () => {
-  const tile = STAGES.plan.tiles!.find((t) => t.panel === "plan-health")!;
-  expect(tile.view).toBe("validation");
+it("is a transitional side panel on Plan, which still opens the Validation view", () => {
+  const panel = STAGES.plan.sidePanels!.find((p) => p.panel === "plan-health")!;
+  expect(panel).toMatchObject({ view: "validation", transitional: true });
 });
 
 describe("PlanHealth", () => {

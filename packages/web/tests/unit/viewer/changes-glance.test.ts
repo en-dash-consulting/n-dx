@@ -20,6 +20,13 @@ describe("glance model", () => {
     expect(groups[2]!.changes.map((c) => c.id)).toEqual(["a", "d"]);
   });
 
+  it("lists a group's changes prioritized first, then by priority, ties in the given order", () => {
+    const [group] = groupGlanceByRelease([
+      change("low", { priority: "low" }), change("none"), change("high", { priority: "high" }), change("flag", { prioritized: true, priority: "low" }),
+    ]);
+    expect(group!.changes.map((c) => c.id)).toEqual(["flag", "high", "none", "low"]);
+  });
+
   it("shows blocked before no criteria, and nothing when neither", () => {
     expect(glanceGap({ criteriaGap: true, openBlockers: 2 })).toBe("blocked");
     expect(glanceGap({ criteriaGap: true, openBlockers: 0 })).toBe("no-criteria");
@@ -105,6 +112,14 @@ describe("ChangesGlance", () => {
   it("still links to the full list when every change fits", async () => {
     await mount([change("c1")]);
     expect(root.querySelector(".cg-more")!.textContent).toBe("Open the full list →");
+  });
+
+  it("marks a prioritized change with the Prioritized tag, and no other", async () => {
+    await mount([change("flag", { prioritized: true }), change("plain")]);
+    const tag = (id: string) => root.querySelector(`.cg-row[data-change="${id}"] .ch-prioritized`);
+    expect(tag("flag")?.textContent).toBe("Prioritized");
+    expect(tag("flag")?.getAttribute("title")).toMatch(/^Prioritized: listed ahead/);
+    expect(tag("plain")).toBeNull();
   });
 
   it("leads a row with the summary, the technical title as its tooltip", async () => {

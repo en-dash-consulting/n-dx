@@ -99,7 +99,7 @@ function writePrd(worktree: string, taskIds: string[]): void {
     items: [{
       id: "epic-1", title: "Epic one", level: "epic", status: "in_progress",
       children: [{
-        id: "feature-1", title: "Feature one", level: "feature", status: "in_progress",
+        id: "feature-1", title: "Feature one", level: "feature", status: "in_progress", assignee: "Ann <ann@x.io>",
         children: [
           ...taskIds.map((id) => ({ id, title: `task ${id}`, level: "task", status: "in_progress", acceptanceCriteria: ["one", "two"] })),
           { id: "next-1", title: "Next task", level: "task", status: "pending", priority: "high" },
@@ -209,6 +209,8 @@ describe("GET /api/live", () => {
       ],
       branch: "side",
       criteriaTotal: 2,
+      // The task names no assignee of its own; its feature's is who it is for.
+      assignee: "Ann <ann@x.io>",
       turns: 3,
       model: "claude-sonnet-4-5",
       startedFrom: "terminal",

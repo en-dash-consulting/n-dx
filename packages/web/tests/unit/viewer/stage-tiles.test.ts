@@ -4,8 +4,8 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { TileGrid, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
-import type { StageTile } from "../../../src/viewer/views/stages.js";
+import { TileGrid, TILE_GAP_PX, TILE_UNIT_PX, TRACKS_PER_ROW, fitTracks } from "../../../src/viewer/views/stage-tiles.js";
+import { STAGES, type StageTile } from "../../../src/viewer/views/stages.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
 const TILES: StageTile[] = [
@@ -55,11 +55,11 @@ describe("TileGrid", () => {
   });
 
   it("draws a band above the grid, outside its fixed rows, with no header to open it", () => {
-    mount({ tiles: [{ view: "changes", panel: "flow", title: "Lifecycle", band: true }, ...TILES] });
-    const band = root.querySelector<HTMLElement>(".stage-bands > .stage-band[data-tile='flow']")!;
-    expect(band.querySelector(".panel-flow")).not.toBeNull();
+    mount({ tiles: [{ view: "changes", panel: "plan-glance", title: "At a glance", band: true }, ...TILES] });
+    const band = root.querySelector<HTMLElement>(".stage-bands > .stage-band[data-tile='plan-glance']")!;
+    expect(band.querySelector(".panel-plan-glance")).not.toBeNull();
     expect(band.querySelector(".stage-tile-head")).toBeNull();
-    expect(root.querySelector(".stage-tiles [data-tile='flow']")).toBeNull();
+    expect(root.querySelector(".stage-tiles [data-tile='plan-glance']")).toBeNull();
   });
 
   it("shows a summary where one exists, else the view as a preview", () => {
@@ -255,12 +255,51 @@ describe("a tile with more than it shows", () => {
   });
 });
 
+describe("a growing tile (Plan's capture)", () => {
+  // jsdom has no layout: give the tile 50px of chrome over a 200px body whose
+  // content is 1,000px tall, far past one configured row.
+  beforeEach(() => {
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 1; });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    vi.spyOn(window, "getComputedStyle").mockImplementation(() => ({ paddingTop: "0px", paddingBottom: "0px", marginBottom: "0px" }) as CSSStyleDeclaration);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const box = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+      if (this.classList.contains("stage-tile-body")) return box(50, 200);
+      // The body measures its children: the content wrapper around the panel.
+      if (this.classList.contains("stage-tile-content") && this.querySelector(".tall")) return box(50, 1000);
+      if (this.classList.contains("stage-tile")) return box(0, 250);
+      return box(0, 0);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  // Plan's product areas: as many boxes as the product has areas.
+  const areas = STAGES.plan.modes![0]!.tiles.find((t) => t.panel === "plan-areas")!;
+  const span = () => tile("plan-areas").style.gridRow;
+
+  it("spans past its configured row to fit its content", () => {
+    mount({ stage: "plan", tiles: [areas], renderPanel: () => h("div", { class: "tall" }) });
+    // 50px chrome + 1,000px content + the tile gap, in 4px tracks.
+    expect(span()).toBe(`span ${Math.ceil((50 + 1000 + TILE_GAP_PX) / TILE_UNIT_PX)}`);
+    expect(Math.ceil((50 + 1000 + TILE_GAP_PX) / TILE_UNIT_PX)).toBeGreaterThan(TRACKS_PER_ROW * (areas.rows ?? 1));
+  });
+
+  it("would keep its configured size without the flag", () => {
+    mount({ stage: "plan", tiles: [{ ...areas, grow: undefined }], renderPanel: () => h("div", { class: "tall" }) });
+    expect(span()).toBe("");
+  });
+});
+
 describe("fitTracks", () => {
-  it("spans the 4px tracks a tile's chrome, content and 16px gap need", () => {
-    // 46px head and borders + 162px content + 16px gap = 224px = 56 tracks.
-    expect(fitTracks(46, 162, TRACKS_PER_ROW)).toBe(56);
+  it("spans the 4px tracks a tile's chrome, content and 20px gap need", () => {
+    // 46px head and borders + 162px content + 20px gap = 228px = 57 tracks.
+    expect(fitTracks(46, 162, TRACKS_PER_ROW)).toBe(57);
     // Rounds up: never clips its own content.
-    expect(fitTracks(46, 163, TRACKS_PER_ROW)).toBe(57);
+    expect(fitTracks(46, 163, TRACKS_PER_ROW)).toBe(58);
   });
 
   it("keeps the configured size (null) once content reaches it, and when nothing is measured", () => {
@@ -270,7 +309,17 @@ describe("fitTracks", () => {
   });
 
   it("one configured row is 232px of tile plus the gap", () => {
-    expect(TRACKS_PER_ROW * 4 - 16).toBe(232);
+    expect(TRACKS_PER_ROW * TILE_UNIT_PX - TILE_GAP_PX).toBe(232);
+  });
+
+  it("tiles sit 20px apart both ways: the column gap and each tile's bottom margin", () => {
+    const css = readFileSync(resolve(__dirname, "../../../src/viewer/styles/stage-tiles.css"), "utf-8");
+    const grid = /\.stage-tiles\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(grid).toMatch(/column-gap:\s*var\(--space-5\)/);
+    expect(grid).toMatch(/row-gap:\s*0/);
+    const tile = /\.stage-tile\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(Number(/margin-bottom:\s*(\d+)px/.exec(tile)?.[1])).toBe(TILE_GAP_PX);
+    expect(TILE_GAP_PX).toBe(20);
   });
 
   it("the stylesheet's row spans are TRACKS_PER_ROW per configured row", () => {

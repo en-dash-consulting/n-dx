@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import type { App } from "../../app.js";
 import { crossings, isFragile } from "../../model/code.js";
 import { inward, inwardOf, nodeOf, out, type Of } from "../../model/graph.js";
-import { Badge, Empty, Facts, Hero, Meter, Page, RecordRow, Rows, Section, Stat, Stats, type Ctx } from "../kit.js";
+import { Badge, Empty, Facts, Hero, Mark, Meter, Page, RecordRow, Rows, Section, Stat, Stats, type Ctx } from "../kit.js";
 import { Missing, Under } from "./generic.js";
 import { IsoFrame } from "../iso-frame.js";
 
@@ -32,6 +32,17 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
   return (
     <Page testId="zone-page">
       <Hero eyebrow={<Under context={context} node={node} what={`Zone${parent ? "" : " · top level"}`} />} title={facts.label} lede={node.description}>
+        {node.needsWork ? (
+          <Badge tone="bad" plain>
+            <Mark node={node} decorative />
+            needs work{node.recommendation ? `: ${node.recommendation}` : ""}
+          </Badge>
+        ) : node.highlighted ? (
+          <Badge tone="warn" plain>
+            <Mark node={node} decorative />
+            flagged for attention on the Analysis page
+          </Badge>
+        ) : null}
         {fragile ? <Badge tone="bad">fragile: cohesion under 0.5 and coupling over 0.5</Badge> : <Badge tone="good">holds together</Badge>}
         <Badge plain>{node.fileCount ?? 0} files</Badge>
         {node.depth ? <Badge plain>depth {node.depth}</Badge> : null}
@@ -102,7 +113,7 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
         </Section>
       ) : null}
       <Section title="Facts" i={9}>
-        <Facts fields={facts.fields.filter((f) => f.key !== "description" && f.key !== "name" && f.key !== "entryPoints")} />
+        <Facts fields={facts.fields.filter((f) => !["description", "name", "entryPoints", "needsWork", "highlighted", "recommendation"].includes(f.key))} />
       </Section>
     </Page>
   );

@@ -708,6 +708,8 @@ describe("hench prep routes", () => {
         tags: ["web", "prep"],
         resume: false,
         liveRun: false,
+        assignee: null,
+        tier: null,
         saved: false,
       });
       expect(tasks[1]).toMatchObject({ criteriaCount: 0, tags: [] });
@@ -728,6 +730,23 @@ describe("hench prep routes", () => {
       expect(long.length).toBeLessThanOrEqual(READY_DESCRIPTION_MAX);
       expect(long.endsWith("…")).toBe(true);
       expect(byId["none"]).not.toHaveProperty("description");
+    });
+
+    it("names who each row is assigned to, inheriting the nearest assigned ancestor, and its saved tier", async () => {
+      // Work's Up next says who a task is for and what a run of it takes.
+      await writeTasks(ctx, [
+        {
+          id: "feat", title: "The feature", status: "in_progress", level: "feature", assignee: "Ann <ann@x.io>", children: [
+            task("own", { priority: "critical", assignee: "Bo <bo@x.io>", run: { tier: "heavy" } }),
+            task("inherits", { priority: "high" }),
+          ],
+        },
+      ]);
+      const port = await open(ctx);
+      const { tasks } = await ready(port);
+      const byId = Object.fromEntries(tasks.map((t) => [t.id, t]));
+      expect(byId["own"]).toMatchObject({ assignee: "Bo <bo@x.io>", tier: "heavy" });
+      expect(byId["inherits"]).toMatchObject({ assignee: "Ann <ann@x.io>", tier: null });
     });
 
     it("marks the rows whose task carries its own run settings", async () => {

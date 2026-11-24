@@ -4,6 +4,8 @@ import { validateDAG } from "../../core/dag.js";
 import { validateRunSettings, RunSettingsSchema } from "../../schema/validate.js";
 import type { PRDItem, Priority } from "../../schema/index.js";
 import { changeLayerType } from "../../core/layer-projection.js";
+import { prioritizedRefusal, storedPrioritized } from "../../core/prioritized.js";
+import { assertShortTitleAvailable } from "../../core/short-title.js";
 import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -16,10 +18,14 @@ export async function handleEditItem(
     id: string;
     title?: string;
     /** Empty string removes it. */
+    shortTitle?: string;
+    /** Empty string removes it. */
     summary?: string;
     description?: string;
     acceptanceCriteria?: string[];
     priority?: string;
+    /** A change (a v1 epic) only; false removes it. */
+    prioritized?: boolean;
     level?: string;
     tags?: string[];
     source?: string;
@@ -43,11 +49,17 @@ export async function handleEditItem(
     const VALID_LEVELS = ["epic", "feature", "task", "subtask"];
     const updates: Partial<PRDItem> = {};
     if (args.title !== undefined) updates.title = args.title;
+    if (args.shortTitle !== undefined) updates.shortTitle = args.shortTitle.trim() || undefined;
     // Empty clears it, as assignee does.
     if (args.summary !== undefined) updates.summary = args.summary.trim() || undefined;
     if (args.description !== undefined) updates.description = args.description;
     if (args.acceptanceCriteria !== undefined) updates.acceptanceCriteria = args.acceptanceCriteria;
     if (args.priority !== undefined) updates.priority = args.priority as Priority;
+    if (args.prioritized !== undefined) {
+      const refusal = prioritizedRefusal(existing);
+      if (refusal) return textResult(refusal, true);
+      updates.prioritized = storedPrioritized(args.prioritized);
+    }
     const v2 = isChangeLayerStore(store);
     if (args.level !== undefined) {
       // A v2 node's type is fixed, and a level maps to no type.
@@ -99,12 +111,16 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, summary, description, acceptanceCriteria, priority, tags, source, assignee, blockedBy, run).",
+        "No fields to update. Provide at least one field (title, shortTitle, summary, description, acceptanceCriteria, priority, prioritized, tags, source, assignee, blockedBy, run).",
         true,
       );
     }
 
-    await store.updateItem(args.id, updates, { applyAttribution: true, projectDir });
+    // Checked under the lock the write holds, so two writers cannot both take a name.
+    const assertBeforeWrite = updates.shortTitle
+      ? (items: readonly PRDItem[]) => assertShortTitleAvailable(items, updates.shortTitle, findItem(items as PRDItem[], args.id)?.item ?? existing)
+      : undefined;
+    await store.updateItem(args.id, updates, { applyAttribution: true, projectDir, assertBeforeWrite });
 
     const changedFields = Object.keys(updates);
     await store.appendLog({
@@ -129,14 +145,16 @@ export async function handleEditItem(
 
 export const editItemTool = defineTool({
   name: "edit_item",
-  description: "Edit content fields of a PRD item (title, plain-language summary, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+  description: "Edit content fields of a PRD item (title, short title, plain-language summary, description, acceptance criteria, priority, prioritized, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
   schema: {
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
+    shortTitle: z.string().optional().describe("New short name the dashboard shows in place of the title. Refused when an open item (pending, in_progress, failing, blocked, deferred) already shows that name; completed items may share it. An empty string removes it."),
     summary: z.string().optional().describe("New plain-language summary: 1-2 sentences for a non-coder on what the work does and why it is worth doing. An empty string removes it."),
     description: z.string().optional().describe("New description"),
     acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),
+    prioritized: z.boolean().optional().describe("v2: a change only; true lists it first in the Inbox and Open changes, ahead of every unflagged change whatever its priority. v1: an epic only, and only stored; nothing orders by it. false removes the flag. Does not change task selection"),
     level: z.enum(["epic", "feature", "task", "subtask"]).optional().describe("New level (epic, feature, task, subtask)"),
     tags: z.array(z.string()).optional().describe("New tags"),
     source: z.string().optional().describe("New source"),

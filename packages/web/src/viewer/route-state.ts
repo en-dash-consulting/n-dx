@@ -21,10 +21,10 @@ const DEEP_LINK_VIEWS = new Set<ViewId>(["prd", "hench-runs", "commands"]);
 
 /**
  * Views whose `subId` is a task id (the rest of `/<view>/<subId>` is a run id or unused).
- * On `work` it is the task the Prepare task modal is open for.
+ * On `work` and `tune` it is the task the Prepare task modal is open for.
  */
 export function isTaskRouteView(view: ViewId): boolean {
-  return view === "prd" || view === "live-task" || view === "work";
+  return view === "prd" || view === "live-task" || view === "work" || view === "tune";
 }
 
 /** Tabs Settings › Commands names in its sub-path; the Run tab is the bare `/commands`. */
@@ -96,14 +96,15 @@ export function areaCapabilityOfTab(tab: string | null): string | null {
 }
 
 /**
- * The Work page, with the Prepare task modal open at `/work/prep/<taskId>`.
- * Any other sub-path is the bare Work page: the modal is the only thing a
- * Work sub-path names, so nothing else may be read as a task id.
+ * The Work page, with the Prepare task modal open at `/work/prep/<taskId>`,
+ * and Work's Tune mode the same way at `/tune/prep/<taskId>` (Ready to run
+ * lives there). Any other sub-path is the bare page: the modal is the only
+ * thing such a sub-path names, so nothing else may be read as a task id.
  */
 function parseWorkPath(base: string, sub: string): ParsedRoute | null {
-  if (base !== "work") return null;
+  if (base !== "work" && base !== "tune") return null;
   const prep = /^prep\/([^/]+)$/.exec(sub);
-  return { view: "work", subId: prep ? prep[1] : null };
+  return { view: base, subId: prep ? prep[1] : null };
 }
 
 /**
@@ -131,7 +132,7 @@ export function normalizeLiveView(view: ViewId, subId: string | null): ViewId {
 export function viewPathname(view: ViewId, subId: string | null): string {
   if (view === "live-task") return subId ? `/live/task/${subId}` : "/live";
   if (view === "live-analyze") return "/live/analyze";
-  if (view === "work") return subId ? `/work/prep/${subId}` : "/work";
+  if (view === "work" || view === "tune") return subId ? `/${view}/prep/${subId}` : `/${view}`;
   return subId ? `/${view}/${subId}` : `/${view}`;
 }
 
@@ -196,7 +197,7 @@ export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, ba
   if (moved) return { view: moved.view, subId: sub || moved.sub };
 
   const work = parseWorkPath(base, sub);
-  if (work && validViews.has("work")) return work;
+  if (work && validViews.has(work.view)) return work;
 
   const live = parseLivePath(base, sub);
   if (live && validViews.has(live.view)) return live;
