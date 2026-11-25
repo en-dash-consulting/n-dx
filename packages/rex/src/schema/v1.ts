@@ -563,6 +563,13 @@ export interface RexConfig {
   titleCollisionSimilarityThreshold?: number;
   /** Opt in to `rex codeowners`: CODEOWNERS files generated from the product layer's stewards. Off unless true. */
   codeOwners?: boolean;
+  /**
+   * How much of the acting identity a PRD write stamps as `lastModifiedBy`:
+   * `"full"` (`Name <email>`, the default), `"name"` (the git user name only)
+   * or `"none"` (no author; `lastModified` is still stamped). Existing stamps
+   * are never rewritten. See `resolveStampActor` in core/identity.ts.
+   */
+  attribution?: "full" | "name" | "none";
   future?: Record<string, unknown>;
   [key: string]: unknown;
 }

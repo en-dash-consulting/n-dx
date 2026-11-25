@@ -1,21 +1,63 @@
 schema: "rex/v2"
 items:
   "1ce411dd-e1a5-4039-936d-bea861c3fc76":
-    lastModified: "2026-11-25T04:53:06.613Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:24:15.974Z"
+    completedAt: "2026-11-25T06:28:53.791Z"
+    endedAt: "2026-11-25T06:28:53.791Z"
+    activeIntervals: [{"end":"2026-11-25T06:28:53.791Z","start":"2026-11-25T06:24:15.974Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "--blocked-by alias in a new rex cli/parse-args.ts (repeatable and comma-separated; empty value clears on update); rex add/update help and ndx add --help manual mode documented. Commit fc1a6ceb8."
+    lastModified: "2026-11-25T06:28:53.791Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "62ca04e7-cd6b-45fc-aacc-b206c0d217d2":
+    status: "completed"
+    startedAt: "2026-11-25T06:40:59.226Z"
+    completedAt: "2026-11-25T06:40:59.226Z"
+    endedAt: "2026-11-25T06:40:59.226Z"
+    activeIntervals: [{"end":"2026-11-25T06:40:59.226Z","start":"2026-11-25T06:40:59.226Z"}]
+    appliedAt: "2026-11-25T06:40:59.226Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-25T04:52:23.431Z"
-    lastModified: "2026-11-25T04:53:11.803Z"
+    lastModified: "2026-11-25T06:40:59.226Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "667a5c44-92bb-410f-b10b-b2f30b4defed":
-    lastModified: "2026-11-25T04:53:08.320Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:29:07.630Z"
+    completedAt: "2026-11-25T06:33:48.479Z"
+    endedAt: "2026-11-25T06:33:48.479Z"
+    activeIntervals: [{"end":"2026-11-25T06:33:48.479Z","start":"2026-11-25T06:29:07.630Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New core/waiting-on.ts (open blockers, stable sibling topo order, JSON waitingOn); wired into status tree, --tree, rex tree and status JSON."
+    lastModified: "2026-11-25T06:33:48.479Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "90239cd3-5e2e-4223-bb91-43bae889384c":
-    lastModified: "2026-11-25T04:53:11.803Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:36:43.292Z"
+    completedAt: "2026-11-25T06:40:59.226Z"
+    endedAt: "2026-11-25T06:40:59.226Z"
+    activeIntervals: [{"end":"2026-11-25T06:40:59.226Z","start":"2026-11-25T06:36:43.292Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx/sv analyze --help gain a MODEL USE section (ANALYZE_MODEL_USE, duplicated in core/help.js and sourcevision/src/cli/help.ts, parity-tested); ndx help lists --narrate and --wait; --deep described accurately."
+    lastModified: "2026-11-25T06:40:59.226Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a24f2113-4338-42dc-8c38-b87f698a44a5":
-    lastModified: "2026-11-25T04:53:00.418Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:12:40.410Z"
+    completedAt: "2026-11-25T06:24:06.285Z"
+    endedAt: "2026-11-25T06:24:06.285Z"
+    activeIntervals: [{"end":"2026-11-25T06:24:06.285Z","start":"2026-11-25T06:12:40.410Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex.attribution full|name|none, resolved from config.json < .n-dx.json rex < .n-dx.local.json rex. It applies to the v2 transaction, the v1 stores and analyze accept. ndx config validates it, shows its default and documents it in --help; docs/packages/rex.md covers it. Tests cover all three modes on the v2 store."
+    lastModified: "2026-11-25T06:24:06.285Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b91027c2-36de-420b-976d-a02f1ee0331b":
-    lastModified: "2026-11-25T04:53:10.072Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:33:58.140Z"
+    completedAt: "2026-11-25T06:36:33.955Z"
+    endedAt: "2026-11-25T06:36:33.955Z"
+    activeIntervals: [{"end":"2026-11-25T06:36:33.955Z","start":"2026-11-25T06:33:58.140Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sv workspace parses its own args: --add/--remove/--root values consumed in both spellings, the one leftover positional is the root; --root added; two positionals or a disagreeing --root refused before any write; help updated."
+    lastModified: "2026-11-25T06:36:33.955Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

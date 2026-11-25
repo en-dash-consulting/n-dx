@@ -106,6 +106,30 @@ describe("cmdTree", () => {
     }
   });
 
+  it("orders siblings after their blockers and marks what they wait on", async () => {
+    writePRD(testDir, {
+      schema: "rex/v1",
+      title: "Deps",
+      items: [
+        { id: "b", title: "Alpha", level: "task", status: "pending", blockedBy: ["a"] },
+        { id: "a", title: "Bravo", level: "task", status: "pending" },
+      ],
+    });
+    const output: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((msg) => {
+      output.push(msg);
+    });
+
+    try {
+      await cmdTree(testDir, {});
+      const fullOutput = output.join("\n");
+      expect(fullOutput.indexOf("Bravo")).toBeLessThan(fullOutput.indexOf("Alpha"));
+      expect(fullOutput).toContain("Alpha (waiting on: Bravo)");
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it("renders in-progress items with ** markers when color is enabled", async () => {
     const output: string[] = [];
     vi.spyOn(console, "log").mockImplementation((msg) => {

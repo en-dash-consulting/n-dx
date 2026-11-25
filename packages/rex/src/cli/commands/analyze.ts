@@ -10,7 +10,8 @@ import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag, resolveRexPaths
 import { isV2Dir } from "./v2-cli.js";
 import { addChanges, report } from "./add-change.js";
 import { changeInputsFromProposals, type ProposedWork } from "../../recommend/changes-from-proposals.js";
-import { stampModified } from "../../core/sync.js";
+import { stampModified, type StampActor } from "../../core/sync.js";
+import { resolveStampActor } from "../../core/identity.js";
 
 import { CLIError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
@@ -276,7 +277,7 @@ async function checkSentinel(dir: string): Promise<boolean> {
  * Exported for tests: the nesting is the property that prevents the churn, and
  * it is worth asserting directly rather than through timing.
  */
-export async function buildAcceptedItems(proposals: Proposal[]): Promise<{
+export async function buildAcceptedItems(proposals: Proposal[], actor?: StampActor): Promise<{
   items: PRDItem[];
   addedCount: number;
   completedCount: number;
@@ -288,7 +289,7 @@ export async function buildAcceptedItems(proposals: Proposal[]): Promise<{
   // `withSelfHealTag` then `stampModified`, in that order, is what the store's
   // addItem applied to each item — preserved here so switching to a batch
   // insert does not quietly change item metadata.
-  const prepare = async (item: PRDItem): Promise<PRDItem> => stampModified(withSelfHealTag(item));
+  const prepare = async (item: PRDItem): Promise<PRDItem> => stampModified(withSelfHealTag(item), undefined, actor);
 
   const count = (status: string): void => {
     addedCount++;
@@ -391,7 +392,7 @@ async function acceptProposals(
     return;
   }
 
-  const { items, addedCount, completedCount } = await buildAcceptedItems(proposals);
+  const { items, addedCount, completedCount } = await buildAcceptedItems(proposals, await resolveStampActor(rexDir));
 
   // One transaction for the whole accept, not one per item. Beyond halving the
   // I/O, this is what keeps the intermediate shapes off disk: an epic inserted

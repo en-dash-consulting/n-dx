@@ -4,10 +4,13 @@
  * Aggregates multiple pre-analyzed repos into a unified .sourcevision/ output.
  *
  * Usage:
- *   sourcevision workspace [dir]              — aggregate from config
- *   sourcevision workspace --add <dir> [root]  — add a member
+ *   sourcevision workspace [root]                — aggregate from config
+ *   sourcevision workspace --add <dir> [root]    — add a member
  *   sourcevision workspace --remove <dir> [root] — remove a member
- *   sourcevision workspace --status [root]     — show member status
+ *   sourcevision workspace --status [root]       — show member status
+ *
+ * The root is --root=<dir> or the one argument left once flag values are
+ * consumed; it defaults to ".".
  */
 
 import { resolve, basename } from "node:path";
@@ -29,27 +32,82 @@ interface WorkspaceFlags {
   add: string[];
   remove: string[];
   status: boolean;
+  /** The --root value, when given. */
+  root?: string;
+  /** Arguments left once every flag and flag value is consumed. */
+  positionals: string[];
 }
 
+const VALUE_FLAGS = ["--add", "--remove", "--root"] as const;
+type ValueFlag = (typeof VALUE_FLAGS)[number];
+
+function missingValue(flag: ValueFlag): CLIError {
+  return new CLIError(`${flag} needs a directory.`, `Usage: sourcevision workspace ${flag} <dir>`);
+}
+
+/**
+ * Parse the arguments after `workspace`. Flag values are consumed in both
+ * spellings (`--add x`, `--add=x`) before positionals are collected, so a
+ * space-separated value is never taken for the root.
+ */
 export function parseWorkspaceFlags(args: string[]): WorkspaceFlags {
-  const flags: WorkspaceFlags = { add: [], remove: [], status: false };
+  const flags: WorkspaceFlags = { add: [], remove: [], status: false, positionals: [] };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === "--add" && i + 1 < args.length) {
-      flags.add.push(args[++i]);
-    } else if (arg.startsWith("--add=")) {
-      flags.add.push(arg.slice("--add=".length));
-    } else if (arg === "--remove" && i + 1 < args.length) {
-      flags.remove.push(args[++i]);
-    } else if (arg.startsWith("--remove=")) {
-      flags.remove.push(arg.slice("--remove=".length));
-    } else if (arg === "--status") {
-      flags.status = true;
+    const flag = VALUE_FLAGS.find((f) => arg === f || arg.startsWith(`${f}=`));
+
+    if (!flag) {
+      if (arg === "--status") flags.status = true;
+      else if (!arg.startsWith("-")) flags.positionals.push(arg);
+      continue;
     }
+
+    let value: string;
+    if (arg === flag) {
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith("-")) throw missingValue(flag);
+      value = next;
+      i++;
+    } else {
+      value = arg.slice(flag.length + 1);
+    }
+    if (value === "") throw missingValue(flag);
+
+    if (flag === "--add") flags.add.push(value);
+    else if (flag === "--remove") flags.remove.push(value);
+    else if (flags.root !== undefined && resolve(flags.root) !== resolve(value)) {
+      throw new CLIError(`--root given twice: "${flags.root}" and "${value}".`, "Pass --root once.");
+    } else flags.root = value;
   }
 
   return flags;
+}
+
+/**
+ * The workspace root: --root, else the one positional, else ".". Throws
+ * before anything is written when two positionals remain or --root and the
+ * positional name different directories.
+ */
+export function resolveWorkspaceRoot(flags: WorkspaceFlags): string {
+  const { root, positionals } = flags;
+
+  if (positionals.length > 1) {
+    throw new CLIError(
+      `More than one root directory given: ${positionals.map((p) => `"${p}"`).join(" and ")}.`,
+      "Pass one root, as the last argument or with --root=<dir>, and give each member its own --add.",
+    );
+  }
+
+  const positional = positionals[0];
+  if (root !== undefined && positional !== undefined && resolve(root) !== resolve(positional)) {
+    throw new CLIError(
+      `--root "${root}" disagrees with the positional root "${positional}".`,
+      "Pass the root once, as --root=<dir> or as the last argument.",
+    );
+  }
+
+  return root ?? positional ?? ".";
 }
 
 // ── Add member ──────────────────────────────────────────────────────────────
@@ -212,9 +270,10 @@ function runAggregate(rootDir: string): void {
 
 // ── Entry point ─────────────────────────────────────────────────────────────
 
-export function cmdWorkspace(targetDir: string, extraArgs: string[]): void {
-  const absDir = resolve(targetDir);
-  const flags = parseWorkspaceFlags(extraArgs);
+/** @param args every argument after `workspace`. */
+export function cmdWorkspace(args: string[]): void {
+  const flags = parseWorkspaceFlags(args);
+  const absDir = resolve(resolveWorkspaceRoot(flags));
 
   if (flags.add.length > 0) {
     addMembers(absDir, flags.add);

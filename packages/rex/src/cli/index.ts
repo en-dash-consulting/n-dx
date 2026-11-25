@@ -11,6 +11,7 @@ import { isItemLevel } from "../schema/index.js";
 import { resolveDir, resolveDirAfter } from "./resolve-dir.js";
 import { resolveRexPaths } from "../store/index.js";
 import { noteLegacyLayout } from "./legacy-layout-notice.js";
+import { parseArgs } from "./parse-args.js";
 
 suppressKnownDeprecations();
 
@@ -78,98 +79,6 @@ function readStdin(): Promise<string> {
     );
     process.stdin.on("error", (err) => settle(() => reject(err)));
   });
-}
-
-/** Keys that accept multiple values (accumulated into arrays). */
-const MULTI_VALUE_KEYS = new Set(["file", "criterion", "capability-criterion", "remove-capability-criterion"]);
-/** Keys that expect a following value when provided as `--key value`. */
-const VALUE_KEYS = new Set([
-  "model",
-  "format",
-  "parent",
-  "area",
-  "title",
-  "description",
-  "status",
-  "priority",
-  "epic",
-  "chunk",
-  "chunk-size",
-  "acknowledge",
-  "direction",
-  "output",
-  "out",
-  "in",
-  "host",
-  "port",
-  "group-by",
-  "accept-llm",
-  "detail",
-  "run",
-  "source",
-  "type",
-  "target",
-  "relation",
-  "under",
-  "summary",
-  "migration",
-  "cut-at",
-  "before",
-  "after",
-  "proposed",
-  "statement",
-  ...MULTI_VALUE_KEYS,
-]);
-
-function parseArgs(argv: string[]): {
-  command: string | undefined;
-  positional: string[];
-  flags: Record<string, string>;
-  multiFlags: Record<string, string[]>;
-} {
-  const flags: Record<string, string> = {};
-  const multiFlags: Record<string, string[]> = {};
-  const positional: string[] = [];
-  let command: string | undefined;
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      const eq = arg.indexOf("=");
-      if (eq !== -1) {
-        const key = arg.slice(2, eq);
-        const val = arg.slice(eq + 1);
-        if (MULTI_VALUE_KEYS.has(key)) {
-          (multiFlags[key] ??= []).push(val);
-        }
-        flags[key] = val;
-      } else {
-        const key = arg.slice(2);
-        const next = argv[i + 1];
-        if (VALUE_KEYS.has(key) && next && !next.startsWith("-")) {
-          if (MULTI_VALUE_KEYS.has(key)) {
-            (multiFlags[key] ??= []).push(next);
-          }
-          flags[key] = next;
-          i++; // consume the value token
-        } else {
-          flags[key] = "true";
-        }
-      }
-    } else if (arg === "-h") {
-      flags.help = "true";
-    } else if (arg === "-q") {
-      flags.quiet = "true";
-    } else if (arg === "-y") {
-      flags.yes = "true";
-    } else if (!command) {
-      command = arg;
-    } else {
-      positional.push(arg);
-    }
-  }
-
-  return { command, positional, flags, multiFlags };
 }
 
 /** Whether the PRD under `dir` uses the v2 layout (product/ and changes/). */

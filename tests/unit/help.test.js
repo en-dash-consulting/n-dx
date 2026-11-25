@@ -267,5 +267,22 @@ describe("help.js", () => {
     it("returns null for a command with no help definition", () => {
       expect(formatOrchestratorCommandHelp("nonexistent")).toBeNull();
     });
+
+    it("documents ndx add's manual mode and that it skips the model call", () => {
+      const output = formatOrchestratorCommandHelp("add");
+      for (const flag of ["--title", "--parent", "--criterion", "--blocked-by"]) expect(output).toContain(flag);
+      expect(output).toMatch(/Manual mode/);
+      expect(output).toMatch(/skips the smart-add model call/);
+    });
+
+    it("ndx analyze lists --narrate and says what each mode sends to a model", () => {
+      const output = formatOrchestratorCommandHelp("analyze");
+      for (const flag of ["--narrate", "--fast", "--deep", "--wait"]) expect(output).toContain(flag);
+      expect(output).toContain("MODEL USE");
+      expect(output).toMatch(/sends code facts to the configured model/);
+      expect(output).toMatch(/--fast\s+Sends nothing/);
+      expect(output).toMatch(/--deep\s+Adds no model use of its own/);
+      expect(output).not.toMatch(/AI-enriched/);
+    });
   });
 });

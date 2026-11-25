@@ -17,6 +17,7 @@ import {
   AUTO_COMPLETABLE_STATUSES,
   SUCCESSFUL_CHILD_STATUSES,
 } from "../../core/parent-completion.js";
+import { buildDependencyIndex, withWaitingOn } from "../../core/waiting-on.js";
 import { info, warn, result } from "../output.js";
 import { bold, cyan } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
@@ -172,7 +173,8 @@ export async function renderJsonOutput(
     tokenFilter: TokenUsageFilter;
   },
 ): Promise<void> {
-  const jsonItems = opts.showAll ? doc.items : filterDeleted(doc.items);
+  const visibleItems = opts.showAll ? doc.items : filterDeleted(doc.items);
+  const jsonItems = withWaitingOn(visibleItems, buildDependencyIndex(doc.items));
   const output: Record<string, unknown> = { ...doc, items: jsonItems };
   output.overrideMarkers = summarizeOverrideMarkers(jsonItems);
   if (opts.verifyResult) {
@@ -228,7 +230,8 @@ function renderTreeWithStats(
   const displayItems = opts.showAll ? items : filterDeleted(filterCompleted(items));
   const hidingCompleted = !opts.showAll && (stats.completed > 0 || stats.deleted > 0);
 
-  for (const line of renderTree(displayItems, 0, opts.coverageMap)) {
+  // The index comes from `items`, so a hidden completed blocker counts as done.
+  for (const line of renderTree(displayItems, 0, opts.coverageMap, buildDependencyIndex(items))) {
     result(line);
   }
 

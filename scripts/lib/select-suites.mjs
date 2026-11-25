@@ -108,6 +108,7 @@ export const ROOT_DRIFT_TEST_FILES = [
   "tests/integration/effective-agent-config-contract.test.js",
   "tests/integration/prd-delta-cli-agreement.test.js",
   "tests/integration/command-effects-manifest-contract.test.js",
+  "tests/integration/analyze-help-parity.test.js",
   // A gateway's re-export surface against the upstream public API.
   "tests/integration/cross-package-contracts.test.js",
   "tests/integration/web-server-viewer-boundary.test.js",

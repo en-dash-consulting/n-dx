@@ -50,6 +50,7 @@ sourcevision mcp [dir]         Start MCP server for AI tool integration
 | `--phase=N` | Run only phase N (1=inventory, 2=imports, 3=zones, 4=components) |
 | `--only=MODULE` | Run only named module (inventory, imports, zones, components) |
 | `--fast` | Static only: no model or network calls (algorithmic names, no judgment) |
+| `--narrate` | Send every zone's facts to the text model, even when a TypeSafe key selects the judgment cascade |
 | `--include-minified` | Map minified bundles in `callgraph.json` too (left out by default) |
 
 ## Output Files

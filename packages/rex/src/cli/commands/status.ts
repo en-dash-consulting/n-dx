@@ -11,6 +11,7 @@ import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
 import { groupByFacet, getFacetValue } from "../../core/facets.js";
 import { walkTree } from "../../core/tree.js";
+import { orderSiblingsByDependencies } from "../../core/waiting-on.js";
 import { green, yellow, createSpinner } from "@n-dx/llm-client";
 import { filterDeleted } from "./status-shared.js";
 import { renderWorkCycleSection } from "./status-work-cycle.js";
@@ -57,7 +58,7 @@ function colorByStatus(title: string, status: PRDItem["status"]): string {
 export function renderAsciiTree(items: PRDItem[]): string[] {
   const lines: string[] = [];
   const walk = (nodes: PRDItem[], prefix: string): void => {
-    nodes.forEach((node, idx) => {
+    orderSiblingsByDependencies(nodes).forEach((node, idx) => {
       const isLast = idx === nodes.length - 1;
       const connector = isLast ? "└── " : "├── ";
       const childPrefix = isLast ? "    " : "│   ";

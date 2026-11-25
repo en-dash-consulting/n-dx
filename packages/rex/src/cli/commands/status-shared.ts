@@ -8,6 +8,12 @@
 
 import { computeStats } from "../../core/stats.js";
 import { isFullyCompleted } from "../../core/prune.js";
+import {
+  buildDependencyIndex,
+  orderSiblingsByDependencies,
+  waitingOnIds,
+  type DependencyIndex,
+} from "../../core/waiting-on.js";
 import { isRootLevel } from "../../schema/index.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
@@ -95,6 +101,17 @@ export function blockedBySuffix(item: PRDItem): string {
     return "";
   }
   return ` (blocked by: ${item.blockedBy.join(", ")})`;
+}
+
+/**
+ * Suffix naming, by title, the open blockers a pending or in-progress item
+ * waits on. `index` must come from the unfiltered tree, so a completed
+ * blocker hidden from the display still counts as done.
+ */
+export function waitingOnSuffix(item: PRDItem, index: DependencyIndex): string {
+  const open = waitingOnIds(item, index);
+  if (open.length === 0) return "";
+  return ` (waiting on: ${open.map((id) => index.titles.get(id) ?? id).join(", ")})`;
 }
 
 /** Format a coverage suffix for a task with acceptance criteria. */
@@ -191,14 +208,19 @@ function colorLine(line: string, status: string): string {
   }
 }
 
-/** Render a PRD tree to lines with status icons and indentation. */
+/**
+ * Render a PRD tree to lines with status icons and indentation. Siblings are
+ * listed after the siblings they wait on. Pass `deps` built from the
+ * unfiltered tree when `items` has been filtered; it defaults to `items`.
+ */
 export function renderTree(
   items: PRDItem[],
   indent: number = 0,
   coverage?: CoverageMap,
+  deps: DependencyIndex = buildDependencyIndex(items),
 ): string[] {
   const lines: string[] = [];
-  for (const item of items) {
+  for (const item of orderSiblingsByDependencies(items)) {
     const icon = STATUS_ICONS[item.status] ?? "?";
     const badge = STATUS_BADGES[item.status] ?? "";
     const prefix = "  ".repeat(indent);
@@ -206,7 +228,7 @@ export function renderTree(
     const priority = item.priority ? ` [${item.priority}]` : "";
     const ts = timestampSuffix(item);
     const cov = coverageSuffix(item.id, coverage);
-    const blocked = blockedBySuffix(item);
+    const blocked = blockedBySuffix(item) + waitingOnSuffix(item, deps);
 
     if (item.children && item.children.length > 0) {
       const stats = computeStats(item.children);
@@ -230,7 +252,7 @@ export function renderTree(
           ),
         );
       }
-      lines.push(...renderTree(item.children, indent + 1, coverage));
+      lines.push(...renderTree(item.children, indent + 1, coverage, deps));
     } else {
       lines.push(
         colorLine(

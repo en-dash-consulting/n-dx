@@ -224,7 +224,7 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --summary, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
+      "Use --status, --priority, --title, --summary, --description, --blocked-by, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
     );
   }
 

@@ -40,7 +40,7 @@ import {
   snapshotItemContent,
   stampChangedItems,
 } from "../core/sync.js";
-import { resolveActor } from "../core/identity.js";
+import { resolveStampActor } from "../core/identity.js";
 
 // ---------------------------------------------------------------------------
 // FolderTreeStore
@@ -179,7 +179,7 @@ export class FolderTreeStore implements PRDStore {
 
   async addItem(item: PRDItem, parentId?: string, _options?: WriteOptions): Promise<void> {
     await this.withTransaction(async (doc) => {
-      const stamped = await stampModified(item);
+      const stamped = await stampModified(item, undefined, await resolveStampActor(this.rexDir));
       if (parentId) {
         if (!insertChild(doc.items, parentId, stamped)) {
           throw new Error(`Parent "${parentId}" not found`);
@@ -200,7 +200,7 @@ export class FolderTreeStore implements PRDStore {
         if (!entry) {
           throw new Error(`Item "${id}" not found`);
         }
-        const merged = await stampUpdatedItem(entry.item, updates, options);
+        const merged = await stampUpdatedItem(entry.item, updates, options, await resolveStampActor(this.rexDir));
         if (!updateInTree(doc.items, id, merged)) {
           throw new Error(`Item "${id}" not found`);
         }
@@ -226,7 +226,7 @@ export class FolderTreeStore implements PRDStore {
       // mutating it in place is sufficient — no re-lookup needed.
       const parent = entry.parents[entry.parents.length - 1];
       if (parent) {
-        Object.assign(parent, await stampModified(parent));
+        Object.assign(parent, await stampModified(parent, undefined, await resolveStampActor(this.rexDir)));
       }
     });
   }
@@ -355,7 +355,7 @@ export class FolderTreeStore implements PRDStore {
     // result is cached process-wide, so warming it here also keeps the
     // `stampModified` calls in addItem/updateItem/removeItem — which run
     // inside this transaction — off the locked span.
-    const actor = await resolveActor();
+    const actor = await resolveStampActor(this.rexDir);
     return withLock(lockPath, async () => {
       const doc = await this.loadDocument();
       // Signatured before `fn` runs, so the stamp below covers whatever it

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 vi.mock("../../../src/core/identity.js", () => ({
   resolveActor: vi.fn().mockResolvedValue("Test Actor <test@example.com>"),
+  resolveStampActor: vi.fn().mockResolvedValue("Test Actor <test@example.com>"),
 }));
 
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";

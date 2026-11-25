@@ -150,7 +150,8 @@ try {
       cmdGitCredentialHelper();
       break;
     case "workspace":
-      cmdWorkspace(targetArg || ".", args.slice(1));
+      // Parses its own arguments: an --add/--remove value is never the root.
+      cmdWorkspace(args.slice(1));
       break;
     case "mcp":
       await cmdMcp(targetArg || ".");

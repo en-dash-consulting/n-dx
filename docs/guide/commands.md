@@ -145,13 +145,14 @@ Generated assistant artifacts:
 ### analyze
 
 ```sh
-ndx analyze .                # standard analysis
-ndx analyze --deep .         # full multi-pass analysis
+ndx analyze .                # standard analysis: sends code facts to the configured model
+ndx analyze --narrate .      # every zone to the text model, even with a TypeSafe key
+ndx analyze --deep .         # each sub-package first, then the root
 ndx analyze --lite .         # fast single-pass (skips LLM enrichment)
 ndx analyze --fast .         # static only: no model or network call, no update check
 ```
 
-Scans the codebase: file inventory, import graph, zone detection (Louvain community detection), component catalog. Results drive recommendations and planning.
+Scans the codebase: file inventory, import graph, zone detection (Louvain community detection), component catalog. Results drive recommendations and planning. `ndx analyze --help` lists what each mode sends to a model under "Model use".
 
 ### recommend
 

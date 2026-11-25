@@ -100,10 +100,16 @@ describe("withPrdModelTransaction", () => {
   it("runs two concurrent transactions one after the other, keeping both changes", async () => {
     let openGate!: () => void;
     const gate = new Promise<void>((r) => (openGate = r));
+    let markEntered!: () => void;
+    const entered = new Promise<void>((r) => (markEntered = r));
     const first = withPrdModelTransaction(rexDir, async (model) => {
+      markEntered();
       await gate;
       return { tree: retitle(model.tree, CAPABILITY, "First"), result: 1 };
     });
+    // The second writer starts once the first holds the lock: what is under
+    // test is that it waits, not which of two racing callers locks first.
+    await entered;
     let secondRan = false;
     const second = withPrdModelTransaction(rexDir, (model) => {
       secondRan = true;

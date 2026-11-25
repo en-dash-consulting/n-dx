@@ -41,6 +41,8 @@ rex add task --title="..." --criterion="..." --criterion="..." --source="..." . 
 rex update <id> --status=completed . # update item
 rex update <id> --criterion="..." --criterion="..." .  # replace acceptance criteria
 rex update <id> --criterion= .       # clear acceptance criteria
+rex add task --title="..." --blocked-by=<id>,<id> .  # add a task that waits on others (repeatable)
+rex update <id> --blocked-by= .      # clear dependencies (--blockedBy is also accepted)
 rex update <id> --run='{"tier":"heavy","models":{"claude":"claude-opus-5-5"},"review":true}' .  # save run settings (replaces the whole block)
 rex update <id> --run=null .         # clear saved run settings (--run= does the same)
 rex move <id> --parent=<parent-id> . # reparent item
@@ -60,6 +62,10 @@ rex reorganize .                     # detect and fix structural issues
 rex health .                         # PRD structure health score
 rex mcp .                            # start MCP server (stdio)
 ```
+
+## Dependencies in status
+
+`rex status`, `rex status --tree` and `rex tree` list each item after the siblings it waits on (its `blockedBy`); unrelated siblings, and siblings in a cycle, keep their stored order. A pending or in-progress item whose blockers are not all completed shows `(waiting on: <titles>)`; a `blocked` item keeps `(blocked by: <ids>)`. `rex status --format=json` adds `waitingOn`, the open blockers' ids, to each such item and changes no other field.
 
 ## Stale release plans (v2)
 
@@ -134,6 +140,22 @@ When scanning an existing codebase for the first time (empty v1 PRD), Rex detect
 - **Pending** — gaps and improvements to build
 
 This prevents existing code from appearing as a wall of pending tasks. On a v2 PRD, functionality the code already has belongs in the product layer as capabilities that read *met*.
+
+## Attribution
+
+Every PRD write stamps the nodes it changes with `lastModified` and `lastModifiedBy` in the committed `state.yaml` (v2) or item files (v1). The `attribution` setting decides what `lastModifiedBy` holds:
+
+| Value | `lastModifiedBy` |
+|-------|------------------|
+| `full` (default) | git `user.name <user.email>`, falling back to either alone, then the OS user |
+| `name` | git `user.name` only; nothing when git has only an email |
+| `none` | nothing; `lastModified` is still stamped |
+
+```sh
+ndx config rex.attribution none .
+```
+
+It is read like other rex settings: `.rex/config.json`, then the `rex` section of `.n-dx.json`, then `.n-dx.local.json` (each later one wins), so one machine can turn it off without changing the repository. It applies to every writer (CLI, MCP, the dashboard). Stamps already written are left as they are, and a node edited under `none` keeps the author it had. The setting does not change the `actor` on `execution-log.jsonl` entries.
 
 ## Files
 
