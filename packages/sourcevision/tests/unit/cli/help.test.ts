@@ -102,6 +102,16 @@ describe("sourcevision CLI help", () => {
       expect(output).toContain("--full");
     });
 
+    it("analyze help says what each mode sends to a model", () => {
+      showCommandHelp("analyze");
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).toContain("MODEL USE");
+      expect(output).toContain("--narrate");
+      expect(output).toMatch(/Default\s+Calls the configured model/);
+      expect(output).toMatch(/--fast\s+Sends nothing/);
+      expect(output).toMatch(/--deep\s+Adds no model use of its own/);
+    });
+
     it("serve help includes --port flag", () => {
       showCommandHelp("serve");
       const output = logSpy.mock.calls[0][0] as string;

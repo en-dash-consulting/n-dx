@@ -188,6 +188,7 @@ One definition, duplicated across a tier boundary where neither side may import 
 | `tests/integration/effective-agent-config-contract.test.js` | `web/src/server/effective-agent-config.ts` vs hench's own resolution |
 | `tests/integration/prd-delta-cli-agreement.test.js` | `web/src/server/prd-delta.ts` vs `rex`'s `tree-diff` |
 | `tests/integration/command-effects-manifest-contract.test.js` | `core/command-effects.js` vs the dashboard's command manifest |
+| `tests/integration/analyze-help-parity.test.js` | `core/help.js` vs `sourcevision/src/cli/help.ts` (`ANALYZE_MODEL_USE`) |
 
 A gateway's re-export surface against the upstream public API:
 

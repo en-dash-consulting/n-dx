@@ -274,6 +274,7 @@ describe("selectAffected", () => {
     ["packages/llm-client/src/config.ts", "tests/integration/task-class-sync.test.js"],
     ["packages/web/src/server/effective-agent-config.ts", "tests/integration/effective-agent-config-contract.test.js"],
     ["packages/web/src/server/prd-delta.ts", "tests/integration/prd-delta-cli-agreement.test.js"],
+    ["packages/sourcevision/src/cli/help.ts", "tests/integration/analyze-help-parity.test.js"],
     ["packages/hench/src/prd/rex-gateway.ts", "tests/integration/cross-package-contracts.test.js"],
     ["packages/web/src/server/rex-gateway.ts", "tests/integration/web-server-viewer-boundary.test.js"],
   ])("a change to %s alone selects a suite that runs %s", (source, test) => {
@@ -427,6 +428,7 @@ describe("root subset test files", () => {
       "tests/integration/effective-agent-config-contract.test.js",
       "tests/integration/prd-delta-cli-agreement.test.js",
       "tests/integration/command-effects-manifest-contract.test.js",
+      "tests/integration/analyze-help-parity.test.js",
       "tests/integration/cross-package-contracts.test.js",
       "tests/integration/web-server-viewer-boundary.test.js",
     ]);

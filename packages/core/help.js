@@ -777,6 +777,25 @@ export function formatToolHelp(tool) {
  * @property {string[]} [related] - Related commands
  */
 
+/**
+ * What each analyze mode sends to a model. A copy of ANALYZE_MODEL_USE in
+ * packages/sourcevision/src/cli/help.ts (core cannot import it);
+ * tests/integration/analyze-help-parity.test.js fails when they differ.
+ */
+export const ANALYZE_MODEL_USE =
+  "Default    Calls the configured model with code facts: file paths and roles,\n" +
+  "           zone structure and import counts, each file's leading doc comment,\n" +
+  "           and the rule documents (CLAUDE.md, AGENTS.md, ARCHITECTURE.md,\n" +
+  "           hints.md). Source file bodies are not sent. With a TypeSafe key\n" +
+  "           the run is a cascade: TypeSafe answers judgments, and only zones\n" +
+  "           it is unsure of go to the text model (in a background\n" +
+  "           'sv narrate' unless --wait).\n" +
+  "--narrate  The same facts for every zone go to the text model, even with a\n" +
+  "           TypeSafe key.\n" +
+  "--fast     Sends nothing: no model or network call.\n" +
+  "--deep     Adds no model use of its own: each detected sub-package is\n" +
+  "           analyzed first, in the chosen mode, then the root.";
+
 /** @type {Record<string, OrchestratorHelpDef>} */
 const ORCHESTRATOR_HELP_DEFS = {
   prd: {
@@ -886,10 +905,13 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   analyze: {
     summary: "run SourceVision codebase analysis",
-    description: "Runs the SourceVision static analysis pipeline on the target directory.\nProduces zone maps, import graphs, component catalogs, and findings.\nOutput is written to .sourcevision/.",
+    description: "Runs the SourceVision analysis pipeline on the target directory.\nProduces zone maps, import graphs, component catalogs, and findings.\nBy default it sends code facts to the configured model; --fast sends nothing.\nOutput is written to .sourcevision/.",
     usage: "ndx analyze [options] [dir]",
+    sections: [{ title: "Model use", content: ANALYZE_MODEL_USE }],
     options: [
-      { flag: "--deep", description: "Enable AI-enriched zone analysis (slower, richer findings)" },
+      { flag: "--narrate", description: "Send every zone's facts to the text model, even when a TypeSafe key selects the judgment cascade" },
+      { flag: "--wait", description: "Cascade mode: narrate uncertain zones before returning instead of in a background child" },
+      { flag: "--deep", description: "Analyze each detected sub-package first, then the root (same model use as the chosen mode)" },
       { flag: "--full", description: "Re-analyze all phases, ignoring cache" },
       { flag: "--lite", description: "File-name-only scan (faster, less detail)" },
       { flag: "--fast", description: "Static only: no model or network calls, the update check included (for batch scans)" },
@@ -901,7 +923,8 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     examples: [
       { command: "ndx analyze", description: "Run analysis in current directory" },
-      { command: "ndx analyze --deep .", description: "Deep analysis with AI enrichment" },
+      { command: "ndx analyze --fast .", description: "Static analysis only: no model or network calls" },
+      { command: "ndx analyze --deep .", description: "Analyze each sub-package, then the root" },
       { command: "ndx analyze --deep --full .", description: "Full deep re-analysis" },
     ],
     related: ["recommend", "plan", "init"],

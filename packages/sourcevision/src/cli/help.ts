@@ -16,6 +16,25 @@ import { formatHelp, formatUsage } from "@n-dx/llm-client";
 import type { HelpDefinition } from "@n-dx/llm-client";
 import { DEFAULT_SERVE_PORT } from "../constants.js";
 
+/**
+ * What each analyze mode sends to a model. `ndx analyze --help`
+ * (packages/core/help.js) carries a copy;
+ * tests/integration/analyze-help-parity.test.js fails when they differ.
+ */
+export const ANALYZE_MODEL_USE =
+  "Default    Calls the configured model with code facts: file paths and roles,\n" +
+  "           zone structure and import counts, each file's leading doc comment,\n" +
+  "           and the rule documents (CLAUDE.md, AGENTS.md, ARCHITECTURE.md,\n" +
+  "           hints.md). Source file bodies are not sent. With a TypeSafe key\n" +
+  "           the run is a cascade: TypeSafe answers judgments, and only zones\n" +
+  "           it is unsure of go to the text model (in a background\n" +
+  "           'sv narrate' unless --wait).\n" +
+  "--narrate  The same facts for every zone go to the text model, even with a\n" +
+  "           TypeSafe key.\n" +
+  "--fast     Sends nothing: no model or network call.\n" +
+  "--deep     Adds no model use of its own: each detected sub-package is\n" +
+  "           analyzed first, in the chosen mode, then the root.";
+
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {
   init: {
@@ -51,16 +70,20 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "3. Zones        Architectural zone detection (Louvain community detection)\n" +
           "4. Components   React component catalog and prop analysis",
       },
+      {
+        title: "Model use",
+        content: ANALYZE_MODEL_USE,
+      },
     ],
     options: [
       { flag: "--phase=<N>", description: "Run only phase N (1–4)" },
       { flag: "--only=<module>", description: "Run only a named module: inventory, imports, zones, components" },
       { flag: "--fast", description: "Static only: no model or network calls (algorithmic names, no judgment)" },
-      { flag: "--narrate", description: "Generative prompts over every zone, even when a TypeSafe key selects the judgment cascade" },
+      { flag: "--narrate", description: "Send every zone's facts to the text model, even when a TypeSafe key selects the judgment cascade" },
       { flag: "--wait", description: "Narrate escalated zones before returning instead of in a background child (cascade mode)" },
       { flag: "--full", description: "Run all 4 enrichment passes in sequence" },
       { flag: "--target-pass=<N>", description: "Run enrichment passes up to pass N (2–4)" },
-      { flag: "--deep", description: "Re-analyze sub-packages before root analysis" },
+      { flag: "--deep", description: "Analyze each detected sub-package first, then the root (same model use as the chosen mode)" },
       { flag: "--per-zone", description: "Per-zone enrichment (smaller context, parallelizable)" },
       { flag: "--include-minified", description: "Map minified bundles (*.min.js, long-line files) in callgraph.json too" },
       { flag: "--third-party=<glob>", description: "Treat files matching <glob> as copied-in third-party code (repeatable; !<glob> denies)" },
