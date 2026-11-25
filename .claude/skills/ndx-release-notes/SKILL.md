@@ -30,7 +30,9 @@ The existing rules in CLAUDE.md / AGENTS.md ("Changeset Versioning") still apply
 - Use scoped package names.
 - Default to `patch`.
 
-The rules here only govern the **body**.
+Add a new changeset file; never edit or rename one already on `main`. The next release may consume and delete that file, so the edit is lost or conflicts, as PR #1094's modify/delete conflict on `.changeset/hench-php-guards.md` showed. Build & Validate's "Forbid edits to existing changesets" step fails a PR that does either.
+
+The rules below only govern the **body**.
 
 ### Body structure
 
