@@ -1,0 +1,116 @@
+{
+  "disposition": "BLOCKED",
+  "pr": 1107,
+  "rootPr": 1104,
+  "baseBranch": "codex/codex-hardening-pr0",
+  "predecessor": "2b1cd99bc11d3058c86ef5fc43f2d27266164ab0",
+  "reviewedSourceCommit": "a1644dc6485fd14d118dd67b19b6137e4b1ca399",
+  "metadataCheckpoint": "f6f5ef02c5f0ba1eda0ac09568aaeb8c78da10a4",
+  "tasks": {
+    "25270990-b5b0-413c-9719-6f70e9c3d38f": "failing",
+    "722f0341-7454-4ac9-bd16-cf97cd090e24": "pending",
+    "5d599339-5a76-42db-a124-5d816c4161b8": "pending"
+  },
+  "blocker": {
+    "field": "shell_environment_policy.set.NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S",
+    "origin": "user",
+    "valueType": "string",
+    "nonempty": true,
+    "compilerCredentialMask": false,
+    "privateTempEntry": false,
+    "contract": "unproven syntax/confidentiality/exact non-argv preservation",
+    "handling": "refuse without changing or forwarding control",
+    "valuesOrRawConfigPersisted": false,
+    "sameRejectedFieldInStartupAndCompiledPolicy": true
+  },
+  "canonicalRepairsUnimplemented": [
+    "desktop-app-only omission",
+    "exact Boolean retired js_repl preservation",
+    "bind-aware duplicate env repair and demonstrated listener-suite classification"
+  ],
+  "bootstraps": {
+    "generatedOnly": true,
+    "canonicalSourceChanged": false,
+    "restoredByUnconditionalCanonicalBuild": true,
+    "sourceSha256": "2e07d95ec0becb553a31098299c46a6ce0f375043e972607b4a968c828718670",
+    "restoredDistSha256": "1623176504541f4084384075ede4d9296a359296dbfa6b3258ef9359a3eb2174",
+    "newModelOrTaskRunStarted": false
+  },
+  "review": {
+    "run": "36892404-a0d4-4e86-889d-c669957dc4e4",
+    "executorModel": "gpt-6-astra",
+    "reviewerModel": "gpt-6.2-astra",
+    "freshDistinct": true,
+    "fixed": [
+      "system-source authority",
+      "duplicate strict-config",
+      "partial requirements on cancellation"
+    ],
+    "additionalChecks": [
+      "gateway process boundary and architecture",
+      "abort after awaited authority"
+    ],
+    "sixEarlierRepairs": "preserved"
+  },
+  "nativeFixture": {
+    "class": "selected CLI with local scripted provider and direct MCP",
+    "cliVersion": "0.167.0-alpha.3.2",
+    "binarySha256": "a636331ed87605efc4cf84028ac2884a75363f9d10ead63cffb57ea0016d486e",
+    "passed": 11,
+    "sourceHashesStable": true,
+    "actualAccountOrModelMcpProof": false
+  },
+  "hostGate": {
+    "originalWholeCommandPassed": false,
+    "base": "2b1cd99bc11d3058c86ef5fc43f2d27266164ab0",
+    "initialPassedTests": {
+      "root": 5287,
+      "graview": 102,
+      "hench": 6271,
+      "llm-client": 2988,
+      "rex": 7326,
+      "web": 5926
+    },
+    "initialSourcevision": "one failure: missing generated PHP grammar",
+    "prerequisite": "documented pinned build:grammars; no source change",
+    "failedCredentialsSuiteRerun": {
+      "passed": 3,
+      "failed": 0
+    },
+    "fullSourcevisionRerun": {
+      "passed": 3606,
+      "skipped": 32,
+      "failed": 0
+    },
+    "combinedSelectedHostSuiteSetValidated": true,
+    "newSingleWholeCommandPassClaimed": false,
+    "requiredStartup": "passed in full root suite"
+  },
+  "automaticGate": {
+    "passed": false,
+    "run": "36892404-a0d4-4e86-889d-c669957dc4e4",
+    "knownHarnessFailures": [
+      "confined real Codex config read",
+      "confined Corepack cache read",
+      "listener setup timeout",
+      "duplicate bind-aware env discards intended exclusions"
+    ],
+    "guardUnchanged": true
+  },
+  "gateFixture": {
+    "preparedOnly": true,
+    "publicPnpmVersion": "10.33.0",
+    "manualExclusions": false,
+    "nativeExecutorAuthOrEnvironmentChanged": false
+  },
+  "unsupportedContinuationOptions": [
+    "stable tool inspected but lacks new closed-world admission",
+    "review CLI supports read-only pending inspection only",
+    "internal review function not launched outside orchestration"
+  ],
+  "nativePolicyScope": "MCP routing; no native command/read-path enforcement claim (PR2)",
+  "reviewerAndActualTwoWorktreeEvidence": "pending separate tasks",
+  "ci": "not queried for final local checkpoint; no pass claimed",
+  "ready": false,
+  "successorDispatched": false
+}

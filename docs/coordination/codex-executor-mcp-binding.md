@@ -331,3 +331,53 @@ model request or user-config edit occurred. The supported Desktop-only contract
 is being evaluated for bounded compatibility remediation; the task remains
 failing until the actual configured path is admitted without substitution and
 the required review and validation succeed. Reviewer/proof tasks remain pending.
+
+## Final blocked checkpoint — no authorized live continuation
+
+The actual selected configuration also contains a nonempty string at
+`shell_environment_policy.set.NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S`. Both the
+startup and fully compiled-policy metadata probes reject that same user-layer
+entry. It is neither a private-temp mismatch nor a known compiler credential
+mask. The authoritative interpretation, syntax, confidentiality and exact
+non-argv preservation mechanism remain unproven. This trust allowlist was not
+omitted, defaulted, normalized or forwarded, and real user/auth/global settings
+were not changed. Only field names and type/equality predicates were recorded;
+no setting values or raw configuration were exposed or persisted.
+
+Two narrowly authorized generated-runtime probes were discarded through
+unconditional canonical builds. The original source SHA-256 remains
+`2e07d95ec0becb553a31098299c46a6ce0f375043e972607b4a968c828718670` and the rebuilt
+generated module SHA-256 is again
+`1623176504541f4084384075ede4d9296a359296dbfa6b3258ef9359a3eb2174`.
+No model/task invocation occurred after run `36892404`. **Canonical desktop-only
+omission, Boolean preservation of the selected native retired `js_repl` switch,
+and the proposed bind-aware test-harness repairs remain unimplemented.** An
+ignored, approved gate-only hermetic-home/public-pnpm fixture is prepared but has
+not run as an automatic task gate; it adds no manual exclusions or guard changes.
+
+Host validation remains explicitly separated:
+
+- The stable native fixture passed all 11 selected-CLI scripted-provider/direct
+  MCP cases. Actual model-driven reviewer/two-worktree acceptance is still open.
+- The whole-PR host command initially failed: root 5,287, Graview 102, Hench 6,271,
+  llm-client 2,988, Rex 7,326 and web 5,926 tests passed; Sourcevision had one
+  failure caused by the missing generated PHP grammar.
+- The documented SHA-pinned PHP grammar build repaired that tooling prerequisite.
+  The failed credentials suite passed 3/3; the complete Sourcevision host rerun
+  then passed 3,606 tests with 32 skipped. This validates the combined selected
+  host suite set, not a new single passing whole-PR command. Historical failures
+  and skips are retained as such.
+- The last automatic confined Hench gate remains failed. Its real-config/cache
+  dependency and bind-aware environment defects were diagnosed; they were not
+  hidden or bypassed. Required startup tests passed in the full host root suite.
+
+Hench exposes only read-only `review pending` inspection; there is no supported
+re-review continuation command. Its gate-only retry reaches the same failing
+admission first. The clean stable tooling runner was inspected but not launched:
+it lacks the new closed-world Codex MCP admission. No internal review function
+was invoked outside orchestration and no model/auth/provider substitute was used.
+
+Executor task `25270990-b5b0-413c-9719-6f70e9c3d38f` remains failing; reviewer and
+proof tasks remain pending. No successor is authorized. The compact committed
+evidence is `codex-hardening-pr1-blocked-checkpoint.json`; exact final head and
+owner-local raw evidence locations are in the external owner handoff. **BLOCKED.**
