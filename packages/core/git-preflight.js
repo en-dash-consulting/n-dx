@@ -194,9 +194,10 @@ function stateCommitPaths(dir) {
 
 /**
  * Paths considered "n-dx generated" for the baseline commit but not owned by
- * the layout resolver: assistant surfaces, the n-dx-modified `.gitignore`, and
- * the README artifacts — all fixed at the project root on either layout, so the
- * working tree is clean immediately after `ndx init`.
+ * the layout resolver: assistant surfaces and the n-dx-modified `.gitignore` —
+ * all fixed at the project root on either layout, so the working tree is clean
+ * immediately after `ndx init`. The README artifacts join them only under
+ * `ndx init --readme` ({@link README_COMMIT_PATHS}).
  *
  * Only entries that actually exist on disk are passed to `git add`; a missing
  * path would abort the entire stage.
@@ -210,9 +211,26 @@ const BASELINE_COMMIT_PATHS = [
   ".agents",
   "CLAUDE.md",
   "AGENTS.md",
-  "README.md",
-  "README.proposed.md",
 ];
+
+/**
+ * What `ndx init --readme` writes. Without the flag init writes no README, so
+ * a README the project already has is never init's to commit.
+ */
+const README_COMMIT_PATHS = ["README.md", "README.proposed.md"];
+
+/**
+ * @typedef {Object} InitCommitOptions
+ * @property {boolean} [readme]  `ndx init --readme`: the README artifacts are init's.
+ */
+
+/**
+ * @param {InitCommitOptions} [opts]
+ * @returns {string[]}
+ */
+function fixedCommitPaths({ readme = false } = {}) {
+  return readme ? [...BASELINE_COMMIT_PATHS, ...README_COMMIT_PATHS] : BASELINE_COMMIT_PATHS;
+}
 
 /**
  * @typedef {Object} GitInitCommitResult
@@ -264,10 +282,11 @@ function ignoredPaths(dir, paths) {
  * the init summary without aborting the rest of the run.
  *
  * @param {string} dir
+ * @param {InitCommitOptions} [opts]
  * @returns {GitInitCommitResult}
  */
-export function commitInitBaseline(dir) {
-  const candidates = [...stateCommitPaths(dir), ...BASELINE_COMMIT_PATHS];
+export function commitInitBaseline(dir, opts) {
+  const candidates = [...stateCommitPaths(dir), ...fixedCommitPaths(opts)];
   const present = candidates.filter((p) => existsSync(join(dir, p)));
   // `git add` refuses a path named outright that an ignore rule covers — the
   // user's global excludes may ignore `.claude/` — and stages nothing after it.
@@ -460,9 +479,10 @@ function trackedMachineLocalFiles(dir) {
  * cannot say where `dir` sits.
  *
  * @param {string} dir
+ * @param {InitCommitOptions} [opts]
  * @returns {{ owned: (p: string) => boolean, analysis: (p: string) => boolean } | null}
  */
-function initPathMatchers(dir) {
+function initPathMatchers(dir, opts) {
   let prefix;
   try {
     prefix = execFileSync("git", ["rev-parse", "--show-prefix"], {
@@ -477,7 +497,7 @@ function initPathMatchers(dir) {
     return (/** @type {string} */ p) => full.some((e) => p === e || p.startsWith(e + "/"));
   };
   return {
-    owned: under([...stateCommitPaths(dir), ...BASELINE_COMMIT_PATHS]),
+    owned: under([...stateCommitPaths(dir), ...fixedCommitPaths(opts)]),
     analysis: under([relative(dir, resolveLayout(dir).sourcevisionDir)]),
   };
 }
@@ -501,12 +521,13 @@ function initPathMatchers(dir) {
  *
  * @param {GitDirtySnapshot} before  Snapshot taken before init wrote anything.
  * @param {string} [dir]  Project root; defaults to the repository root.
+ * @param {InitCommitOptions} [opts]
  * @returns {GitInitCommitResult}
  */
-export function commitInitChanges(before, dir = before.root) {
+export function commitInitChanges(before, dir = before.root, opts) {
   const after = snapshotDirtyPaths(before.root);
   if (!after) return { status: "add-failed", kind: "files", error: "`git status` failed" };
-  const match = initPathMatchers(dir);
+  const match = initPathMatchers(dir, opts);
   if (!match) return { status: "add-failed", kind: "files", error: "could not locate the project in the repository" };
   const untrack = trackedMachineLocalFiles(dir);
   const untrackSet = new Set(untrack);
@@ -573,17 +594,17 @@ export function commitInitChanges(before, dir = before.root) {
  * - Outside a repository nothing runs; the preflight warning says why.
  *
  * @param {string} dir
- * @param {{ gitResult?: GitPreflightResult | null, before?: GitDirtySnapshot | null, commit?: boolean }} opts
- *   `commit: false` is `ndx init --no-commit`.
+ * @param {{ gitResult?: GitPreflightResult | null, before?: GitDirtySnapshot | null, commit?: boolean, readme?: boolean }} opts
+ *   `commit: false` is `ndx init --no-commit`; `readme: true` is `ndx init --readme`.
  * @returns {GitInitCommitResult | null}
  */
-export function finishInitCommit(dir, { gitResult, before, commit = true }) {
+export function finishInitCommit(dir, { gitResult, before, commit = true, readme = false }) {
   const status = gitResult?.status;
   if (status !== "initialized" && status !== "inside") return null;
   if (!commit) return { status: "skipped" };
-  if (status === "initialized") return commitInitBaseline(dir);
+  if (status === "initialized") return commitInitBaseline(dir, { readme });
   if (!before) return { status: "add-failed", error: "could not read `git status` before init" };
-  return commitInitChanges(before, dir);
+  return commitInitChanges(before, dir, { readme });
 }
 
 /**

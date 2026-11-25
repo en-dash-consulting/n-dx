@@ -218,6 +218,7 @@ function InitApp({
   gitResult,
   gitBefore,
   commitInit = true,
+  readme = false,
   recordIdentity,
   onComplete,
 }) {
@@ -349,26 +350,29 @@ function InitApp({
         model = await readModel();
       }
 
-      // Target-repo README generation — runs before assistant integrations
-      // so the synthesized structure overview reflects the user's project,
-      // not the n-dx artifacts written by the assistant setup that follows.
-      // Errors are best-effort; failure does not block the rest of init.
-      // The subprocess emits the result as JSON on stdout so the recap can
-      // surface a proposed-file diff hint when an existing README is found.
-      const readmeUrl = new URL("./readme-generator.js", import.meta.url).href;
-      const readmeScript = [
-        `import{generateTargetReadme}from"${readmeUrl}";`,
-        `try{`,
-        `const r=generateTargetReadme(${JSON.stringify(dir)});`,
-        `process.stdout.write(JSON.stringify(r||{}))`,
-        `}catch{process.stdout.write("{}")}`,
-      ].join("");
+      // `--readme` only: target-repo README generation — runs before
+      // assistant integrations so the synthesized structure overview reflects
+      // the user's project, not the n-dx artifacts written by the assistant
+      // setup that follows. Errors are best-effort; failure does not block
+      // the rest of init. The subprocess emits the result as JSON on stdout
+      // so the recap can surface a proposed-file diff hint when an existing
+      // README is found.
       let readmeResult = null;
-      try {
-        const out = await spawnAsync("node", ["--input-type=module", "-e", readmeScript], true);
-        readmeResult = JSON.parse((out && out.trim()) || "{}");
-      } catch {
-        readmeResult = null;
+      if (readme) {
+        const readmeUrl = new URL("./readme-generator.js", import.meta.url).href;
+        const readmeScript = [
+          `import{generateTargetReadme}from"${readmeUrl}";`,
+          `try{`,
+          `const r=generateTargetReadme(${JSON.stringify(dir)});`,
+          `process.stdout.write(JSON.stringify(r||{}))`,
+          `}catch{process.stdout.write("{}")}`,
+        ].join("");
+        try {
+          const out = await spawnAsync("node", ["--input-type=module", "-e", readmeScript], true);
+          readmeResult = JSON.parse((out && out.trim()) || "{}");
+        } catch {
+          readmeResult = null;
+        }
       }
 
       // Assistant integrations (vendor-neutral) — inline ESM subprocess
@@ -408,7 +412,7 @@ function InitApp({
       // tool directory, assistant surface and config write so the commit
       // leaves no init path dirty.
       recordIdentity?.();
-      const gitCommitResult = finishInitCommit(dir, { gitResult, before: gitBefore, commit: commitInit });
+      const gitCommitResult = finishInitCommit(dir, { gitResult, before: gitBefore, commit: commitInit, readme });
 
       setRecap({
         dirLabel,

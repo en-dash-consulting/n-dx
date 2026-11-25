@@ -206,7 +206,7 @@ export const COMMAND_EFFECTS = {
       { path: "{rex}/, {hench}/, {sourcevision}/", what: "tool directories and a first fast analysis" },
       { path: "{config}, .gitignore, .gitattributes", what: "project config and git rules" },
       { path: "CLAUDE.md, AGENTS.md, .claude/, .agents/, .codex/, .mcp.json", what: "assistant instructions, skills and MCP registration" },
-      { path: "README.md", what: "a README, or README.proposed.md beside an existing one" },
+      { path: "README.md", what: "a README, or README.proposed.md beside an existing one", conditional: true, when: "with --readme" },
       { path: "~/.claude.json", what: "local-scope MCP registration", conditional: true, when: "with --mcp-scope=local" },
       { path: ".git/", what: "a git repository and a `chore: n-dx init` baseline commit", conditional: true, when: "with --git, or on a TTY when the preflight prompt is accepted" },
     ],

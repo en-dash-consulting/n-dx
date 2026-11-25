@@ -263,6 +263,13 @@ describe("formatPreflightBanner", () => {
     expect(formatPreflightBanner(COMMAND_EFFECTS.plan).join("\n")).toContain("only with --accept");
   });
 
+  it("lists init's README only under --readme", () => {
+    const readmeWrites = COMMAND_EFFECTS.init.writes.filter((w) => /README/.test(w.path));
+    expect(readmeWrites).toHaveLength(1);
+    expect(readmeWrites[0]).toMatchObject({ conditional: true, when: "with --readme" });
+    expect(formatPreflightBanner(COMMAND_EFFECTS.init).join("\n")).toContain("only with --readme");
+  });
+
   it("emits no ANSI when given no colour functions", () => {
     for (const effects of Object.values(COMMAND_EFFECTS)) {
       expect(formatPreflightBanner(effects).join("\n")).not.toMatch(/\x1b\[/);

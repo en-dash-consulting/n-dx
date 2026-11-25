@@ -264,6 +264,27 @@ describe.skipIf(!GIT_OK)("git-preflight: commitInitBaseline", () => {
     expect(status).toBe("");
   });
 
+  it("commits a README only under --readme: without it the project's own README is not init's", async () => {
+    initRepo(tmpDir);
+    await writeFile(join(tmpDir, ".gitignore"), ".n-dx.local.json\n");
+    await writeFile(join(tmpDir, "README.md"), "# mine\n");
+
+    const result = commitInitBaseline(tmpDir);
+    expect(result.status).toBe("committed");
+    expect(result.paths).not.toContain("README.md");
+    expect(execFileSync("git", ["status", "--porcelain"], { cwd: tmpDir, encoding: "utf-8" })).toContain("README.md");
+  });
+
+  it("commits README.md and README.proposed.md when init ran with --readme", async () => {
+    initRepo(tmpDir);
+    await writeFile(join(tmpDir, "README.md"), "# mine\n");
+    await writeFile(join(tmpDir, "README.proposed.md"), "# generated\n");
+
+    const result = commitInitBaseline(tmpDir, { readme: true });
+    expect(result.status).toBe("committed");
+    expect(result.paths).toEqual(expect.arrayContaining(["README.md", "README.proposed.md"]));
+  });
+
   it("leaves the commit to the caller: finishInitCommit does nothing outside a repository", () => {
     expect(finishInitCommit(tmpDir, { gitResult: { status: "declined" }, before: null })).toBeNull();
     expect(finishInitCommit(tmpDir, { gitResult: { status: "non-interactive" }, before: null })).toBeNull();
@@ -356,6 +377,20 @@ describe.skipIf(!GIT_OK)("git-preflight: committing init's paths in an existing 
     expect(committed).toEqual([".gitignore", ".n-dx.json", ".rex/config.json"]);
     // The user's staged, unstaged and untracked changes are untouched.
     expect(status()).toEqual(userStatus);
+  });
+
+  it("treats README.proposed.md as init's only under --readme", async () => {
+    const before = snapshotDirtyPaths(tmpDir);
+    await simulateInitWrites();
+    await writeFile(join(tmpDir, "README.proposed.md"), "# generated\n");
+
+    const plain = finishInitCommit(tmpDir, { gitResult: inside, before });
+    expect(plain.paths).not.toContain("README.proposed.md");
+    expect(status()).toEqual(["?? README.proposed.md"]);
+
+    const withReadme = finishInitCommit(tmpDir, { gitResult: inside, before, readme: true });
+    expect(withReadme.paths).toEqual(["README.proposed.md"]);
+    expect(status()).toEqual([]);
   });
 
   it("creates no commit when a re-init changed nothing", () => {

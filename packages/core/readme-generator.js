@@ -1,7 +1,7 @@
 /**
  * Target-repo README generation.
  *
- * Used by `ndx init` to synthesize a README that describes the **user's
+ * Used by `ndx init --readme` (opt-in) to synthesize a README that describes the **user's
  * repository**, not the n-dx toolkit itself.  The generator derives
  * project name / description / structure from the target project's own
  * manifest (package.json, pyproject.toml, go.mod, Cargo.toml) and
@@ -245,10 +245,13 @@ export function detectCommands(dir, manifest) {
   return { installCommand: null, testCommand: null, packageManager: null };
 }
 
+/** Base names (lower-case, extension stripped) of a license file. */
+const LICENSE_FILE_STEMS = new Set(["license", "licence", "copying"]);
+
 /**
- * Detect a license file in the project root (case-insensitive). Returns
- * the filename when found, used as a fallback signal when the manifest
- * does not declare a license.
+ * Find a license file in the project root (case-insensitive): LICENSE,
+ * LICENCE or COPYING, bare or with an extension (LICENSE.md, LICENSE.txt, …).
+ * The README links to it only when it exists.
  *
  * @param {string} dir
  * @returns {string | null}
@@ -256,14 +259,15 @@ export function detectCommands(dir, manifest) {
 export function findLicenseFile(dir) {
   let entries;
   try {
-    entries = readdirSync(dir);
+    entries = readdirSync(dir, { withFileTypes: true });
   } catch {
     return null;
   }
-  for (const name of entries) {
-    const lower = name.toLowerCase();
-    if (lower === "license" || lower === "licence") return name;
-    if (lower.startsWith("license.") || lower.startsWith("licence.")) return name;
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const lower = entry.name.toLowerCase();
+    const dot = lower.indexOf(".");
+    if (LICENSE_FILE_STEMS.has(dot === -1 ? lower : lower.slice(0, dot))) return entry.name;
   }
   return null;
 }
@@ -295,17 +299,18 @@ export function listTopLevelDirs(dir, limit = 12) {
 /**
  * Compose README markdown from manifest + structure data.
  *
- * The template guarantees four sections, in this canonical order:
+ * Sections, in this canonical order:
  *
  *   1. ## Overview      — manifest `description` or a project-name stub
  *   2. ## Quick Start   — install command (per detected package manager)
  *                         plus an optional top-level structure summary
  *   3. ## Testing       — detected test command or a stub explaining how
  *                         to wire one up
- *   4. ## License       — manifest `license` field or "See LICENSE"
+ *   4. ## License       — manifest `license` field and/or a link to the
+ *                         license file; omitted when there is neither
  *
- * Every section emits a non-empty body even when its backing signal is
- * absent, so the four canonical headings are stable across projects.
+ * The first three always emit a non-empty body, so their headings are
+ * stable across projects. License never points at a file that does not exist.
  *
  * @param {{ projectName: string, description: string | null,
  *   scripts: Record<string, string> | null, topLevelDirs: string[],
@@ -358,18 +363,19 @@ export function composeReadme({
     );
   }
 
-  // 4. License — manifest `license` field, falling back to a LICENSE-file
-  // hint, falling back to a generic "See LICENSE" pointer.
-  lines.push("## License", "");
-  if (license && license.trim().length > 0) {
-    const licenseLine = licenseFile
-      ? `${license.trim()} — see [${licenseFile}](./${licenseFile}) for the full text.`
-      : `${license.trim()} — see LICENSE for the full text.`;
-    lines.push(licenseLine, "");
-  } else if (licenseFile) {
-    lines.push(`See [${licenseFile}](./${licenseFile}).`, "");
-  } else {
-    lines.push("See LICENSE.", "");
+  // 4. License — the manifest's `license` field, with a link only to a license
+  // file that exists. With neither, the section is left out rather than
+  // pointing at a file that is not there.
+  const declared = license && license.trim().length > 0 ? license.trim() : null;
+  if (declared || licenseFile) {
+    lines.push("## License", "");
+    if (declared && licenseFile) {
+      lines.push(`${declared} — see [${licenseFile}](./${licenseFile}) for the full text.`, "");
+    } else if (declared) {
+      lines.push(`${declared}.`, "");
+    } else {
+      lines.push(`See [${licenseFile}](./${licenseFile}).`, "");
+    }
   }
 
   return lines.join("\n");

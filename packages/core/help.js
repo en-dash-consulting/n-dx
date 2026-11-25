@@ -862,6 +862,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--assistants=<list>", description: "Comma-separated list of assistants to provision (e.g. --assistants=claude,codex)" },
       { flag: "--mcp-scope=local", description: "Register Claude MCP servers via 'claude mcp add --scope local' instead of the tracked .mcp.json default" },
       { flag: "--no-llm", description: "Static-only, for batch runs: spawn no vendor CLI and make no model or network call (no auth check, no claude MCP lookup, no update check, no provider or model prompt); the vendor is recorded only from --provider or existing config" },
+      { flag: "--readme", description: "Also generate a README from the project's manifest: README.md, or README.proposed.md beside an existing README (which is never touched). Off by default" },
     ],
     examples: [
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
@@ -879,6 +880,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx init --assistants=claude .", description: "Initialize with only Claude surfaces" },
       { command: "ndx init --mcp-scope=local .", description: "Register Claude MCP servers via local scope instead of tracked .mcp.json" },
       { command: "ndx init --no-llm --no-commit .", description: "Initialize with no model, vendor CLI or network call (batch scans)" },
+      { command: "ndx init --readme .", description: "Initialize and generate a README (or README.proposed.md)" },
     ],
     related: ["plan", "status", "config"],
   },
