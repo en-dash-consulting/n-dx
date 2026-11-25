@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "044b9de7-6f19-401c-b094-291a2ad11dad":
-    lastModified: "2026-11-25T01:19:25.874Z"
+    status: "completed"
+    startedAt: "2026-11-25T02:33:16.364Z"
+    completedAt: "2026-11-25T02:36:04.441Z"
+    endedAt: "2026-11-25T02:36:04.441Z"
+    activeIntervals: [{"end":"2026-11-25T02:36:04.441Z","start":"2026-11-25T02:33:16.364Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Validate changesets now runs scripts/changeset-pr-checks.mjs validate: content-based version-PR detection (deletes ≥1 changeset, adds none, none remain vs origin/main) skips with a log line; otherwise runs changeset status --since=origin/main."
+    lastModified: "2026-11-25T02:36:04.441Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "52db514f-8426-4fe7-83b5-339de35c3007":
     lastModified: "2026-11-25T01:19:57.856Z"

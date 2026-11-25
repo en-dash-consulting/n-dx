@@ -296,8 +296,19 @@ jobs:
         # otherwise only fail in the Release workflow after merge to main).
         # --since=origin/main is required because PR checkouts are detached
         # HEAD with no local "main" branch for changeset to diff against.
+        #
+        # Skipped on the Changesets version PR, which consumes every changeset
+        # while bumping package.json, so `changeset status` would exit 1. It is
+        # detected by content, not branch name: against origin/main the branch
+        # deletes a changeset, adds none and leaves none
+        # (scripts/changeset-pr-checks.mjs). A bare
+        # `github.head_ref != 'changeset-release/main'` would not do: in the
+        # merge queue (merge_group) head_ref is empty, so that test is true and
+        # the step would still run and fail the queued version PR. The content
+        # check holds in pull_request and merge_group alike (fetch-depth 0 gives
+        # both origin/main); on push to main the diff is empty, so it runs.
         if: runner.os == 'Linux'
-        run: pnpm exec changeset status --since=origin/main
+        run: node scripts/changeset-pr-checks.mjs validate --base=origin/main
 
   # THE TEST SUITES: FOUR GROUPS PER OS, TWELVE JOBS, ALL IN PARALLEL.
   #
