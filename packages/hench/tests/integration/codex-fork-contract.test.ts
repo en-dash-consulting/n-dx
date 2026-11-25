@@ -84,7 +84,7 @@ describe("Codex warm-parent loop contract", () => {
     expect(second.run.session?.outcome).toBe("hit");
     expect(cli.invocations).toHaveLength(3);
     expect(cli.invocations[0].args).toEqual(expect.arrayContaining(["--sandbox", "read-only", "mcp_servers.rex.enabled=false", "mcp_servers.sourcevision.enabled=false"]));
-    expect(cli.invocations[0].args).not.toContain("--ignore-user-config");
+    expect(cli.invocations[0].args).toContain("--ignore-user-config");
     for (const call of cli.invocations.slice(1)) {
       expect(call.args.slice(0, 3)).toEqual(["exec", "fork", "parent"]);
       expect(call.args).toEqual(expect.arrayContaining(['sandbox_mode="workspace-write"', 'approval_policy="never"', "gpt-6-astra"]));

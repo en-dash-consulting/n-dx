@@ -1,10 +1,11 @@
 # Executor MCP binding — work unit 25270990
 
-**Overall disposition: BLOCKED.** This is an incomplete PR 1 draft. The executor
-task remains failing; reviewer wiring and model-driven isolation proof have not
-started. Do not dispatch a successor. The current enumeration-and-override
-mechanism has an unresolved settings race described below and is not a stable
-completed isolation interface.
+**Overall disposition: BLOCKED.** This is an incomplete PR 1 draft. A bounded
+executor repair now uses constrained native exec with strict admission instead
+of enumerating mutable registrations. Its real exec race probes cannot run in
+the confined executor (loopback listen EPERM); required review and gate evidence
+are still outstanding. Reviewer wiring and model-driven isolation proof have not
+started. Do not dispatch a successor or treat this interface as completed.
 
 Scope: executor launches only. Reviewer wiring and full model-driven two-worktree
 evidence remain the next two work units; Sidecar isolation is unchanged.
@@ -20,22 +21,37 @@ Orientation carries the binding with both servers disabled, preserving its
 read-only MCP posture. The first native check precedes the PRD status transition.
 
 `bindCodexMcp` validates the file against the executing installation and actual
-canonical spawn cwd, reads the native effective configuration, disables unrelated
-registrations/apps, sets the required Rex/SourceVision commands, arguments and
-cwd, and reads the effective configuration again. Unsafe inherited transports,
-server environments, missing required servers or wrong roots refuse. The file
-is re-read after native verification; missing or modified files are not repaired
-silently. A native server name that cannot safely be addressed by CLI overrides
-also refuses. No credentials are put in argv or copied to a new home.
+canonical spawn cwd. It reads the original native configuration with layers and
+the separate `configRequirements/read` RPC, then admits only a bounded projection
+for `exec --ignore-user-config --strict-config`. App-server does not accept the
+ignore flag: the inspection is not presented as verification of ignored exec.
+The original HOME/CODEX_HOME and selected binary remain unchanged. No credentials
+are copied, logged or put into argv. Model flags, supported selected provider,
+login storage/forced login/workspace and confinement settings survive admission.
+Apps, plugins and shell snapshots are disabled. Only run-owned Rex/SourceVision
+commands, arguments and canonical cwd are supplied. Native table merging cannot
+bring back names from ignored user/project configuration after admission.
 
-Codex merges table overrides, so `-c mcp_servers={...}` alone does **not** exclude
-ambient registrations. The implementation keeps native user/profile and
-organizational settings loaded rather than using `--ignore-user-config` on work
-turns. An unsupported native configuration protocol refuses without fallback.
-`readCodexEffectiveConfig` is the shared bounded reader used by this check and
-the existing private-temp check; it never starts a model thread.
+Admission requires the verified native version `0.167.0-alpha.3.2`, explicit own
+`requirements: null`, and known layer metadata. Empty system placeholders are
+distinct from nonempty managed defaults. Nonempty system/default layers, MDM,
+enterprise/legacy managed sources, unknown/missing metadata, profiles, hooks and
+unprojectable settings refuse before executor spawn. Built-in login and a narrow
+Responses-provider subset with environment-backed auth are admitted; unknown
+provider fields/helpers/static credentials refuse without evaluation or fallback.
+Active project settings beyond MCP registrations also refuse. This is bounded
+support, not a claim of arbitrary native/organizational configuration support.
+
+The run-owned file is re-read after admission; missing or modified files are not
+repaired silently. Exec consumes the admitted in-memory commands. The shared
+`readCodexEffectiveConfig` reader retains its existing config-only behavior for
+private-temp callers; `includeLayersAndRequirements: true` returns the envelope
+only after both RPCs succeed. It never starts a model thread.
 
 ## Evidence and limits
+
+The observations below predate the constrained-exec repair unless explicitly
+identified as run `36892404`. Historical failures remain failures.
 
 On 2026-11-24, the selected macOS `codex-cli 0.167.0-alpha.3.2` passed
 `tests/integration/codex-worktree-mcp.test.ts` with
@@ -222,3 +238,96 @@ provable organizational restrictions, and specifically refuse unknown mechanisms
 Managed requirements require the separate `configRequirements/read` response
 with an explicit own `requirements` field; absence/error is unknown, not an
 unmanaged result. Full lifecycle and model-driven evidence remain required.
+
+## Bounded implementation 36892404 — constrained exec, host validation outstanding
+
+Starting/current HEAD: `9e4a8db3aeadb63e63c17b28e373a0e1ca6cf0a3`, branch
+`codex/codex-hardening-pr1`. Integrated predecessor remains
+`2b1cd99bc11d3058c86ef5fc43f2d27266164ab0`. Only executor task `25270990` was
+implemented. No reviewer/evidence task, real login, global config, repository
+trust, provider/model pin, saved gate or historical failure record was changed.
+
+The failure diagnosis is unchanged: per-name disabling cannot exclude a name
+added after inspection. This implementation takes the authorized different
+approach described in Runtime interface above. The previous unsafe native-result
+unit assertions are replaced by admission and transport-reset assertions because
+ignored exec no longer consumes the inspected registrations. Cancellation,
+run-file replacement and the existing six repairs retain regression coverage.
+
+Validation in the confined executor:
+
+- Dependency drift check and settings-only resolution passed; original executor
+  `gpt-6-astra`, required `gpt-6.2-astra` self-review, reviewOptional=false and
+  skipTestGate=false remain. Existing policy/trust warnings remain visible.
+- Both changed packages built and typechecked. Shared native-reader tests:
+  31 passed, including separate requirements RPC/error/absence handling.
+- Eleven scoped Hench files: 258 passed. They cover admission, binding/writer,
+  adapter/helper, fresh/resume/fork/retry, scratch cleanup, self-heal and existing
+  Claude-executor/Codex pair-review behavior. Pair tests initially inherited the
+  repository ESM package scope from the checkout-local TMPDIR; an ignored
+  CommonJS package marker in that temporary root restores ordinary OS-temp
+  semantics without changing product code or weakening the tests.
+- Required startup plus architecture/domain/changeset policy: 242 passed.
+- Selected actual CLI, native config plus direct stdio MCP: three passed,
+  including assigned sentinels, original operator config unchanged and only
+  assigned PRD intent/state hashes changed. These are not actual exec evidence.
+- Actual native exec race cases for fresh/resume/fork/retry: four failed at
+  loopback listener setup with `listen EPERM`, before exec. They were not made
+  expected failures or skipped to obtain green. The fixture uses a local scripted
+  Responses provider and actual production adapter/binding argv; its fresh
+  control without the ignore flag must start all three foreign registrations,
+  including both trusted-project names. Retry exercises the native continuation
+  launch shape; automatic retry dispatch has separate deterministic coverage.
+  Host execution of these tests remains required, not a claimed pass.
+- Whitespace check passed. The whole-PR affected selection against the exact
+  predecessor is now `root,graview,hench,llm-client,rex,sourcevision,web` (list
+  only). No new affected-gate or mandatory distinct-review pass is claimed;
+  outer Hench retains both responsibilities and their original settings.
+
+`git add` of the twelve owned paths failed with `Unable to create .../.git/index.lock:
+Operation not permitted`. No commit was created and no Git bypass was attempted.
+The initial `.rex/changes/isolate-codex-executor-and-reviewer/state.yaml` edit was
+already present at launch and was neither edited nor staged by this executor.
+Rex MCP capability inspection was approval-blocked; local intent and settings
+resolution supplied context, not model-side MCP proof. Outer Hench/coordinator
+must keep completion open and own supported status/log/atomic commit operations.
+
+Exact host validation commands, owned paths and the required final-trailer commit
+message are in ignored `.local_testing/PR1-EXECUTOR-HANDOFF.md` and
+`.local_testing/pr1-executor-commit-message.txt`. No PR was published or later
+work dispatched. CI was not queried; no CI pass is claimed. **BLOCKED.**
+
+### Post-review host evidence and actual-settings refusal
+
+Required fresh distinct `gpt-6.2-astra` review for run
+`36892404-a0d4-4e86-889d-c669957dc4e4` fixed three must-fixes: operator-modifiable
+system sources, duplicate `--strict-config`, and cancellation returning incomplete
+requirements metadata. The authority helper uses the existing gateway process
+primitive; architecture policy passes. A post-authority abort check remains before
+binding arguments return. Both changed packages built and typechecked; scoped
+review checks passed 87 Hench, 32 native-reader and 244 root tests. Hench preserved
+the repairs in `a1644dc6485fd14d118dd67b19b6137e4b1ca399` with task trailers.
+
+The coordinator's stable host rerun passed **all 11 native fixture cases** in
+12.83 seconds. Source and native-reader hashes matched before and after. This
+replaces the listener gap for those cases, including fresh/resume/fork/retry,
+nonvacuous foreign-registration control, built-in provider/policy checks and
+managed refusal. It is selected native CLI plus local scripted-provider/direct
+MCP evidence; it does not complete the separate actual-model reviewer/proof work.
+The historical four duplicate-flag failures and confined listener failures remain
+failed evidence, not reclassified passes.
+
+The enabled per-invocation affected gate failed: root-policy passed; root-drift
+and six package commands failed/retried under confinement on native-config and
+Corepack-cache access, plus an effects-manifest setup timeout. No full-owned-diff
+passing gate is claimed. The separate whole-PR host gate remains required against
+exact predecessor `2b1cd99bc11d3058c86ef5fc43f2d27266164ab0`.
+
+A read-only preflight with the actual selected production configuration and
+literal executor model refused the explicit user-layer top-level `desktop`
+setting. Only that field name and layer type were inspected for diagnosis; no
+values, configuration, arguments or credentials were exposed or persisted, and no
+model request or user-config edit occurred. The supported Desktop-only contract
+is being evaluated for bounded compatibility remediation; the task remains
+failing until the actual configured path is admitted without substitution and
+the required review and validation succeed. Reviewer/proof tasks remain pending.
