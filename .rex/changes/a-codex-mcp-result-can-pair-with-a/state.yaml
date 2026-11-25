@@ -1,6 +1,7 @@
 schema: "rex/v2"
 items:
   "cde3b8f7-640e-472b-9b96-a3f578edefa6":
+    assignee: "codex-hardening-pr-3"
     createdAt: "2026-11-07T01:42:40.431Z"
-    lastModified: "2026-11-07T01:42:52.786Z"
+    lastModified: "2026-11-25T00:30:47.245Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

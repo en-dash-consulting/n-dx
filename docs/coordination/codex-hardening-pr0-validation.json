@@ -1,0 +1,193 @@
+{
+  "baselineMain": "3de0afbd9d34289779a7c8e832c3c3e6d0e48986",
+  "layout": "rex/v2",
+  "rexDir": ".rex",
+  "baselineValidation": {
+    "ok": true,
+    "checks": [
+      {
+        "name": "config.json schema",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "PRD schema",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "schema version",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "DAG integrity",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "blockedBy cycles",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "stuck tasks",
+        "pass": false,
+        "severity": "warn",
+        "errors": [
+          "\"0cd4914e-f1cc-4305-b0d6-ce43a3e897a3\": in_progress for 442h (threshold: 48h)"
+        ]
+      },
+      {
+        "name": "timestamp consistency",
+        "pass": false,
+        "severity": "warn",
+        "errors": [
+          "Timestamp inconsistency: \"c9f50a60-abe8-4f8e-91a4-2da8d9a4bf10\" (Add troubleshooting guide for common issues) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"70cd90a1-cb38-4536-ae0b-671af963878f\" (Audit and surface all package commands through ndx) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"768c9835-31a7-4113-996b-ab7749a731a4\" (Branded n-dx ASCII art CLI header for init) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"e081ca17-aa6a-47e4-ad19-0ab77f8adb98\" (Classify changes in run summary (code/docs/config/metadata-only)) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"53b8ddbc-6382-44a1-bb95-44192e912055\" (Audit and fix WCAG AA color contrast ratios, add prefers-reduced-motion support, and add non-color redundant indicators for status and severity) \u2014 status is \"completed\" but completedAt is missing.",
+          "Timestamp inconsistency: \"5c8cb33a-e446-42ac-bfde-07bd91f4b081\" (Fix hench task-completion commit gap + fullTestCommand schema drop (#302)) \u2014 status is \"completed\" but completedAt is missing.",
+          "Timestamp inconsistency: \"926c6deb-91ed-4b60-8013-3e8c5e03c481\" (Helpful error when users run package commands that belong to ndx) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"f11fbd38-5550-4165-84dd-0eb4f66c7ac2\" (Defer the PRD timeline view and re-scope it to the Changes view) \u2014 status is \"completed\" but completedAt is missing.",
+          "Timestamp inconsistency: \"22625730-8bd0-4b82-8e61-2144ee207ea8\" (Rewrite commands.md to be user-centric) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"6440a3d3-00b3-4599-ac3a-836fb27945e7\" (Rewrite ndx --help to be user-centric) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"e762d16d-81be-4647-8608-cfbe9bda9475\" (Show prior attempt history in task card) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"224703a3-3a67-44ef-9e01-375c0990827b\" (Skip provider prompt when existing config is valid) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"d0c0c683-75e6-4857-8ef2-0c1a0bb90680\" (Surface selection reasoning in auto-select run header) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"7be07d44-976d-4d18-a209-887526f741b3\" (Unified init status report instead of mixed sub-init output) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"addc40f1-decb-4d0c-9f17-6cc455e1590e\" (Write a 5-minute quickstart tutorial) \u2014 completedAt is before startedAt."
+        ]
+      },
+      {
+        "name": "parent-child status consistency",
+        "pass": false,
+        "severity": "warn",
+        "errors": [
+          "Parent-child inconsistency: \"eaa62be5-cd00-4968-b9bc-99c0ab8f8288\" (Command transparency) \u2014 status is \"completed\" but has non-terminal children: \"Add dashboard preflight cards, new Run buttons and labelled terminal-only rows on Commands\" (deferred).",
+          "Parent-child inconsistency: \"6a62ff2c-5713-421e-b250-296b8ceb5a35\" (Navigation and landings) \u2014 status is \"completed\" but has non-terminal children: \"Turn SourceVision Overview and Rex Dashboard into package landing pages, add a Hench landing, and move Rex execution panels to the Flight Deck\" (cancelled).",
+          "Parent-child inconsistency: \"dbea1b0f-a865-48dd-adc0-e4c31dde781c\" (Release plumbing) \u2014 status is \"completed\" but has non-terminal children: \"Reproduce Windows near-port relocation never engaging (#367)\" (deferred)."
+        ]
+      },
+      {
+        "name": "release plans",
+        "pass": true,
+        "severity": "warn",
+        "errors": []
+      }
+    ],
+    "summary": {
+      "total": 9,
+      "passed": 6,
+      "failed": 0,
+      "warnings": 3
+    }
+  },
+  "finalValidation": {
+    "ok": true,
+    "checks": [
+      {
+        "name": "config.json schema",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "PRD schema",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "schema version",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "DAG integrity",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "blockedBy cycles",
+        "pass": true,
+        "errors": []
+      },
+      {
+        "name": "stuck tasks",
+        "pass": false,
+        "severity": "warn",
+        "errors": [
+          "\"0cd4914e-f1cc-4305-b0d6-ce43a3e897a3\": in_progress for 442h (threshold: 48h)"
+        ]
+      },
+      {
+        "name": "timestamp consistency",
+        "pass": false,
+        "severity": "warn",
+        "errors": [
+          "Timestamp inconsistency: \"c9f50a60-abe8-4f8e-91a4-2da8d9a4bf10\" (Add troubleshooting guide for common issues) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"70cd90a1-cb38-4536-ae0b-671af963878f\" (Audit and surface all package commands through ndx) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"768c9835-31a7-4113-996b-ab7749a731a4\" (Branded n-dx ASCII art CLI header for init) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"e081ca17-aa6a-47e4-ad19-0ab77f8adb98\" (Classify changes in run summary (code/docs/config/metadata-only)) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"53b8ddbc-6382-44a1-bb95-44192e912055\" (Audit and fix WCAG AA color contrast ratios, add prefers-reduced-motion support, and add non-color redundant indicators for status and severity) \u2014 status is \"completed\" but completedAt is missing.",
+          "Timestamp inconsistency: \"5c8cb33a-e446-42ac-bfde-07bd91f4b081\" (Fix hench task-completion commit gap + fullTestCommand schema drop (#302)) \u2014 status is \"completed\" but completedAt is missing.",
+          "Timestamp inconsistency: \"926c6deb-91ed-4b60-8013-3e8c5e03c481\" (Helpful error when users run package commands that belong to ndx) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"f11fbd38-5550-4165-84dd-0eb4f66c7ac2\" (Defer the PRD timeline view and re-scope it to the Changes view) \u2014 status is \"completed\" but completedAt is missing.",
+          "Timestamp inconsistency: \"22625730-8bd0-4b82-8e61-2144ee207ea8\" (Rewrite commands.md to be user-centric) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"6440a3d3-00b3-4599-ac3a-836fb27945e7\" (Rewrite ndx --help to be user-centric) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"e762d16d-81be-4647-8608-cfbe9bda9475\" (Show prior attempt history in task card) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"224703a3-3a67-44ef-9e01-375c0990827b\" (Skip provider prompt when existing config is valid) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"d0c0c683-75e6-4857-8ef2-0c1a0bb90680\" (Surface selection reasoning in auto-select run header) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"7be07d44-976d-4d18-a209-887526f741b3\" (Unified init status report instead of mixed sub-init output) \u2014 completedAt is before startedAt.",
+          "Timestamp inconsistency: \"addc40f1-decb-4d0c-9f17-6cc455e1590e\" (Write a 5-minute quickstart tutorial) \u2014 completedAt is before startedAt."
+        ]
+      },
+      {
+        "name": "parent-child status consistency",
+        "pass": false,
+        "severity": "warn",
+        "errors": [
+          "Parent-child inconsistency: \"eaa62be5-cd00-4968-b9bc-99c0ab8f8288\" (Command transparency) \u2014 status is \"completed\" but has non-terminal children: \"Add dashboard preflight cards, new Run buttons and labelled terminal-only rows on Commands\" (deferred).",
+          "Parent-child inconsistency: \"6a62ff2c-5713-421e-b250-296b8ceb5a35\" (Navigation and landings) \u2014 status is \"completed\" but has non-terminal children: \"Turn SourceVision Overview and Rex Dashboard into package landing pages, add a Hench landing, and move Rex execution panels to the Flight Deck\" (cancelled).",
+          "Parent-child inconsistency: \"dbea1b0f-a865-48dd-adc0-e4c31dde781c\" (Release plumbing) \u2014 status is \"completed\" but has non-terminal children: \"Reproduce Windows near-port relocation never engaging (#367)\" (deferred)."
+        ]
+      },
+      {
+        "name": "release plans",
+        "pass": true,
+        "severity": "warn",
+        "errors": []
+      }
+    ],
+    "summary": {
+      "total": 9,
+      "passed": 6,
+      "failed": 0,
+      "warnings": 3
+    }
+  },
+  "treeRuleWarningsUnchanged": true,
+  "treeRuleWarningsByRule": {
+    "title-release-token": 81,
+    "capability-criteria": 4,
+    "criteria-growth": 65,
+    "unreviewed-spec": 338
+  },
+  "readerWarnings": [],
+  "baselineMissingHistoricalLandingAttributions": 1037,
+  "requiredStartup": {
+    "command": "node_modules/.bin/vitest run tests/e2e/cli-dev.test.js tests/integration/scheduler-startup.test.js",
+    "baseline": "PASS: 2 files, 14 tests",
+    "postCapture": "PASS: 2 files, 14 tests"
+  },
+  "affectedGate": {
+    "command": "node scripts/run-all-tests.mjs affected 3de0afbd9d34289779a7c8e832c3c3e6d0e48986",
+    "result": "No affected suites; 0/0 executed. This is not an implementation-test pass."
+  },
+  "packageSourceChanged": false,
+  "standingProductChanged": false,
+  "changeset": "Not required: CI package-source rule; no publishable package source changed.",
+  "featureEvidence": "Not run: no models, native enforcement, actual accounts or browser flows in PR 0",
+  "CI": "Not yet observed; draft PR creation pending",
+  "independentReview": "No feature review claimed; required fresh distinct reviews are saved on implementation work units."
+}

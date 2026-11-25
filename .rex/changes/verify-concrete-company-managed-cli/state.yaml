@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "0231fd52-2bcb-483f-bf77-bd89bb24d939":
+    assignee: "codex-hardening-pr-5"
+    createdAt: "2026-11-25T00:26:56.801Z"
+    lastModified: "2026-11-25T00:27:03.543Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4fb6419e-6d59-4e91-836f-e759c79fe327":
+    assignee: "codex-hardening-pr-5"
+    lastModified: "2026-11-25T00:30:41.165Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bc1816c6-3449-4d0f-b48a-a87347104a58":
+    assignee: "codex-hardening-pr-5"
+    lastModified: "2026-11-25T00:27:03.543Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
