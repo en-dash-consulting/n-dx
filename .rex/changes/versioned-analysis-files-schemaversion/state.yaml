@@ -31,7 +31,14 @@ items:
     lastModified: "2026-11-25T06:10:12.130Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ae021f60-89b4-420e-970f-fdad584f9405":
-    lastModified: "2026-11-25T04:50:40.462Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:10:22.300Z"
+    completedAt: "2026-11-25T06:12:16.906Z"
+    endedAt: "2026-11-25T06:12:16.906Z"
+    activeIntervals: [{"end":"2026-11-25T06:12:16.906Z","start":"2026-11-25T06:10:22.300Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "public-surface.md: Analysis files row (experimental, no owner decision recorded) and section covering files, schemaVersion rule, unknown/missing version, ecosystem keys, manifest.packs, parseIssues; callgraph.json and zone files excluded. No docs index lists surfaces."
+    lastModified: "2026-11-25T06:12:16.906Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c9c861a1-86d1-470a-bb0c-cdcf9cfbb5d5":
     lastModified: "2026-11-25T04:50:42.857Z"
