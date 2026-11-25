@@ -12,9 +12,16 @@ export const HENCH_SCHEMA_VERSION = "hench/v1";
 
 /**
  * Supported project languages for language-aware guard configuration.
- * "auto" triggers detection during `hench init`.
+ * "auto" triggers detection during `hench init`. The schema, `hench config`
+ * and init derive from this list; the trust review's copy in llm-client and
+ * web's settings field are held to it by tests.
  */
-export type ProjectLanguage = "typescript" | "javascript" | "go" | "swift" | "php";
+export const PROJECT_LANGUAGES = ["typescript", "javascript", "go", "swift", "php"] as const;
+export type ProjectLanguage = (typeof PROJECT_LANGUAGES)[number];
+
+export function isProjectLanguage(value: unknown): value is ProjectLanguage {
+  return (PROJECT_LANGUAGES as readonly unknown[]).includes(value);
+}
 
 /**
  * Configurable subset of policy limits (all optional, defaults applied at runtime).

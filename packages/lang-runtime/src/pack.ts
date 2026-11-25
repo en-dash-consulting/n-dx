@@ -169,20 +169,34 @@ export interface FrameworkFacts {
  * for it; the golden harness runs the language pack's queries only. Query
  * names must differ from the language pack's: captures are keyed by them.
  * Every kind it produces is listed in the language pack's `produces` too.
+ *
+ * A framework with {@link digest} reads its own queries' captures one file at
+ * a time, as each file is parsed, and those captures are then dropped: only
+ * the digests stay in memory until {@link read}, rather than every file's
+ * captures at once (PHP's dynamic code captures most expressions).
  */
-export interface FrameworkPack extends FactProducer {
+export interface FrameworkPack<Digest = unknown> extends FactProducer {
   readonly id: string;
   readonly queries: readonly PackQuery[];
   /** One record per rule, keyed by rule name (every query name at least). */
   readonly provenance: Readonly<Record<string, RuleProvenance>>;
   /**
+   * What {@link read} needs from one parsed file's captures of this
+   * framework's queries, taken while they are held; the language pack's
+   * captures stay on the file for `read`. Called once per parsed file (not an
+   * oversized file's declaration prefix), before any other file is read.
+   * One that throws fails the framework as a throwing `read` does.
+   */
+  digest?(file: PackSourceFile, kinds: readonly FactKind[]): Digest;
+  /**
    * Read every parsed file's captures (the language pack's and this
    * framework's) into the wanted kinds it produces. Called once per analysis.
    * `context` follows a reference into another file (FastAPI's
    * `include_router(items.router)`); a framework that reads one file at a
-   * time ignores it.
+   * time ignores it. With {@link digest}, `files` carry no captures of this
+   * framework's queries and `digests` holds each file's digest by path.
    */
-  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], context?: FrameworkContext): FrameworkFacts;
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], context?: FrameworkContext, digests?: ReadonlyMap<string, Digest>): FrameworkFacts;
 }
 
 /** Reserved: an optional precise (SCIP) index tier. Not implemented yet. */

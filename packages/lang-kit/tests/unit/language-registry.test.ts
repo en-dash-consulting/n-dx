@@ -194,6 +194,39 @@ describe("skipsDirectory — PHP", () => {
     expect(skipsDirectory(phpConfig, name, (marker) => markerMatches("page.html", marker))).toBe(true);
   });
 
+  it.each(["node_modules", "dist"])("skips a nested %s, as the TypeScript config does", (name) => {
+    expect(skipsDirectory(phpConfig, name, holdsNothing, at(`web/themes/t/${name}`))).toBe(true);
+  });
+
+  it("skips the TypeScript skip directories except build, and reuses its generated patterns", () => {
+    expect([...phpConfig.skipDirectories]).toEqual([...typescriptConfig.skipDirectories].filter((d) => d !== "build"));
+    expect(phpConfig.generatedFilePatterns).toBe(typescriptConfig.generatedFilePatterns);
+  });
+
+  it("keeps a build directory: a PHP site copies libraries into one", () => {
+    expect(skipsDirectory(phpConfig, "build", holdsNothing, at("js/build"))).toBe(false);
+  });
+
+  it("merged with Python, a build package holding __init__.py is kept", () => {
+    const merged = mergeLanguageConfigs([pythonConfig, phpConfig]);
+    expect(skipsDirectory(merged, "build", (file) => file === "__init__.py", at("build"))).toBe(false);
+    expect(skipsDirectory(merged, "build", holdsNothing, at("build"))).toBe(true);
+  });
+
+  it("merged with Java, a build package below src/ is kept", () => {
+    const merged = mergeLanguageConfigs([javaConfig, phpConfig]);
+    expect(skipsDirectory(merged, "build", holdsNothing, at("src/main/java/com/acme/build", ["Foo.java"]))).toBe(false);
+    expect(skipsDirectory(merged, "build", holdsNothing, at("build", ["pom.xml"]))).toBe(true);
+  });
+
+  it("labels minified JS generated and leaves first-party JS source", () => {
+    const generated = (path: string) => phpConfig.generatedFilePatterns.some((p) => p.test(path));
+    expect(generated("js/jquery.min.js")).toBe(true);
+    expect(generated("js/app.bundle.js")).toBe(true);
+    expect(generated("js/app.js")).toBe(false);
+    expect(generated("src/Page.php")).toBe(false);
+  });
+
   it("merged with TypeScript, cache and tmp are kept by TypeScript source too", () => {
     const merged = mergeLanguageConfigs([typescriptConfig, phpConfig]);
     const holdsTs = (marker: string) => markerMatches("index.ts", marker);

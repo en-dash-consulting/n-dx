@@ -2280,8 +2280,8 @@ Hench settings (.hench/config.json):
                                      PATH. Prefer claude.cli_path, which is shared across packages.
                                      Written to .n-dx.local.json; outside it the value applies
                                      only once the repository is trusted (ndx trust accept .).
-  hench.language           string    Project toolchain — "typescript", "javascript", "go" or
-                                     "swift". Selects the hench.guard.* defaults.
+  hench.language           string    Project toolchain — "typescript", "javascript", "go",
+                                     "swift" or "php". Selects the hench.guard.* defaults.
   hench.loopPauseMs        number    Pause between consecutive runs in a loop (default: 2000)
   hench.maxFailedAttempts  number    Consecutive failures before a task is skipped as stuck
                                      (default: 3)

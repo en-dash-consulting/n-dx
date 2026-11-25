@@ -34,9 +34,11 @@
  *
  * **Include-path roots**, in this order, without duplicates:
  * 1. literal `set_include_path(…)` and `ini_set('include_path', …)` anywhere
- *    in the repository (a `get_include_path()` part stands for the roots
- *    already known and is dropped; `PATH_SEPARATOR`, `:` and `;` separate
- *    roots), by file path then position;
+ *    in the repository, by file path then position, for every file (which
+ *    entry script runs a setting is unknown). `PATH_SEPARATOR`, `:` and `;`
+ *    separate roots; a `get_include_path()` part stands for the configured
+ *    path in force for the including file (2 and 3, else PHP's default `.`),
+ *    so appending keeps `.` and replacing drops it;
  * 2. `include_path` of a `.user.ini` and `php_value include_path` of a
  *    `.htaccess` in the including file's directory or above, nearest first
  *    (https://www.php.net/manual/en/configuration.file.per-user.php,
@@ -167,6 +169,33 @@ function strtr(subject: string, from: string, to: string): string {
 /** Thrown inside {@link evaluatePath} when the expression is not computable. */
 class NotComputable extends Error {}
 
+/**
+ * Sub-expressions (parentheses, call arguments) one path expression may nest
+ * before {@link evaluatePath} gives up on it: generated or adversarial input
+ * nested thousands deep would overflow the stack, and real paths nest a few.
+ */
+export const MAX_PATH_NESTING = 32;
+
+/**
+ * Constants a chain may pass through, each defined through the next, before
+ * {@link repositoryConstants} gives up on its head; real chains are a few long.
+ */
+export const MAX_CONSTANT_CHAIN = 32;
+
+/** Thrown inside {@link evaluatePath} past {@link MAX_PATH_NESTING}. */
+class NestedTooDeep extends Error {}
+
+/** Thrown through every lookup of a constant chain past {@link MAX_CONSTANT_CHAIN}, caught at its head. */
+class ChainTooDeep extends Error {}
+
+/** Told of each expression or constant given up on for depth, for a counted notice. */
+export interface DepthReport {
+  /** A path expression written in `file` nested past {@link MAX_PATH_NESTING}. */
+  expression(file: string, text: string): void;
+  /** A constant whose definition chain passed {@link MAX_CONSTANT_CHAIN}. */
+  constant(name: string): void;
+}
+
 /** One escape in a double-quoted string (https://www.php.net/manual/en/language.types.string.php). */
 const DOUBLE_ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: "\r", v: "\v", e: "\u001b", f: "\f", "\\": "\\", $: "$", '"': '"' };
 
@@ -176,10 +205,18 @@ const DOUBLE_ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: 
  * A variable is computable only through `variable`; so are `str_replace()`,
  * `strtr()` with three arguments, `strtolower()`, `strtoupper()` and
  * `ltrim()`, `rtrim()` and `trim()` with a character list, which an autoloader
- * applies to its class name.
+ * applies to its class name. Past {@link MAX_PATH_NESTING} nested
+ * sub-expressions it is not computable, and `report` is told.
  */
-export function evaluatePath(text: string, file: string, constant: ConstantLookup, variable: VariableLookup = NO_VARIABLES): string | undefined {
+export function evaluatePath(
+  text: string,
+  file: string,
+  constant: ConstantLookup,
+  variable: VariableLookup = NO_VARIABLES,
+  report?: Pick<DepthReport, "expression">,
+): string | undefined {
   let at = 0;
+  let nesting = 0;
 
   const skip = (): void => {
     for (;;) {
@@ -353,9 +390,12 @@ export function evaluatePath(text: string, file: string, constant: ConstantLooku
     return value;
   };
 
+  // Every nested sub-expression passes through here, so its depth bounds the recursion.
   const expression = (): string => {
+    if (++nesting > MAX_PATH_NESTING) throw new NestedTooDeep();
     let value = term();
     while (eat(".")) value += term();
+    nesting -= 1;
     return value;
   };
 
@@ -365,6 +405,10 @@ export function evaluatePath(text: string, file: string, constant: ConstantLooku
     return at === text.length ? value : undefined;
   } catch (error) {
     if (error instanceof NotComputable) return undefined;
+    if (error instanceof NestedTooDeep) {
+      report?.expression(file, text);
+      return undefined;
+    }
     throw error;
   }
 }
@@ -554,9 +598,14 @@ function constantsOf(file: PackSourceFile): Array<{ readonly name: string; reado
 
 /**
  * The repository's global constants: a name's value when every definition
- * computes to the same one, undefined when none does or two differ.
+ * computes to the same one, undefined when none does or two differ, or when
+ * its definition chain (the constant, the constants its value names, theirs
+ * and so on) is longer than {@link MAX_CONSTANT_CHAIN}; `report` is told of
+ * those and of each value nested past {@link MAX_PATH_NESTING}. A chain's
+ * length is memoized with its value, so the outcome does not depend on the
+ * order constants are looked up in.
  */
-export function repositoryConstants(sources: readonly PackSourceFile[]): ConstantLookup {
+export function repositoryConstants(sources: readonly PackSourceFile[], report?: DepthReport): ConstantLookup {
   const definitions = new Map<string, ConstantDefinition[]>();
   for (const file of [...sources].sort((a, b) => compare(a.path, b.path))) {
     for (const { name, definition } of constantsOf(file)) {
@@ -565,18 +614,49 @@ export function repositoryConstants(sources: readonly PackSourceFile[]): Constan
       else definitions.set(name, [definition]);
     }
   }
-  const values = new Map<string, string | undefined>();
-  const evaluating = new Set<string>();
-  const constant: ConstantLookup = (name) => {
-    if (values.has(name)) return values.get(name);
+  /** Each evaluated constant's value and chain length (1 for a value naming no constant). */
+  const values = new Map<string, { readonly value: string | undefined; readonly chain: number }>();
+  const evaluating: string[] = [];
+  /** The longest chain below the constant being evaluated, so far. */
+  let below = 0;
+  const lookup = (name: string): string | undefined => {
+    const known = values.get(name);
+    if (known !== undefined) {
+      if (evaluating.length + known.chain > MAX_CONSTANT_CHAIN) throw new ChainTooDeep();
+      below = Math.max(below, known.chain);
+      return known.value;
+    }
     const defined = definitions.get(name);
-    if (defined === undefined || evaluating.has(name)) return undefined;
-    evaluating.add(name);
-    const computed = new Set(defined.map((d) => evaluatePath(d.value, d.file, constant)));
-    evaluating.delete(name);
+    if (defined === undefined || evaluating.includes(name)) return undefined;
+    if (evaluating.length >= MAX_CONSTANT_CHAIN) throw new ChainTooDeep();
+    const outer = below;
+    below = 0;
+    evaluating.push(name);
+    let computed: Set<string | undefined>;
+    try {
+      computed = new Set(defined.map((d) => evaluatePath(d.value, d.file, lookup, undefined, report)));
+    } finally {
+      evaluating.pop();
+    }
     const value = computed.size === 1 ? [...computed][0] : undefined;
-    values.set(name, value);
+    const chain = below + 1;
+    values.set(name, { value, chain });
+    below = Math.max(outer, chain);
     return value;
+  };
+  // The head of a chain: definitions evaluate through `lookup`, so a chain too long is caught here alone.
+  const constant: ConstantLookup = (name) => {
+    try {
+      return lookup(name);
+    } catch (error) {
+      if (!(error instanceof ChainTooDeep)) throw error;
+      // Only the head is known to be too long: a constant part way down may be within the cap from its own start.
+      values.set(name, { value: undefined, chain: MAX_CONSTANT_CHAIN + 1 });
+      report?.constant(name);
+      return undefined;
+    } finally {
+      below = 0;
+    }
   };
   return constant;
 }
@@ -729,23 +809,38 @@ export async function readPhpIncludeConfigs(
 /** One include-path root: a repository directory, or a directory relative to the working directory. */
 type Root = { readonly kind: "repo" | "relative"; readonly path: string };
 
-/** An include path's roots; a part outside the repository is reported to `outside`. */
-function rootsOf(value: string, outside: (part: string) => void): Root[] {
+/** A part of an include path set in code: a root, or `get_include_path()` standing alone between separators. */
+type SetterPart = Root | typeof CURRENT_INCLUDE_PATH;
+
+/**
+ * An include path's parts in order; a part outside the repository is
+ * reported to `outside`. `get_include_path()` joined to other text in one
+ * part is not computable and is dropped.
+ */
+function partsOf(value: string, outside: (part: string) => void): SetterPart[] {
   const parts = value.split(new RegExp(`[${PATH_SEPARATOR}:;]`));
   // `C:\php\pear` was split at its drive colon: join it back.
   for (let i = 0; i + 1 < parts.length; i += 1) {
     if (/^[A-Za-z]$/.test(parts[i]!) && /^[\\/]/.test(parts[i + 1]!)) parts.splice(i, 2, `${parts[i]}:${parts[i + 1]}`);
   }
-  const roots: Root[] = [];
+  const out: SetterPart[] = [];
   for (const part of parts) {
+    if (part === CURRENT_INCLUDE_PATH) out.push(part);
     if (part === "" || part.includes(CURRENT_INCLUDE_PATH)) continue;
     const located = locate(part);
     if (located === undefined) continue;
     if (located.kind === "outside") outside(part.replace(REPO, "<repository>").replace(OUTSIDE, "<above the repository>"));
-    else roots.push(located);
+    else out.push(located);
   }
-  return roots;
+  return out;
 }
+
+/** An include path's roots, without its `get_include_path()` parts. */
+const rootsOf = (value: string, outside: (part: string) => void): Root[] =>
+  partsOf(value, outside).filter((p): p is Root => p !== CURRENT_INCLUDE_PATH);
+
+/** PHP's default include path, as far as the repository goes: `.` (`/usr/share/php` lies outside it). */
+const DEFAULT_ROOTS: readonly Root[] = [{ kind: "relative", path: "." }];
 
 const sameRoot = (a: Root, b: Root): boolean => a.kind === b.kind && a.path === b.path;
 
@@ -767,6 +862,48 @@ const INCLUDE_FORMS = new Set(["include", "include_once", "require", "require_on
 /** Whether a written import is an include rather than a `use`. */
 export const isInclude = (w: WrittenImport): boolean => w.form !== undefined && INCLUDE_FORMS.has(w.form);
 
+/** The notice code of path expressions and constants not evaluated for depth. */
+export const PHP_TOO_DEEP = "php-too-deep";
+
+/** How many files and constants the too-deep notice names before it counts the rest. */
+const NOTICE_TOO_DEEP = 5;
+
+/** A {@link DepthReport} counting what it is told, each expression once, for the `[php-too-deep]` notice. */
+class TooDeepCount implements DepthReport {
+  private readonly expressions = new Map<string, Set<string>>();
+  private readonly constants = new Set<string>();
+
+  expression(file: string, text: string): void {
+    const texts = this.expressions.get(file);
+    if (texts === undefined) this.expressions.set(file, new Set([text]));
+    else texts.add(text);
+  }
+
+  constant(name: string): void {
+    this.constants.add(name);
+  }
+
+  /** The `[php-too-deep]` notice; empty when nothing was given up on. */
+  notices(): string[] {
+    const named = (items: readonly string[]): string =>
+      `${items.slice(0, NOTICE_TOO_DEEP).join(", ")}${items.length > NOTICE_TOO_DEEP ? `, and ${items.length - NOTICE_TOO_DEEP} more` : ""}`;
+    const parts: string[] = [];
+    const count = [...this.expressions.values()].reduce((n, texts) => n + texts.size, 0);
+    if (count > 0) {
+      const files = [...this.expressions.keys()].sort(compare);
+      parts.push(`${count} path expression${count === 1 ? " nests" : "s nest"} more than ${MAX_PATH_NESTING} levels deep (in ${named(files)})`);
+    }
+    if (this.constants.size > 0) {
+      const one = this.constants.size === 1;
+      parts.push(
+        `${this.constants.size} constant${one ? " is" : "s are"} defined through a chain of more than ${MAX_CONSTANT_CHAIN} constants (${named([...this.constants].sort(compare))})`,
+      );
+    }
+    if (parts.length === 0) return [];
+    return [`[${PHP_TOO_DEEP}] ${parts.join(", and ")}; not evaluated, so an include using one gives no edge.`];
+  }
+}
+
 /** Every include of a project, resolved against its files, constants and include-path roots. */
 export class PhpIncludes {
   private readonly files: ReadonlySet<string>;
@@ -777,22 +914,26 @@ export class PhpIncludes {
   private readonly workingDirectoryCache = new Map<string, readonly string[]>();
   /** A constant's value when every definition in the repository computes to the same one. */
   private readonly constant: ConstantLookup;
-  private readonly setterRoots: Root[] = [];
+  /** Each literal include-path setting in code, by file path then position. */
+  private readonly setters: SetterPart[][] = [];
   private readonly configs: readonly PhpIncludeConfig[];
   private readonly configRoots = new Map<PhpIncludeConfig, Root[]>();
+  private readonly rootsCache = new Map<string, readonly Root[]>();
   private readonly outsideRoots = new Set<string>();
+  /** Expressions and constants given up on for depth. */
+  private readonly tooDeep = new TooDeepCount();
 
   constructor(sources: readonly PackSourceFile[], files: ReadonlySet<string>, configs: readonly PhpIncludeConfig[]) {
     this.files = files;
     this.sortedFiles = [...files].sort(compare);
     this.docroot = primaryDocroot(files);
     this.entryDirectories = entryDirectories(files);
-    this.constant = repositoryConstants(sources);
+    this.constant = repositoryConstants(sources, this.tooDeep);
     for (const file of [...sources].sort((a, b) => compare(a.path, b.path))) {
       for (const value of this.includePathSettings(file)) {
-        const computed = evaluatePath(value, file.path, this.constant);
+        const computed = evaluatePath(value, file.path, this.constant, undefined, this.tooDeep);
         if (computed === undefined) continue;
-        for (const root of rootsOf(computed, (part) => this.outsideRoots.add(`"${part}" (set in ${file.path})`))) this.addRoot(this.setterRoots, root);
+        this.setters.push(partsOf(computed, (part) => this.outsideRoots.add(`"${part}" (set in ${file.path})`)));
       }
     }
     this.configs = configs;
@@ -820,15 +961,32 @@ export class PhpIncludes {
     if (!roots.some((r) => sameRoot(r, root))) roots.push(root);
   }
 
-  /** Include-path roots for a file, in search order; PHP's default `.` when nothing sets one. */
-  private rootsFor(file: string): Root[] {
-    const roots: Root[] = [...this.setterRoots];
+  /**
+   * Include-path roots for a file, in search order: each setting in code,
+   * its `get_include_path()` standing for the configured path in force (the
+   * file's `.user.ini`/`.htaccess` and any `php.ini`, else PHP's default
+   * `.`), then the configured path; PHP's default `.` when nothing sets one.
+   * A setting applies to every file: which entry script runs it is unknown.
+   */
+  private rootsFor(file: string): readonly Root[] {
+    const dir = dirOf(file);
+    const cached = this.rootsCache.get(dir);
+    if (cached !== undefined) return cached;
     const scoped = this.configs
-      .filter((c) => c.kind !== "php.ini" && (dirOf(c.file) === "" || file.startsWith(`${dirOf(c.file)}/`)))
+      .filter((c) => c.kind !== "php.ini" && (dirOf(c.file) === "" || dir === dirOf(c.file) || dir.startsWith(`${dirOf(c.file)}/`)))
       .sort((a, b) => b.file.split("/").length - a.file.split("/").length || compare(a.file, b.file));
-    const global = this.configs.filter((c) => c.kind === "php.ini");
-    for (const config of [...scoped, ...global]) for (const root of this.configRoots.get(config) ?? []) this.addRoot(roots, root);
-    return roots.length > 0 ? roots : [{ kind: "relative", path: "." }];
+    const inForce = [...scoped, ...this.configs.filter((c) => c.kind === "php.ini")];
+    const configured: Root[] = [];
+    for (const config of inForce) for (const root of this.configRoots.get(config) ?? []) this.addRoot(configured, root);
+    const current = inForce.length > 0 ? configured : DEFAULT_ROOTS;
+    const roots: Root[] = [];
+    for (const setter of this.setters) {
+      for (const part of setter) for (const root of part === CURRENT_INCLUDE_PATH ? current : [part]) this.addRoot(roots, root);
+    }
+    for (const root of configured) this.addRoot(roots, root);
+    const out = roots.length > 0 ? roots : DEFAULT_ROOTS;
+    this.rootsCache.set(dir, out);
+    return out;
   }
 
   /**
@@ -857,7 +1015,7 @@ export class PhpIncludes {
 
   /** The value of a path expression written in `file`, with the repository's constants and `variable`; undefined when not computable. */
   evaluate(text: string, file: string, variable?: VariableLookup): string | undefined {
-    return evaluatePath(text, file, this.constant, variable);
+    return evaluatePath(text, file, this.constant, variable, this.tooDeep);
   }
 
   /** What an include written in `file` resolves to; a dynamic one carries its candidates. */
@@ -972,6 +1130,9 @@ export class PhpIncludes {
 
   /** One sentence per include-path root ignored for lying outside the repository. */
   notices(): string[] {
-    return [...this.outsideRoots].sort(compare).map((root) => `include path root ${root} is outside the repository; ignored.`);
+    return [
+      ...[...this.outsideRoots].sort(compare).map((root) => `include path root ${root} is outside the repository; ignored.`),
+      ...this.tooDeep.notices(),
+    ];
   }
 }

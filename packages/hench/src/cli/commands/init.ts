@@ -5,6 +5,7 @@ import { henchRuntimeGitignoreEntries } from "../../store/artifacts.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { info } from "../output.js";
+import { isProjectLanguage } from "../../schema/index.js";
 import type { ProjectLanguage } from "../../schema/index.js";
 
 /** True when any top-level directory ends in .xcodeproj or .xcworkspace. */
@@ -74,7 +75,7 @@ export async function detectProjectLanguage(dir: string): Promise<ProjectLanguag
     const config = JSON.parse(raw) as Record<string, unknown>;
     if (typeof config.language === "string" && config.language !== "auto") {
       const lang = config.language;
-      if (lang === "go" || lang === "swift" || lang === "php" || lang === "typescript" || lang === "javascript") {
+      if (isProjectLanguage(lang)) {
         return lang;
       }
     }

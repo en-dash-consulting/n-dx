@@ -1066,7 +1066,7 @@ const HENCH_FIELD_CHECKS = {
   // not hide the binary the layer below names.
   claudePath: optional((v) => typeof v === "string"),
   permissionMode: optional(oneOf("default", "acceptEdits", "bypassPermissions", "plan")),
-  language: optional(oneOf("typescript", "javascript", "go", "swift")),
+  language: optional(oneOf("typescript", "javascript", "go", "swift", "php")),
   provider: optional(oneOf("cli", "api")),
   fullTestCommand: optional(isString),
   testGate: optional(shape({

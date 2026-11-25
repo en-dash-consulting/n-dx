@@ -56,6 +56,11 @@ describe("validateConfigKeyValue", () => {
     it("still rejects an unknown member and names the allowed values", () => {
       expect(validateConfigKeyValue("provider", "codex")).toContain("cli, api");
     });
+
+    it("offers PHP as a project language", () => {
+      expect(field("language").enumValues).toContain("php");
+      expect(validateConfigKeyValue("language", "php")).toBeNull();
+    });
   });
 
   describe("array fields", () => {

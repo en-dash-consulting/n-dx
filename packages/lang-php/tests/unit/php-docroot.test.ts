@@ -29,10 +29,63 @@ describe("phpDocroots", () => {
 });
 
 describe("parseHtaccess", () => {
-  it("reads directory denial over a grant, and a grant alone", () => {
-    expect(parseHtaccess("a/.htaccess", "Order deny,allow\nDENY FROM ALL\nAllow from all\n").access).toEqual({ denied: true, line: 2 });
+  it("reads directory denial over a grant under Order allow,deny, and a grant alone", () => {
+    expect(parseHtaccess("a/.htaccess", "Order allow,deny\nAllow from all\nDENY FROM ALL\n").access).toEqual({ denied: true, line: 3 });
+    // Under deny,allow (also the default) an Allow overrides a Deny.
+    expect(parseHtaccess("a/.htaccess", "Order deny,allow\nDENY FROM ALL\nAllow from all\n").access).toEqual({ denied: false, line: 3 });
     expect(parseHtaccess("a/.htaccess", "<IfModule mod_authz_core.c>\n  Require all granted\n</IfModule>\n").access).toEqual({ denied: false, line: 2 });
     expect(parseHtaccess("a/.htaccess", "Options -Indexes\n").access).toBeUndefined();
+  });
+
+  it("reads Require ip, host and local as a restriction, which a grant in the same file overrides and a sibling denial does not", () => {
+    expect(parseHtaccess("a/.htaccess", "Require ip 127.0.0.1 ::1\nRequire host example.org\n").access).toEqual({
+      denied: false,
+      line: 1,
+      restriction: "Require ip 127.0.0.1 ::1",
+    });
+    expect(parseHtaccess("a/.htaccess", "Require local\n").access).toEqual({ denied: false, line: 1, restriction: "Require local" });
+    expect(parseHtaccess("a/.htaccess", "Require ip 10.0.0.0/8\nRequire all granted\n").access).toEqual({ denied: false, line: 2 });
+    // Sibling Require lines are <RequireAny>: the named clients are served.
+    expect(parseHtaccess("a/.htaccess", "Require ip 10.0.0.0/8\nRequire all denied\n").access).toEqual({
+      denied: false,
+      line: 1,
+      restriction: "Require ip 10.0.0.0/8",
+    });
+    // `Require not` only narrows inside <RequireAll>; a bare `Require ip` with no address names no client.
+    expect(parseHtaccess("a/.htaccess", "Require not ip 10.0.0.1\nRequire ip\n").access).toBeUndefined();
+    // Not read inside <Files>, nor for methods other than GET and POST.
+    expect(parseHtaccess("a/.htaccess", "<Files admin.php>\nRequire ip 10.0.0.1\n</Files>\n").access).toBeUndefined();
+    expect(parseHtaccess("a/.htaccess", "<LimitExcept GET POST>\nRequire local\n</LimitExcept>\n").access).toBeUndefined();
+  });
+
+  it("reads Apache 2.2's Allow from <clients> by Order, and joins it with Require as Satisfy All", () => {
+    // deny,allow: the Allow overrides Deny from all for the clients it names.
+    expect(parseHtaccess("a/.htaccess", "Order deny,allow\nDeny from all\nAllow from 10.0.0.0/8\n").access).toEqual({
+      denied: false,
+      line: 3,
+      restriction: "Allow from 10.0.0.0/8",
+    });
+    // deny,allow is the default Order.
+    expect(parseHtaccess("a/.htaccess", "Deny from all\nAllow from 10.0.0.1\n").access).toEqual({ denied: false, line: 2, restriction: "Allow from 10.0.0.1" });
+    // allow,deny: Deny from all overrides every Allow.
+    expect(parseHtaccess("a/.htaccess", "Order allow,deny\nDeny from all\nAllow from 10.0.0.0/8\n").access).toEqual({ denied: true, line: 2 });
+    expect(parseHtaccess("a/.htaccess", "Order Allow,Deny\nAllow from 10.0.0.0/8\n").access).toEqual({ denied: false, line: 2, restriction: "Allow from 10.0.0.0/8" });
+    // Allow from <clients> under deny,allow with no denial serves everyone.
+    expect(parseHtaccess("a/.htaccess", "Allow from 10.0.0.0/8\n").access).toBeUndefined();
+    // The dual-version idiom: each half restricts, so the directory is restricted once, at its first line.
+    const dual = [
+      "<IfModule mod_authz_core.c>",
+      "  Require ip 10.0.0.0/8",
+      "</IfModule>",
+      "<IfModule !mod_authz_core.c>",
+      "  Order deny,allow",
+      "  Deny from all",
+      "  Allow from 10.0.0.0/8",
+      "</IfModule>",
+    ].join("\n");
+    expect(parseHtaccess("admin/.htaccess", dual).access).toEqual({ denied: false, line: 2, restriction: "Require ip 10.0.0.0/8" });
+    // Mixed without <IfModule>, a client must pass both: a denial in either wins.
+    expect(parseHtaccess("a/.htaccess", "Require all granted\nDeny from all\n").access).toEqual({ denied: true, line: 2 });
   });
 
   it("applies a <Limit>/<LimitExcept> rule only when the block covers GET or POST", () => {
@@ -78,6 +131,19 @@ describe("parseHtaccess", () => {
       { directive: "RewriteRule", pattern: "^feed$", target: "/feed.php", line: 8 },
       { directive: "FallbackResource", target: "/front.php", line: 11 },
     ]);
+    expect(h.notices).toEqual([".htaccess:6 RewriteRule target $1.php takes its PHP file from the request; no route recorded."]);
+  });
+
+  it("reads a CodeIgniter-style front controller with path info or a query-string path, and notices a back-reference in the file", () => {
+    const h = parseHtaccess(
+      "web/.htaccess",
+      ["RewriteRule ^(.*)$ index.php/$1 [L]", "RewriteRule ^(.*)$ index.php?/$1 [L]", "RewriteRule ^p/(\\w+)$ pages/$1.php/x [L]"].join("\n"),
+    );
+    expect(h.frontControllers).toEqual([
+      { directive: "RewriteRule", pattern: "^(.*)$", target: "index.php", line: 1 },
+      { directive: "RewriteRule", pattern: "^(.*)$", target: "index.php", line: 2 },
+    ]);
+    expect(h.notices).toEqual(["web/.htaccess:3 RewriteRule target pages/$1.php/x takes its PHP file from the request; no route recorded."]);
   });
 });
 
@@ -98,6 +164,24 @@ describe("readDocrootRoutes", () => {
       "a/public/index.php GET /index.php docroot a/public, POST /index.php docroot a/public",
       "b/web/index.php GET /index.php docroot b/web, POST /index.php docroot b/web",
       "b/web/x/y.php GET /x/y.php docroot b/web, POST /x/y.php docroot b/web",
+    ]);
+  });
+
+  it("keeps pages an Apache 2.2 or dual-version allow-list restricts, with one notice, and drops them under Order allow,deny", () => {
+    const dual = "<IfModule mod_authz_core.c>\nRequire ip 10.0.0.0/8\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder deny,allow\nDeny from all\nAllow from 10.0.0.0/8\n</IfModule>\n";
+    const htaccess = new Map([
+      ["admin/.htaccess", dual],
+      ["ops/.htaccess", "Order deny,allow\nDeny from all\nAllow from 10.0.0.0/8\n"],
+      ["mixed/.htaccess", "Require ip 10.0.0.0/8\nRequire all denied\n"],
+      ["closed/.htaccess", "Order allow,deny\nDeny from all\nAllow from 10.0.0.0/8\n"],
+    ]);
+    const pages = ["index.php", "admin/a.php", "ops/b.php", "mixed/c.php", "closed/d.php"].map(page);
+    const { facts, notices } = readDocrootRoutes(pages, htaccess);
+    expect([...facts.keys()]).toEqual(["index.php", "admin/a.php", "ops/b.php", "mixed/c.php"]);
+    expect(notices).toEqual([
+      "PHP: admin/.htaccess:2 Require ip 10.0.0.0/8 serves admin/ only to the clients it names; its 1 file stays a route.",
+      "PHP: mixed/.htaccess:1 Require ip 10.0.0.0/8 serves mixed/ only to the clients it names; its 1 file stays a route.",
+      "PHP: ops/.htaccess:3 Allow from 10.0.0.0/8 serves ops/ only to the clients it names; its 1 file stays a route.",
     ]);
   });
 

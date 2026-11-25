@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "34e95b8a-299f-4e48-8b5d-6ac8b0be5f68":
+    status: "completed"
+    startedAt: "2026-11-25T00:48:01.742Z"
+    completedAt: "2026-11-25T00:48:31.801Z"
+    endedAt: "2026-11-25T00:48:31.801Z"
+    activeIntervals: [{"end":"2026-11-25T00:48:31.801Z","start":"2026-11-25T00:48:01.742Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added .changeset/hench-php-guards-skipped-report.md (@n-dx/hench patch): all-skipped report, partial-skip count and reasons, ./ paths to php -l."
+    lastModified: "2026-11-25T00:48:31.801Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "765655a7-938f-4627-a628-dbf1fc9fe6d2":
+    status: "completed"
+    startedAt: "2026-11-25T00:48:31.801Z"
+    completedAt: "2026-11-25T00:48:31.801Z"
+    endedAt: "2026-11-25T00:48:31.801Z"
+    activeIntervals: [{"end":"2026-11-25T00:48:31.801Z","start":"2026-11-25T00:48:31.801Z"}]
+    appliedAt: "2026-11-25T00:48:31.801Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-25T00:46:50.918Z"
+    lastModified: "2026-11-25T00:48:31.801Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -22,7 +22,7 @@
  */
 
 import { stat } from "node:fs/promises";
-import { extname, join, sep } from "node:path";
+import { extname, isAbsolute, join, sep } from "node:path";
 import { execRepoShellCmd } from "../guard/sandbox.js";
 import { isExecutableOnPath, repoCommandEnv, resolveShellKind } from "../prd/llm-gateway.js";
 import type { ExecOptions, ExecResult } from "../process/exec.js";
@@ -76,9 +76,13 @@ const SHELL_SAFE_PATH = /^[A-Za-z0-9._/@+=,:-]+$/;
  * A changed path as one shell argument, or undefined when cmd.exe cannot be
  * given it safely: inside its double quotes `%` and `!` still expand and `"`
  * cannot be escaped.
+ *
+ * A relative path is prefixed with `./`, so a file named `-zx.php` reaches the
+ * tool as a path, never as an option.
  */
 export function quotePathForShell(path: string, shellKind: PhpShellKind): string | undefined {
-  const p = path.split(sep).join("/");
+  const slashed = path.split(sep).join("/");
+  const p = isAbsolute(path) || slashed.startsWith("./") ? slashed : `./${slashed}`;
   if (SHELL_SAFE_PATH.test(p)) return p;
   if (shellKind === "posix") return `'${p.replace(/'/g, "'\\''")}'`;
   return /["%!^]/.test(p) ? undefined : `"${p}"`;

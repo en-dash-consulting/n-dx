@@ -8,6 +8,7 @@
  */
 
 import type { LanguageConfig } from "./registry.js";
+import { TYPESCRIPT_GENERATED_FILE_PATTERNS, TYPESCRIPT_SKIP_DIRECTORIES } from "./typescript.js";
 
 /**
  * PHP extensions that other ecosystems use too: `.inc` (Pascal, assembly,
@@ -28,11 +29,23 @@ export const PHP_REPOSITORY_ONLY_EXTENSIONS: ReadonlySet<string> = new Set([".in
 export const PHP_DOCROOT_DIRECTORIES: readonly string[] = ["public", "web", "htdocs", "www", "public_html"];
 
 /**
+ * The TypeScript config's skip directories without `build`: a PHP site keeps
+ * copied-in libraries under `js/build/`, and an unconditional `build` would
+ * override Python's and Java's conditional rules for it when configs merge.
+ */
+const PHP_SKIP_DIRECTORIES: ReadonlySet<string> = new Set(
+  [...TYPESCRIPT_SKIP_DIRECTORIES].filter((name) => name !== "build"),
+);
+
+/**
  * Language config for PHP projects.
  *
  * Key PHP-specific behaviors:
  * - `.inc`, `.module` and `.install` count as PHP only in a repository
  *   detected as PHP (see {@link PHP_REPOSITORY_ONLY_EXTENSIONS}).
+ * - Skip directories are the TypeScript config's except `build/`
+ *   (`node_modules/`, `dist/`), and generated-file patterns are its own
+ *   (`*.min.js`): a PHP site's themes ship them.
  * - `vendor/` is skipped only beside a `composer.json` (`skipOnlyBeside`):
  *   legacy repositories commit hand-copied libraries under `vendor/` without
  *   Composer, and those are source to inventory.
@@ -72,13 +85,13 @@ export const phpConfig: LanguageConfig = {
     "phpunit.xml.dist",
   ]),
 
-  skipDirectories: new Set(),
+  skipDirectories: PHP_SKIP_DIRECTORIES,
 
   skipUnlessContains: new Map([".phpunit.cache", "cache", "tmp"].map((name) => [name, ["*.php"]])),
 
   skipOnlyBeside: new Map([["vendor", ["composer.json"]]]),
 
-  generatedFilePatterns: [],
+  generatedFilePatterns: TYPESCRIPT_GENERATED_FILE_PATTERNS,
 
   entryPointPatterns: [
     /^index\.php$/,
