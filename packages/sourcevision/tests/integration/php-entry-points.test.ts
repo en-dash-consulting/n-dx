@@ -2,7 +2,7 @@
  * PHP CLI and cron entry points (the PHP pack's php-entry rules) through the
  * analyze pipeline: the imports phase's single pack call collects them and
  * the classifications phase marks each file `entrypoint` with `pack`
- * evidence, a cron job's schedule in its detail. Without the PHP pack,
+ * evidence, a cron job's schedule in its detail and its `schedule` field. Without the PHP pack,
  * classifications.json is what the path signals alone produce.
  */
 
@@ -18,6 +18,7 @@ import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { packEntryPointSignals } from "../../src/analyzers/pack-framework-facts.js";
 import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Inventory } from "../../src/schema/v1.js";
+import { ClassificationsSchema } from "../../src/schema/validate.js";
 import { toCanonicalJSON } from "../../src/util/sort.js";
 import { skipUnlessPackRuns, workspacePack } from "../helpers/workspace-pack.js";
 
@@ -28,7 +29,8 @@ const FILES: Record<string, string> = {
   "tools/migrate.php": "#!/usr/bin/env php\n<?php\necho 'migrated';\n",
   "cron/cleanup.php": "<?php\nif (php_sapi_name() !== 'cli') { exit(1); }\necho 'clean';\n",
   "lib/report.php": "<?php\necho 'report';\n",
-  crontab: "MAILTO=ops@example.com\n15 4 * * * php /var/www/app/lib/report.php\n",
+  "bin/sync.php": "<?php\necho 'synced';\n",
+  crontab: "MAILTO=ops@example.com\n15 4 * * * php /var/www/app/lib/report.php\n*/5 * * * * php /app/bin/sync.php\n",
 };
 
 /** The workspace PHP pack, never one in the user's pack directory. */
@@ -85,8 +87,26 @@ describe("PHP entry points in classifications", () => {
       signalKind: "pack",
       detail: "cron entry point: 15 4 * * * (crontab:2)",
       weight: 1,
+      schedule: { expression: "15 4 * * *", file: "crontab", line: 2 },
     });
     expect(entry("index.php")?.evidence?.some((e) => e.signalKind === "pack")).not.toBe(true);
+  });
+
+  it("carries a crontab job's schedule as a structured field, and none for a CLI script", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "php");
+    const { classifications } = await pipeline(WORKSPACE_PHP);
+    const entry = (path: string) => classifications.files.find((f) => f.path === path);
+
+    expect(entry("bin/sync.php")).toMatchObject({ archetype: "entrypoint" });
+    expect(entry("bin/sync.php")?.evidence).toContainEqual({
+      archetypeId: "entrypoint",
+      signalKind: "pack",
+      detail: "cron entry point: */5 * * * * (crontab:3)",
+      weight: 1,
+      schedule: { expression: "*/5 * * * *", file: "crontab", line: 3 },
+    });
+    expect(entry("tools/migrate.php")?.evidence?.every((e) => e.schedule === undefined)).toBe(true);
+    expect(ClassificationsSchema.safeParse(classifications).success).toBe(true);
   });
 
   it("reclassifies an unchanged file whose pack evidence is gone", async (ctx) => {

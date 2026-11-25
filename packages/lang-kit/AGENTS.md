@@ -21,7 +21,7 @@ the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
 which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
 facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
 pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources,
-routes, outbound calls, entry points, config reads, flag checks, version floor, legacy constructs, dynamic code) and `DECLARED_FACT_KINDS` (components, typed but not
+routes, outbound calls, entry points, config reads, flag checks, version floor, legacy constructs, dynamic code, declarations) and `DECLARED_FACT_KINDS` (components, typed but not
 yet produced). `VersionFloorFact` is one per file: the oldest language
 version its syntax needs, the rule and construct that set it and the
 language's own page (migration guide or changelog); versions compare with `compareLanguageVersions`.
@@ -31,7 +31,10 @@ deprecated (`LEGACY_STATUSES`; `notice` is never a removal), each version a
 string as code or chooses what to run from a value (`DYNAMIC_CODE_KINDS`),
 with the expression as written and never a value; its optional `database`
 names the tables, `table.column`s and query calls a database-driven site
-reads. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
+reads, `notice` the pack notice code that counts the site, and an include
+site's `candidates` its possible files with their `total`.
+`DeclarationsFact` is one per file: its namespaces and named types, each
+with its qualified name (any pack may fill it). `ConfigReadFact` and `FlagCheckFact` are language-neutral and
 never carry a value; a flag's `normalized` name comes from
 `normalizeFlagName`, so every pack spells one flag alike. `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`
@@ -46,11 +49,12 @@ it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
 `namespace` and `constant` symbol kinds (a trait contains its members, a
 namespace does not), the `conditional` `ImportGuard`, `WrittenImport.form`
 (`IMPORT_FORMS`) and `alias`, `WrittenImport.candidates` (a dynamic
-include's possible files, held in memory, never import edges),
+include's possible files, never import edges, with `candidatesTotal` when
+capped),
 `CallFact.construct` (`new`) and `RouteFact.source` (a docroot or
 `.htaccess` line, for a route not declared in its handler's code), and
 `EntryPointFact` (`cli` or `cron`, with its `source` and a cron job's
-`schedule` as written). The contract names no parser type; `@n-dx/lang-runtime`'s
+`schedule` as written and its `crontab` file and line). The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports

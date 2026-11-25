@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { listFixtureFiles, skipUnlessGrammar } from "@n-dx/lang-runtime";
 import type { DynamicCodeFact } from "@n-dx/lang-kit";
-import { MAX_EXPRESSION_DEPTH, PHP_DB_DISPATCH, PHP_DB_EXEC, pack, phpGrammarPath, phpPack } from "../../src/index.js";
+import { MAX_EXPRESSION_DEPTH, PHP_DB_DISPATCH, PHP_DB_EXEC, PHP_DYNAMIC_DISPATCH, PHP_DYNAMIC_EXEC, pack, phpGrammarPath, phpPack } from "../../src/index.js";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-database-flow");
 
@@ -142,5 +142,16 @@ describe("php database-driven dynamic code", () => {
     expect(notices.filter((n) => n.includes(`[${PHP_DB_DISPATCH}]`))).toEqual([
       `PHP: [${PHP_DB_DISPATCH}] 12 sites choose what to run from database data: drupal/menu.php:26, front.php:5, front.php:6, lib/PageRepository.php:18, lib/PageRepository.php:24, and 7 more; tables menu_router, pages, routes.`,
     ]);
+  });
+
+  it("names the database notice on each database-driven site, the other notice elsewhere", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const facts = (await analyze()).facts.flatMap((f) => f.dynamicCode ?? []);
+    const counted = (notice: string) => facts.filter((f) => f.notice === notice).length;
+    expect([counted(PHP_DB_EXEC), counted(PHP_DB_DISPATCH)]).toEqual([2, 12]);
+    for (const f of facts) {
+      const fed = f.database !== undefined;
+      expect(f.notice).toBe(f.kind === "exec" ? (fed ? PHP_DB_EXEC : PHP_DYNAMIC_EXEC) : fed ? PHP_DB_DISPATCH : PHP_DYNAMIC_DISPATCH);
+    }
   });
 });

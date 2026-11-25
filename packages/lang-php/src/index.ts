@@ -16,6 +16,7 @@ export * from "./php-version-sources.js";
 export * from "./php-docroot.js";
 export * from "./php-docroots.js";
 export * from "./php-database-flow.js";
+export * from "./php-declarations.js";
 export * from "./php-dynamic-code.js";
 export * from "./php-cron.js";
 export * from "./php-entry-points.js";

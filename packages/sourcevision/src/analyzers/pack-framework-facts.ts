@@ -28,14 +28,15 @@ import { ROUTE_SKIP_ROLES } from "./server-route-detection.js";
  * one analysis. Config reads and flag checks become config.json
  * (`pack-config-facts.ts`); version floors, legacy constructs and dynamic
  * code become the SDLC profile's `ecosystem`
- * (`pack-ecosystem.ts`).
+ * (`pack-ecosystem.ts`); declarations become declarations.json
+ * (`pack-declarations-files.ts`).
  */
 export type PackFrameworkFacts = readonly PackFrameworkFact[];
 
 /** One file's framework facts, as its pack returned them (`packFrameworkFactsOf` in `pack-imports.ts`). */
 export type PackFrameworkFact = Pick<
   FileFacts,
-  "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor" | "legacyConstructs" | "dynamicCode"
+  "path" | "routes" | "outboundCalls" | "entryPoints" | "configReads" | "flagChecks" | "versionFloor" | "legacyConstructs" | "dynamicCode" | "declarations"
 > & {
   /**
    * The framework fact kinds the file's pack was asked for, which tells a
@@ -150,8 +151,8 @@ const ENTRY_POINT_WEIGHT = 1;
 /**
  * The packs' entry-point facts as classification signals for the
  * `entrypoint` archetype, by file: `cli entry point: shebang (line 1)`,
- * `cron entry point: 0 3 * * * (crontab:4)`. No artifact has a field for a
- * cron schedule, so it is kept only in this evidence text.
+ * `cron entry point: 0 3 * * * (crontab:4)`. A cron fact that names its
+ * crontab line also gives the signal a structured `schedule`; a CLI one never.
  */
 export function packEntryPointSignals(facts: PackFrameworkFacts | undefined): Map<string, PackSignal[]> {
   const signals = new Map<string, PackSignal[]>();
@@ -165,6 +166,9 @@ export function packEntryPointSignals(facts: PackFrameworkFacts | undefined): Ma
           ? `cron entry point: ${e.schedule} (${e.source})`
           : `${e.kind} entry point: ${e.source} (line ${e.position.line})`,
         weight: ENTRY_POINT_WEIGHT,
+        ...(e.kind === "cron" && e.schedule !== undefined && e.crontab !== undefined
+          ? { schedule: { expression: e.schedule, file: e.crontab.file, line: e.crontab.line } }
+          : {}),
       })),
     );
   }

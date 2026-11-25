@@ -86,8 +86,9 @@ legacy layout. Covered:
 - the fact files registered in `packages/sourcevision/src/schema/data-files.ts`:
   `inventory.json`, `imports.json`, `classifications.json`, `components.json`,
   `project-profile.json`, `sdlc-profile.json`, `readiness.json`,
-  `infrastructure.json`, `outbound.json`, and `config.json` and `legacy.json`,
-  which are written only when a language pack produced their facts
+  `infrastructure.json`, `outbound.json`, and `config.json`, `legacy.json`,
+  `sites.json` and `declarations.json`, which are written only when a language
+  pack produced their facts
 - the object `sv readiness --json` prints: the `readiness.json` shape without
   `schemaVersion`, recomputed when the command runs
 

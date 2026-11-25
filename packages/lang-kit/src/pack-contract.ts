@@ -122,10 +122,13 @@ export interface WrittenImport {
    * or that text does not narrow the files down.
    *
    * Candidates are evidence, not edges: consumers must never turn them into
-   * import edges. Held in memory only; no persisted artifact has a field for
-   * them.
+   * import edges. A pack that also reports the include as a dynamic-code site
+   * copies them to {@link DynamicCodeFact.candidates}, which sourcevision
+   * persists; this field itself is held in memory only.
    */
   readonly candidates?: readonly string[];
+  /** How many files the literal text matched, when the pack capped `candidates`; absent when they are all listed. */
+  readonly candidatesTotal?: number;
 }
 
 /** Everything one file refers to. Both lists are sorted and deduplicated. */
@@ -213,6 +216,34 @@ export interface SymbolFact {
   readonly exports?: readonly string[];
 }
 
+// ── Declarations (produced) ─────────────────────────────────────────────────
+
+/**
+ * What one file declares, by name: the namespaces (or packages) it opens and
+ * the types it declares, each with the name other files reach it by. Unlike
+ * `symbols`, which lists every declaration with its span, this is the short
+ * per-file index a reader needs to find where a type lives, including one
+ * nothing imports.
+ */
+export interface DeclarationsFact {
+  /** Namespaces as written (`Acme\Billing`), in document order, distinct; empty when the file declares its types globally. */
+  readonly namespaces: readonly string[];
+  /** Named types in document order; an anonymous type is not one. A type declared inside a conditional block is. */
+  readonly types: readonly DeclaredType[];
+}
+
+/** A named type a file declares. */
+export interface DeclaredType {
+  /** Simple name as declared (`Invoice`). */
+  readonly name: string;
+  /** The name qualified by its namespace, in the language's own spelling (`Acme\Billing\Invoice`); `name` when global. */
+  readonly qualifiedName: string;
+  /** One of the type kinds of {@link SymbolKind} (`class`, `interface`, `trait`, `enum`). */
+  readonly kind: SymbolKind;
+  /** Where the name starts. */
+  readonly position: SourcePosition;
+}
+
 // ── Calls (produced) ────────────────────────────────────────────────────────
 
 /** A string literal passed directly as a call argument. */
@@ -275,6 +306,8 @@ export interface EntryPointFact {
   readonly source: string;
   /** For `cron`: the schedule as written (`*\/5 * * * *`, `@daily`). */
   readonly schedule?: string;
+  /** For `cron`: the crontab-like file (repository-relative) and 1-based line of the job. */
+  readonly crontab?: { readonly file: string; readonly line: number };
   readonly position: SourcePosition;
 }
 
@@ -505,7 +538,19 @@ export interface DynamicCodeFact {
   readonly literal?: true;
   /** Set on an `exec` or `dispatch` site fed by a database query result: what feeds it. */
   readonly database?: DynamicCodeDatabase;
+  /** The code of the pack notice that counts the site (`php-db-dispatch`); absent for a pack that notices none. */
+  readonly notice?: string;
+  /** On an `include` site: the project files it could load (`WrittenImport.candidates`), never edges. */
+  readonly candidates?: DynamicIncludeCandidates;
   readonly position: SourcePosition;
+}
+
+/** The files a dynamic include could load. */
+export interface DynamicIncludeCandidates {
+  /** Sorted, distinct, project-relative; a pack may cap the list. */
+  readonly files: readonly string[];
+  /** How many files matched, `files.length` or more. */
+  readonly total: number;
 }
 
 /**
@@ -653,6 +698,8 @@ export interface FileFacts {
   readonly legacyConstructs?: readonly LegacyConstructFact[];
   /** In document order. */
   readonly dynamicCode?: readonly DynamicCodeFact[];
+  /** Absent when the file opens no namespace and declares no named type. */
+  readonly declarations?: DeclarationsFact;
 }
 
 /** Fact kinds a pack produces today. */
@@ -669,6 +716,7 @@ export const PRODUCED_FACT_KINDS = [
   "versionFloor",
   "legacyConstructs",
   "dynamicCode",
+  "declarations",
 ] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */

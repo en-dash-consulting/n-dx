@@ -1014,6 +1014,15 @@ export interface ClassificationEvidence {
   signalKind: ArchetypeSignal["kind"] | "pack";
   detail: string;
   weight: number;
+  /** `pack` evidence for a file a cron job runs: the job's schedule and where it is written. */
+  schedule?: CronSchedule;
+}
+
+/** A cron job's schedule as the crontab spells it (`*\/5 * * * *`, `@daily`), with the crontab's path and 1-based line. */
+export interface CronSchedule {
+  expression: string;
+  file: string;
+  line: number;
 }
 
 export interface FileClassification {
@@ -1778,6 +1787,100 @@ export interface LegacyLanguageFiles {
 /** `legacy.json` — per language (the inventory's, lower-cased), each file's floor and legacy-construct uses. */
 export interface LegacyData extends FactFile {
   languages: Record<string, LegacyLanguageFiles>;
+}
+
+// ── Dynamic-code sites per file ─────────────────────────────────────────────
+// The per-file facts behind `SdlcLanguageEcosystem`'s `dynamicCode`, written
+// to `sites.json` only when a pack reported a site. Positions and names only:
+// never the expression as written, a value or row data.
+
+/** The files a dynamic include could load; never import edges. */
+export interface CodeSiteCandidates {
+  /** Sorted, distinct, at most 50 (`MAX_SITE_CANDIDATES`). */
+  files: string[];
+  /** How many files matched; more than `files.length` only when `truncated`. */
+  total: number;
+  /** Set when `files` stops at the cap. */
+  truncated?: true;
+}
+
+/** One place a file runs a string as code, chooses what to run from a value, or builds an include path (lang-kit's `DynamicCodeFact`). */
+export interface CodeSite {
+  /** The pack notice that counts the site (`php-db-dispatch`); the site's kind when the pack names none. */
+  code: string;
+  kind: "exec" | "dispatch" | "include";
+  /** What matched, a stable id (`eval`, `variable-function`, `host-include`). */
+  construct: string;
+  /** 1-indexed. */
+  line: number;
+  /** 0-indexed, in UTF-16 code units. */
+  column: number;
+  /** The enclosing function, `Class::method` or closure; absent at a file's top level. */
+  scope?: string;
+  /** Set when an `exec` site's code is written as literals alone. */
+  literal?: true;
+  /** An include's candidate files. */
+  candidates?: CodeSiteCandidates;
+  /** A database-fed site's tables and `table.column` names, each sorted. */
+  database?: { tables: string[]; columns: string[] };
+}
+
+/** One file's sites, sorted by line, then column. */
+export interface SiteFileEntry {
+  path: string;
+  sites: CodeSite[];
+}
+
+/** One language's files with a site; the split is `SdlcLanguageEcosystem`'s, mirror copies left out. */
+export interface SiteLanguageFiles {
+  /** The application's own files, sorted by path. */
+  files: SiteFileEntry[];
+  /** Third-party files likewise; absent when there are none. */
+  thirdParty?: SiteFileEntry[];
+}
+
+/** `sites.json` — per language (the inventory's, lower-cased), each file's dynamic-code sites. */
+export interface SitesData extends FactFile {
+  languages: Record<string, SiteLanguageFiles>;
+}
+
+// ── Declarations per file ───────────────────────────────────────────────────
+// lang-kit's `DeclarationsFact`, written to `declarations.json` only when a
+// pack reported one: what each file declares, including a type nothing
+// imports, without callgraph.json's size.
+
+/** A named type a file declares; an anonymous one is never listed. */
+export interface DeclaredTypeEntry {
+  /** A type kind of lang-kit's `SymbolKind` (`class`, `interface`, `trait`, `enum`). */
+  kind: string;
+  /** Simple name as declared. */
+  name: string;
+  /** Qualified by its namespace in the language's spelling (`Acme\Billing\Invoice`); `name` when global. */
+  qualifiedName: string;
+  /** 1-indexed line of the name. */
+  line: number;
+}
+
+/** One file's declarations. */
+export interface DeclarationFileEntry {
+  path: string;
+  /** Namespaces the file opens, in document order; empty when it declares globally. */
+  namespaces: string[];
+  /** Sorted by line, then qualified name. */
+  types: DeclaredTypeEntry[];
+}
+
+/** One language's files with declarations; the split is `SdlcLanguageEcosystem`'s, mirror copies left out. */
+export interface DeclarationLanguageFiles {
+  /** The application's own files, sorted by path. */
+  files: DeclarationFileEntry[];
+  /** Third-party files likewise; absent when there are none. */
+  thirdParty?: DeclarationFileEntry[];
+}
+
+/** `declarations.json` — per language (the pack id: the inventory's language, lower-cased), each file's namespaces and named types. */
+export interface DeclarationsData extends FactFile {
+  languages: Record<string, DeclarationLanguageFiles>;
 }
 
 /**

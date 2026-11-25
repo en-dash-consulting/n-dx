@@ -1,15 +1,43 @@
 schema: "rex/v2"
 items:
   "8d49a2a6-38c9-439e-85fb-536f6988090b":
-    lastModified: "2026-11-25T04:51:48.846Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:32:38.267Z"
+    completedAt: "2026-11-25T06:36:20.835Z"
+    endedAt: "2026-11-25T06:36:20.835Z"
+    activeIntervals: [{"end":"2026-11-25T06:36:20.835Z","start":"2026-11-25T06:32:38.267Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "classifications.json pack evidence gains optional schedule {expression, file, line} for cron entry points; lang-kit EntryPointFact.crontab {file, line} filled by lang-php."
+    lastModified: "2026-11-25T06:36:20.835Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cb9f00d6-30d7-4397-a7e4-e9fcb6916aff":
+    status: "completed"
+    startedAt: "2026-11-25T06:36:20.835Z"
+    completedAt: "2026-11-25T06:36:20.835Z"
+    endedAt: "2026-11-25T06:36:20.835Z"
+    activeIntervals: [{"end":"2026-11-25T06:36:20.835Z","start":"2026-11-25T06:36:20.835Z"}]
+    appliedAt: "2026-11-25T06:36:20.835Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-25T04:51:14.541Z"
-    lastModified: "2026-11-25T04:51:48.846Z"
+    lastModified: "2026-11-25T06:36:20.835Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e146caf5-d27d-48c2-9f6e-ade3dc48b511":
-    lastModified: "2026-11-25T04:51:39.740Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:14:28.052Z"
+    completedAt: "2026-11-25T06:24:27.372Z"
+    endedAt: "2026-11-25T06:24:27.372Z"
+    activeIntervals: [{"end":"2026-11-25T06:24:27.372Z","start":"2026-11-25T06:14:28.052Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit DynamicCodeFact gains notice and candidates {files,total}; WrittenImport gains candidatesTotal. PHP pack fills them (include candidates via the resolver context). sourcevision writes sites.json (pack-sites-files.ts), registered in data-files.ts, typed in v1.ts, validated; removed when no site."
+    lastModified: "2026-11-25T06:24:27.372Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "efc731f2-9b83-4d5f-8964-6098a729f72b":
-    lastModified: "2026-11-25T04:51:42.194Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:24:37.181Z"
+    completedAt: "2026-11-25T06:32:19.520Z"
+    endedAt: "2026-11-25T06:32:19.520Z"
+    activeIntervals: [{"end":"2026-11-25T06:32:19.520Z","start":"2026-11-25T06:24:37.181Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit DeclarationsFact/\"declarations\" kind; lang-php php-declarations framework; sourcevision declarations.json (schemaVersion, canonical, removed when absent)."
+    lastModified: "2026-11-25T06:32:19.520Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -12,13 +12,13 @@ import { pack, phpGrammarPath, phpPack } from "../../src/index.js";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-entry-points");
 
-/** `kind file (source) [schedule]` for every entry point, sorted, and the notices. */
+/** `kind file (source) [schedule] {crontab#line}` for every entry point, sorted, and the notices. */
 async function entryPoints(kinds: Parameters<typeof pack.analyzeProject>[0]["kinds"] = ["entryPoints"]) {
   const result = await pack.analyzeProject({ projectDir: dir, files: listFixtureFiles(dir, [...phpPack.config.extensions]), kinds });
   expect(result.degraded).toBeUndefined();
   const lines = result.facts
     .flatMap((f) =>
-      (f.entryPoints ?? []).map((e) => `${e.kind} ${f.path} (${e.source} @${e.position.line})${e.schedule === undefined ? "" : ` [${e.schedule}]`}`),
+      (f.entryPoints ?? []).map((e) => `${e.kind} ${f.path} (${e.source} @${e.position.line})${e.schedule === undefined ? "" : ` [${e.schedule}]`}${e.crontab === undefined ? "" : ` {${e.crontab.file}#${e.crontab.line}}`}`),
     )
     .sort();
   return { lines, notices: result.notices ?? [] };
@@ -32,10 +32,10 @@ describe("php entry points", () => {
       "cli bin/migrate.php (shebang @1)",
       "cli cron/cleanup.php (PHP_SAPI check @3)",
       "cli scripts/report.php ($argv @3)",
-      "cron bin/migrate.php (etc/cron.d/app:2 @1) [0 * * * *]",
-      "cron cron/cleanup.php (crontab:3 @1) [*/5 * * * *]",
-      "cron jobs/nightly.php (crontab:5 @1) [@daily]",
-      "cron scripts/report.php (crontab:4 @1) [0 3 * * *]",
+      "cron bin/migrate.php (etc/cron.d/app:2 @1) [0 * * * *] {etc/cron.d/app#2}",
+      "cron cron/cleanup.php (crontab:3 @1) [*/5 * * * *] {crontab#3}",
+      "cron jobs/nightly.php (crontab:5 @1) [@daily] {crontab#5}",
+      "cron scripts/report.php (crontab:4 @1) [0 3 * * *] {crontab#4}",
     ]);
     // Not marked: cron/web-check.php (compares with 'apache2handler'), tools/args.php ($argv outside a CLI directory), index.php.
     expect(notices).toEqual([

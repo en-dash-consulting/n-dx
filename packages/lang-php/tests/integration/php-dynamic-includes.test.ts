@@ -6,6 +6,8 @@
  * `candidates`. Runs the pack entry; skips when the grammar is not built.
  */
 
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FileFacts } from "@n-dx/lang-kit";
@@ -92,6 +94,37 @@ describe("php dynamic includes", () => {
       [15, true], // assigned the host in the function, then `.=`
       [18, false], // $_GET, not the host
     ]);
+  });
+
+  it("gives each dynamic-include site the candidates of its written include, by position", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const files = listFixtureFiles(dir, [...phpPack.config.extensions]);
+    const result = await pack.analyzeProject({ projectDir: dir, files, kinds: ["imports", "dynamicCode"] });
+    const index = result.facts.find((f) => f.path === "htdocs/index.php")!;
+    const written = new Map(index.imports!.written!.map((w) => [`${w.position.line}:${w.position.column}`, w.candidates]));
+    const sites = index.dynamicCode!.filter((f) => f.kind === "include");
+    expect(sites.some((f) => f.candidates !== undefined)).toBe(true);
+    for (const site of sites) {
+      const listed = written.get(`${site.position.line}:${site.position.column}`);
+      expect(site.candidates).toEqual(listed === undefined ? undefined : { files: listed, total: listed.length });
+    }
+  });
+
+  it(`gives a site past ${MAX_INCLUDE_CANDIDATES} candidates the first ${MAX_INCLUDE_CANDIDATES} and the total`, async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const project = mkdtempSync(join(tmpdir(), "php-many-candidates-"));
+    try {
+      mkdirSync(join(project, "gen"));
+      const pages = Array.from({ length: 60 }, (_, i) => `gen/page${String(i).padStart(2, "0")}.php`);
+      for (const page of pages) writeFileSync(join(project, page), "<?php\n");
+      writeFileSync(join(project, "index.php"), "<?php\ninclude __DIR__ . '/gen/page' . $n . '.php';\n");
+      const result = await pack.analyzeProject({ projectDir: project, files: ["index.php", ...pages], kinds: ["imports", "dynamicCode"] });
+      const index = result.facts.find((f) => f.path === "index.php")!;
+      expect(index.dynamicCode!.map((f) => f.candidates)).toEqual([{ files: pages.slice(0, MAX_INCLUDE_CANDIDATES), total: 60 }]);
+      expect(index.imports!.written!.map((w) => [w.candidates?.length, w.candidatesTotal])).toEqual([[MAX_INCLUDE_CANDIDATES, 60]]);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 
   it(`lists at most ${MAX_INCLUDE_CANDIDATES} candidates and counts the rest`, () => {

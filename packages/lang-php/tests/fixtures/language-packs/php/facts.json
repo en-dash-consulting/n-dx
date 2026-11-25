@@ -444,7 +444,8 @@
           "position": {
             "line": 26,
             "column": 8
-          }
+          },
+          "notice": "php-dynamic-include"
         },
         {
           "kind": "include",
@@ -453,7 +454,8 @@
           "position": {
             "line": 30,
             "column": 16
-          }
+          },
+          "notice": "php-dynamic-include"
         },
         {
           "kind": "include",
@@ -462,7 +464,8 @@
           "position": {
             "line": 35,
             "column": 17
-          }
+          },
+          "notice": "php-dynamic-include"
         }
       ]
     },
@@ -790,7 +793,30 @@
             "column": 15
           }
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [],
+        "types": [
+          {
+            "name": "Shop_Cart",
+            "qualifiedName": "Shop_Cart",
+            "kind": "class",
+            "position": {
+              "line": 4,
+              "column": 6
+            }
+          },
+          {
+            "name": "Shop_Order",
+            "qualifiedName": "Shop_Order",
+            "kind": "class",
+            "position": {
+              "line": 33,
+              "column": 6
+            }
+          }
+        ]
+      }
     },
     {
       "path": "php53/src/Shop/Order.php",
@@ -1364,6 +1390,7 @@
             "line": 75,
             "column": 20
           },
+          "notice": "php-dynamic-include",
           "scope": "{closure:Order::load}"
         },
         {
@@ -1374,6 +1401,7 @@
             "line": 77,
             "column": 8
           },
+          "notice": "php-dynamic-dispatch",
           "scope": "Order::load"
         },
         {
@@ -1384,9 +1412,53 @@
             "line": 84,
             "column": 11
           },
+          "notice": "php-dynamic-dispatch",
           "scope": "order_total"
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [
+          "Acme\\Shop"
+        ],
+        "types": [
+          {
+            "name": "Payable",
+            "qualifiedName": "Acme\\Shop\\Payable",
+            "kind": "interface",
+            "position": {
+              "line": 16,
+              "column": 10
+            }
+          },
+          {
+            "name": "Timestamps",
+            "qualifiedName": "Acme\\Shop\\Timestamps",
+            "kind": "trait",
+            "position": {
+              "line": 23,
+              "column": 6
+            }
+          },
+          {
+            "name": "Model",
+            "qualifiedName": "Acme\\Shop\\Model",
+            "kind": "class",
+            "position": {
+              "line": 33,
+              "column": 15
+            }
+          },
+          {
+            "name": "Order",
+            "qualifiedName": "Acme\\Shop\\Order",
+            "kind": "class",
+            "position": {
+              "line": 38,
+              "column": 6
+            }
+          }
+        ]
+      }
     },
     {
       "path": "php53/src/Shop/braced.php",
@@ -1625,7 +1697,32 @@
             "column": 17
           }
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [
+          "Acme\\Shop\\Legacy"
+        ],
+        "types": [
+          {
+            "name": "Cart",
+            "qualifiedName": "Acme\\Shop\\Legacy\\Cart",
+            "kind": "class",
+            "position": {
+              "line": 5,
+              "column": 10
+            }
+          },
+          {
+            "name": "GlobalCart",
+            "qualifiedName": "GlobalCart",
+            "kind": "class",
+            "position": {
+              "line": 20,
+              "column": 10
+            }
+          }
+        ]
+      }
     },
     {
       "path": "php8/src/Orders/OrderService.php",
@@ -2041,9 +2138,44 @@
             "line": 69,
             "column": 16
           },
+          "notice": "php-dynamic-dispatch",
           "scope": "OrderService::events"
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [
+          "App\\Orders"
+        ],
+        "types": [
+          {
+            "name": "Audited",
+            "qualifiedName": "App\\Orders\\Audited",
+            "kind": "class",
+            "position": {
+              "line": 14,
+              "column": 12
+            }
+          },
+          {
+            "name": "Status",
+            "qualifiedName": "App\\Orders\\Status",
+            "kind": "enum",
+            "position": {
+              "line": 19,
+              "column": 5
+            }
+          },
+          {
+            "name": "OrderService",
+            "qualifiedName": "App\\Orders\\OrderService",
+            "kind": "class",
+            "position": {
+              "line": 36,
+              "column": 12
+            }
+          }
+        ]
+      }
     }
   ],
   "unparsed": [],
@@ -2051,5 +2183,13 @@
     "PHP: no document root found (no index.php at the repository root or in a public, web, htdocs, *_htdocs, httpdocs, www or public_html directory); no docroot routes recorded.",
     "PHP: [php-dynamic-dispatch] 3 sites choose what to run from a value: php53/src/Shop/Order.php:77, php53/src/Shop/Order.php:84, php8/src/Orders/OrderService.php:69.",
     "PHP: [php-dynamic-include] 4 includes build their path at run time and give no edge: php52/index.php:26, php52/index.php:30, php52/index.php:35, php53/src/Shop/Order.php:75."
-  ]
+  ],
+  "parse": {
+    "files": 5,
+    "sizeLimitBytes": 1048576,
+    "syntaxErrors": [],
+    "oversized": [],
+    "unreadable": [],
+    "notUtf8": []
+  }
 }

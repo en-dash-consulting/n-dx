@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { listFixtureFiles, skipUnlessGrammar } from "@n-dx/lang-runtime";
 import type { DynamicCodeFact, FactKind } from "@n-dx/lang-kit";
-import { PHP_DYNAMIC_DISPATCH, PHP_DYNAMIC_EXEC, pack, phpGrammarPath, phpPack } from "../../src/index.js";
+import { PHP_DYNAMIC_DISPATCH, PHP_DYNAMIC_EXEC, PHP_DYNAMIC_INCLUDE, PHP_HOST_INCLUDE, pack, phpGrammarPath, phpPack } from "../../src/index.js";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "php-dynamic-code");
 /** Namespaced helpers and a global polyfill named as built-ins. */
@@ -70,8 +70,21 @@ describe("php dynamic code", () => {
       construct: "call_user_func",
       expression: "call_user_func([$this, $name])",
       scope: "Router::handle",
+      notice: PHP_DYNAMIC_DISPATCH,
       position: { line: 6, column: 8 },
     });
+  });
+
+  it("names on every site the notice that counts it", async (ctx) => {
+    skipUnlessGrammar(ctx, phpGrammarPath());
+    const facts = (await analyze()).facts.flatMap((f) => f.dynamicCode ?? []);
+    const codes = new Set(facts.map((f) => `${f.kind === "include" ? f.construct : f.kind} ${f.notice}`));
+    expect([...codes].sort()).toEqual([
+      `dispatch ${PHP_DYNAMIC_DISPATCH}`,
+      `dynamic-include ${PHP_DYNAMIC_INCLUDE}`,
+      `exec ${PHP_DYNAMIC_EXEC}`,
+      `host-include ${PHP_HOST_INCLUDE}`,
+    ]);
   });
 
   it("counts includes whose path is not computable, host-based apart", async (ctx) => {

@@ -108,7 +108,7 @@ Pack `notices` go to the same `warn` as degrade notices.
 `packFacts`; `packEntryPointSignals` turns each into an `entrypoint` signal
 that `analyzeClassifications` scores (weight 1), recorded as evidence with
 `signalKind` `pack` and a detail such as `cron entry point: 0 3 * * *
-(crontab:4)`; the schedule lives only in that detail. A file with pack signals, or pack evidence last run, is always
+(crontab:4)`, a cron one also `schedule` {expression, file, line}. A file with pack signals, or pack evidence last run, is always
 reclassified. Without facts classifications.json is unchanged.
 
 `configReads` and `flagChecks` become config.json, `versionFloor`,
@@ -116,7 +116,9 @@ reclassified. Without facts classifications.json is unchanged.
 config facts, legacy constructs and dynamic code only when present, the version-floor
 histogram whenever the pack was asked for floors (`PackFrameworkFact.asked`),
 even with none found. The same facts, per file, become legacy.json
-(`pack-legacy-files.ts`, ecosystem's own/third-party split), only when present.
+(`pack-legacy-files.ts`, ecosystem's own/third-party split) and sites.json
+(`pack-sites-files.ts`, each dynamic-code site), only when present. `declarations`
+facts become declarations.json (`pack-declarations-files.ts`, same split).
 
 ### Terraform as a database-engine source
 

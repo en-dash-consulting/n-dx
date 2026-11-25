@@ -29,7 +29,13 @@
  *   `host-include` when it reads the request's host name, else
  *   `dynamic-include`. The resolver's `[php-dynamic-include]` and
  *   `[php-host-include]` notices already name them, so they are counted here,
- *   never noticed again.
+ *   never noticed again; each carries the candidate files the resolver
+ *   found for it (`candidates`, at most `MAX_INCLUDE_CANDIDATES`, with the
+ *   total).
+ *
+ * Every site names the notice that counts it (`notice`): the include codes
+ * above, `[php-db-exec]`/`[php-db-dispatch]` for a database-driven site,
+ * else `[php-dynamic-exec]`/`[php-dynamic-dispatch]`.
  *
  * A named rule is PHP's function only when the call reaches the global
  * function, resolved as PHP does (`php-namespaces.ts`: `eval`, `\eval`, a
@@ -52,13 +58,21 @@
  */
 
 import { join } from "node:path";
-import type { DynamicCodeFact, FactKind, FileFacts, SourcePosition } from "@n-dx/lang-kit";
-import { innermostEach, type Capture, type FrameworkFacts, type FrameworkPack, type PackSourceFile, type RuleProvenance } from "@n-dx/lang-runtime";
+import type { DynamicCodeFact, DynamicIncludeCandidates, FactKind, FileFacts, SourcePosition } from "@n-dx/lang-kit";
+import {
+  innermostEach,
+  type Capture,
+  type FrameworkContext,
+  type FrameworkFacts,
+  type FrameworkPack,
+  type PackSourceFile,
+  type RuleProvenance,
+} from "@n-dx/lang-runtime";
 import { PHP_PACKAGE } from "./package-paths.js";
 import { databaseFeeds, nodeKey, type FlowSite } from "./php-database-flow.js";
 import { readWrittenImports } from "./php-imports.js";
 import { builtinCallResolver, declaredFunctions } from "./php-namespaces.js";
-import { hostReader, noticeLocations } from "./php-include-notices.js";
+import { hostReader, noticeLocations, PHP_DYNAMIC_INCLUDE, PHP_HOST_INCLUDE } from "./php-include-notices.js";
 import { isDynamicIncludePath, isInclude, repositoryConstants, type ConstantLookup } from "./php-includes.js";
 
 /** The notice code of sites that run a string as code. */
@@ -242,6 +256,7 @@ interface Site extends FlowSite {
   readonly construct: string;
   readonly expression: string;
   readonly literal?: true;
+  readonly candidates?: DynamicIncludeCandidates;
 }
 
 /** The exec or dispatch site a call of global function `name` is, if any. */
@@ -353,24 +368,56 @@ function scopeNamer(captures: FileCaptures): (at: SourcePosition) => string | un
   };
 }
 
-/** Each include in `file` whose path is not computable; counted only, so the database flow reads no operand of theirs. */
-function includeSites(file: PackSourceFile, constant: ConstantLookup): Site[] {
+/** An include site's candidate files as the resolver found them, by position; empty without a resolver. */
+function includeCandidates(file: PackSourceFile, context: FrameworkContext | undefined): Map<string, DynamicIncludeCandidates> {
+  const found = new Map<string, DynamicIncludeCandidates>();
+  for (const w of context?.resolve(file.path).written ?? []) {
+    if (!isInclude(w) || !w.candidates?.length) continue;
+    found.set(key(w.position), { files: w.candidates, total: Math.max(w.candidatesTotal ?? 0, w.candidates.length) });
+  }
+  return found;
+}
+
+/**
+ * Each include in `file` whose path is not computable, with the candidate
+ * files the resolver found for it; counted only, so the database flow reads
+ * no operand of theirs.
+ */
+function includeSites(file: PackSourceFile, constant: ConstantLookup, context: FrameworkContext | undefined): Site[] {
   const dynamic = readWrittenImports(file).filter((w) => isInclude(w) && isDynamicIncludePath(w.specifier, file.path, constant));
   if (dynamic.length === 0) return [];
   const readsHost = hostReader(file);
-  return dynamic.map((w) => ({
-    kind: "include",
-    construct: readsHost(w.specifier, w.position) ? "host-include" : "dynamic-include",
-    expression: w.specifier,
-    position: w.position,
-    operands: [],
-  }));
+  const candidates = includeCandidates(file, context);
+  return dynamic.map((w) => {
+    const listed = candidates.get(key(w.position));
+    return {
+      kind: "include",
+      construct: readsHost(w.specifier, w.position) ? "host-include" : "dynamic-include",
+      expression: w.specifier,
+      position: w.position,
+      operands: [],
+      ...(listed && { candidates: listed }),
+    };
+  });
+}
+
+/** The code of the notice that counts `site`: the resolver's for includes, this module's otherwise. */
+function noticeCode(site: Site, database: boolean): string {
+  if (site.kind === "include") return site.construct === "host-include" ? PHP_HOST_INCLUDE : PHP_DYNAMIC_INCLUDE;
+  if (site.kind === "exec") return database ? PHP_DB_EXEC : PHP_DYNAMIC_EXEC;
+  return database ? PHP_DB_DISPATCH : PHP_DYNAMIC_DISPATCH;
 }
 
 const before = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
 
-/** Every dynamic-code site of each file, in document order, database-driven ones marked; files without one are left out. */
-export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, DynamicCodeFact[]> {
+/**
+ * Every dynamic-code site of each file, in document order, database-driven
+ * ones marked, each with the code of the notice that counts it (a
+ * database-driven site the `php-db-*` one); files without one are left out.
+ * With `context`, the pack's resolver, an include site carries its candidate
+ * files.
+ */
+export function readDynamicCode(files: readonly PackSourceFile[], context?: FrameworkContext): Map<string, DynamicCodeFact[]> {
   const declared = declaredFunctions(files);
   const constant = repositoryConstants(files);
   const read = files.map((file) => {
@@ -380,7 +427,7 @@ export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, D
   const feeds = databaseFeeds(read, constant);
   const out = new Map<string, DynamicCodeFact[]>();
   for (const { file, captures, sites: code } of read) {
-    const sites = [...code, ...includeSites(file, constant)];
+    const sites = [...code, ...includeSites(file, constant, context)];
     if (sites.length === 0) continue;
     const scopeAt = scopeNamer(captures);
     out.set(
@@ -388,7 +435,7 @@ export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, D
       sites
         .sort((a, b) => before(a.position, b.position))
         .map((site): DynamicCodeFact => {
-          const { kind, construct, expression, position, literal } = site;
+          const { kind, construct, expression, position, literal, candidates } = site;
           const scope = scopeAt(position);
           const database = feeds.get(site);
           return {
@@ -396,9 +443,11 @@ export function readDynamicCode(files: readonly PackSourceFile[]): Map<string, D
             construct,
             expression,
             position,
+            notice: noticeCode(site, database !== undefined),
             ...(literal === undefined ? {} : { literal }),
             ...(scope === undefined ? {} : { scope }),
             ...(database === undefined ? {} : { database }),
+            ...(candidates === undefined ? {} : { candidates }),
           };
         }),
     );
@@ -488,9 +537,9 @@ export const phpDynamicCode: FrameworkPack = {
     return [{ name: QUERY, path: join(PHP_PACKAGE.queryDir("php-dynamic"), `${QUERY}.scm`) }];
   },
   provenance: PROVENANCE,
-  read(files: readonly PackSourceFile[], kinds: readonly FactKind[]): FrameworkFacts {
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], context?: FrameworkContext): FrameworkFacts {
     if (!kinds.includes("dynamicCode")) return { facts: new Map(), notices: [] };
-    const found = readDynamicCode(files);
+    const found = readDynamicCode(files, context);
     const facts = new Map<string, Omit<FileFacts, "path">>([...found].map(([path, dynamicCode]) => [path, { dynamicCode }]));
     return { facts, notices: dynamicCodeNotices(found) };
   },
