@@ -10,13 +10,16 @@ items:
     resolutionDetail: "Validate changesets now runs scripts/changeset-pr-checks.mjs validate: content-based version-PR detection (deletes ≥1 changeset, adds none, none remain vs origin/main) skips with a log line; otherwise runs changeset status --since=origin/main."
     lastModified: "2026-11-25T02:36:04.441Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2c091a65-08aa-4a78-a118-e12ce22ff80c":
+    lastModified: "2026-11-25T02:37:19.778Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "52db514f-8426-4fe7-83b5-339de35c3007":
-    lastModified: "2026-11-25T01:19:57.856Z"
+    lastModified: "2026-11-25T02:37:39.741Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bbe2e8e7-cdc3-467a-a8a7-90ee8e90978b":
-    lastModified: "2026-11-25T01:19:40.233Z"
+    lastModified: "2026-11-25T02:37:35.458Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c3ee8669-70a0-444a-957f-d61c0b401dbb":
     createdAt: "2026-11-25T01:19:13.547Z"
-    lastModified: "2026-11-25T01:20:05.161Z"
+    lastModified: "2026-11-25T02:37:19.778Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
