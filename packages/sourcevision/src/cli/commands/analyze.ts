@@ -61,6 +61,7 @@ import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
 import { packConfigData, writeConfigData } from "../../analyzers/pack-config-facts.js";
 import { packLegacyData, writeLegacyData } from "../../analyzers/pack-legacy-files.js";
 import { packSitesData, writeSitesData } from "../../analyzers/pack-sites-files.js";
+import { packDeclarationsData, writeDeclarationsData } from "../../analyzers/pack-declarations-files.js";
 import { packEcosystem, withEcosystem } from "../../analyzers/pack-ecosystem.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
@@ -907,6 +908,8 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     writeLegacyData(ctx.svDir, packLegacyData(packFacts, inventory));
     // Each dynamic-code site behind `ecosystem.<lang>.dynamicCode`, likewise.
     writeSitesData(ctx.svDir, packSitesData(packFacts, inventory));
+    // Each file's namespaces and named types, likewise.
+    writeDeclarationsData(ctx.svDir, packDeclarationsData(packFacts, inventory));
 
     // The judgement computed from that profile, persisted so a reader that
     // only wants the headline — the dashboard's status poll, the hub card —

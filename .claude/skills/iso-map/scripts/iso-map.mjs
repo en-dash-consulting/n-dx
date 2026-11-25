@@ -2814,7 +2814,9 @@ var DATA_FILES = {
   /** Written only when a language pack produced version floors or legacy-construct uses. */
   legacy: "legacy.json",
   /** Written only when a language pack produced dynamic-code sites. */
-  sites: "sites.json"
+  sites: "sites.json",
+  /** Written only when a language pack produced declarations (namespaces, named types). */
+  declarations: "declarations.json"
 };
 var ALL_DATA_FILES = Object.values(DATA_FILES);
 

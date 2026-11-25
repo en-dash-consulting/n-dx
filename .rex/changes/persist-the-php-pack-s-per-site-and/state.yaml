@@ -18,5 +18,12 @@ items:
     lastModified: "2026-11-25T06:24:27.372Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "efc731f2-9b83-4d5f-8964-6098a729f72b":
-    lastModified: "2026-11-25T04:51:42.194Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:24:37.181Z"
+    completedAt: "2026-11-25T06:32:19.520Z"
+    endedAt: "2026-11-25T06:32:19.520Z"
+    activeIntervals: [{"end":"2026-11-25T06:32:19.520Z","start":"2026-11-25T06:24:37.181Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit DeclarationsFact/\"declarations\" kind; lang-php php-declarations framework; sourcevision declarations.json (schemaVersion, canonical, removed when absent)."
+    lastModified: "2026-11-25T06:32:19.520Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

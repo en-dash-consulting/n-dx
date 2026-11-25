@@ -216,6 +216,34 @@ export interface SymbolFact {
   readonly exports?: readonly string[];
 }
 
+// ── Declarations (produced) ─────────────────────────────────────────────────
+
+/**
+ * What one file declares, by name: the namespaces (or packages) it opens and
+ * the types it declares, each with the name other files reach it by. Unlike
+ * `symbols`, which lists every declaration with its span, this is the short
+ * per-file index a reader needs to find where a type lives, including one
+ * nothing imports.
+ */
+export interface DeclarationsFact {
+  /** Namespaces as written (`Acme\Billing`), in document order, distinct; empty when the file declares its types globally. */
+  readonly namespaces: readonly string[];
+  /** Named types in document order; an anonymous type is not one. A type declared inside a conditional block is. */
+  readonly types: readonly DeclaredType[];
+}
+
+/** A named type a file declares. */
+export interface DeclaredType {
+  /** Simple name as declared (`Invoice`). */
+  readonly name: string;
+  /** The name qualified by its namespace, in the language's own spelling (`Acme\Billing\Invoice`); `name` when global. */
+  readonly qualifiedName: string;
+  /** One of the type kinds of {@link SymbolKind} (`class`, `interface`, `trait`, `enum`). */
+  readonly kind: SymbolKind;
+  /** Where the name starts. */
+  readonly position: SourcePosition;
+}
+
 // ── Calls (produced) ────────────────────────────────────────────────────────
 
 /** A string literal passed directly as a call argument. */
@@ -668,6 +696,8 @@ export interface FileFacts {
   readonly legacyConstructs?: readonly LegacyConstructFact[];
   /** In document order. */
   readonly dynamicCode?: readonly DynamicCodeFact[];
+  /** Absent when the file opens no namespace and declares no named type. */
+  readonly declarations?: DeclarationsFact;
 }
 
 /** Fact kinds a pack produces today. */
@@ -684,6 +714,7 @@ export const PRODUCED_FACT_KINDS = [
   "versionFloor",
   "legacyConstructs",
   "dynamicCode",
+  "declarations",
 ] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */

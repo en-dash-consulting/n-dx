@@ -793,7 +793,30 @@
             "column": 15
           }
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [],
+        "types": [
+          {
+            "name": "Shop_Cart",
+            "qualifiedName": "Shop_Cart",
+            "kind": "class",
+            "position": {
+              "line": 4,
+              "column": 6
+            }
+          },
+          {
+            "name": "Shop_Order",
+            "qualifiedName": "Shop_Order",
+            "kind": "class",
+            "position": {
+              "line": 33,
+              "column": 6
+            }
+          }
+        ]
+      }
     },
     {
       "path": "php53/src/Shop/Order.php",
@@ -1392,7 +1415,50 @@
           "notice": "php-dynamic-dispatch",
           "scope": "order_total"
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [
+          "Acme\\Shop"
+        ],
+        "types": [
+          {
+            "name": "Payable",
+            "qualifiedName": "Acme\\Shop\\Payable",
+            "kind": "interface",
+            "position": {
+              "line": 16,
+              "column": 10
+            }
+          },
+          {
+            "name": "Timestamps",
+            "qualifiedName": "Acme\\Shop\\Timestamps",
+            "kind": "trait",
+            "position": {
+              "line": 23,
+              "column": 6
+            }
+          },
+          {
+            "name": "Model",
+            "qualifiedName": "Acme\\Shop\\Model",
+            "kind": "class",
+            "position": {
+              "line": 33,
+              "column": 15
+            }
+          },
+          {
+            "name": "Order",
+            "qualifiedName": "Acme\\Shop\\Order",
+            "kind": "class",
+            "position": {
+              "line": 38,
+              "column": 6
+            }
+          }
+        ]
+      }
     },
     {
       "path": "php53/src/Shop/braced.php",
@@ -1631,7 +1697,32 @@
             "column": 17
           }
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [
+          "Acme\\Shop\\Legacy"
+        ],
+        "types": [
+          {
+            "name": "Cart",
+            "qualifiedName": "Acme\\Shop\\Legacy\\Cart",
+            "kind": "class",
+            "position": {
+              "line": 5,
+              "column": 10
+            }
+          },
+          {
+            "name": "GlobalCart",
+            "qualifiedName": "GlobalCart",
+            "kind": "class",
+            "position": {
+              "line": 20,
+              "column": 10
+            }
+          }
+        ]
+      }
     },
     {
       "path": "php8/src/Orders/OrderService.php",
@@ -2050,7 +2141,41 @@
           "notice": "php-dynamic-dispatch",
           "scope": "OrderService::events"
         }
-      ]
+      ],
+      "declarations": {
+        "namespaces": [
+          "App\\Orders"
+        ],
+        "types": [
+          {
+            "name": "Audited",
+            "qualifiedName": "App\\Orders\\Audited",
+            "kind": "class",
+            "position": {
+              "line": 14,
+              "column": 12
+            }
+          },
+          {
+            "name": "Status",
+            "qualifiedName": "App\\Orders\\Status",
+            "kind": "enum",
+            "position": {
+              "line": 19,
+              "column": 5
+            }
+          },
+          {
+            "name": "OrderService",
+            "qualifiedName": "App\\Orders\\OrderService",
+            "kind": "class",
+            "position": {
+              "line": 36,
+              "column": 12
+            }
+          }
+        ]
+      }
     }
   ],
   "unparsed": [],

@@ -17,6 +17,8 @@ export const DATA_FILES = {
   legacy: "legacy.json",
   /** Written only when a language pack produced dynamic-code sites. */
   sites: "sites.json",
+  /** Written only when a language pack produced declarations (namespaces, named types). */
+  declarations: "declarations.json",
 } as const;
 
 export const ALL_DATA_FILES = Object.values(DATA_FILES);

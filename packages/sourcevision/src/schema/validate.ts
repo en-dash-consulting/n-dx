@@ -823,6 +823,27 @@ export const SitesSchema = z.object({
   })),
 });
 
+// ── Declarations per file ───────────────────────────────────────────────────
+
+const DeclarationFileEntrySchema = z.object({
+  path: z.string().min(1),
+  namespaces: z.array(z.string().min(1)),
+  types: z.array(z.object({
+    kind: z.string().min(1),
+    name: z.string().min(1),
+    qualifiedName: z.string().min(1),
+    line: z.number().int().positive(),
+  })),
+}).refine((f) => f.namespaces.length > 0 || f.types.length > 0, { message: "a file with no namespace and no type is not listed" });
+
+export const DeclarationsSchema = z.object({
+  ...FactFileVersion,
+  languages: z.record(z.string().min(1), z.object({
+    files: z.array(DeclarationFileEntrySchema),
+    thirdParty: z.array(DeclarationFileEntrySchema).min(1).optional(),
+  })),
+});
+
 export const SdlcProfileSchema = z.object({
   schemaVersion: z.string(),
   projectDir: z.string().optional(),
@@ -969,6 +990,8 @@ export function validateModule(
       return validate(LegacySchema, data);
     case "sites":
       return validate(SitesSchema, data);
+    case "declarations":
+      return validate(DeclarationsSchema, data);
     default:
       return {
         ok: false,

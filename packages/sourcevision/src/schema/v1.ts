@@ -1835,6 +1835,45 @@ export interface SitesData extends FactFile {
   languages: Record<string, SiteLanguageFiles>;
 }
 
+// ── Declarations per file ───────────────────────────────────────────────────
+// lang-kit's `DeclarationsFact`, written to `declarations.json` only when a
+// pack reported one: what each file declares, including a type nothing
+// imports, without callgraph.json's size.
+
+/** A named type a file declares; an anonymous one is never listed. */
+export interface DeclaredTypeEntry {
+  /** A type kind of lang-kit's `SymbolKind` (`class`, `interface`, `trait`, `enum`). */
+  kind: string;
+  /** Simple name as declared. */
+  name: string;
+  /** Qualified by its namespace in the language's spelling (`Acme\Billing\Invoice`); `name` when global. */
+  qualifiedName: string;
+  /** 1-indexed line of the name. */
+  line: number;
+}
+
+/** One file's declarations. */
+export interface DeclarationFileEntry {
+  path: string;
+  /** Namespaces the file opens, in document order; empty when it declares globally. */
+  namespaces: string[];
+  /** Sorted by line, then qualified name. */
+  types: DeclaredTypeEntry[];
+}
+
+/** One language's files with declarations; the split is `SdlcLanguageEcosystem`'s, mirror copies left out. */
+export interface DeclarationLanguageFiles {
+  /** The application's own files, sorted by path. */
+  files: DeclarationFileEntry[];
+  /** Third-party files likewise; absent when there are none. */
+  thirdParty?: DeclarationFileEntry[];
+}
+
+/** `declarations.json` — per language (the pack id: the inventory's language, lower-cased), each file's namespaces and named types. */
+export interface DeclarationsData extends FactFile {
+  languages: Record<string, DeclarationLanguageFiles>;
+}
+
 /**
  * Evidence-based CI/CD maturity for one repository.
  *

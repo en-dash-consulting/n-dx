@@ -19,10 +19,10 @@ import {
 } from "../../src/index.js";
 
 describe("pack contract", () => {
-  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads, flag checks, the version floor, legacy constructs and dynamic code as produced", () => {
+  it("names imports, symbols, calls, resources, routes, outbound calls, entry points, config reads, flag checks, the version floor, legacy constructs, dynamic code and declarations as produced", () => {
     expect([...PRODUCED_FACT_KINDS]).toEqual([
       "imports", "symbols", "calls", "resources", "routes", "outboundCalls", "entryPoints", "configReads", "flagChecks", "versionFloor",
-      "legacyConstructs", "dynamicCode",
+      "legacyConstructs", "dynamicCode", "declarations",
     ]);
   });
 

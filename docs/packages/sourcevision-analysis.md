@@ -250,6 +250,7 @@ All output is written to `.sourcevision/`:
 | `config.json` | **New.** Config reads and feature-flag checks from language packs, per file, with flag and config-key indexes; no values. Only written when a pack produces them |
 | `legacy.json` | **New.** Per language and file, the version floor and each legacy-construct use (rule, status, versions, position) behind `sdlc-profile.json`'s `ecosystem`; third-party files apart. Only written when a pack finds a floor or a use |
 | `sites.json` | **New.** Per language and file, each dynamic-code site (notice code, construct, position) behind `sdlc-profile.json`'s `ecosystem`, an include's candidate files (at most 50, with the total) and a database-fed site's tables and columns; third-party files apart. Only written when a pack finds a site |
+| `declarations.json` | **New.** Per language and file, the namespaces a file opens and each named type it declares (kind, name, fully qualified name, line), imported or not; third-party files apart. Only written when a pack reports declarations (PHP today) |
 | `llms.txt` | Structured Markdown summary for LLM consumption |
 | `CONTEXT.md` | Dense XML-tagged summary optimized for Claude |
 | `zones/{zone-id}/context.md` | Detailed per-zone context |

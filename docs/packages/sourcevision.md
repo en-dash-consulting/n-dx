@@ -222,6 +222,7 @@ All output is written to `.sourcevision/`:
 | `config.json` | **New.** Where code reads configuration and checks feature flags, per file, with indexes of flags (by normalized name, with the lines each gates) and config keys (with their consumer files). Names, keys and positions only, never values. Written only when a language pack produces config reads or flag checks (the PHP pack does); otherwise absent. Field names are under review. |
 | `legacy.json` | **New.** The files behind `ecosystem`'s `versionFloors` and `legacyConstructs`, per language: each file's floor and every legacy-construct use (see [Legacy constructs per file](#legacy-constructs-per-file)). Written only when a language pack finds a floor or a use (the PHP pack does); otherwise absent. |
 | `sites.json` | **New.** The sites behind `ecosystem`'s `dynamicCode`, per language and file: each site's notice code, construct and position, an include's candidate files (capped at 50, with the total) and a database-fed site's tables and columns (see [Dynamic-code sites per file](#dynamic-code-sites-per-file)). Written only when a language pack finds a site; otherwise absent. |
+| `declarations.json` | **New.** What each file declares, per language: its namespaces and each named type's kind, name, fully qualified name and line, including types nothing imports (see [Declarations per file](#declarations-per-file)). Written only when a language pack reports declarations (the PHP pack does); otherwise absent. |
 | `llms.txt` | AI-readable codebase summary |
 | `CONTEXT.md` | Detailed AI context document |
 | `zones/{zone-id}/` | Per-zone context and summary files |
@@ -416,6 +417,21 @@ Files are sorted by path, uses by line then column. `uses` counts removed and de
 ```
 
 An include's `candidates` are the files it could load, never edges: at most 50, sorted, with `total`, and `truncated: true` when `total` is larger. A database-fed site names the tables and `table.column`s its queries read. Never the expression as written, a value or row data. Files are sorted by path, sites by line then column. Without a site no file is written, and one an earlier run left is removed. The console notices are unchanged.
+
+## Declarations per file
+
+`declarations.json` lists, per language (the pack id) and with `legacy.json`'s split (`src/analyzers/pack-declarations-files.ts`), each file that opens a namespace or declares a named type. It comes from lang-kit's language-neutral `declarations` fact; the PHP pack fills it today (`packages/lang-php/src/php-declarations.ts`).
+
+```json
+{ "languages": { "php": { "files": [
+  { "path": "src/Billing.php", "namespaces": ["Acme\\Billing"], "types": [
+    { "kind": "interface", "name": "Payable", "qualifiedName": "Acme\\Billing\\Payable", "line": 4 },
+    { "kind": "class", "name": "Invoice", "qualifiedName": "Acme\\Billing\\Invoice", "line": 6 } ] },
+  { "path": "src/compat.php", "namespaces": [], "types": [
+    { "kind": "class", "name": "Json_Encoder", "qualifiedName": "Json_Encoder", "line": 3 } ] } ] } } }
+```
+
+PHP types are classes, interfaces, traits and enums. A type's namespace is the braced `namespace A { … }` around it or the last `namespace A;` before it; outside both, `qualifiedName` is the name and `namespaces` is empty. A type declared in a conditional block, function or method is listed; an anonymous class is not. Files are sorted by path, types by line. imports.json shows only what something imports, and callgraph.json is JavaScript and TypeScript only; this file is the place to find an unreferenced class. Without declarations no file is written, and one an earlier run left is removed. It is a separate file rather than a field in inventory.json because inventory.json is written before packs run and stays language-neutral.
 
 ## Jev request size
 

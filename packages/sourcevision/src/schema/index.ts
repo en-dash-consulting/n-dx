@@ -12,6 +12,7 @@ export {
   ConfigSchema,
   LegacySchema,
   SitesSchema,
+  DeclarationsSchema,
   BranchWorkRecordSchema,
   validate,
   validateModule,

@@ -117,7 +117,8 @@ config facts, legacy constructs and dynamic code only when present, the version-
 histogram whenever the pack was asked for floors (`PackFrameworkFact.asked`),
 even with none found. The same facts, per file, become legacy.json
 (`pack-legacy-files.ts`, ecosystem's own/third-party split) and sites.json
-(`pack-sites-files.ts`, each dynamic-code site), only when present.
+(`pack-sites-files.ts`, each dynamic-code site), only when present. `declarations`
+facts become declarations.json (`pack-declarations-files.ts`, same split).
 
 ### Terraform as a database-engine source
 
