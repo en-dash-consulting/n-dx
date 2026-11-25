@@ -59,7 +59,7 @@ language id and config, `produces`, and `analyzeProject({ projectDir, files,
 kinds })`, which returns `FileFacts` per file read, the files it could not
 read, optional `notices` for what it read but skipped, an optional `parse`
 report (`PackParseReport`: files with syntax errors, oversized, unreadable or
-not UTF-8; absent when all parsed cleanly), and a `degraded` notice
+not UTF-8; every list empty when all parsed cleanly, absent for a pack with no parser), and a `degraded` notice
 (reason, remedy) when it could not run at all.
 It is per project because resolution needs the whole project. Its doc comment
 says what each field means for a pack that is not tree-sitter based (a TS/JS

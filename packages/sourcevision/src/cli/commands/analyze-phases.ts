@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import {
   DATA_FILES,
   toCanonicalJSON,
+  toFactFileJSON,
   analyzeInventory,
   detectLanguages,
   mergeLanguageConfigs,
@@ -57,7 +58,9 @@ import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
 import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers/inventory.js";
+import { recordManifestPacks } from "../../analyzers/manifest.js";
 import { mergeTokenUsage } from "../../analyzers/token-usage.js";
+import type { PackRun } from "../../schema/index.js";
 import { describeThirdPartyMark } from "../../analyzers/third-party.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
 import { KNOWN_PACKS } from "../../language/pack-loader.js";
@@ -227,10 +230,11 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
 
     // Serialize only { files, summary } (strip stats/changedFiles)
     const outPath = join(ctx.svDir, DATA_FILES.inventory);
-    writeFileSync(outPath, toCanonicalJSON({
+    const inventoryFile: Inventory = {
       files: ctx.inventoryResult.files,
       summary: ctx.inventoryResult.summary,
-    }));
+    };
+    writeFileSync(outPath, toFactFileJSON(inventoryFile));
     mkdirSync(dirname(fingerprintPath), { recursive: true });
     writeFileSync(fingerprintPath, JSON.stringify({ fingerprint }) + "\n");
     updateManifestModule(ctx.absDir, "inventory", "complete");
@@ -293,7 +297,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const fileSetChanged = didFileSetChange(ctx);
 
     const packFacts: Array<PackFrameworkFacts[number]> = [];
-    const analysedPacks: string[] = [];
+    const analysedPacks: PackRun[] = [];
     const imports = await analyzeImports(ctx.absDir, inventory, {
       ...(!ctx.fullMode && previousImports ? {
         previousImports,
@@ -302,21 +306,23 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
       } : {}),
       packs: {
         framework: (facts, asked) => packFacts.push(...packFrameworkFactsOf(facts, asked)),
-        analysed: (id) => analysedPacks.push(id),
+        analysed: (id, version) => analysedPacks.push({ id, version }),
         suggest: (id) => suggestPack(ctx, id),
       },
     });
     ctx.packFacts = packFacts;
     const outPath = join(ctx.svDir, DATA_FILES.imports);
-    writeFileSync(outPath, toCanonicalJSON(imports));
+    writeFileSync(outPath, toFactFileJSON(imports));
 
     // A pack-only language (Java, Python) is analysed only when its pack ran, which
     // the inventory phase could not know; without such a pack inventory.json is untouched.
-    const summary = withPackAnalysedLanguages(inventory.summary, analysedPacks);
+    const summary = withPackAnalysedLanguages(inventory.summary, analysedPacks.map((p) => p.id));
     if (summary !== inventory.summary) {
-      writeFileSync(inventoryPath, toCanonicalJSON({ ...inventory, summary }));
+      writeFileSync(inventoryPath, toFactFileJSON({ ...inventory, summary }));
       if (ctx.inventoryResult) ctx.inventoryResult.summary = summary;
     }
+    // Terraform runs later, in the output step, which adds or removes its own entry.
+    recordManifestPacks(ctx.absDir, analysedPacks);
     updateManifestModule(ctx.absDir, "imports", "complete");
     info(`  ${bold(String(imports.summary.totalEdges))} edges, ${bold(String(imports.summary.totalExternal))} external → ${dim(outPath)}`);
   } catch (err) {
@@ -371,7 +377,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     }
 
     const outPath = join(ctx.svDir, DATA_FILES.classifications);
-    writeFileSync(outPath, toCanonicalJSON(classifications));
+    writeFileSync(outPath, toFactFileJSON(classifications));
     updateManifestModule(ctx.absDir, "classifications", "complete");
     info(`  ${bold(String(classifications.summary.totalClassified))} classified, ${bold(String(classifications.summary.totalUnclassified))} unclassified → ${dim(outPath)}`);
   } catch (err) {
@@ -500,7 +506,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
       ctx.pendingNames = zonesResult.pendingNames;
     }
     const outPath = join(ctx.svDir, DATA_FILES.zones);
-    writeFileSync(outPath, toCanonicalJSON(zones));
+    writeFileSync(outPath, toFactFileJSON(zones));
 
     // --full / --target-pass=<N>: run remaining enrichment passes up to the
     // target (--full targets MAX_ENRICHMENT_PASS). We stop early when a
@@ -547,7 +553,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         if (zonesResult.tokenUsage) {
           mergeTokenUsage(ctx.tokenUsage, zonesResult.tokenUsage);
         }
-        writeFileSync(outPath, toCanonicalJSON(zones));
+        writeFileSync(outPath, toFactFileJSON(zones));
 
         const nextFingerprint = fingerprint(zones);
         if (nextFingerprint === prevFingerprint) {
@@ -683,7 +689,7 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
       packFacts: await packFrameworkFacts(ctx, inventory),
     });
     const outPath = join(ctx.svDir, DATA_FILES.components);
-    writeFileSync(outPath, toCanonicalJSON(components));
+    writeFileSync(outPath, toFactFileJSON(components));
     updateManifestModule(ctx.absDir, "components", "complete");
     info(`  ${bold(String(components.summary.totalComponents))} components, ${bold(String(components.summary.totalRouteModules))} route modules, ${bold(String(components.summary.totalUsageEdges))} usage edges → ${dim(outPath)}`);
     const docrootLine = describeDocrootRoutes(components.serverRoutes);
@@ -743,7 +749,7 @@ export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
         info(`  ${count} third-party ${count === 1 ? "file" : "files"} left out of the call graph (--include-third-party maps them)`),
     });
     const outPath = join(ctx.svDir, DATA_FILES.callGraph);
-    writeFileSync(outPath, toCanonicalJSON(callGraph));
+    writeFileSync(outPath, toFactFileJSON(callGraph));
     updateManifestModule(ctx.absDir, "callgraph", "complete");
     info(`  ${bold(String(callGraph.summary.totalFunctions))} functions, ${bold(String(callGraph.summary.totalCalls))} calls, ${bold(String(callGraph.summary.filesWithCalls))} files → ${dim(outPath)}`);
 
@@ -835,7 +841,7 @@ function enrichZonesWithCallGraph(
       zonesData.findings = enforceSeverityRules(deduplicateFindings([...existingFindings, ...callGraphFindings]));
     }
 
-    writeFileSync(zonesPath, toCanonicalJSON(zonesData));
+    writeFileSync(zonesPath, toFactFileJSON(zonesData));
     const findingCount = callGraphFindings.length;
     info(`  ${green("Enriched")} zones.json with call graph statistics${findingCount > 0 ? ` and ${bold(String(findingCount))} finding${findingCount !== 1 ? "s" : ""}` : ""}`);
   } catch (err) {

@@ -289,6 +289,20 @@ describe("buildPackImportGraph", () => {
     ]);
   });
 
+  it("records a clean parse report as zero counts and warns nothing", async () => {
+    const entry = stubEntry(javaConfig, {
+      facts: [{ path: "src/A.java" }],
+      unparsed: [],
+      parse: { files: 1, sizeLimitBytes: 1024 * 1024, syntaxErrors: [], oversized: [], unreadable: [], notUtf8: [] },
+    });
+    const { graph, messages } = await run(["src/A.java"], [knownPack(javaConfig, { entry })]);
+    const none = { count: 0, examples: [] };
+    expect(graph.parseIssues).toEqual({
+      java: { files: 1, clean: 1, sizeLimitBytes: 1024 * 1024, syntaxErrors: none, oversized: none, unreadable: none, notUtf8: none },
+    });
+    expect(messages).toEqual([]);
+  });
+
   it("only suggests a missing opt-in pack the project does not list: no warning, no edges", async () => {
     const { graph, messages, suggested } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })]);
     expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [], parseIssues: {} });

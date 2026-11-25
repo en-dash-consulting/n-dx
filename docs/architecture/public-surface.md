@@ -16,6 +16,7 @@ until promoted; an exported symbol alone does not make it frozen.
 | Directory layout | `.ndx/rex/`, `.ndx/hench/`, `.ndx/sourcevision/`, `.ndx/graview/`; legacy directories remain resolvable | Soft-frozen; frozen at 1.0.0 |
 | Attribution | Final git trailer block with bare `N-DX-Item: <id>` and `N-DX` provenance | Soft-frozen; frozen at 1.0.0 |
 | Rex TypeScript helpers | Library exports in `packages/rex/src/public.ts` beyond the schema contract | Outside this declared freeze |
+| Analysis files | `manifest.json` and the fact files under the sourcevision directory, plus `sv readiness --json`, versioned by `schemaVersion`; [rules](#analysis-files) | Experimental until explicitly promoted |
 | Extensions | `ndx.extension` manifest, process environment, `/x/<name>/` proxy, and the four versioned hub project/extension endpoints; [contract](../extensions/versioning) | Experimental until explicitly promoted |
 | Graview projection and product face | Declaration, snapshot names, face and its feature flags | Outside this declared freeze; flags marked experimental stay experimental |
 
@@ -75,6 +76,48 @@ same after an analysis improvement.
 | `set_file_archetype` | Persist an archetype override |
 | `get_route_tree` | Pages, API routes and layouts |
 | `get_readiness` | Heuristic SDLC readiness scorecard and caveat |
+
+## Analysis files
+
+The analysis directory is `.ndx/sourcevision/`, or `.sourcevision/` on the
+legacy layout. Covered:
+
+- `manifest.json`
+- the fact files registered in `packages/sourcevision/src/schema/data-files.ts`:
+  `inventory.json`, `imports.json`, `classifications.json`, `components.json`,
+  `project-profile.json`, `sdlc-profile.json`, `readiness.json`,
+  `infrastructure.json`, `outbound.json`, and `config.json` and `legacy.json`,
+  which are written only when a language pack produced their facts
+- the object `sv readiness --json` prints: the `readiness.json` shape without
+  `schemaVersion`, recomputed when the command runs
+
+Outside the surface: `callgraph.json`, `zones.json` and other zone output,
+`llms.txt`, `CONTEXT.md`, and every cache. Field shapes are the types in
+`packages/sourcevision/src/schema/v1.ts`. Analysis quality is heuristic, as
+for the MCP tools: a stable shape does not promise stable values.
+
+**`schemaVersion`.** Every covered file has a top-level `schemaVersion`,
+which is `1.0.0` today. A reader may rely on every field that version
+defines. New optional fields can appear without a bump. Removing or renaming
+a field, or changing its type or meaning, bumps the version and needs a
+release-note entry. When a reader sees a version it does not know, it should
+refuse that file or say it is skipping it, not guess. A file with no
+`schemaVersion` predates the field; its shape belongs to the release named in
+`manifest.json` `toolVersion`.
+
+**`ecosystem` keys.** `sdlc-profile.json` and `readiness.json` key
+`ecosystem` by the language in lower case, which is the pack id (`php`,
+`python`). `inventory.json` uses the language's display name (`PHP`).
+
+**`manifest.packs`.** These are the language packs that loaded and ran, as
+`{ id, version }` sorted by id. A pack that is installed but had no files, or
+that degraded, is not listed. `[]` means no pack ran. The field is absent on
+manifests written before it existed.
+
+**`imports.json` `summary.parseIssues`.** This maps each pack that ran to how
+its files parsed. Zero counts mean that pack parsed every file cleanly. A
+missing pack means it did not run. A missing field means either the analysis
+predates the field or no pack ran.
 
 ## Bundle and paths
 

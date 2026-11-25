@@ -5,7 +5,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
-import type { Manifest, ModuleStatus } from "../schema/index.js";
+import type { Manifest, ModuleStatus, PackRun } from "../schema/index.js";
+import { cmp } from "../util/sort.js";
 import { TOOL_VERSION } from "../constants.js";
 import { resolveSourcevisionPaths } from "../paths.js";
 import { readRepoIdentity } from "../util/git-remote.js";
@@ -44,6 +45,32 @@ export function writeManifest(dir: string, manifest: Manifest): void {
   const svDir = resolveSourcevisionPaths(absDir).svDir;
   mkdirSync(svDir, { recursive: true });
   writeFileSync(join(svDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+}
+
+/** `ran` as `Manifest.packs` stores it: one entry per id, sorted by id. */
+export function sortedPackRuns(ran: Iterable<PackRun>): PackRun[] {
+  const byId = new Map<string, string>();
+  for (const { id, version } of ran) byId.set(id, version);
+  return [...byId].sort(([a], [b]) => cmp(a, b)).map(([id, version]) => ({ id, version }));
+}
+
+/** Record `ran`, the packs this analysis's imports phase ran, as the manifest's `packs`. */
+export function recordManifestPacks(dir: string, ran: Iterable<PackRun>): void {
+  const manifest = readManifest(dir);
+  manifest.packs = sortedPackRuns(ran);
+  writeManifest(dir, manifest);
+}
+
+/**
+ * `packs` with pack `id` listed at `version`, or removed when `version` is
+ * undefined (the pack did not run): for a step that runs one pack after the
+ * imports phase. Undefined stays undefined, since without the imports phase's
+ * list the other packs that ran are unknown.
+ */
+export function withPackRun(packs: readonly PackRun[] | undefined, id: string, version: string | undefined): PackRun[] | undefined {
+  if (packs === undefined) return undefined;
+  const others = packs.filter((p) => p.id !== id);
+  return sortedPackRuns(version === undefined ? others : [...others, { id, version }]);
 }
 
 export function updateManifestModule(

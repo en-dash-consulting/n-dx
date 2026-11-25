@@ -1,21 +1,61 @@
 schema: "rex/v2"
 items:
   "6535016a-5b36-4c8a-a518-785882ab9263":
-    lastModified: "2026-11-25T04:49:51.275Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:01:01.113Z"
+    completedAt: "2026-11-25T06:04:12.404Z"
+    endedAt: "2026-11-25T06:04:12.404Z"
+    activeIntervals: [{"end":"2026-11-25T06:04:12.404Z","start":"2026-11-25T06:01:01.113Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-runtime always returns the parse report; sourcevision records an entry per pack that ran, zero counts when clean, notice only on issues; ImportsSummary doc states the three readings."
+    lastModified: "2026-11-25T06:04:12.404Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7f4713b1-ab9e-4b67-bf59-19b5aa16284a":
-    lastModified: "2026-11-25T04:49:49.080Z"
+    status: "completed"
+    startedAt: "2026-11-25T05:53:50.636Z"
+    completedAt: "2026-11-25T06:00:49.007Z"
+    endedAt: "2026-11-25T06:00:49.007Z"
+    activeIntervals: [{"end":"2026-11-25T06:00:49.007Z","start":"2026-11-25T05:53:50.636Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fact files are written through toFactFileJSON, which stamps SCHEMA_VERSION (key-sorted, so byte-stable). FactFile/WrittenFactFile types live in v1.ts, and validate.ts accepts the field as optional. An e2e test checks every DATA_FILES entry."
+    lastModified: "2026-11-25T06:00:49.007Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "90605ac0-4321-4bc1-b0de-85f3935daa39":
-    lastModified: "2026-11-25T04:49:56.393Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:04:22.034Z"
+    completedAt: "2026-11-25T06:10:12.130Z"
+    endedAt: "2026-11-25T06:10:12.130Z"
+    activeIntervals: [{"end":"2026-11-25T06:10:12.130Z","start":"2026-11-25T06:04:22.034Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "manifest.json packs: [{id, version}] sorted by id, from packs that loaded and ran (imports phase + Terraform enrichment); validator accepts with and without; unit + e2e tests."
+    lastModified: "2026-11-25T06:10:12.130Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ae021f60-89b4-420e-970f-fdad584f9405":
-    lastModified: "2026-11-25T04:50:40.462Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:10:22.300Z"
+    completedAt: "2026-11-25T06:12:16.906Z"
+    endedAt: "2026-11-25T06:12:16.906Z"
+    activeIntervals: [{"end":"2026-11-25T06:12:16.906Z","start":"2026-11-25T06:10:22.300Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "public-surface.md: Analysis files row (experimental, no owner decision recorded) and section covering files, schemaVersion rule, unknown/missing version, ecosystem keys, manifest.packs, parseIssues; callgraph.json and zone files excluded. No docs index lists surfaces."
+    lastModified: "2026-11-25T06:12:16.906Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c9c861a1-86d1-470a-bb0c-cdcf9cfbb5d5":
-    lastModified: "2026-11-25T04:50:42.857Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:12:27.010Z"
+    completedAt: "2026-11-25T06:13:38.301Z"
+    endedAt: "2026-11-25T06:13:38.301Z"
+    activeIntervals: [{"end":"2026-11-25T06:13:38.301Z","start":"2026-11-25T06:12:27.010Z"}]
+    lastModified: "2026-11-25T06:13:38.301Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "da77bb00-e07f-4e64-8f47-0edfd6db5e43":
+    status: "completed"
+    startedAt: "2026-11-25T06:13:38.301Z"
+    completedAt: "2026-11-25T06:13:38.301Z"
+    endedAt: "2026-11-25T06:13:38.301Z"
+    activeIntervals: [{"end":"2026-11-25T06:13:38.301Z","start":"2026-11-25T06:13:38.301Z"}]
+    appliedAt: "2026-11-25T06:13:38.301Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-25T04:49:29.900Z"
-    lastModified: "2026-11-25T04:50:42.857Z"
+    lastModified: "2026-11-25T06:13:38.301Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

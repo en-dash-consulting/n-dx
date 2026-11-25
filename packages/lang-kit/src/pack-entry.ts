@@ -114,8 +114,9 @@ export interface PackProjectResult {
    */
   readonly notices?: readonly string[];
   /**
-   * The files that did not parse cleanly, for a pack with a parser. Absent
-   * when every file parsed cleanly, or the pack has no parser to report on.
+   * How the requested files parsed, for a pack with a parser: every list
+   * empty when every file parsed cleanly. Absent when the pack has no parser
+   * to report on.
    */
   readonly parse?: PackParseReport;
   /**

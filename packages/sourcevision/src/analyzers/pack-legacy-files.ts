@@ -23,7 +23,7 @@ import { join } from "node:path";
 import type { LegacyConstructFact } from "@n-dx/lang-kit";
 import { DATA_FILES } from "../schema/data-files.js";
 import type { Inventory, LegacyConstructUse, LegacyData, LegacyFileEntry, LegacyLanguageFiles } from "../schema/index.js";
-import { toCanonicalJSON } from "../util/sort.js";
+import { toFactFileJSON } from "../util/sort.js";
 import { byLanguage, byVersion } from "./pack-ecosystem.js";
 import type { PackFrameworkFacts } from "./pack-framework-facts.js";
 
@@ -108,5 +108,5 @@ export function writeLegacyData(svDir: string, data: LegacyData | undefined): vo
     rmSync(path, { force: true });
     return;
   }
-  writeFileSync(path, toCanonicalJSON(data));
+  writeFileSync(path, toFactFileJSON(data));
 }

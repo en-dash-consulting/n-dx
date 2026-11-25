@@ -20,7 +20,7 @@ import {
   sortInventory,
   sortImports,
   sortZonesData,
-  toCanonicalJSON,
+  toFactFileJSON,
 } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import {
@@ -365,9 +365,9 @@ export function writeWorkspaceOutput(
   // Write data files. `withheld` is destructured off above rather than written:
   // zones.json must stay indistinguishable from single-repo output, and a
   // near-miss is a report to the operator, not part of the graph.
-  writeFileSync(join(svDir, DATA_FILES.inventory), toCanonicalJSON(inventory));
-  writeFileSync(join(svDir, DATA_FILES.imports), toCanonicalJSON(imports));
-  writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(zones));
+  writeFileSync(join(svDir, DATA_FILES.inventory), toFactFileJSON(inventory));
+  writeFileSync(join(svDir, DATA_FILES.imports), toFactFileJSON(imports));
+  writeFileSync(join(svDir, DATA_FILES.zones), toFactFileJSON(zones));
 
   // Build and write manifest
   const manifest: Manifest = {

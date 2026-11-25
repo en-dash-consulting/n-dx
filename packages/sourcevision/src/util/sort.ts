@@ -25,7 +25,10 @@ import type {
   OutboundDependency,
   DeclaredContract,
   OutboundData,
+  FactFile,
+  WrittenFactFile,
 } from "../schema/index.js";
+import { SCHEMA_VERSION } from "../schema/index.js";
 import { toCanonicalJSON as canonicalJSON } from "@n-dx/llm-client";
 import { redactLiteralsDeep } from "./redact-literals.js";
 
@@ -286,4 +289,21 @@ export function sortOutbound(data: OutboundData): OutboundData {
  */
 export function toCanonicalJSON(value: unknown): string {
   return canonicalJSON(redactLiteralsDeep(value));
+}
+
+/**
+ * A fact file as written: `schemaVersion` set to {@link SCHEMA_VERSION},
+ * replacing any version the input was read with.
+ */
+export function stampSchemaVersion<T extends FactFile>(data: T): WrittenFactFile<T> {
+  return { ...data, schemaVersion: SCHEMA_VERSION };
+}
+
+/**
+ * Canonical JSON for a fact file in `DATA_FILES` that has no version of its
+ * own. Keys are sorted, so `schemaVersion` always lands in the same place and
+ * the output stays byte-stable.
+ */
+export function toFactFileJSON<T extends FactFile>(data: T): string {
+  return toCanonicalJSON(stampSchemaVersion(data));
 }

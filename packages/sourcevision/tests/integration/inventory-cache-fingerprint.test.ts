@@ -16,7 +16,7 @@ import { analyzeInventory, inventoryFingerprint } from "../../src/analyzers/inve
 import { detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
 import { resolveSourcevisionPaths } from "../../src/paths.js";
 import type { Inventory } from "../../src/schema/v1.js";
-import { toCanonicalJSON } from "../../src/util/sort.js";
+import { toCanonicalJSON, toFactFileJSON } from "../../src/util/sort.js";
 
 const FILES: Record<string, string> = {
   "package.json": "{}",
@@ -118,7 +118,7 @@ describe("inventory cache fingerprint", () => {
     const direct = await analyzeInventory(run.absDir, {
       languageConfig: mergeLanguageConfigs(await detectLanguages(run.absDir)),
     });
-    expect(written).toBe(toCanonicalJSON({ files: direct.files, summary: direct.summary }));
+    expect(written).toBe(toFactFileJSON({ files: direct.files, summary: direct.summary }));
     expect(written).not.toContain("fingerprint");
     expect(existsSync(fingerprintPath(run))).toBe(true);
   }, 60_000);

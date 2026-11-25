@@ -33,7 +33,7 @@ export type {
   Zones,
 } from "../schema/index.js";
 export { SCHEMA_VERSION } from "../schema/v1.js";
-export { toCanonicalJSON } from "../util/sort.js";
+export { toCanonicalJSON, toFactFileJSON } from "../util/sort.js";
 export { toPosix } from "../util/paths.js";
 export { detectLanguages } from "../language/detect.js";
 export { mergeLanguageConfigs } from "@n-dx/lang-kit";

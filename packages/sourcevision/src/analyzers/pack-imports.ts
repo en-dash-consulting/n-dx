@@ -73,8 +73,8 @@ export interface PackImportsOptions {
    * for (see {@link packFrameworkFactsOf}).
    */
   readonly framework?: (facts: readonly FileFacts[], asked: readonly FactKind[]) => void;
-  /** Receives the id of each pack that ran without degrading. */
-  readonly analysed?: (packId: string) => void;
+  /** Receives the id and version of each pack that ran without degrading. */
+  readonly analysed?: (packId: string, version: string) => void;
   /** The project's `sourcevision.packs`: a missing pack listed here is warned about. */
   readonly listed?: readonly string[];
   /**
@@ -111,7 +111,7 @@ export interface PackImportGraph {
    * language (Go's regex parser) can run it on them.
    */
   readonly unparsed: string[];
-  /** Pack id → how its files parsed, for each pack that ran and had a file that did not parse cleanly. */
+  /** Pack id → how its files parsed, for each pack that ran and reported a parse (zero counts when every file parsed cleanly). */
   readonly parseIssues: Record<string, PackParseIssues>;
 }
 
@@ -274,13 +274,13 @@ export async function buildPackImportGraph(
       degrade(pack, result.degraded);
       continue;
     }
-    options.analysed?.(pack.id);
+    options.analysed?.(pack.id, load.entry.version);
     unparsed.push(...result.unparsed);
     for (const notice of result.notices ?? []) warn(notice);
     if (result.parse) {
       const issues = parseIssuesOf(result.parse);
       parseIssues[pack.id] = issues;
-      warn(parseIssuesNotice(pack.id, issues));
+      if (issues.clean < issues.files || issues.legacySyntax !== undefined) warn(parseIssuesNotice(pack.id, issues));
     }
     if (framework.length > 0) options.framework?.(result.facts, framework);
 
