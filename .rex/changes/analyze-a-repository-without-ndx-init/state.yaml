@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-25T04:54:05.518Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ac9a2ba2-c37a-48cb-b7ef-9a968c7392b1":
-    lastModified: "2026-11-25T04:53:55.622Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:41:54.321Z"
+    completedAt: "2026-11-25T06:49:59.359Z"
+    endedAt: "2026-11-25T06:49:59.359Z"
+    activeIntervals: [{"end":"2026-11-25T06:49:59.359Z","start":"2026-11-25T06:41:54.321Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx analyze creates its output folder via init's layout rule instead of requireInit. sv init and reset ignore .cache/ and .backup/ in <svDir>/.gitignore and never edit the repo's. In analyze-only repos the vendor-CLI log goes to <svDir>/.cache and the setup-incomplete notice is skipped. Verified by real --fast and model runs on a fresh repo, and by a new integration test."
+    lastModified: "2026-11-25T06:49:59.359Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dda019c0-eadb-447b-a175-d13cf3198851":
     createdAt: "2026-11-25T04:53:45.866Z"

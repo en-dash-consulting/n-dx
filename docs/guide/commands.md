@@ -154,6 +154,8 @@ ndx analyze --fast .         # static only: no model or network call, no update 
 
 Scans the codebase: file inventory, import graph, zone detection (Louvain community detection), component catalog. Results drive recommendations and planning. `ndx analyze --help` lists what each mode sends to a model under "Model use".
 
+Analysis needs no `ndx init`. In a repository init never touched, it creates its output folder (`.ndx/sourcevision/`, or `.sourcevision/` beside legacy `.rex`/`.hench` state) and writes nothing outside it: the machine-local `.cache/` is ignored by a `.gitignore` inside the folder, the project's `.gitignore` is never edited, and vendor-CLI calls are logged to `.cache/claude_commands.log` instead of the root. Your vendor CLI's own files are its business.
+
 ### recommend
 
 ```sh

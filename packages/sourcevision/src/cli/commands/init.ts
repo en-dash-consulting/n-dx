@@ -25,18 +25,19 @@ export function cmdInit(dir: string): void {
   const svDirName = relativeToRoot(layout, svDir);
 
   // `.cache/` is machine-local (see docs/architecture/generated-files.md).
-  // Ignore it before the already-initialized return so a re-init fixes a
-  // project initialized without the entry: `ndx init` commits what init
-  // wrote, and would otherwise commit the cache with it.
-  ensureGitignoreEntry(absDir, `${svDirName}/${SV_CACHE_DIRNAME}/`);
+  // Ignored by a `.gitignore` inside the output folder, never by editing the
+  // project's own: analysis runs in repositories the operator does not own and
+  // writes nothing outside its folder. Done before the already-initialized
+  // return so a re-init fixes a folder made without it: `ndx init` commits
+  // what init wrote, and would otherwise commit the cache with it.
+  mkdirSync(svDir, { recursive: true });
+  ensureSvIgnoreEntry(svDir, `${SV_CACHE_DIRNAME}/`);
 
   if (existsSync(join(svDir, "manifest.json"))) {
     info(`${svDirName}/ already initialized in ${absDir}`);
     info("Run 'sourcevision analyze' to update.");
     return;
   }
-
-  mkdirSync(svDir, { recursive: true });
 
   // Git info (returns undefined if not a git repo)
   const gitSha = getCurrentHead(absDir);
@@ -73,9 +74,12 @@ export function cmdInit(dir: string): void {
   info("  sourcevision serve      View results in the browser");
 }
 
-/** Append `entry` to the project's `.gitignore` unless a line already names it. */
-function ensureGitignoreEntry(dir: string, entry: string): void {
-  const gitignorePath = join(dir, ".gitignore");
+/**
+ * Append `entry` to the output folder's own `.gitignore` unless a line already
+ * names it. Entries are relative to `svDir`.
+ */
+export function ensureSvIgnoreEntry(svDir: string, entry: string): void {
+  const gitignorePath = join(svDir, ".gitignore");
   let content = "";
   try {
     content = readFileSync(gitignorePath, "utf-8");

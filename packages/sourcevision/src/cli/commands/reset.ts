@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, rmSync, readdirSync, copyFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, readdirSync, copyFileSync, statSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
 import { info } from "../output.js";
+import { ensureSvIgnoreEntry } from "./init.js";
 import { detectSubAnalyses } from "../sourcevision-core.js";
 import { resolveSourcevisionPaths } from "../../paths.js";
 
@@ -21,8 +22,8 @@ function resetSvDir(svDir: string, label: string): void {
     }
   }
 
-  // Ensure .backup is gitignored
-  writeFileSync(join(svDir, ".gitignore"), ".backup/\n");
+  // Ensure .backup is gitignored, beside the entries init wrote there.
+  ensureSvIgnoreEntry(svDir, ".backup/");
 
   // Remove all analysis files (keep .backup and .gitignore)
   for (const entry of entries) {

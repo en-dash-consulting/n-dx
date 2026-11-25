@@ -35,7 +35,7 @@
  */
 
 import { spawn, execFileSync } from "child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { execFileSyncCli } from "./win-spawn.js";
 import { ensureSourceBuild } from "./source-build.js";
@@ -146,7 +146,7 @@ import {
   terminateTreeByPid,
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
-import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
+import { checkProjectStaleness, formatStalenessNotice, isAnalyzeOnlyProject } from "./stale-check.js";
 import { formatNarrationStatus, readNarrationState } from "./narration-status.js";
 import {
   COMMAND_EFFECTS,
@@ -1655,6 +1655,21 @@ function formatReadmeSummaryLines(result) {
  * @returns {import("./layout.js").Layout} The layout the rest of init writes to.
  */
 function establishInitLayout(dir) {
+  const layout = chooseNewStateLayout(dir);
+  if (layout.container) mkdirSync(layout.container, { recursive: true });
+  return layout;
+}
+
+/**
+ * The layout n-dx state should be created on, without creating anything: the
+ * detected one when the project has `.ndx/` or any legacy state, else `.ndx/`.
+ * {@link establishInitLayout} documents why; `ndx analyze` reuses the rule to
+ * place its output folder in a project init never touched.
+ *
+ * @param {string} dir  Project root.
+ * @returns {import("./layout.js").Layout}
+ */
+function chooseNewStateLayout(dir) {
   const detected = resolveLayout(dir);
   if (detected.mode === "ndx") return detected;
 
@@ -1667,9 +1682,7 @@ function establishInitLayout(dir) {
   ];
   if (legacyState.some((path) => existsSync(path))) return detected;
 
-  const target = resolveLayout(dir, { mode: "ndx" });
-  mkdirSync(target.container, { recursive: true });
-  return target;
+  return resolveLayout(dir, { mode: "ndx" });
 }
 
 /**
@@ -2141,12 +2154,30 @@ async function withPreflight(command, rest, dir, work) {
   }
 }
 
+/**
+ * `ndx analyze` needs no `ndx init`: it creates its output folder where init
+ * would put it and writes nothing else. In a repository that is only analysed,
+ * vendor-CLI invocations are logged inside that folder's machine-local cache
+ * instead of `claude_commands.log` at the root (an operator's own
+ * `NDX_CLI_LOG_PATH` still wins).
+ */
 async function handleAnalyze(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, ["sourcevision"]);
+  const absDir = resolve(dir);
+  if (!statSync(absDir, { throwIfNoEntry: false })?.isDirectory()) {
+    console.error(`Error: ${dir} is not a directory`);
+    exitWithCleanup(1);
+  }
+  const layout = chooseNewStateLayout(absDir);
+  const cacheDir = join(layout.sourcevisionDir, ".cache");
+  mkdirSync(cacheDir, { recursive: true });
+  const extraEnv = isAnalyzeOnlyProject(absDir) && !process.env.NDX_CLI_LOG_PATH
+    ? { NDX_CLI_LOG_PATH: join(cacheDir, CLI_LOG_FILENAME) }
+    : undefined;
+
   const flags = forwardableFlags(extractFlags(rest));
   await withPreflight("analyze", rest, dir, () =>
-    runOrDie(tools.sourcevision, ["analyze", ...flags, dir]),
+    runOrDie(tools.sourcevision, ["analyze", ...flags, dir], extraEnv),
   );
   exitWithCleanup(0);
 }
@@ -3959,7 +3990,10 @@ async function main() {
   // Run before command dispatch so the notice can be shown after output.
   // Skipped for init (about to fix staleness), help, version, and quiet mode,
   // and for extension commands: n-dx resolves no project for an extension.
-  if (!updateCheckQuiet && builtin && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
+  // `analyze` needs no init, so a repository that is only analysed is not an
+  // incomplete setup.
+  const analyzeOnly = command === "analyze" && isAnalyzeOnlyProject(dir);
+  if (!updateCheckQuiet && builtin && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp && !analyzeOnly) {
     try {
       staleCheckResult = checkProjectStaleness(dir);
     } catch {
