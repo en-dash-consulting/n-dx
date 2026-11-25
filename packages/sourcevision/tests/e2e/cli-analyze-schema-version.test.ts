@@ -3,7 +3,7 @@
  * two analyses of an unchanged project write byte-identical fact files (once
  * zones.json has recorded its first stability comparison; see `twoSteadyRuns`).
  *
- * config.json and legacy.json are written only when a language pack produced
+ * config.json, legacy.json and sites.json are written only when a language pack produced
  * their facts, so they are checked over the invented PHP estate
  * (`tests/fixtures/php-legacy-estate/`), which skips when the PHP grammar is
  * not built. Everything else is checked over a small TypeScript project.
@@ -23,7 +23,7 @@ const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const PHP_ESTATE = join(import.meta.dirname, "../fixtures/php-legacy-estate");
 
 /** Written only when a language pack produced their facts. */
-const PACK_ONLY: readonly string[] = [DATA_FILES.config, DATA_FILES.legacy];
+const PACK_ONLY: readonly string[] = [DATA_FILES.config, DATA_FILES.legacy, DATA_FILES.sites];
 
 /** Carries the analysis time, so it differs between two runs by design. */
 const TIMESTAMPED: readonly string[] = [DATA_FILES.manifest];
@@ -92,7 +92,7 @@ describe("schemaVersion on every fact file", { timeout: 600_000 }, () => {
     expectByteIdentical(first, second);
   });
 
-  it("stamps config.json and legacy.json over the PHP estate, byte-identical across runs", async (ctx) => {
+  it("stamps config.json, legacy.json and sites.json over the PHP estate, byte-identical across runs", async (ctx) => {
     await skipUnlessPackRuns(ctx, "php");
     const dir = join(scratch(), "estate");
     cpSync(PHP_ESTATE, dir, { recursive: true });

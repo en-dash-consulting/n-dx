@@ -15,6 +15,8 @@ export const DATA_FILES = {
   config: "config.json",
   /** Written only when a language pack produced version floors or legacy-construct uses. */
   legacy: "legacy.json",
+  /** Written only when a language pack produced dynamic-code sites. */
+  sites: "sites.json",
 } as const;
 
 export const ALL_DATA_FILES = Object.values(DATA_FILES);

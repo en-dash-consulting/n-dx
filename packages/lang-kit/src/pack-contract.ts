@@ -122,10 +122,13 @@ export interface WrittenImport {
    * or that text does not narrow the files down.
    *
    * Candidates are evidence, not edges: consumers must never turn them into
-   * import edges. Held in memory only; no persisted artifact has a field for
-   * them.
+   * import edges. A pack that also reports the include as a dynamic-code site
+   * copies them to {@link DynamicCodeFact.candidates}, which sourcevision
+   * persists; this field itself is held in memory only.
    */
   readonly candidates?: readonly string[];
+  /** How many files the literal text matched, when the pack capped `candidates`; absent when they are all listed. */
+  readonly candidatesTotal?: number;
 }
 
 /** Everything one file refers to. Both lists are sorted and deduplicated. */
@@ -505,7 +508,19 @@ export interface DynamicCodeFact {
   readonly literal?: true;
   /** Set on an `exec` or `dispatch` site fed by a database query result: what feeds it. */
   readonly database?: DynamicCodeDatabase;
+  /** The code of the pack notice that counts the site (`php-db-dispatch`); absent for a pack that notices none. */
+  readonly notice?: string;
+  /** On an `include` site: the project files it could load (`WrittenImport.candidates`), never edges. */
+  readonly candidates?: DynamicIncludeCandidates;
   readonly position: SourcePosition;
+}
+
+/** The files a dynamic include could load. */
+export interface DynamicIncludeCandidates {
+  /** Sorted, distinct, project-relative; a pack may cap the list. */
+  readonly files: readonly string[];
+  /** How many files matched, `files.length` or more. */
+  readonly total: number;
 }
 
 /**

@@ -11,6 +11,7 @@ export {
   OutboundSchema,
   ConfigSchema,
   LegacySchema,
+  SitesSchema,
   BranchWorkRecordSchema,
   validate,
   validateModule,

@@ -1780,6 +1780,61 @@ export interface LegacyData extends FactFile {
   languages: Record<string, LegacyLanguageFiles>;
 }
 
+// ── Dynamic-code sites per file ─────────────────────────────────────────────
+// The per-file facts behind `SdlcLanguageEcosystem`'s `dynamicCode`, written
+// to `sites.json` only when a pack reported a site. Positions and names only:
+// never the expression as written, a value or row data.
+
+/** The files a dynamic include could load; never import edges. */
+export interface CodeSiteCandidates {
+  /** Sorted, distinct, at most 50 (`MAX_SITE_CANDIDATES`). */
+  files: string[];
+  /** How many files matched; more than `files.length` only when `truncated`. */
+  total: number;
+  /** Set when `files` stops at the cap. */
+  truncated?: true;
+}
+
+/** One place a file runs a string as code, chooses what to run from a value, or builds an include path (lang-kit's `DynamicCodeFact`). */
+export interface CodeSite {
+  /** The pack notice that counts the site (`php-db-dispatch`); the site's kind when the pack names none. */
+  code: string;
+  kind: "exec" | "dispatch" | "include";
+  /** What matched, a stable id (`eval`, `variable-function`, `host-include`). */
+  construct: string;
+  /** 1-indexed. */
+  line: number;
+  /** 0-indexed, in UTF-16 code units. */
+  column: number;
+  /** The enclosing function, `Class::method` or closure; absent at a file's top level. */
+  scope?: string;
+  /** Set when an `exec` site's code is written as literals alone. */
+  literal?: true;
+  /** An include's candidate files. */
+  candidates?: CodeSiteCandidates;
+  /** A database-fed site's tables and `table.column` names, each sorted. */
+  database?: { tables: string[]; columns: string[] };
+}
+
+/** One file's sites, sorted by line, then column. */
+export interface SiteFileEntry {
+  path: string;
+  sites: CodeSite[];
+}
+
+/** One language's files with a site; the split is `SdlcLanguageEcosystem`'s, mirror copies left out. */
+export interface SiteLanguageFiles {
+  /** The application's own files, sorted by path. */
+  files: SiteFileEntry[];
+  /** Third-party files likewise; absent when there are none. */
+  thirdParty?: SiteFileEntry[];
+}
+
+/** `sites.json` — per language (the inventory's, lower-cased), each file's dynamic-code sites. */
+export interface SitesData extends FactFile {
+  languages: Record<string, SiteLanguageFiles>;
+}
+
 /**
  * Evidence-based CI/CD maturity for one repository.
  *

@@ -2812,7 +2812,9 @@ var DATA_FILES = {
   /** Written only when a language pack produced config reads or flag checks. */
   config: "config.json",
   /** Written only when a language pack produced version floors or legacy-construct uses. */
-  legacy: "legacy.json"
+  legacy: "legacy.json",
+  /** Written only when a language pack produced dynamic-code sites. */
+  sites: "sites.json"
 };
 var ALL_DATA_FILES = Object.values(DATA_FILES);
 

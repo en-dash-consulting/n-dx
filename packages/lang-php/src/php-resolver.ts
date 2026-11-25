@@ -778,7 +778,10 @@ export function preparePhpImports(
         return w;
       }
       const candidates = outcome.candidates;
-      const include = candidates === undefined ? w : { ...w, candidates: candidates.files };
+      const include =
+        candidates === undefined
+          ? w
+          : { ...w, candidates: candidates.files, ...(candidates.total > candidates.files.length && { candidatesTotal: candidates.total }) };
       readsHost ??= hostReader(file);
       const host = readsHost(w.specifier, w.position);
       dynamic.push({ path: file.path, position: w.position, specifier: w.specifier, host, ...(candidates && { candidates }) });

@@ -796,6 +796,33 @@ export const LegacySchema = z.object({
   })),
 });
 
+// ── Dynamic-code sites per file ─────────────────────────────────────────────
+
+const CodeSiteSchema = z.object({
+  code: z.string().min(1),
+  kind: z.enum(["exec", "dispatch", "include"]),
+  construct: z.string().min(1),
+  line: z.number().int().positive(),
+  column: COUNT,
+  scope: z.string().min(1).optional(),
+  literal: z.literal(true).optional(),
+  candidates: z
+    .object({ files: z.array(z.string().min(1)).min(1), total: z.number().int().positive(), truncated: z.literal(true).optional() })
+    .refine((c) => (c.truncated === true) === c.total > c.files.length, { message: "truncated exactly when total exceeds the listed files" })
+    .optional(),
+  database: z.object({ tables: z.array(z.string().min(1)), columns: z.array(z.string().min(1)) }).optional(),
+});
+
+const SiteFileEntrySchema = z.object({ path: z.string().min(1), sites: z.array(CodeSiteSchema).min(1) });
+
+export const SitesSchema = z.object({
+  ...FactFileVersion,
+  languages: z.record(z.string().min(1), z.object({
+    files: z.array(SiteFileEntrySchema),
+    thirdParty: z.array(SiteFileEntrySchema).min(1).optional(),
+  })),
+});
+
 export const SdlcProfileSchema = z.object({
   schemaVersion: z.string(),
   projectDir: z.string().optional(),
@@ -940,6 +967,8 @@ export function validateModule(
       return validate(ConfigSchema, data);
     case "legacy":
       return validate(LegacySchema, data);
+    case "sites":
+      return validate(SitesSchema, data);
     default:
       return {
         ok: false,

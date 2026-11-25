@@ -31,7 +31,8 @@ deprecated (`LEGACY_STATUSES`; `notice` is never a removal), each version a
 string as code or chooses what to run from a value (`DYNAMIC_CODE_KINDS`),
 with the expression as written and never a value; its optional `database`
 names the tables, `table.column`s and query calls a database-driven site
-reads. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
+reads, `notice` the pack notice code that counts the site, and an include
+site's `candidates` its possible files with their `total`. `ConfigReadFact` and `FlagCheckFact` are language-neutral and
 never carry a value; a flag's `normalized` name comes from
 `normalizeFlagName`, so every pack spells one flag alike. `OutboundCallFact.confidence` means what sourcevision's
 `Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`
@@ -46,7 +47,8 @@ it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
 `namespace` and `constant` symbol kinds (a trait contains its members, a
 namespace does not), the `conditional` `ImportGuard`, `WrittenImport.form`
 (`IMPORT_FORMS`) and `alias`, `WrittenImport.candidates` (a dynamic
-include's possible files, held in memory, never import edges),
+include's possible files, never import edges, with `candidatesTotal` when
+capped),
 `CallFact.construct` (`new`) and `RouteFact.source` (a docroot or
 `.htaccess` line, for a route not declared in its handler's code), and
 `EntryPointFact` (`cli` or `cron`, with its `source` and a cron job's

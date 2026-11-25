@@ -221,6 +221,7 @@ All output is written to `.sourcevision/`:
 | `readiness.json` | Readiness score computed from that profile, with the profile's `ecosystem` carried through unscored |
 | `config.json` | **New.** Where code reads configuration and checks feature flags, per file, with indexes of flags (by normalized name, with the lines each gates) and config keys (with their consumer files). Names, keys and positions only, never values. Written only when a language pack produces config reads or flag checks (the PHP pack does); otherwise absent. Field names are under review. |
 | `legacy.json` | **New.** The files behind `ecosystem`'s `versionFloors` and `legacyConstructs`, per language: each file's floor and every legacy-construct use (see [Legacy constructs per file](#legacy-constructs-per-file)). Written only when a language pack finds a floor or a use (the PHP pack does); otherwise absent. |
+| `sites.json` | **New.** The sites behind `ecosystem`'s `dynamicCode`, per language and file: each site's notice code, construct and position, an include's candidate files (capped at 50, with the total) and a database-fed site's tables and columns (see [Dynamic-code sites per file](#dynamic-code-sites-per-file)). Written only when a language pack finds a site; otherwise absent. |
 | `llms.txt` | AI-readable codebase summary |
 | `CONTEXT.md` | Detailed AI context document |
 | `zones/{zone-id}/` | Per-zone context and summary files |
@@ -400,6 +401,21 @@ A mirror copy is left out of the same phases as third-party code, and its pack t
 ```
 
 Files are sorted by path, uses by line then column. `uses` counts removed and deprecated uses and `notices` the review notices; `removedIn` and `deprecatedIn` count a file's uses as `legacyConstructs` does. Summed over `files`, they equal the profile's `legacyConstructs` (files with a use, uses, notices, per-rule uses and files, `removedIn`, `deprecatedIn`) and the floors equal `versionFloors.floors`; summed over `thirdParty`, they equal `thirdParty.legacyConstructs`. Versions and positions only: each rule's php.net pages are in the profile, and no code is copied. Without a floor or a use no file is written, and one an earlier run left is removed.
+
+## Dynamic-code sites per file
+
+`sites.json` lists, per language and with `legacy.json`'s split (`src/analyzers/pack-sites-files.ts`), each file's dynamic-code sites behind `ecosystem.<lang>.dynamicCode`: code run from a string, what runs chosen by a value, and includes whose path is built at run time. Each site has `code`, the pack notice that counts it (`php-dynamic-include`, `php-host-include`, `php-dynamic-exec`, `php-dynamic-dispatch`, or `php-db-exec`/`php-db-dispatch` for a database-fed site), its `kind`, `construct`, `line` and `column`, and `scope` when it is inside a function.
+
+```json
+{ "languages": { "php": { "files": [
+  { "path": "index.php", "sites": [
+    { "code": "php-host-include", "kind": "include", "construct": "host-include", "line": 3, "column": 8,
+      "candidates": { "files": ["config/a.example.com.php"], "total": 1 } },
+    { "code": "php-db-dispatch", "kind": "dispatch", "construct": "call_user_func", "line": 6, "column": 0,
+      "database": { "tables": ["hooks"], "columns": ["hooks.handler"] } } ] } ] } } }
+```
+
+An include's `candidates` are the files it could load, never edges: at most 50, sorted, with `total`, and `truncated: true` when `total` is larger. A database-fed site names the tables and `table.column`s its queries read. Never the expression as written, a value or row data. Files are sorted by path, sites by line then column. Without a site no file is written, and one an earlier run left is removed. The console notices are unchanged.
 
 ## Jev request size
 

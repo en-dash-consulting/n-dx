@@ -8,7 +8,14 @@ items:
     lastModified: "2026-11-25T04:51:48.846Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e146caf5-d27d-48c2-9f6e-ade3dc48b511":
-    lastModified: "2026-11-25T04:51:39.740Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:14:28.052Z"
+    completedAt: "2026-11-25T06:24:27.372Z"
+    endedAt: "2026-11-25T06:24:27.372Z"
+    activeIntervals: [{"end":"2026-11-25T06:24:27.372Z","start":"2026-11-25T06:14:28.052Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit DynamicCodeFact gains notice and candidates {files,total}; WrittenImport gains candidatesTotal. PHP pack fills them (include candidates via the resolver context). sourcevision writes sites.json (pack-sites-files.ts), registered in data-files.ts, typed in v1.ts, validated; removed when no site."
+    lastModified: "2026-11-25T06:24:27.372Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "efc731f2-9b83-4d5f-8964-6098a729f72b":
     lastModified: "2026-11-25T04:51:42.194Z"
