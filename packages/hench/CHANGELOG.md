@@ -1,5 +1,202 @@
 # @n-dx/hench
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`af36dc6`](https://github.com/en-dash-consulting/n-dx/commit/af36dc66cc229035cfff1814c38e06bba8e81eb3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` retries OpenAI API runs through configured fallback models and Claude when `llm.autoFailover` is enabled.
+  
+  The run consumes at most three fallback selections, checks token and spend limits before each attempt, and keeps each provider's credentials and tool format separate. Usage is attributed to the effective model. Exhaustion restores the original selection and error; cancellation, refusals, malformed output and budget limits stop immediately. Authentication and unavailable-model failures may advance the chain. Failover remains off by default.
+  
+  Each attempt in the OpenAI-origin chain, including Claude fallbacks, gets two minutes plus `ceil(hench.maxTokens / 10)` seconds, clamped to 10–30 minutes. The deadline covers response bodies and primary retries/backoff; secondary clients do not retry. Caller abort takes precedence over timeout.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`1ef17b6`](https://github.com/en-dash-consulting/n-dx/commit/1ef17b65a5f40a669b55ff0e26b9a7f9048cd591) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` reuses Claude orientation sessions across unrelated child environment changes while preserving Codex execution identity checks.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`c0312ba`](https://github.com/en-dash-consulting/n-dx/commit/c0312ba073856eeda452d5b4fe969eb78fd6dc2e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx hench record` measures Codex assisted-skill usage from cumulative rollout counters and reports unavailable usage explicitly.
+  
+  Start with `n-dx hench usage mark --task=<id>`. Codex discovery uses `CODEX_THREAD_ID` and `CODEX_HOME`; explicit session and transcript flags support wrappers. Cached input is separated from fresh input, repeated counters are ignored, and nested records exclude previously attributed spans. Claude message accounting remains supported.
+  
+  Codex records retain their vendor when usage is unavailable, supplied explicitly, or disabled. A transcript from a different vendor cannot consume the selected session's marks or watermark.
+  
+  Action needed: use marks instead of `--since` for Codex rollouts. Missing counters, unsupported formats, and counter resets preserve the boundary for recovery and report unavailable diagnostics. Partial transcripts report partial diagnostics.
+  
+  Soft freeze: additive Codex transcript discovery and persisted diagnostics; existing Claude commands and record fields remain available.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`f2a6963`](https://github.com/en-dash-consulting/n-dx/commit/f2a6963b6fb79981bf884dedc55e971b520489b5) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work --resolve` and the dashboard preparation dialog now identify command, Git-subcommand and blocked-path controls that Codex CLI does not enforce.
+  
+  The same notice appears in run output and saved diagnostics. No vendor or provider is switched automatically. Direct OpenAI API runs retain Hench's tool guards.
+  
+  The hub `Sidecar` separately admits audited macOS Codex CLI 0.167.0-alpha.3.2 (experimental, off by default; enable with `web.sidecar`). Its confined profile does not add command, Git-subcommand, blocked-path or general read-path guards to native Hench runs. Other hub platforms, versions and unavailable executables are refused.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`6e42626`](https://github.com/en-dash-consulting/n-dx/commit/6e426266b307a8dc162326bfc48a6b5ead707500) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` counts resumed Codex usage once and skips assisted bookkeeping inside managed execution and review.
+  
+  Cumulative session counters are converted to fresh-input, cache and output deltas before run and review accounting. Missing boundaries, resets and identity mismatches retain measurement diagnostics; usage rollups preserve partial or unavailable provenance. Standalone assisted marks and nested records keep their existing behavior. Historical run records are unchanged.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`72ff8ef`](https://github.com/en-dash-consulting/n-dx/commit/72ff8efe0997769ddca7ac02a0e3f98f0e70667d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Test-only: Verify literal Codex model pins through Windows command wrapping while preserving rejection and migration-guidance checks.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`35c3d57`](https://github.com/en-dash-consulting/n-dx/commit/35c3d574f49f8e6bcbf8b6d3ad409e04a134d6e0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` reports unsupported Codex command and path guards when Codex reviews a Claude executor's work in pair mode.
+  
+  The warning appears in resolution, dashboard preparation, live output and saved run diagnostics. Non-Codex reviewers, disabled review and API execution do not acquire this warning.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`35c3d57`](https://github.com/en-dash-consulting/n-dx/commit/35c3d574f49f8e6bcbf8b6d3ad409e04a134d6e0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` gives Codex execution and review processes private writable temporary directories, including resumed and forked sessions.
+  
+  Normal temporary-file APIs use the private directory through `TMPDIR`, `TMP` and `TEMP`. Each spawn removes its directory after exit, including failure and cancellation. Host temporary directories stay excluded and network permissions stay unchanged.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`5a62b27`](https://github.com/en-dash-consulting/n-dx/commit/5a62b2765a585347ad9e91187623817f2617c090) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` and Codex completions refuse native environment allowlists that would remove their private temporary directories before model work starts.
+  
+  Action needed: If `shell_environment_policy.include_only` is nonempty, retain `TMPDIR`, `TMP` and `TEMP` explicitly alongside its existing entries. Preserve other exclusions. The selected Codex CLI must support strict `app-server config/read`; update the CLI or `llm.codex.cli_path` if that check is unavailable.
+  
+  The check reads effective native configuration without changing filters, credentials, network permissions or writable roots. Fresh, resumed and forked execution and review calls use the same check.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`5a62b27`](https://github.com/en-dash-consulting/n-dx/commit/5a62b2765a585347ad9e91187623817f2617c090) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` cleans populated read-only Codex temporary directories without replacing successful results, failures or cancellations with cleanup errors.
+  
+  Cleanup repairs permissions only on owned directories, leaves symlink targets untouched and reports an actionable warning if removal cannot finish.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`1d98c43`](https://github.com/en-dash-consulting/n-dx/commit/1d98c439e2ca62fa47a5dfe27894f32a1b91b39f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `llm.effort` now controls supported Codex CLI and OpenAI API reasoning effort, including agent execution and review.
+  
+  Codex checks the selected client's advertised model capabilities before sending an override. Unsupported settings and unavailable capability information warn clearly. OpenAI blocking and streaming requests validate effort against model support. Without an explicit rule, existing client settings and defaults remain unchanged.
+  
+  `n-dx config` accepts `none`, `minimal`, and `ultra` alongside the existing effort levels, and recognizes `agent.review`. Each provider still checks support for the selected model before sending the setting.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`66d672d`](https://github.com/en-dash-consulting/n-dx/commit/66d672d8eda9875885ff6cd48c5503f350d89edb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` reuses eligible Codex work sessions for transient retries and self-review while preserving prior attempt context.
+  
+  Reuse requires a supported selected CLI and matching checkout, model, execution policy and credential identity. Failed retry continuations stop without replaying the work; unsupported or changed identities use a fresh context with the existing retry notice. Review with a different model starts fresh. Batch continuation and pair repair retain their existing behavior.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`8386e6c`](https://github.com/en-dash-consulting/n-dx/commit/8386e6c5c4c9a8b3eaaa8a3ea2cda26a9c3eb2ea) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` continues unfinished Codex sessions once and refuses reviewed completion when the reviewer produces no usable report.
+  
+  Action needed: If review stops without a valid report, fix the reported reviewer problem and rerun the task. Use `--review-optional` only when best-effort review is intended.
+  
+  Continuation uses the original session only while its execution identity remains valid, reapplies policy, and preserves cancellation and validation gates. Shell ampersands do not trigger recovery.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`5424d95`](https://github.com/en-dash-consulting/n-dx/commit/5424d95cff4272c252493733ced790cd198e822c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` uses Luna, Sol 6.1 and Astra for unpinned Codex light, standard and heavy work, with matching init choices and dashboard defaults.
+  
+  Action needed: To retain a previous standard execution default, set `n-dx config llm.codex.model <model-id> .`. This pins standard work only. Preserve heavy work with `n-dx config llm.tiers.codex.heavy <model-id> .` and light work with `n-dx config llm.tiers.codex.light <model-id> .` (or `n-dx config llm.codex.lightModel <model-id> .`). To retain a reviewer, set `n-dx config llm.codex.reviewModel <model-id> .`. Use the previous model ID for each slot you want to keep.
+  
+  Routine review uses Sol 6.1; a saved heavy review tier uses Astra. Existing execution, tier, Hench, task and reviewer pins are preserved without rewriting saved settings. GPT-5.5 remains selectable with an API-key-only label reflecting its ChatGPT sign-in retirement.
+  
+  The heavy tier pin also retains the model for saved `run.reviewTier: heavy` reviews. Such a saved tier takes precedence over `llm.codex.reviewModel`; explicit task reviewer models and CLI reviewer overrides still win.
+  
+  These are workload recommendations, not n-dx benchmarks or proof of account access. Codex effort remains at client defaults pending separate effort support.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`6a6bb33`](https://github.com/en-dash-consulting/n-dx/commit/6a6bb3331547997eee9519a3ae5770cf9c0ad374) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` preserves Codex JSON-summary and text usage reporting while counting resumed session counters only once.
+  
+  Session protocol events retain cumulative accounting and reject unbounded resumed summaries. Partial observations preserve measured output deltas and recover missing input and cache counts from the session rollout when available. Historical records remain unchanged.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`c225ddf`](https://github.com/en-dash-consulting/n-dx/commit/c225ddfcbca6a9ae128dbf93d86dc2dc58c33af3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` supports warm-parent forks with capability-gated Codex binaries and falls back to cold sessions when the selected binary lacks support.
+  
+  Action needed: To retain per-task cold starts on supported Codex versions, set `hench.sessionStrategy` to `cold`.
+  
+  Each task forks the orientation parent, reapplies sandbox, approvals, model and credential hiding, and must report a distinct child session ID. Parent reuse checks checkout, execution policy, binary version and credential/config identity. Opaque keychain identity uses cold starts. Custom-provider fork requests fall back to cold. Batch and explicit cold strategies retain their behavior.
+  
+  The initial conservative version floor is Codex CLI 0.167, with an additional command-surface probe.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`f3d4e26`](https://github.com/en-dash-consulting/n-dx/commit/f3d4e269d52e036f1312b0734744bfb923896384) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Test-only: Verify Codex API task execution with either registry setting, auth and model refusals before task mutation, and dashboard admission while retaining unsupported CLI-provider refusals.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`7c6aac8`](https://github.com/en-dash-consulting/n-dx/commit/7c6aac87a4e0b9d4d246862b477b44f4d66a1b01) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Test-only: Align saved-task provider routing and dashboard regression fixtures with direct OpenAI API execution, retaining unsupported-provider fallback and settings save-order coverage.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`1ef17b6`](https://github.com/en-dash-consulting/n-dx/commit/1ef17b65a5f40a669b55ff0e26b9a7f9048cd591) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx config --help` and run diagnostics explain capability-gated Codex forks and identity fallbacks without denying session resume support.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`9593571`](https://github.com/en-dash-consulting/n-dx/commit/959357134677d6d2faddd95653eb856b9112cf7d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench.testGate.hostSlot` makes hench run one managed test execution at a time per OS user on the host, across worktrees, and records queue time apart from run time.
+  
+  It is off by default, which changes nothing. Set it with `ndx config hench.testGate.hostSlot true .`. The slot covers the test gate and its re-run, the post-task tests and the completion test run; it does not cover an agent's own shell commands, which only `hench.testGate.maxWorkers` bounds. A waiting run prints the holder. Run records and `hench show` gain `queueMs` and `executionMs`. The slot lives under `<ndx home>/validation-slot/`, and a stale holder record is reclaimed automatically. The holder record names the running test command (its process group on POSIX), so a hench process that crashes or is killed mid-run keeps the slot held until its tests have exited.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`12f8590`](https://github.com/en-dash-consulting/n-dx/commit/12f85901302afb7e5aa9455cc7e2ed233681d5d4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work` in a PHP project now runs `php -l` on each changed PHP file and, when Composer files changed, `composer validate`; the test gate runs the project's own `vendor/bin/phpunit`.
+  
+  Action needed: a PHP checkout (as detected below) is now judged against the PHP guard baseline (`php`, `composer`, `phpunit`, `git`). If its `.hench/config.json` was written with the JavaScript defaults, `ndx trust .` reports the extra commands; run `ndx trust accept .` to keep them, or replace the guard with the PHP defaults.
+  
+  A project with a root `composer.json` is detected as PHP by `hench init` and by repository trust. When a root `package.json` sits beside it, the project is PHP only if it has more PHP files than JavaScript/TypeScript files, so a JavaScript app with a little PHP keeps its npm tools while a Laravel app stays PHP. A PHP project gets the PHP guard defaults and the new `php-project` template. Each check runs only when its prerequisite exists: `php -l` and `composer validate` need the tool on PATH, `composer validate` runs only when the change touched `composer.json` or `composer.lock`, and PHPUnit needs `phpunit.xml` or `phpunit.xml.dist` plus an installed `vendor/bin/phpunit`. n-dx installs nothing; a missing tool skips its check. A failing `php -l` or `composer validate` fails the run, so the task is not marked done. These checks run even with `--skip-test-gate`.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`e0d1d99`](https://github.com/en-dash-consulting/n-dx/commit/e0d1d99e274dae23cdbb98728b161383066490ab) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A test run killed inside hench's Linux sandbox no longer leaves later sandboxed test runs waiting on the validation slot until they time out.
+  
+  Under bubblewrap each confined command gets its own PID namespace, and a confined runner cannot tell whether a holder in another sandbox is still alive. Hench runs on the host, where it can, so it now clears a stale holder record before each confined spawn (`run_command`, `git`, the vendor CLI) and before each of its own validation commands. This runs whether or not `hench.testGate.hostSlot` is on, never waits, and never stops the spawn.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`506c354`](https://github.com/en-dash-consulting/n-dx/commit/506c354e5469d1fdef19fca2306f82f0fb298922) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A failing machine-id lookup no longer delays each sandboxed command, or fails a test run started inside another run's validation slot.
+  
+  Hench now reads the slot directory on the host and passes it as `NDX_VALIDATION_SLOT_DIR` (the directory only, no token) to every command it confines: `run_command`, `git`, its own validation commands and the vendor CLI session. An absolute `NDX_VALIDATION_SLOT_DIR` is the slot directory for hench and for `scripts/run-all-tests.mjs`, with or without a token, so a run handed one does no lookup of its own. A transient lookup failure is remembered for 60 s instead of being retried by every caller, and the stale-holder check before each confined spawn never waits on a lookup: until the host's identity is known, it skips that spawn's check.
+  
+  The vendor CLI session, Codex's included, waits for the lookup when it is still running, up to the 10 s lookup limit, and Ctrl-C stops the wait, so a session started early no longer runs without the directory for its whole life. If the lookup fails, the session starts without it and one warning says so.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`f07f977`](https://github.com/en-dash-consulting/n-dx/commit/f07f9776a0de58b274ba0c0748e975352a14caf6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, a network change that renames the host (macOS `ryans-mbp.local` → `ryans-mbp.lan`) no longer lets two test runs on one machine run at once.
+  
+  The slot directory is now named after a hash of the machine id (Linux `/etc/machine-id`, macOS `IOPlatformUUID`, Windows `MachineGuid`), falling back to a hash of the hostname when none can be read; no raw id is written to disk. The command hench runs inside the slot also gets the slot's directory as `NDX_VALIDATION_SLOT_DIR` beside its token, so a slot acquire it starts nests in its parent's slot even if its own lookup would differ.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`4e8c9c3`](https://github.com/en-dash-consulting/n-dx/commit/4e8c9c3c92cc5113ae46fb0cae8d2186b5d891e7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, the validation slot is now per host: it lives in `<ndx home>/validation-slot/<host>/`, one directory per machine.
+  
+  Hosts that share one ndx home over a network filesystem no longer clear each other's slot and run their tests at the same time. A rare race between two waiters clearing a crashed holder could also let both run at once; a waiter now removes only its own reclaim lock.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`cf31738`](https://github.com/en-dash-consulting/n-dx/commit/cf317382fb3db5b07ff855223eb505d8e676cd93) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, a restarted hench no longer waits forever on a slot record left under its own process id, and the wait message names the record to delete.
+  
+  When hench dies without giving the slot back, the operating system can give its process id to another process. Windows does this within moments. A hench process now treats a `holder.json` or `reclaim.lock` that names its own process id, but a token it does not hold, as left by a dead process and reclaims it at once, unless the record's test command is still running. Another hench process cannot tell whether that process id has been reused, so it keeps waiting. The wait line now ends with the full `holder.json` path: confirm no ndx test run is active, then delete that file. Only an interrupt (Ctrl-C, SIGTERM) stops a wait; there is no maximum wait.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`2be1521`](https://github.com/en-dash-consulting/n-dx/commit/2be15210f623e6d606e5ebdc718bf71e7161421a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With `hench.testGate.hostSlot` on, a validation slot that cannot be taken no longer lets a run finish without running its tests.
+  
+  If the slot directory cannot be written (no permission, a read-only or full disk, a filesystem without hard links), the test gate, its re-run, the post-task tests and the completion check now run their command without the slot and report its real result. A warning says the slot was skipped, why, and names the slot directory. Before, the gate was reported as not run and the task was completed and committed untested. Interrupting a wait (Ctrl-C, SIGTERM) still stops without running the tests.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`2292ea5`](https://github.com/en-dash-consulting/n-dx/commit/2292ea556159b9fa13cf4a2dc9073f26b96a792f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench.testGate.maxWorkers` caps the test workers of every test command a run starts, passed as `NDX_TEST_MAX_WORKERS`.
+  
+  It reaches the test gate and its re-run, the post-task tests, the completion test run and the agent's shell. It is unset by default, which changes nothing. A lower `NDX_TEST_MAX_WORKERS` already in the environment wins, so the setting can lower a cap you exported but never raise it. Set it with `ndx config hench.testGate.maxWorkers 2 .`; it only takes effect in a project whose vitest configs read `NDX_TEST_MAX_WORKERS`. An invalid value is refused.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`796e7f7`](https://github.com/en-dash-consulting/n-dx/commit/796e7f7277a95c20bf9baabc6a83ec47b172da9f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` preserves earlier context in summaries when OpenAI API runs use the default model tiers.
+  
+  Compaction uses Chat Completions for the default Luna summary and keeps the Responses endpoint for existing Sol and Astra agent-model pins. Summary requests honor explicit tier, route, and effort settings. Billed tokens from a truncated or filtered Chat Completions summary count toward the run even when its text is discarded.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`ebcfab1`](https://github.com/en-dash-consulting/n-dx/commit/ebcfab1180b813b0482ba72b0c01ecda3485dfea) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work --provider=api` runs Codex tasks and sequential loops through OpenAI Responses, with guarded tools, budgets, cancellation and completion checks.
+  
+  Select a supported model (`gpt-6.1-sol` or `gpt-6-astra`) and configure OpenAI API authentication. CLI execution with API-key authentication remains a separate supported option. Direct runs support diff approval; CLI self/pair review remains unavailable on API execution. OpenAI API failover is opt-in through `llm.autoFailover`: Codex light, Claude standard, then Claude light, at most once per selection per run. Claude uses its own API credentials; unsupported OpenAI fallback models are skipped.
+  
+  The dashboard offers both Codex providers and checks API readiness from the selected authentication mode. API model discovery no longer requires a Codex CLI install.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: every package suite can measure line, branch and function coverage with per-line hit counts, and fails below its recorded coverage floor.
+  
+  `pnpm test:coverage` runs each package's new `test:coverage` script, which writes HTML, lcov and JSON reports to `packages/<pkg>/coverage/`. `pnpm coverage:lines <pkg>` prints how many times the suite executed each line. Shared settings live in `tests/vitest-coverage.mjs`; see TESTING.md, "Code Coverage".
+
+- [#1085](https://github.com/en-dash-consulting/n-dx/pull/1085) [`6d42dbc`](https://github.com/en-dash-consulting/n-dx/commit/6d42dbce2a9121f03a6c4e7a4d23b2b490e5aaa1) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard's add-change box shows a `+` for attaching images when the model `ndx work` runs takes images, with thumbnails below the box until you add.
+  
+  Pick images with `+` or paste one into the box. PNG, JPEG, GIF and WebP up to 5 MB each are accepted, at most eight per change. Add creates the change first, then stores each image beside its `index.md` in the change's folder under `changes/`. The image moves with the change when it is placed or reparented. If an image cannot be stored, the change is still added and the box says which image failed.
+  
+  `ndx work` lists a change's images in the agent's brief, under Attached Images, with their paths, so the agent opens them before starting. The `+` is offered for Claude, Codex and Gemini models. For a local model it is offered only when the model's name marks it as a vision model (for example `llava` or `qwen2.5vl`). It is offered only on v2 PRDs.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`d5e1f90`](https://github.com/en-dash-consulting/n-dx/commit/d5e1f90f795c8e042c56e003dfad9fd6e1a51198) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx` preserves explicit Codex model pins across configuration, task execution and review, including older IDs supported by API-key authentication.
+  
+  Action needed: If Codex rejects a pinned model with ChatGPT authentication, explicitly select an available model in the originating setting, or configure an API key with `n-dx config credentials.codex` and select `n-dx config llm.codex.auth api` if your API project supports that model.
+  
+  Model defaults no longer replace older pins. Authentication-specific model rejections explain the choice without changing settings or retrying with another model. Older IDs missing from the pricing table are reported as unknown instead of using a replacement model's rates as known prices.
+  
+  Long, repetitive provider errors no longer stall Codex model-rejection guidance.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`624a286`](https://github.com/en-dash-consulting/n-dx/commit/624a2866587ec56dcb72b05163566b9780cfa835) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: remove dead code without changing behaviour: empty placeholder modules, unused re-export barrels and shims, unexported helpers and exports nothing imported, and unused locals in the dashboard.
+  
+  Removed `hench/src/tools/pr-status-trailers.ts`, `hench/src/process/exec-shell.ts`, `hench/src/types/index.ts`, `rex/src/core/compact-single-children.ts` and `sourcevision/src/analyzers/index.ts`; none had an importer. The `./dist/*` subpaths of those files no longer exist; that export is an internal escape hatch with no stability guarantee.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`196c89c`](https://github.com/en-dash-consulting/n-dx/commit/196c89c94357fe21bb71f97081e60799c33eb9c1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The OS sandbox lets confined test gates and agent shells use the host validation slot in `<ndx home>/validation-slot/`, so the slot works with `NDX_SANDBOX` on.
+  
+  Before this, a confined command that took the slot (the repository's own test runner, or a gate with `hench.testGate.hostSlot` on) failed with `EPERM` before any test ran, because the sandbox denies the ndx home. Tool children and the vendor CLI now get read and write access to that one directory, which holds only pids, tokens, timestamps and project paths. The dashboard token, the credential store and the rest of the ndx home stay denied, and git hooks get no access. The directory is created before the spawn. A nested acquire now reads the holder record before it creates or writes anything, so it needs read access only.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`c38983e`](https://github.com/en-dash-consulting/n-dx/commit/c38983e92756424a1126f8b553268b07cdcff9fc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Under bubblewrap on Linux, a confined test runner now nests inside its gate's validation slot and waits for a live holder instead of taking the slot from it.
+  
+  bubblewrap gives the confined command its own PID namespace, where the holder's pid outside it looked dead. A gate's runner then queued behind its own gate, and an agent shell with no token removed a live holder's record and ran beside it. Each slot record now names the PID namespace it was written in, and the sandbox tells the confined command which namespaces enclose it. A holder outside the reader's namespace, or in a sibling sandbox, is never judged dead. One inside it is judged by its pid there. Seatbelt on macOS, and records written by earlier versions, keep the plain pid check.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`0248eed`](https://github.com/en-dash-consulting/n-dx/commit/0248eed741f3e48ef39b986dc88e6a7a7fb65ab4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work --provider=api` continues OpenAI reasoning and token-limited turns safely, identifies Claude refusals correctly, and returns cancelled tasks to pending.
+  
+  Stateless Responses requests ask for encrypted reasoning. JSON and streaming output-token exhaustion retain measured usage and prompt continuation, including reasoning-only responses. Calls and opaque reasoning from truncated turns are discarded; other incomplete or malformed responses fail safely, and truncated context summaries remain rejected.
+  
+  Opt-in `llm.autoFailover` consumes Codex light, Claude standard and Claude light at most once each per run, with separate credentials and usage attribution. Refusals, malformed output, budget limits and caller aborts do not switch providers. Cancelled OpenAI and Claude API tasks emit `task_cancelled`.
+  
+  Healthy reasoning/output turns can exceed one minute. Each attempt in this OpenAI-origin chain, including Claude fallbacks, gets two minutes plus `ceil(hench.maxTokens / 10)` seconds, clamped to 10–30 minutes. The deadline covers body reads and primary retries/backoff; secondary calls do not retry. Caller abort wins over timeout. Failover stays off by default.
+
+- [#1065](https://github.com/en-dash-consulting/n-dx/pull/1065) [`5d4fad4`](https://github.com/en-dash-consulting/n-dx/commit/5d4fad41c207e4086726d6ae571a226b69b5f997) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: refactor hench without changing behaviour: the three API loops share their scaffolding, the pre-run commit gate moves out of shared.ts, and run-record caps and local endpoint defaults are named once.
+
+- [#1029](https://github.com/en-dash-consulting/n-dx/pull/1029) [`57ce619`](https://github.com/en-dash-consulting/n-dx/commit/57ce61952f5ed1cae0e4fb5c1c64ad4aec61a783) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `n-dx work` reports failed Codex continuations with the actual attempt count and describes truncated sessions as unfinished.
+  
+  Failed continuations stop without claiming the configured retry budget was exhausted. Cancellation, timeout and other run bounds retain their existing outcomes.
+
+- [#1030](https://github.com/en-dash-consulting/n-dx/pull/1030) [`1799c93`](https://github.com/en-dash-consulting/n-dx/commit/1799c934c784eae570c14d5471432baf579fbe73) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On Linux, the host validation slot is now reclaimed after a sandboxed holder exits, so later test gates no longer wait forever behind a slot nobody holds.
+  
+  Before, hench treated some of your own processes that Linux will not let it inspect as possibly the gone holder. It now skips processes that cannot be inside a sandbox.
+- Updated dependencies [[`3c39a05`](https://github.com/en-dash-consulting/n-dx/commit/3c39a05a8bffb6bd6bbaa8c87a03a5bd83270fdd), [`0915a65`](https://github.com/en-dash-consulting/n-dx/commit/0915a6527b22ed5bada412d6ef89d0dfbef30a07), [`6e42626`](https://github.com/en-dash-consulting/n-dx/commit/6e426266b307a8dc162326bfc48a6b5ead707500), [`72ff8ef`](https://github.com/en-dash-consulting/n-dx/commit/72ff8efe0997769ddca7ac02a0e3f98f0e70667d), [`388ea30`](https://github.com/en-dash-consulting/n-dx/commit/388ea30de298e7db30f01f9aaf9aba2813d5dabc), [`35c3d57`](https://github.com/en-dash-consulting/n-dx/commit/35c3d574f49f8e6bcbf8b6d3ad409e04a134d6e0), [`5a62b27`](https://github.com/en-dash-consulting/n-dx/commit/5a62b2765a585347ad9e91187623817f2617c090), [`5a62b27`](https://github.com/en-dash-consulting/n-dx/commit/5a62b2765a585347ad9e91187623817f2617c090), [`1d98c43`](https://github.com/en-dash-consulting/n-dx/commit/1d98c439e2ca62fa47a5dfe27894f32a1b91b39f), [`66d672d`](https://github.com/en-dash-consulting/n-dx/commit/66d672d8eda9875885ff6cd48c5503f350d89edb), [`231b98e`](https://github.com/en-dash-consulting/n-dx/commit/231b98e2aab4c0c40dad63618137d9b5a0a1b177), [`5424d95`](https://github.com/en-dash-consulting/n-dx/commit/5424d95cff4272c252493733ced790cd198e822c), [`c225ddf`](https://github.com/en-dash-consulting/n-dx/commit/c225ddfcbca6a9ae128dbf93d86dc2dc58c33af3), [`f2a6963`](https://github.com/en-dash-consulting/n-dx/commit/f2a6963b6fb79981bf884dedc55e971b520489b5), [`59b22c4`](https://github.com/en-dash-consulting/n-dx/commit/59b22c401d4bcc421af760f0f22f7f884a53a995), [`12f8590`](https://github.com/en-dash-consulting/n-dx/commit/12f85901302afb7e5aa9455cc7e2ed233681d5d4), [`a1cf1a2`](https://github.com/en-dash-consulting/n-dx/commit/a1cf1a29169fb953a90353e0fefc23025e5592a1), [`0b2cff4`](https://github.com/en-dash-consulting/n-dx/commit/0b2cff4f72112b52261b2bb41eeaba48ff86d4e2), [`966bfdc`](https://github.com/en-dash-consulting/n-dx/commit/966bfdc0227f593b9040408ed048af28a3e7c14f), [`796e7f7`](https://github.com/en-dash-consulting/n-dx/commit/796e7f7277a95c20bf9baabc6a83ec47b172da9f), [`ebcfab1`](https://github.com/en-dash-consulting/n-dx/commit/ebcfab1180b813b0482ba72b0c01ecda3485dfea), [`be3ca15`](https://github.com/en-dash-consulting/n-dx/commit/be3ca157bec442233a17495296baa6b8dd20eae1), [`144a340`](https://github.com/en-dash-consulting/n-dx/commit/144a3402adafdef7674df3f7611ea5c026eefc2b), [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95), [`6d42dbc`](https://github.com/en-dash-consulting/n-dx/commit/6d42dbce2a9121f03a6c4e7a4d23b2b490e5aaa1), [`d5e1f90`](https://github.com/en-dash-consulting/n-dx/commit/d5e1f90f795c8e042c56e003dfad9fd6e1a51198), [`a1cf1a2`](https://github.com/en-dash-consulting/n-dx/commit/a1cf1a29169fb953a90353e0fefc23025e5592a1), [`624a286`](https://github.com/en-dash-consulting/n-dx/commit/624a2866587ec56dcb72b05163566b9780cfa835), [`a1cf1a2`](https://github.com/en-dash-consulting/n-dx/commit/a1cf1a29169fb953a90353e0fefc23025e5592a1), [`56bf63e`](https://github.com/en-dash-consulting/n-dx/commit/56bf63e9000ff4142c2c1da33f35b110f54e9691), [`196c89c`](https://github.com/en-dash-consulting/n-dx/commit/196c89c94357fe21bb71f97081e60799c33eb9c1), [`c38983e`](https://github.com/en-dash-consulting/n-dx/commit/c38983e92756424a1126f8b553268b07cdcff9fc), [`0248eed`](https://github.com/en-dash-consulting/n-dx/commit/0248eed741f3e48ef39b986dc88e6a7a7fb65ab4), [`1dc0110`](https://github.com/en-dash-consulting/n-dx/commit/1dc01107170e5152c4874798bacd765fa490b8f8), [`7cafacd`](https://github.com/en-dash-consulting/n-dx/commit/7cafacd93a2369e4d6375b4e1a0815b13f9f345e), [`2f58d1c`](https://github.com/en-dash-consulting/n-dx/commit/2f58d1c309c8ee327a9209f8bff28c67bead098f)]:
+  - @n-dx/llm-client@0.10.5
+  - @n-dx/rex@0.10.5
+
 ## 0.10.4
 
 ### Patch Changes

@@ -11,5 +11,6 @@ items:
     startedAt: "2026-04-03T14:35:08.286Z"
     completedAt: "2026-04-03T14:35:08.286Z"
     appliedAt: "2026-04-03T14:35:08.286Z"
+    shippedIn: "0.10.5"
     lastModified: "2026-11-19T15:36:20.751Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
