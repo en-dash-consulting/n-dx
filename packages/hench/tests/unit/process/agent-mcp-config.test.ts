@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -215,6 +215,17 @@ describe("resolveLauncherCli", () => {
 // ── writeAgentMcpConfig / prepareAgentMcpConfig ──────────────────────────
 
 describe("writeAgentMcpConfig", () => {
+  it("refuses a redirected MCP directory before sweeping or writing there", async () => {
+    const henchDir = join(dir, ".hench");
+    const sibling = join(dir, "other-checkout");
+    await mkdir(henchDir);
+    await mkdir(sibling);
+    await symlink(sibling, join(henchDir, "mcp"), "junction");
+    await expect(writeAgentMcpConfig({ henchDir, runId: "run", cliPath: REAL_CORE_CLI, projectDir: dir }))
+      .rejects.toThrow(/MCP configuration directory/);
+    expect(await readdir(sibling)).toEqual([]);
+  });
+
   it("writes under .hench/mcp/, which is gitignored", async () => {
     const henchDir = join(dir, ".hench");
     const path = await writeAgentMcpConfig({

@@ -24,7 +24,7 @@
 
 import { codexGuardLimitations } from "./codex-policy.js";
 import { CodexManagedUsage } from "./codex-managed-usage.js";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RetryConfig, RunRecord, TokenUsage, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
@@ -110,6 +110,7 @@ import {
 } from "./spawn-budget.js";
 import { DEFAULT_TASKS_PER_SESSION } from "./session-cache.js";
 import { mkdir, rm, writeFile, readFile } from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import { dirname } from "node:path";
 import {
   loadLLMConfig,
@@ -186,6 +187,7 @@ import {
   prepareAgentMcpConfig,
   LAUNCHER_REJECTION_DETAIL,
 } from "../../process/agent-mcp-config.js";
+import { bindCodexMcp, readExecutorMcpBinding } from "./codex-mcp-binding.js";
 
 // ── normalizeCodexResponse ────────────────────────────────────────────────
 
@@ -943,6 +945,9 @@ export async function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<S
   const backstop = opts.configBackstop;
   const scratch = opts.spawnConfig.withScratchDir ? createCodexScratch() : undefined;
   try {
+    if (opts.spawnConfig.codexMcpBinding) {
+      readExecutorMcpBinding(opts.spawnConfig.codexMcpBinding.path, opts.cwd);
+    }
     if (scratch) {
       const spawnConfig = opts.spawnConfig.withScratchDir!(scratch.dir);
       opts = { ...opts, spawnConfig, cliEnv: { ...opts.cliEnv, ...spawnConfig.env } };
@@ -1000,7 +1005,16 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     })
     : cliEnv;
   const spawnEnv = sandbox ? await sandbox.prepareSpawn(sessionEnv) : sessionEnv;
-  // An abort that fired during the await above has no listener to reach yet.
+  let args = spawnConfig.args;
+  if (spawnConfig.codexMcpBinding && !abortSignal?.aborted) {
+    try {
+      args = await bindCodexMcp({ ...spawnConfig.codexMcpBinding, binary: cliBinary,
+        args, cwd, env: spawnEnv, signal: abortSignal });
+    } catch (error) {
+      if (!abortSignal?.aborted) throw error;
+    }
+  }
+  // No child listener exists until all asynchronous preflights have settled.
   if (abortSignal?.aborted) {
     sandbox?.dispose();
     const reason = describeAbortReason(abortSignal.reason);
@@ -1012,8 +1026,8 @@ async function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnR
     // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
     // with a self-quoted verbatim command line instead of shell:true+args.
     const inv = sandbox
-      ? sandbox.wrap(cliBinary, [...spawnConfig.args])
-      : { file: cliBinary, args: [...spawnConfig.args], env: {} };
+      ? sandbox.wrap(cliBinary, [...args])
+      : { file: cliBinary, args: [...args], env: {} };
     const proc = spawnCli(inv.file, inv.args, {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
@@ -2736,8 +2750,6 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     if (isSelfConfinedVendorSession(projectDir, vendor)) startHostIdentityLookup();
   }
 
-  await transitionToInProgress(store, taskId, brief.task.status);
-
   // Build the execution policy from guard config (needed for diagnostics at init)
   const policy: ExecutionPolicy = {
     ...DEFAULT_EXECUTION_POLICY,
@@ -2762,8 +2774,66 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const reviewVendor: LLMVendor = pairVendor ?? vendor;
   const reviewModel = opts.reviewPass ? resolveReviewModel(reviewVendor, llmConfig, opts.reviewModel) : undefined;
 
+  // Validate routing before opening run writers or mutating PRD status.
+  const runId = randomUUID();
+  // CLI-specific: load config for CLI path and env resolution
+  const cliBinary = resolveVendorCliPath(llmConfig, config);
+  // The session's shell inherits this, so the agent's own test runs are
+  // capped like the gate's.
+  const cliEnv = resolveSessionCliEnv(llmConfig, config, "CLI environment", (line) => {
+    detail(line, { captureWhenQuiet: true });
+  });
+
+  const configuredEffort = vendor === LLM_VENDOR.CODEX
+    ? resolveTaskModel("agent.execute", llmConfig).effort
+    : resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig);
+  const executionEffort = vendor === LLM_VENDOR.CODEX
+    ? await resolveCodexCliEffort(opts.spawnModel, configuredEffort, { binary: cliBinary, env: cliEnv, cwd: projectDir }, "agent.execute")
+    : configuredEffort;
+
+  // Pin the spawned session's MCP servers to *this* project directory, so the
+  // agent's PRD writes land in the worktree the run is executing in. Without
+  // this the session inherits Claude Code's registrations for the repository,
+  // and a local-scope entry pinning another checkout silently redirects every
+  // `update_task_status` there — the per-workspace PRD lock cannot help,
+  // because the write never reaches this workspace at all.
+  //
+  // Codex verifies its native effective registrations before every spawn.
+  //
+  // A claude pair reviewer captures findings to the PRD too, so it needs the
+  // same pin even when the executor is codex.
+  let mcpConfigPath: string | undefined;
+  let reviewerMcpConfigPath: string | undefined;
+  if (vendor === LLM_VENDOR.CLAUDE || vendor === LLM_VENDOR.CODEX || reviewVendor === LLM_VENDOR.CLAUDE) {
+    const prepared = await prepareAgentMcpConfig({ henchDir, runId,
+      projectDir: vendor === LLM_VENDOR.CODEX ? realpathSync(projectDir) : projectDir });
+    if (prepared.ok) {
+      mcpConfigPath = prepared.path;
+      if (reviewVendor === LLM_VENDOR.CLAUDE) reviewerMcpConfigPath = prepared.path;
+    } else {
+      if (vendor === LLM_VENDOR.CODEX) {
+        throw new Error(`Codex MCP binding refused: ${LAUNCHER_REJECTION_DETAIL[prepared.reason]}. Launch with n-dx work from the assigned checkout; inherited MCP registrations are not permitted.`);
+      }
+      detail(
+        `MCP servers: inheriting the session's registrations ` +
+          `(${LAUNCHER_REJECTION_DETAIL[prepared.reason]}). ` +
+          `PRD writes are not pinned to ${projectDir}.`,
+      );
+    }
+  }
+
+  // Refuse an invalid executor binding before changing any PRD task status.
+  // Spawn-time verification below repeats this on fresh/resume/fork/retry.
+  if (vendor === LLM_VENDOR.CODEX) {
+    if (!mcpConfigPath) throw new Error("Codex MCP binding refused: missing executor configuration");
+    await bindCodexMcp({ path: mcpConfigPath, binary: cliBinary,
+      args: ["exec"], cwd: projectDir, env: cliEnv, signal: opts.abortSignal });
+  }
+  await transitionToInProgress(store, taskId, brief.task.status);
+
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
+    runId,
     reviewPlan: reviewModel === undefined
       ? undefined
       : {
@@ -2811,49 +2881,6 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const boundedBriefText = briefText.length > contextCharLimit
     ? briefText.slice(0, contextCharLimit)
     : briefText;
-
-  // CLI-specific: load config for CLI path and env resolution
-  const cliBinary = resolveVendorCliPath(llmConfig, config);
-  // The session's shell inherits this, so the agent's own test runs are
-  // capped like the gate's.
-  const cliEnv = resolveSessionCliEnv(llmConfig, config, "CLI environment", (line) => {
-    detail(line, { captureWhenQuiet: true });
-  });
-
-  const configuredEffort = vendor === LLM_VENDOR.CODEX
-    ? resolveTaskModel("agent.execute", llmConfig).effort
-    : resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig);
-  const executionEffort = vendor === LLM_VENDOR.CODEX
-    ? await resolveCodexCliEffort(opts.spawnModel, configuredEffort, { binary: cliBinary, env: cliEnv, cwd: projectDir }, "agent.execute")
-    : configuredEffort;
-
-  // Pin the spawned session's MCP servers to *this* project directory, so the
-  // agent's PRD writes land in the worktree the run is executing in. Without
-  // this the session inherits Claude Code's registrations for the repository,
-  // and a local-scope entry pinning another checkout silently redirects every
-  // `update_task_status` there — the per-workspace PRD lock cannot help,
-  // because the write never reaches this workspace at all.
-  //
-  // Claude only: no other adapter honours `--mcp-config`, and the pre-flight
-  // warns for those instead.
-  //
-  // A claude pair reviewer captures findings to the PRD too, so it needs the
-  // same pin even when the executor is codex.
-  let mcpConfigPath: string | undefined;
-  let reviewerMcpConfigPath: string | undefined;
-  if (vendor === LLM_VENDOR.CLAUDE || reviewVendor === LLM_VENDOR.CLAUDE) {
-    const prepared = await prepareAgentMcpConfig({ henchDir, runId: run.id, projectDir });
-    if (prepared.ok) {
-      if (vendor === LLM_VENDOR.CLAUDE) mcpConfigPath = prepared.path;
-      if (reviewVendor === LLM_VENDOR.CLAUDE) reviewerMcpConfigPath = prepared.path;
-    } else {
-      detail(
-        `MCP servers: inheriting the session's registrations ` +
-          `(${LAUNCHER_REJECTION_DETAIL[prepared.reason]}). ` +
-          `PRD writes are not pinned to ${projectDir}.`,
-      );
-    }
-  }
 
   // Assemble the review-pass context once, if `--review` is on. Building it
   // here rather than at the call site keeps the per-attempt success path free

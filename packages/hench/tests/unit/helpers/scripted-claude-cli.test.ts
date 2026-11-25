@@ -34,14 +34,17 @@ describe("scripted CLI config preflight", () => {
     const model = vi.fn(() => modelTurn);
     const spawn = cliSpawnsOnly(model);
     const set = { TMPDIR: "C:\\private temp\\scratch", TMP: "C:\\private temp\\scratch", TEMP: "C:\\private temp\\scratch" };
-    const args = ["app-server", ...Object.entries(set).flatMap(([key, value]) => ["-c", `shell_environment_policy.set.${key}=${JSON.stringify(value)}`])];
+    const args = ["app-server", "-c", "features.apps=false", "-c", "mcp_servers.rex.enabled=true",
+      ...Object.entries(set).flatMap(([key, value]) => ["-c", `shell_environment_policy.set.${key}=${JSON.stringify(value)}`])];
     const child = (platform === "Windows"
       ? spawn("C:\\Windows\\System32\\cmd.exe", ["/d", "/v:off", "/s", "/c", `"${buildWindowsCliCommandLine("codex", args)}"`])
       : spawn("codex", args)) as ChildProcessWithoutNullStreams;
     try {
       const response = new Promise<string>(resolve => child.stdout.once("data", chunk => resolve(String(chunk))));
       child.stdin.write(JSON.stringify({ id: 1, method: "config/read" }) + "\n");
-      expect(JSON.parse(await response)).toEqual({ id: 1, result: { config: { shell_environment_policy: { set } } } });
+      expect(JSON.parse(await response)).toEqual({ id: 1, result: { config: {
+        shell_environment_policy: { set }, features: { apps: false }, mcp_servers: { rex: { enabled: true } },
+      } } });
       expect(model).not.toHaveBeenCalled();
       expect(spawn("codex", ["exec", "-m", "gpt-5.4"])).toBe(modelTurn);
       expect(model).toHaveBeenCalledExactlyOnceWith("codex", ["exec", "-m", "gpt-5.4"], undefined);

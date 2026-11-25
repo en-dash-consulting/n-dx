@@ -29,10 +29,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, realpathSync, writeFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { serializeDocument } from "@n-dx/rex";
 import { cleanupProjectDir } from "../helpers/index.js";
 import {
@@ -63,6 +63,7 @@ describe("codex batch resume — contract", () => {
   let cli: ScriptedClaudeCli;
 
   beforeEach(async () => {
+    vi.stubEnv("NDX_CLI_PATH", resolve(import.meta.dirname, "../../../core/cli.js"));
     vi.resetModules();
     ({ projectDir, henchDir, rexDir } = await setupScriptedProject("hench-codex-resume-"));
 
@@ -98,6 +99,7 @@ describe("codex batch resume — contract", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     vi.doUnmock("node:child_process");
     vi.restoreAllMocks();
     await cleanupProjectDir(projectDir);
@@ -219,6 +221,15 @@ describe("codex batch resume — contract", () => {
       "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
       "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
+      "-c", "features.apps=false",
+      "-c", "features.plugins=false",
+      ...[["rex", "rex"], ["sourcevision", "sv"]].flatMap(([name, command]) => [
+        "-c", `mcp_servers.${name}.command=${JSON.stringify(process.execPath)}`,
+        "-c", `mcp_servers.${name}.args=${JSON.stringify([realpathSync(process.env.NDX_CLI_PATH!), command, "mcp", realpathSync(projectDir)])}`,
+        "-c", `mcp_servers.${name}.cwd=${JSON.stringify(realpathSync(projectDir))}`,
+        "-c", `mcp_servers.${name}.enabled=true`,
+        "-c", `mcp_servers.${name}.required=true`,
+      ]),
       "-",
     ]);
     expect(run.session).toMatchObject({ strategy: "batch", outcome: "hit", reason: "chain-continued" });

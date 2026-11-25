@@ -41,10 +41,11 @@
  */
 
 import { existsSync, realpathSync } from "node:fs";
-import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { projectRootOf } from "../prd/llm-gateway.js";
 
 /**
  * Why no launcher CLI could be used, in a form the run can print.
@@ -355,12 +356,25 @@ export async function writeAgentMcpConfig(opts: {
   readonly projectDir: string;
 }): Promise<string> {
   const path = agentMcpConfigPath(opts.henchDir, opts.runId);
-  const dir = dirname(path);
-  await mkdir(dir, { recursive: true });
+  const dir = join(opts.henchDir, AGENT_MCP_DIRNAME);
+  const root = projectRootOf(resolve(opts.henchDir));
+  if (realpathSync(root) !== realpathSync(opts.projectDir) || dirname(path) !== dir) {
+    throw new Error("MCP configuration directory must belong to the assigned worktree");
+  }
+  // Validate each state-directory component before creating children or
+  // sweeping old files. A linked checkout root itself is a valid alias.
+  let parent = root;
+  for (const part of relative(root, dir).split(sep)) {
+    parent = join(parent, part);
+    await mkdir(parent, { recursive: true, mode: 0o700 });
+    if (!(await lstat(parent)).isDirectory()) {
+      throw new Error(`Unsafe MCP configuration directory ${parent}: expected a directory in the assigned worktree`);
+    }
+  }
   await pruneStaleConfigs(dir, Date.now());
 
   const doc = buildAgentMcpServers({ cliPath: opts.cliPath, projectDir: opts.projectDir });
-  await writeFile(path, `${JSON.stringify(doc, null, 2)}\n`, "utf-8");
+  await writeFile(path, `${JSON.stringify(doc, null, 2)}\n`, { encoding: "utf-8", mode: 0o600, flag: "wx" });
   return path;
 }
 

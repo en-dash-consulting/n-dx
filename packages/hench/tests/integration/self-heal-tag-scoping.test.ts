@@ -23,7 +23,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig, saveConfig } from "../../src/store/config.js";
 import { SELF_HEAL_TAG } from "@n-dx/rex/dist/store/index.js";
@@ -162,12 +162,14 @@ describe("self-heal tag scoping — integration", () => {
   let rexDir: string;
 
   beforeEach(async () => {
+    vi.stubEnv("NDX_CLI_PATH", resolve(import.meta.dirname, "../../../core/cli.js"));
     vi.clearAllMocks();
     vi.resetModules();
     ({ projectDir, henchDir, rexDir } = await setupProjectDir());
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
   });
