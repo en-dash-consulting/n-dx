@@ -277,7 +277,7 @@ export {
   mapApprovalToCodexFlag,
 } from "./codex-cli-provider.js";
 export type { CodexCliProviderOptions } from "./codex-cli-provider.js";
-export { assertCodexScratchEnvironment } from "./codex-scratch-env.js";
+export { assertCodexScratchEnvironment, readCodexEffectiveConfig } from "./codex-scratch-env.js";
 
 export {
   CodexProjectConfigError,

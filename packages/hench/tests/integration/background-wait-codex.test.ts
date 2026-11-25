@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { cleanupProjectDir } from "../helpers/index.js";
 import {
   createScriptedClaudeCli,
@@ -21,6 +21,7 @@ describe("cliLoop — shell text cannot trigger Codex recovery", () => {
   let cli: ScriptedClaudeCli;
 
   beforeEach(async () => {
+    vi.stubEnv("NDX_CLI_PATH", resolve(import.meta.dirname, "../../../core/cli.js"));
     vi.resetModules();
     ({ projectDir, henchDir, rexDir } = await setupScriptedProject("hench-bg-codex-"));
     writeFileSync(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }), "utf-8");
@@ -38,6 +39,7 @@ describe("cliLoop — shell text cannot trigger Codex recovery", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     vi.doUnmock("node:child_process");
     vi.restoreAllMocks();
     await cleanupProjectDir(projectDir);

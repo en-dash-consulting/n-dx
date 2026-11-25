@@ -329,7 +329,7 @@ describe("hench → llm-client gateway contract", () => {
 
   const GATEWAY_FUNCTIONS = [
     "createOpenAiApiProvider", "supportsOpenAiTurns",
-    "createCodexScratch", "assertCodexScratchEnvironment",
+    "createCodexScratch", "assertCodexScratchEnvironment", "readCodexEffectiveConfig",
     "loadClaudeConfig",
     "loadLLMConfig",
     "compileEnvPolicy",
@@ -982,7 +982,7 @@ describe("gateway export auto-detection", () => {
         "dominantPromptSections", "formatPromptSectionCosts",
         "mapErrorReasonToFailureCategory", "mapRunFailureToCategory", "classifyVendorError",
         "failureCategoryLabel", "compileCodexPolicyFlags", "mapSandboxToCodexFlag",
-        "createCodexScratch", "assertCodexScratchEnvironment",
+        "createCodexScratch", "assertCodexScratchEnvironment", "readCodexEffectiveConfig",
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry", "createOpenAiApiProvider", "supportsOpenAiTurns",

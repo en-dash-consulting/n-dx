@@ -74,6 +74,20 @@ function configArgs(args: readonly string[]): string[] {
 }
 
 export async function assertCodexScratchEnvironment(options: ScratchEnvironmentOptions): Promise<void> {
+  const config = await readCodexEffectiveConfig(options);
+  if (config) {
+    try { checkConfig(config, options.scratchDir); }
+    catch (error) { throw new ClaudeClientError((error as Error).message, "unknown", false); }
+  }
+}
+
+/** Read the selected CLI's effective configuration without starting a thread.
+ * Returns undefined only on cancellation. Never logs native configuration,
+ * which can contain credentials. Callers must not persist the returned object.
+ */
+export async function readCodexEffectiveConfig(
+  options: Omit<ScratchEnvironmentOptions, "scratchDir">,
+): Promise<Record<string, unknown> | undefined> {
   if (options.signal?.aborted) return;
   const args = configArgs(options.args);
   return new Promise((resolve, reject) => {
@@ -85,12 +99,13 @@ export async function assertCodexScratchEnvironment(options: ScratchEnvironmentO
     let initialized = false;
     let stderrTail = "";
     let rejectedSelector: string | undefined;
+    let config: Record<string, unknown> | undefined;
     const finish = (error?: Error, reason: "unknown" | "not-found" = "unknown"): void => {
       if (done) return;
       done = true;
       clearTimeout(timer);
       options.signal?.removeEventListener("abort", abort);
-      const settle = () => error ? reject(new ClaudeClientError(error.message, reason, false)) : resolve();
+      const settle = () => error ? reject(new ClaudeClientError(error.message, reason, false)) : resolve(config);
       if (!child) { settle(); return; }
       child.stdin?.end();
       void terminateProcessTree(child, { forceKillTimeoutMs: 250, scanTimeoutMs: 500 })
@@ -148,7 +163,8 @@ export async function assertCodexScratchEnvironment(options: ScratchEnvironmentO
             send({ method: "initialized", params: {} });
             send({ id: 2, method: "config/read", params: { cwd: options.cwd, includeLayers: false } });
           } else {
-            checkConfig(result.config, options.scratchDir);
+            config = record(result.config);
+            if (!config) throw new Error(UNVERIFIED);
             finish();
           }
         } catch (error) {

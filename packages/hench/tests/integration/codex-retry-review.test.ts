@@ -1,8 +1,8 @@
 /** Mocked protocol coverage; installed-CLI observations are documented separately. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { serializeDocument } from "@n-dx/rex";
 import { cleanupProjectDir } from "../helpers/index.js";
 import { createScriptedClaudeCli, setupScriptedProject, type ScriptedClaudeCli, type ScriptedTurn } from "../helpers/scripted-claude-cli.js";
@@ -24,6 +24,7 @@ describe("Codex retry and self-review loop contract", () => {
   let reusable: boolean;
 
   beforeEach(async () => {
+    vi.stubEnv("NDX_CLI_PATH", resolve(import.meta.dirname, "../../../core/cli.js"));
     vi.resetModules();
     ({ projectDir, henchDir, rexDir } = await setupScriptedProject("hench-codex-fork-"));
     writeFileSync(join(rexDir, "prd.md"), serializeDocument({ schema: "rex/v1", title: "Fork fixture", items: [
@@ -49,6 +50,7 @@ describe("Codex retry and self-review loop contract", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     vi.doUnmock("node:child_process");
     vi.restoreAllMocks();
     await cleanupProjectDir(projectDir);
@@ -76,6 +78,33 @@ describe("Codex retry and self-review loop contract", () => {
     ...(id ? [{ type: "thread.started", thread_id: id }] : []),
     { type: "error", message: "ECONNRESET" },
   ] });
+
+  it("refuses a missing launcher before PRD state changes or an executor spawn", async () => {
+    vi.stubEnv("NDX_CLI_PATH", "");
+    vi.stubEnv("N_DX_CLI_PATH", "");
+    const before = readFileSync(join(rexDir, "prd.md"), "utf8");
+    await expect(run("task-1")).rejects.toThrow(/Codex MCP binding refused/);
+    expect(cli.invocations).toHaveLength(0);
+    expect(readFileSync(join(rexDir, "prd.md"), "utf8")).toBe(before);
+  });
+
+  it.each(["missing", "malformed", "wrong-workspace"])("revalidates %s binding on transient retry", async kind => {
+    cli.script(() => {
+      const dir = join(henchDir, "mcp");
+      const path = join(dir, readdirSync(dir)[0]);
+      if (kind === "missing") rmSync(path);
+      if (kind === "malformed") writeFileSync(path, "not JSON");
+      if (kind === "wrong-workspace") {
+        const doc = JSON.parse(readFileSync(path, "utf8"));
+        doc.mcpServers.rex.args[3] = join(projectDir, "sibling");
+        writeFileSync(path, JSON.stringify(doc));
+      }
+      return failed("work");
+    });
+    const outcome = await run("task-1");
+    expect(cli.invocations).toHaveLength(1);
+    expect(outcome.run.error).toContain("Codex MCP binding refused");
+  });
 
   it("carries distinct validated execution/review pins through retries and resumed self-review", async () => {
     writeFileSync(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex",
