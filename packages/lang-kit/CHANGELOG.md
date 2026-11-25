@@ -1,5 +1,99 @@
 # @n-dx/lang-kit
 
+## 0.10.5
+
+### Patch Changes
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`a01e575`](https://github.com/en-dash-consulting/n-dx/commit/a01e5753f70be4774dab4e2a0bcc673e48d13d0c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: the pack contract gains language-neutral `configReads` and `flagChecks` fact kinds, and `sv analyze` writes them to a new `config.json` when a pack produces them.
+  
+  No pack produces them yet, so every analysis is unchanged and writes no `config.json`. The facts record keys, flag names, files, positions and the lines a flag check gates, never a value; `normalizeFlagName` gives one flag's spellings one name. The dashboard's data-file list names `config.json` so it is served and watched once it exists.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`8aefbe2`](https://github.com/en-dash-consulting/n-dx/commit/8aefbe2a7f24f8ffc67cd1ba86e28ca93ebf33f1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: a framework pack's context now carries `configFiles`, the configuration text its pack's resolver read beside the sources, and `RouteFact` gains an optional `source` naming where a route was declared outside its handler's code.
+
+- [#1096](https://github.com/en-dash-consulting/n-dx/pull/1096) [`f5b87db`](https://github.com/en-dash-consulting/n-dx/commit/f5b87db435673ff2b7cd145a5b97bd436d081a95) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: every package suite can measure line, branch and function coverage with per-line hit counts, and fails below its recorded coverage floor.
+  
+  `pnpm test:coverage` runs each package's new `test:coverage` script, which writes HTML, lcov and JSON reports to `packages/<pkg>/coverage/`. `pnpm coverage:lines <pkg>` prints how many times the suite executed each line. Shared settings live in `tests/vitest-coverage.mjs`; see TESTING.md, "Code Coverage".
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`1e55cf9`](https://github.com/en-dash-consulting/n-dx/commit/1e55cf9f2dd1eafa6176f9965cc71e174aef4695) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx analyze` now detects a PHP repository whose app sits one folder below the root, such as phpBB's `phpBB/` or osCommerce's `catalog/`, instead of falling back to TypeScript.
+  
+  With no other language's marker at the root, a `composer.json` or `index.php` in a direct child directory marks PHP; detection never looks deeper. A repository with no marker at all takes the language with the most source files, PHP included, unless that is TypeScript or Terraform files match or outnumber it. Repositories with a root marker, such as `package.json` beside a `php/` folder, keep their detection.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`98a2c93`](https://github.com/en-dash-consulting/n-dx/commit/98a2c939f2081fe6c3825a5c85fcd629202bfe9e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With the PHP pack, `classifications.json` now marks a legacy PHP application's command-line and cron scripts as entry points.
+  
+  A script is a CLI entry point when it starts with a `#!/usr/bin/env php` or `#!/usr/bin/php` shebang, or when it sits under `bin/`, `cli/`, `cron/`, `scripts/` or `jobs/` and checks `PHP_SAPI` / `php_sapi_name()` against `'cli'` or reads `$argv`. A script that a `crontab`, `*.cron` or `cron.d/` file in the repository runs with `php` is a cron entry point. Each one is classified `entrypoint`, and its evidence says why: the shebang or check with its line, or the cron schedule as written with the crontab line. A crontab job whose script is not in the repository is reported as a notice. Without the PHP pack, `classifications.json` is unchanged.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`e6b640b`](https://github.com/en-dash-consulting/n-dx/commit/e6b640b9e5956116d088dc775c79159c5d9ca898) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: lang-kit reads Composer metadata as text, for the PHP pack's namespace resolver.
+  
+  `readComposerProjects` gives one model per `composer.json` in the inventory (a manifest inside another project's vendor directory excluded): name, `require` and `require-dev` as written, `autoload` and `autoload-dev` (PSR-4, PSR-0, classmap, files, exclude-from-classmap) with repository-relative paths, repositories, the vendor directory, and the packages of the `composer.lock` beside it with their autoload blocks. A `composer.lock` is read up to 16 MiB, since a large project's lock outgrows the 1 MiB cap other build files keep. Composer is never run. Malformed JSON or a field of the wrong type is a notice, never an exception.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`6bf5241`](https://github.com/en-dash-consulting/n-dx/commit/6bf5241853c8233ce5202eee62aefcee64ca6927) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With the PHP pack, `sv analyze` marks dynamic-code sites that run or dispatch on database data and names the tables and columns they read.
+  
+  A site is database-driven when the code `eval` runs, or the callable `call_user_func`, `$f()`, `new $class` or `$obj->$method()` uses, comes from a query result: in the same function or top-level scope (`mysql_fetch_assoc`, `$wpdb->get_results`, `PDOStatement::fetch`, `db_query_range(…)->fetchAssoc()`, `foreach` over a result), or through repository functions and methods that return one, so Drupal 7's menu router dispatch from `menu_router` is found. Each such site lists its tables, `table.column` for a literal SELECT list (`SELECT *` gives the table alone) and the query calls the value comes from, in the new `[php-db-exec]` and `[php-db-dispatch]` notices. A parameter-fed site is never marked, and a flow the analysis cannot decide is left unmarked rather than guessed. Names and locations only, never row data.
+  
+  The profile's optional `ecosystem.php.dynamicCode.database` counts those sites by kind, table and column; `readiness.json` carries it. The lang-kit `DynamicCodeFact` gains an optional `database`. WordPress's `get_var`, `get_row`, `get_col` and `get_results` now count as embedded-SQL calls. A repository without the PHP pack, or without such a site, writes the same files as before.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`9eddb9f`](https://github.com/en-dash-consulting/n-dx/commit/9eddb9f8bcf19d50b2de8662cf11c3e84bfc8fab) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx analyze` with the PHP pack now reads Drupal's `.module` and `.install` files, so their classes, includes and `eval` sites are reported.
+  
+  Before, the pack skipped them: a class declared in a `.module` file (Drupal 7's `FieldException`) became a `php:` external, and `php_eval`'s `eval` went unreported. They count as PHP only in a repository detected as PHP; elsewhere they are still not inventoried, and analysis without the pack is unchanged. Drupal's `.theme`, `.profile`, `.engine` and `.test` files are still not read.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`263d95e`](https://github.com/en-dash-consulting/n-dx/commit/263d95e1bd0d40c52b7e9bab1139a536a3b7b085) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With the PHP pack, `sv analyze` reports each place PHP code runs a string as code or chooses what to run from a value.
+  
+  These are the parts of a legacy app that reading its files alone cannot explain, such as routes kept in a database table or PHP stored in content.
+  
+  Code run from a string: `eval`, `assert` with a string, `preg_replace` with the `/e` modifier and `create_function`, marked `literal` when the code is written as literals alone. Code chosen by a value: `call_user_func(_array)` and callback built-ins such as `array_map` and `usort` given a variable callable (`[$this, $name]`, never `[$this, 'save']` or a closure), `$f()`, `new $class`, `$obj->$method()` and `$class::$method()`. Each site comes with its file, line, the expression as written and the enclosing function or method, listed in the new `[php-dynamic-exec]` and `[php-dynamic-dispatch]` notices; never a value.
+  
+  The profile's optional `ecosystem.php.dynamicCode` counts the sites (`sites`, in `files` files) by kind (`kinds`: `exec`, `dispatch`, and `include` for the includes whose path is built at run time) and by construct (`constructs`), with `literal` exec sites counted apart; `readiness.json` carries it. The lang-kit contract gains the `dynamicCode` fact kind (`DynamicCodeFact`, `DYNAMIC_CODE_KINDS`). A repository without the PHP pack, or without such a site, writes the same files as before.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`0c31f42`](https://github.com/en-dash-consulting/n-dx/commit/0c31f4223c595c4ee0d202c64533d411e998e675) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: the PHP pack exports `extractPhpEmbeddedSql`, which reads table names from SQL passed to PHP query and prepare calls through lang-kit's SQL reference extractor, like the Java and Go packs' readers. Nothing is written to an analysis artifact.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`a592749`](https://github.com/en-dash-consulting/n-dx/commit/a5927499f0f28212f41c6e494490a6c617fd5511) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx analyze` now detects PHP repositories as PHP instead of analysing them as TypeScript, and `php` is a valid `language` setting in `ndx config` and on Settings › Project.
+  
+  A repository is PHP when it has a root `composer.json` (weighed by source count against other markers, as for any language), or, with no other marker, a `.php` file at its root or an `index.php` in `public/`, `web/`, `htdocs/`, `www/` or `public_html/`. A TypeScript repository with a few PHP files keeps its detection. PHP files are inventoried and classified only; no PHP pack exists yet, so imports, zones and every other artifact are unchanged for them.
+  
+  `.inc`, `.module` and `.install` count as PHP only in a PHP repository. There, `vendor/` is skipped only beside a `composer.json`, so hand-copied libraries in a legacy `vendor/` are inventoried, and `cache/`, `tmp/` and `.phpunit.cache/` are skipped unless they directly hold a `.php` file. `.phtml`, `.php3`, `.php4` and `.php5` files are labelled PHP in every repository.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`0a55de6`](https://github.com/en-dash-consulting/n-dx/commit/0a55de6523e6ace586a206f68cec4ad1b80d4d5d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - PHP 5 files that use `$s{0}` string offsets now keep their includes, calls and symbols, and `imports.json` reports them under `summary.parseIssues.php.legacySyntax`, not as syntax errors.
+  
+  The PHP 8 grammar cannot parse the curly-brace offset, so these valid legacy files used to lose facts and count as broken. The PHP pack now rewrites each offset to `$s[0]` in place, at the same length so every position is the source's, and parses again. `legacySyntax` counts the files and the rewrites by construct (`brace-offset`), and each offset still counts once as a `curly-offset` legacy construct. Short open tags and `each()` were never parse failures; they stay legacy-construct facts.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`80bcac9`](https://github.com/en-dash-consulting/n-dx/commit/80bcac989a958219ad4d4b2ad61ba1dd68f6e72b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With the PHP pack, `sv analyze` reports each use of a PHP construct later versions removed or deprecated, and `sdlc-profile.json` and `readiness.json` count them per repository.
+  
+  Each rule cites the php.net page of every version it names: the migration guide from 5.6 on, the PHP 5 changelog for 5.3 to 5.5. Removed: `mysql_*`, `ereg*`/`split`, ASP and `<script language="php">` tags, call-time pass-by-reference, the `session_register` and magic-quotes functions, `mcrypt_*`, `create_function`, `each()`, `$s{0}` offsets, PHP 4 constructors, `(unset)` and `__autoload`. Deprecated: `${}` interpolation, `utf8_encode`/`utf8_decode` and likely dynamic properties. Short open tags `<?` and `==` between a non-numeric string and a number are review notices, never removals. A call of a function the repository declares itself (a polyfill) is not counted, nor is a `<% %>` JavaScript template (Underscore, EJS) inside a `<script>` element.
+  
+  The profile's optional `ecosystem.php.legacyConstructs` holds `files`, `uses`, `notices`, per-rule counts (`rules`) and uses by the version that removed (`removedIn`) or deprecated (`deprecatedIn`) them. The lang-kit contract gains the `legacyConstructs` fact kind (`LegacyConstructFact`, `LanguageBoundary`, `LEGACY_STATUSES`). `scripts/php-corpus-report.mjs` counts a file whose only parse errors are `$s{0}` offsets as clean, so they are not counted twice. A repository without the PHP pack, or with no such construct, writes the same files as before.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`f867805`](https://github.com/en-dash-consulting/n-dx/commit/f86780564927ea637da9293cbe34bf042c167921) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx analyze` with the PHP pack no longer stalls on unusual lines in the repository being analysed.
+  
+  Eleven text patterns that slowed down sharply on long lines are now linear scans. They read `.htaccess` directives, `include_path` settings in `.htaccess`, `php.ini` and `.user.ini`, database connection strings, `PHP_SAPI` checks, trailing slashes in Composer and include paths, and feature-flag names. Results are unchanged. A `.htaccess`, `php.ini` or `.user.ini` line longer than 64 KiB is now skipped and counted in a notice instead of being read.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`86e8aab`](https://github.com/en-dash-consulting/n-dx/commit/86e8aabd3a8923a40ba44e7ad3649a2688f17862) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Internal: the language pack contract gains `trait`, `namespace` and `constant` symbol kinds, a `conditional` import guard (`IMPORT_GUARDS`) and optional `WrittenImport.candidates` for dynamic includes, which never become import edges. No pack produces them yet, so analyze output is unchanged.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`966597b`](https://github.com/en-dash-consulting/n-dx/commit/966597bab5a972213e5a2a12edffee0092445a6d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The opt-in PHP pack (`ndx sv pack add php`) now reads each PHP file's includes, `use` imports, declarations and calls, including PHP 5 pages with HTML between `<?php` blocks.
+  
+  Includes inside conditions, loops and functions are marked conditional. Imports are reported as written and not yet linked to files, so `imports.json` gains no PHP edges; with the pack installed, `ndx analyze` lists PHP among the analysed languages.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`f17f946`](https://github.com/en-dash-consulting/n-dx/commit/f17f94636d3a5d9ca51bb5c8615c720965bc0cc9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With the PHP pack, `sv analyze` reports the oldest PHP version each file's syntax needs, and `sdlc-profile.json` and `readiness.json` count the repository's PHP files by that version.
+  
+  Each rule dates one construct (namespaces, short arrays, `??`, typed properties, `match`, enums, typed class constants and the rest, PHP 5.3 to 8.3) by the php.net page that introduces it, cited in the rule: the version's migration guide from 5.6 on, the PHP 5 changelog for 5.3 to 5.5, whose guides php.net no longer hosts. The floor is syntax only: functions, extensions and configuration play no part, so it is a lower bound. Two things date nothing: what the parser's error recovery made of code it cannot parse (a PHP 5 `$s{0}` offset), and an attribute alone on its line, which PHP before 8.0 reads as a `#` comment. The lang-kit contract gains the `versionFloor` fact kind (`VersionFloorFact`, `compareLanguageVersions`); the profile's optional `ecosystem.php.versionFloors` holds `floors`, `none` and `highest`. A repository whose PHP has no dated syntax still gets the counts, with no `highest`, so an all-PHP-5 repository is not mistaken for one the pack never read. A repository without PHP files or without the PHP pack writes the same files as before.
+
+- [#1065](https://github.com/en-dash-consulting/n-dx/pull/1065) [`1dc0110`](https://github.com/en-dash-consulting/n-dx/commit/1dc01107170e5152c4874798bacd765fa490b8f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Internal: refactor llm-client and the language packs without changing behaviour: shared HTTP retry and child-process settling, one merged project-config loader, vendor failover as a table, and shared span helpers in the packs.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`d4d2866`](https://github.com/en-dash-consulting/n-dx/commit/d4d28664500af935874abbc49084703d7e28871f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv analyze` no longer follows a symlinked directory when it looks for sub-analyses, so `--deep` never analyzes or writes outside the project.
+  
+  Action needed: a symlinked directory is no longer promoted as a sub-analysis. Analyze its target on its own with `sv analyze <target>`.
+  
+  Before, a link such as `vendor-link -> ../other-project` pulled that project's zones and file paths into this project's `zones.json` and `CONTEXT.md`, and `--deep` ran analyze inside it. Two links back to their own directory made the search branch without end, and analyze hung in the zones phase. A sub-analysis whose `.sourcevision/` resolves outside the project is now also refused.
+  
+  The IaC, API-contract, `go.mod` and Java package-root scans now read regular files only, as the inventory does, so a symlinked file is never read.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`a4f0ab9`](https://github.com/en-dash-consulting/n-dx/commit/a4f0ab91e1c6a69c86a296edb0e26bd831126f76) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv analyze` now reports language-pack files that do not parse cleanly, in one `[<pack>-parse]` line and in `imports.json` `summary.parseIssues`.
+  
+  The report counts files with syntax errors, files over the parser's 1 MiB limit, unreadable files and files that are not valid UTF-8, with up to 50 sorted example paths for each. It covers every pack the imports phase runs (PHP, Java, Go, Python). Nothing becomes fatal: facts are still read from a file with syntax errors, and a non-UTF-8 file is still parsed. When every file parses cleanly the field is absent and `imports.json` is unchanged. The field names are new and under review.
+
+- [#1051](https://github.com/en-dash-consulting/n-dx/pull/1051) [`5e253e4`](https://github.com/en-dash-consulting/n-dx/commit/5e253e4a8e2043ddf5082703e307850f29e1a2ec) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv analyze` now removes a URL password that holds `/`, `?` or `#`. Before this, a URL such as `mysql://app:pa/ss@db/app` was written whole, password included. Generated passwords often hold `/`.
+  
+  The PHP pack's outbound targets follow the same rule. Before this, a password holding `@` or `#` could leave part of itself in the target. A base64 value ending in `=` padding (`abcKey==`) is no longer turned into `abcKey=REDACTED`.
+
 ## 0.10.4
 
 No changes in this release.
