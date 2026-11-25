@@ -107,6 +107,8 @@ export const ManifestSchema = z.object({
   // validates; nullable inside, so "looked and found no remote" is a thing
   // the artifact can say.
   repo: RepoIdentitySchema.optional(),
+  // Optional, so a manifest written before the field existed still validates.
+  packs: z.array(z.object({ id: z.string().min(1), version: z.string().min(1) })).optional(),
   modules: z.record(z.string(), ModuleInfoSchema),
   lastAnalysis: AnalysisRunSchema.optional(),
   narration: z.object({

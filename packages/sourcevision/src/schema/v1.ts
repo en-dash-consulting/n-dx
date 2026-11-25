@@ -177,6 +177,12 @@ export interface NarrationState {
  * remote field is nullable rather than optional: `null` says the analyser
  * looked and there was no remote, which an absent key cannot say.
  */
+/** A language pack that ran in an analysis: its id (`php`) and its package version. */
+export interface PackRun {
+  id: string;
+  version: string;
+}
+
 export interface RepoIdentity {
   /**
    * The repository's name: the last segment of the remote path when there is
@@ -225,6 +231,13 @@ export interface Manifest {
    * @see util/git-remote.ts — the one reader of the remote
    */
   repo?: RepoIdentity;
+  /**
+   * The language packs that loaded and ran in this analysis, each with its
+   * package version, sorted by id. A pack that is installed but had no files,
+   * or that degraded, is not listed; `[]` means none ran. Absent on
+   * manifests written before the field existed.
+   */
+  packs?: PackRun[];
   modules: Record<string, ModuleInfo>;
   /** Aggregate token usage from the most recent analyze run. */
   tokenUsage?: AnalyzeTokenUsage;

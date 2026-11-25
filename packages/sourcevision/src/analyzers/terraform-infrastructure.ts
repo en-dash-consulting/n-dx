@@ -41,6 +41,8 @@ export interface TerraformInfrastructureOptions {
    * no warning, the caller names it in one end-of-run line.
    */
   readonly suggest?: (packId: string) => void;
+  /** Receives the pack's id and version when it ran without degrading. */
+  readonly analysed?: (packId: string, version: string) => void;
 }
 
 const ID_PREFIX = "infra:";
@@ -144,6 +146,7 @@ export async function enrichTerraformInfrastructure(
     });
   }
   if (result.degraded) return skip(result.degraded);
+  options.analysed?.(pack.id, load.entry.version);
 
   // The first declaration wins, as it does in the shallow scan; facts at its
   // position are its module instances, merged into one.

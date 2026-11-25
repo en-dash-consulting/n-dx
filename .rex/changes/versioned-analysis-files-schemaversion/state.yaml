@@ -21,7 +21,14 @@ items:
     lastModified: "2026-11-25T06:00:49.007Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "90605ac0-4321-4bc1-b0de-85f3935daa39":
-    lastModified: "2026-11-25T04:49:56.393Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:04:22.034Z"
+    completedAt: "2026-11-25T06:10:12.130Z"
+    endedAt: "2026-11-25T06:10:12.130Z"
+    activeIntervals: [{"end":"2026-11-25T06:10:12.130Z","start":"2026-11-25T06:04:22.034Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "manifest.json packs: [{id, version}] sorted by id, from packs that loaded and ran (imports phase + Terraform enrichment); validator accepts with and without; unit + e2e tests."
+    lastModified: "2026-11-25T06:10:12.130Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ae021f60-89b4-420e-970f-fdad584f9405":
     lastModified: "2026-11-25T04:50:40.462Z"

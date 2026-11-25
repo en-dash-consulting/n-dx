@@ -58,7 +58,9 @@ import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
 import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers/inventory.js";
+import { recordManifestPacks } from "../../analyzers/manifest.js";
 import { mergeTokenUsage } from "../../analyzers/token-usage.js";
+import type { PackRun } from "../../schema/index.js";
 import { describeThirdPartyMark } from "../../analyzers/third-party.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
 import { KNOWN_PACKS } from "../../language/pack-loader.js";
@@ -295,7 +297,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const fileSetChanged = didFileSetChange(ctx);
 
     const packFacts: Array<PackFrameworkFacts[number]> = [];
-    const analysedPacks: string[] = [];
+    const analysedPacks: PackRun[] = [];
     const imports = await analyzeImports(ctx.absDir, inventory, {
       ...(!ctx.fullMode && previousImports ? {
         previousImports,
@@ -304,7 +306,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
       } : {}),
       packs: {
         framework: (facts, asked) => packFacts.push(...packFrameworkFactsOf(facts, asked)),
-        analysed: (id) => analysedPacks.push(id),
+        analysed: (id, version) => analysedPacks.push({ id, version }),
         suggest: (id) => suggestPack(ctx, id),
       },
     });
@@ -314,11 +316,13 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
 
     // A pack-only language (Java, Python) is analysed only when its pack ran, which
     // the inventory phase could not know; without such a pack inventory.json is untouched.
-    const summary = withPackAnalysedLanguages(inventory.summary, analysedPacks);
+    const summary = withPackAnalysedLanguages(inventory.summary, analysedPacks.map((p) => p.id));
     if (summary !== inventory.summary) {
       writeFileSync(inventoryPath, toFactFileJSON({ ...inventory, summary }));
       if (ctx.inventoryResult) ctx.inventoryResult.summary = summary;
     }
+    // Terraform runs later, in the output step, which adds or removes its own entry.
+    recordManifestPacks(ctx.absDir, analysedPacks);
     updateManifestModule(ctx.absDir, "imports", "complete");
     info(`  ${bold(String(imports.summary.totalEdges))} edges, ${bold(String(imports.summary.totalExternal))} external → ${dim(outPath)}`);
   } catch (err) {

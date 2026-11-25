@@ -50,6 +50,7 @@ import { markOutboundThirdParty, outsideStructurePredicate, parseThirdPartyGlobF
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { enrichTerraformInfrastructure } from "../../analyzers/terraform-infrastructure.js";
+import { withPackRun } from "../../analyzers/manifest.js";
 import { setJevRequestByteCeiling } from "../../analyzers/jev-split.js";
 import { terraformConfig } from "@n-dx/lang-kit";
 import { loadInventoryConfig } from "../../language/detect.js";
@@ -868,6 +869,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // With the Terraform pack, Terraform resources gain the model's optional
     // fields; without it the file is exactly what the scan found.
     const inventoryPaths = (inventory.files as Array<{ path: string }>).map((f) => f.path);
+    let terraformVersion: string | undefined;
     const infrastructure = await enrichTerraformInfrastructure(
       toInfrastructureData(computeInfrastructure(ctx.absDir, inventoryPaths)),
       ctx.absDir,
@@ -875,9 +877,14 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
       {
         listed: ((await loadInventoryConfig(ctx.absDir)).packs ?? []).includes(terraformConfig.id),
         suggest: (id) => suggestPack(ctx, id),
+        analysed: (_id, version) => { terraformVersion = version; },
       },
     );
     writeFileSync(join(ctx.svDir, DATA_FILES.infrastructure), toFactFileJSON(infrastructure));
+    // The imports phase listed the packs it ran; Terraform runs here, so its entry is set here.
+    const packs = withPackRun(manifest.packs, terraformConfig.id, terraformVersion);
+    if (packs === undefined) delete manifest.packs;
+    else manifest.packs = packs;
 
     // SDLC readiness — commands, CI, deployment, quality gates and the rest,
     // each claim carrying the file that proves it. Its own bounded walk,

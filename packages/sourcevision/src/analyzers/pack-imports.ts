@@ -73,8 +73,8 @@ export interface PackImportsOptions {
    * for (see {@link packFrameworkFactsOf}).
    */
   readonly framework?: (facts: readonly FileFacts[], asked: readonly FactKind[]) => void;
-  /** Receives the id of each pack that ran without degrading. */
-  readonly analysed?: (packId: string) => void;
+  /** Receives the id and version of each pack that ran without degrading. */
+  readonly analysed?: (packId: string, version: string) => void;
   /** The project's `sourcevision.packs`: a missing pack listed here is warned about. */
   readonly listed?: readonly string[];
   /**
@@ -274,7 +274,7 @@ export async function buildPackImportGraph(
       degrade(pack, result.degraded);
       continue;
     }
-    options.analysed?.(pack.id);
+    options.analysed?.(pack.id, load.entry.version);
     unparsed.push(...result.unparsed);
     for (const notice of result.notices ?? []) warn(notice);
     if (result.parse) {

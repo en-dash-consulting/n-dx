@@ -21,6 +21,7 @@ import { cmdAnalyze } from "../../src/cli/commands/analyze.js";
 import { DATA_FILES } from "../../src/schema/data-files.js";
 import type { Inventory, LegacyData, SdlcProfile } from "../../src/schema/index.js";
 import { validateModule } from "../../src/schema/validate.js";
+import { toFactFileJSON } from "../../src/util/sort.js";
 import { fileTotals, floorTotals, profileCounts } from "../helpers/legacy-totals.js";
 import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 
@@ -81,7 +82,10 @@ describe("legacy.json over a legacy PHP estate", { timeout: 180_000 }, () => {
   it("is what a run without the imports phase builds from facts read on demand", async (ctx) => {
     if (skipped) ctx.skip(skipped);
     const inventory = json<Inventory>(DATA_FILES.inventory);
-    expect(packLegacyData(await readImportsPackFrameworkFacts(dir, inventory), inventory)).toEqual(json(DATA_FILES.legacy));
+    const onDemand = packLegacyData(await readImportsPackFrameworkFacts(dir, inventory), inventory);
+    expect(onDemand).toBeDefined();
+    // Compared as written, so the schemaVersion stamp the writer adds is on both sides.
+    expect(toFactFileJSON(onDemand!)).toBe(readFileSync(join(svDir, DATA_FILES.legacy), "utf-8"));
   });
 });
 

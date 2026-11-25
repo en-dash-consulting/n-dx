@@ -51,6 +51,23 @@ describe("validateManifest", () => {
     });
     expect(result.ok).toBe(true);
   });
+
+  describe("packs", () => {
+    const BASE = { schemaVersion: "1.0.0", toolVersion: "0.1.0", analyzedAt: "2024-01-01T00:00:00Z", targetPath: "/test", modules: {} };
+
+    it("accepts a manifest without packs, as written before the field existed", () => {
+      expect(validateManifest(BASE).ok).toBe(true);
+    });
+
+    it("accepts a manifest listing the packs that ran, or none", () => {
+      expect(validateManifest({ ...BASE, packs: [{ id: "php", version: "0.10.5" }] }).ok).toBe(true);
+      expect(validateManifest({ ...BASE, packs: [] }).ok).toBe(true);
+    });
+
+    it("rejects a pack entry without a version", () => {
+      expect(validateManifest({ ...BASE, packs: [{ id: "php" }] }).ok).toBe(false);
+    });
+  });
 });
 
 describe("validateManifest lastAnalysis.jev", () => {

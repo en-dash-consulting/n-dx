@@ -212,7 +212,7 @@ All output is written to `.sourcevision/`:
 
 | File | Contents |
 |------|----------|
-| `manifest.json` | Analysis metadata, version, timestamps |
+| `manifest.json` | Analysis metadata, version, timestamps. `packs`: the language packs that loaded and ran in this analysis, `{ id, version }` sorted by id, the version being the pack package's (`[]` when none ran; no field in an analysis that predates it). An installed pack with no files of its language, or one that degraded, is not listed |
 | `inventory.json` | File listing with classifications |
 | `imports.json` | Dependency graph (edges + metadata). **New:** `summary.parseIssues`, keyed by pack id, one entry for every language pack that ran (zero counts when it parsed every file cleanly; no entry for a pack that did not run; no field when no pack ran or the analysis predates it): `files`, `clean`, `sizeLimitBytes`, and for `syntaxErrors` (parsed with error recovery; facts still read), `oversized` (over the size limit, not parsed), `unreadable` and `notUtf8` (parsed with replacement characters; may overlap `syntaxErrors`) a `count` and up to 50 sorted `examples`; `legacySyntax` (PHP 5's `$s{0}` offsets, rewritten to `$s[0]` in place and parsed cleanly, so facts are whole and positions are the source's; never under `syntaxErrors`) adds `constructs`, rewrites by construct. A `[<pack>-parse]` notice line sums it up. Field names are under review |
 | `zones.json` | Architectural zone map with cohesion/coupling metrics |
