@@ -24,3 +24,13 @@ Nothing else is part of the contract. That includes `@n-dx/*` package internals,
 ## Choosing a range
 
 Set `ndxVersion` to the releases you have tested, e.g. `">=0.10.0 <0.12.0"`. n-dx is pre-1.0, so a minor release may change CLI output that an extension parses. Prefer `--json` output where a command offers it.
+
+## Upcoming releases
+
+An extension whose range stops below a minor turns itself off when that minor ships. This table says ahead of time whether a planned minor changes the contract.
+
+| Release | `apiVersion` | Contract change |
+| --- | --- | --- |
+| 0.11.0 | `1`, unchanged | None planned: the manifest, environment, `/x/<name>/` proxy and versioned hub endpoints stay as in 0.10.x. An extension pinned below 0.11.0 may widen `ndxVersion` to `<0.12.0` once tested against it |
+
+A row is added before each minor ships. If a planned contract change appears, the row names it and the release notes say what to change.
