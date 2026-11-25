@@ -17,7 +17,24 @@ sourcevision workspace [root-dir]            # aggregate from config
 sourcevision workspace --add <dir> [root-dir]    # add a member
 sourcevision workspace --remove <dir> [root-dir] # remove a member
 sourcevision workspace --status [root-dir]       # show members + freshness
+sourcevision workspace --discover <dir> [--jobs=<n>] [--timeout=<s>] [--json]
+                                                 # find, analyse, register, aggregate
 ```
+
+`--discover <dir>` makes `<dir>` the workspace root. It walks `<dir>` for
+repository roots (`.git` directory or file, `.svn`), never descending into a
+found root (a nested repository is part of its parent's analysis), skipping
+`node_modules` and hidden folders, and never following a symlink; a symlink to
+a repository outside `<dir>` is reported. Each root without an analysis of its
+current HEAD gets `sv analyze --fast` in a child process (no model or network
+call, credentials stripped from its environment), `--jobs` at a time (default
+2), each stopped after `--timeout` seconds (default 600). The roots that
+produced a non-empty inventory are added as members and aggregated. The
+others are reported with a reason — `analysis-failed`, `timed-out`,
+`no-supported-files`, `outside-dir`, `unreadable` — in the output, and in
+`skipped` with `--json` (beside `found` and the aggregate counts). `<dir>`
+being a repository itself is refused: the workspace output would land in
+its analysis folder.
 
 The root directory is the *workspace root* — where the aggregated output lives.
 Individual member repos are specified relative to this root. The workspace root
@@ -31,6 +48,10 @@ itself may or may not be a repo (it could be a bare directory containing only
 | `--add <dir>` | Add a directory as a workspace member (persists to config) |
 | `--remove <dir>` | Remove a workspace member |
 | `--status` | List members with analysis freshness, zone counts, file counts |
+| `--discover <dir>` | Find, statically analyse and aggregate the repositories under `<dir>` |
+| `--jobs=<n>` | With `--discover`: analyses run at once (default 2) |
+| `--timeout=<s>` | With `--discover`: seconds before one analysis is stopped (default 600) |
+| `--json` | With `--discover`: print found and skipped repositories as JSON |
 | `--fast` | Skip AI enrichment during cross-repo analysis |
 | `--quiet, -q` | Suppress informational output |
 

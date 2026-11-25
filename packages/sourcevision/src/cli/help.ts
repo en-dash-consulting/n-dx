@@ -298,7 +298,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     tool: "sourcevision",
     command: "workspace",
     summary: "aggregate multiple analyzed repos into a unified view",
-    usage: "sourcevision workspace [--add <dir>]... [--remove <dir>]... [--status] [--root=<dir> | <root>]",
+    usage: "sourcevision workspace [--add <dir>]... [--remove <dir>]... [--status] [--root=<dir> | <root>]\n" +
+      "       sourcevision workspace --discover <dir> [--jobs=<n>] [--timeout=<s>] [--json]",
     description:
       "Aggregates pre-analyzed repositories into a unified .sourcevision/ output.\n" +
       "Each member repo must already have .sourcevision/ from a prior analysis run.\n" +
@@ -309,12 +310,23 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "(--add <dir>, --add=<dir>) are consumed first; the root is --root=<dir> or\n" +
       "the one argument left over, and defaults to the current directory. Two\n" +
       "leftover arguments, or --root naming a different directory from the\n" +
-      "leftover argument, are an error and nothing is written.",
+      "leftover argument, are an error and nothing is written.\n" +
+      "\n" +
+      "--discover <dir> finds the repositories under <dir> (a .git or .svn\n" +
+      "directory; never inside a found repository, never through a symlink),\n" +
+      "runs 'analyze --fast' (no model or network call) on each without an\n" +
+      "analysis of its current HEAD, registers them as members of <dir> and\n" +
+      "aggregates. Repositories that fail, time out or have no supported files\n" +
+      "are listed with the reason and left out.",
     options: [
       { flag: "--add <dir>", description: "Add a directory as a workspace member (persists to .n-dx.json); repeatable" },
       { flag: "--remove <dir>", description: "Remove a workspace member; repeatable" },
       { flag: "--root=<dir>", description: "The workspace root (default: the leftover argument, else .)" },
       { flag: "--status", description: "List members with analysis freshness, zone counts, file counts" },
+      { flag: "--discover <dir>", description: "Find, statically analyse and aggregate the repositories under <dir>" },
+      { flag: "--jobs=<n>", description: "With --discover: analyses run at once (default 2)" },
+      { flag: "--timeout=<s>", description: "With --discover: seconds before one repository's analysis is stopped (default 600)" },
+      { flag: "--json", description: "With --discover: print the found and skipped repositories as JSON" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
     examples: [
@@ -322,6 +334,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "sourcevision workspace --status --root=../ws", description: "Name the root explicitly" },
       { command: "sourcevision workspace .", description: "Run workspace aggregation" },
       { command: "sourcevision workspace --status .", description: "Check member status" },
+      { command: "sourcevision workspace --discover ~/clones --jobs=4", description: "Analyse and aggregate a folder of clones" },
       { command: "sv workspace .", description: "Using the 'sv' alias" },
     ],
     related: ["analyze", "validate"],
