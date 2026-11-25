@@ -654,6 +654,28 @@ describe("validateClassifications", () => {
     expect(result.ok).toBe(true);
   });
 
+  describe("pack evidence schedule", () => {
+    const withEvidence = (evidence: Record<string, unknown>) => ({
+      ...validClassifications,
+      files: [{ path: "bin/sync.php", archetype: "entrypoint", confidence: 1, source: "algorithmic", evidence: [evidence] }],
+    });
+    const cron = { archetypeId: "entrypoint", signalKind: "pack", detail: "cron entry point: */5 * * * * (crontab:3)", weight: 1 };
+
+    it("accepts a cron schedule with its crontab path and line", () => {
+      const result = validateClassifications(withEvidence({ ...cron, schedule: { expression: "*/5 * * * *", file: "crontab", line: 3 } }));
+      expect(result.ok).toBe(true);
+    });
+
+    it("accepts evidence written before the field existed", () => {
+      expect(validateClassifications(withEvidence(cron)).ok).toBe(true);
+    });
+
+    it("rejects a schedule without its line", () => {
+      const result = validateClassifications(withEvidence({ ...cron, schedule: { expression: "*/5 * * * *", file: "crontab" } }));
+      expect(result.ok).toBe(false);
+    });
+  });
+
   it("accepts empty classifications", () => {
     const result = validateClassifications({
       archetypes: [],

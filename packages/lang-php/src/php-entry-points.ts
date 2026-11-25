@@ -18,7 +18,7 @@
  *   `PHP_SAPI check` or `$argv`, at the first such place.
  * - `crontab`: a PHP file a crontab-like file's job runs (`php path/x.php`)
  *   is a `cron` entry point, `source` `<crontab path>:<line>`, with the
- *   schedule as written. A script that is not a PHP file of the repository
+ *   schedule as written and the crontab's path and line in `crontab`. A script that is not a PHP file of the repository
  *   is a notice.
  *
  * A file is `cli` once (shebang first) and `cron` once per job line.
@@ -118,7 +118,7 @@ export function readEntryPoints(files: readonly PackSourceFile[], configFiles: R
         notices.push(`PHP: ${at} runs ${job.script}, which is not a PHP file of the repository; no entry point recorded.`);
         continue;
       }
-      add(target, { kind: "cron", source: at, schedule: job.schedule, position: START });
+      add(target, { kind: "cron", source: at, schedule: job.schedule, crontab: { file: job.file, line: job.line }, position: START });
     }
   }
   const facts = new Map<string, Omit<FileFacts, "path">>([...entries].map(([path, list]) => [path, { entryPoints: list }]));

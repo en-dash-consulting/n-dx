@@ -259,6 +259,11 @@ const ClassificationEvidenceSchema = z.object({
   signalKind: z.enum(["path", "import", "export", "filename", "directory", "pack"]),
   detail: z.string(),
   weight: z.number().min(0).max(1),
+  schedule: z.object({
+    expression: z.string().min(1),
+    file: z.string().min(1),
+    line: z.number().int().positive(),
+  }).optional(),
 });
 
 const FileClassificationSchema = z.object({

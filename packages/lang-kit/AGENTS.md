@@ -54,7 +54,7 @@ capped),
 `CallFact.construct` (`new`) and `RouteFact.source` (a docroot or
 `.htaccess` line, for a route not declared in its handler's code), and
 `EntryPointFact` (`cli` or `cron`, with its `source` and a cron job's
-`schedule` as written). The contract names no parser type; `@n-dx/lang-runtime`'s
+`schedule` as written and its `crontab` file and line). The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports

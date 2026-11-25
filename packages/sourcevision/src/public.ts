@@ -143,6 +143,7 @@ export type {
   Classifications,
   FileClassification,
   ClassificationEvidence,
+  CronSchedule,
   ClassificationsSummary,
   ArchetypeDefinition,
   ArchetypeSignal,

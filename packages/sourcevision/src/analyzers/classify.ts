@@ -19,6 +19,7 @@ import type {
   ArchetypeSignal,
   FileClassification,
   ClassificationEvidence,
+  CronSchedule,
   Classifications,
   ClassificationsSummary,
   AnalyzeTokenUsage,
@@ -75,6 +76,8 @@ export interface PackSignal {
   archetypeId: string;
   detail: string;
   weight: number;
+  /** A cron job's schedule, recorded on the evidence as written. */
+  schedule?: CronSchedule;
 }
 
 /**
@@ -179,7 +182,13 @@ function classifyFile(
     for (const signal of packSignals) {
       if (signal.archetypeId !== archetype.id) continue;
       archetypeScore += signal.weight;
-      evidence.push({ archetypeId: archetype.id, signalKind: "pack", detail: signal.detail, weight: signal.weight });
+      evidence.push({
+        archetypeId: archetype.id,
+        signalKind: "pack",
+        detail: signal.detail,
+        weight: signal.weight,
+        ...(signal.schedule ? { schedule: signal.schedule } : {}),
+      });
     }
 
     for (const signal of archetype.signals) {

@@ -152,14 +152,14 @@ describe("withPackOutbound", () => {
 });
 
 describe("packEntryPointSignals", () => {
-  it("gives one entrypoint signal per fact, a cron job's schedule in its detail", () => {
+  it("gives one entrypoint signal per fact, a cron job's schedule in its detail and as a structured field", () => {
     const signals = packEntryPointSignals([
       { path: "a.php", routes: [route("/a")] },
       {
         path: "bin/x.php",
         entryPoints: [
           { kind: "cli", source: "shebang", position: at(1) },
-          { kind: "cron", source: "crontab:3", schedule: "*/5 * * * *", position: at(1) },
+          { kind: "cron", source: "crontab:3", schedule: "*/5 * * * *", crontab: { file: "crontab", line: 3 }, position: at(1) },
         ],
       },
     ]);
@@ -168,10 +168,22 @@ describe("packEntryPointSignals", () => {
         "bin/x.php",
         [
           { archetypeId: "entrypoint", detail: "cli entry point: shebang (line 1)", weight: 1 },
-          { archetypeId: "entrypoint", detail: "cron entry point: */5 * * * * (crontab:3)", weight: 1 },
+          {
+            archetypeId: "entrypoint",
+            detail: "cron entry point: */5 * * * * (crontab:3)",
+            weight: 1,
+            schedule: { expression: "*/5 * * * *", file: "crontab", line: 3 },
+          },
         ],
       ],
     ]);
+  });
+
+  it("gives no structured schedule to a cron fact without its crontab location", () => {
+    const signals = packEntryPointSignals([
+      { path: "bin/x.php", entryPoints: [{ kind: "cron", source: "crontab:3", schedule: "@daily", position: at(1) }] },
+    ]);
+    expect(signals.get("bin/x.php")).toEqual([{ archetypeId: "entrypoint", detail: "cron entry point: @daily (crontab:3)", weight: 1 }]);
   });
 
   it("is empty without entry-point facts", () => {

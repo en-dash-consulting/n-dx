@@ -1014,6 +1014,15 @@ export interface ClassificationEvidence {
   signalKind: ArchetypeSignal["kind"] | "pack";
   detail: string;
   weight: number;
+  /** `pack` evidence for a file a cron job runs: the job's schedule and where it is written. */
+  schedule?: CronSchedule;
+}
+
+/** A cron job's schedule as the crontab spells it (`*\/5 * * * *`, `@daily`), with the crontab's path and 1-based line. */
+export interface CronSchedule {
+  expression: string;
+  file: string;
+  line: number;
 }
 
 export interface FileClassification {

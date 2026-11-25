@@ -306,6 +306,8 @@ export interface EntryPointFact {
   readonly source: string;
   /** For `cron`: the schedule as written (`*\/5 * * * *`, `@daily`). */
   readonly schedule?: string;
+  /** For `cron`: the crontab-like file (repository-relative) and 1-based line of the job. */
+  readonly crontab?: { readonly file: string; readonly line: number };
   readonly position: SourcePosition;
 }
 

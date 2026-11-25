@@ -108,7 +108,7 @@ Pack `notices` go to the same `warn` as degrade notices.
 `packFacts`; `packEntryPointSignals` turns each into an `entrypoint` signal
 that `analyzeClassifications` scores (weight 1), recorded as evidence with
 `signalKind` `pack` and a detail such as `cron entry point: 0 3 * * *
-(crontab:4)`; the schedule lives only in that detail. A file with pack signals, or pack evidence last run, is always
+(crontab:4)`, a cron one also `schedule` {expression, file, line}. A file with pack signals, or pack evidence last run, is always
 reclassified. Without facts classifications.json is unchanged.
 
 `configReads` and `flagChecks` become config.json, `versionFloor`,
