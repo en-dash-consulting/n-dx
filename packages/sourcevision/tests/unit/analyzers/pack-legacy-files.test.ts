@@ -7,7 +7,7 @@ import { packEcosystem } from "../../../src/analyzers/pack-ecosystem.js";
 import type { PackFrameworkFacts } from "../../../src/analyzers/pack-framework-facts.js";
 import { packLegacyData, writeLegacyData } from "../../../src/analyzers/pack-legacy-files.js";
 import { DATA_FILES } from "../../../src/schema/data-files.js";
-import type { Inventory, LegacyData, LegacyFileEntry } from "../../../src/schema/index.js";
+import { SCHEMA_VERSION, type Inventory, type LegacyData, type LegacyFileEntry } from "../../../src/schema/index.js";
 import { validateModule } from "../../../src/schema/validate.js";
 import { fileTotals, floorTotals, profileCounts } from "../../helpers/legacy-totals.js";
 
@@ -176,7 +176,9 @@ describe("writeLegacyData", () => {
     expect(existsSync(path)).toBe(false);
 
     writeLegacyData(dir, packLegacyData([{ path: "a.php", legacyConstructs: [use(MYSQL, 1)] }], inventory({ "a.php": {} })));
-    expect(validateModule("legacy", JSON.parse(readFileSync(path, "utf-8"))).ok).toBe(true);
+    const written = JSON.parse(readFileSync(path, "utf-8"));
+    expect(validateModule("legacy", written).ok).toBe(true);
+    expect(written.schemaVersion).toBe(SCHEMA_VERSION);
 
     writeFileSync(path, "{}");
     writeLegacyData(dir, undefined);

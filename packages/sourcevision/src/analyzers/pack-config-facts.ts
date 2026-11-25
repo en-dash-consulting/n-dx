@@ -41,7 +41,7 @@ import type {
   Inventory,
 } from "../schema/index.js";
 import { DATA_FILES } from "../schema/data-files.js";
-import { toCanonicalJSON } from "../util/sort.js";
+import { toFactFileJSON } from "../util/sort.js";
 import type { PackFrameworkFacts } from "./pack-framework-facts.js";
 
 const SOURCES: ReadonlySet<string> = new Set(CONFIG_SOURCES);
@@ -200,5 +200,5 @@ export function writeConfigData(svDir: string, data: ConfigData | undefined): vo
     rmSync(path, { force: true });
     return;
   }
-  writeFileSync(path, toCanonicalJSON(data));
+  writeFileSync(path, toFactFileJSON(data));
 }

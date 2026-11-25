@@ -4,7 +4,14 @@ items:
     lastModified: "2026-11-25T04:49:51.275Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7f4713b1-ab9e-4b67-bf59-19b5aa16284a":
-    lastModified: "2026-11-25T04:49:49.080Z"
+    status: "completed"
+    startedAt: "2026-11-25T05:53:50.636Z"
+    completedAt: "2026-11-25T06:00:49.007Z"
+    endedAt: "2026-11-25T06:00:49.007Z"
+    activeIntervals: [{"end":"2026-11-25T06:00:49.007Z","start":"2026-11-25T05:53:50.636Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fact files are written through toFactFileJSON, which stamps SCHEMA_VERSION (key-sorted, so byte-stable). FactFile/WrittenFactFile types live in v1.ts, and validate.ts accepts the field as optional. An e2e test checks every DATA_FILES entry."
+    lastModified: "2026-11-25T06:00:49.007Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "90605ac0-4321-4bc1-b0de-85f3935daa39":
     lastModified: "2026-11-25T04:49:56.393Z"

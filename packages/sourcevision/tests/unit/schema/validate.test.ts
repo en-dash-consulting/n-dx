@@ -1022,3 +1022,52 @@ describe("formatValidationErrors", () => {
     }
   });
 });
+
+describe("fact-file schemaVersion", () => {
+  // The smallest valid file per module, as written before schemaVersion existed.
+  const unversioned: Record<string, Record<string, unknown>> = {
+    inventory: { files: [], summary: { totalFiles: 0, totalLines: 0, byLanguage: {}, byRole: {}, byCategory: {} } },
+    imports: {
+      edges: [],
+      external: [],
+      summary: { totalEdges: 0, totalExternal: 0, circularCount: 0, circulars: [], mostImported: [], avgImportsPerFile: 0 },
+    },
+    classifications: {
+      archetypes: [],
+      files: [],
+      summary: { totalClassified: 0, totalUnclassified: 0, byArchetype: {}, bySource: {} },
+    },
+    zones: { zones: [], crossings: [], unzoned: [] },
+    components: {
+      components: [],
+      usageEdges: [],
+      routeModules: [],
+      routeTree: [],
+      serverRoutes: [],
+      summary: {
+        totalComponents: 0, totalRouteModules: 0, totalUsageEdges: 0, totalServerRoutes: 0,
+        routeConventions: {}, mostUsedComponents: [], layoutDepth: 0,
+      },
+    },
+    callGraph: {
+      functions: [],
+      edges: [],
+      summary: { totalFunctions: 0, totalCalls: 0, filesWithCalls: 0, mostCalled: [], mostCalling: [], cycleCount: 0 },
+    },
+    outbound: { dependencies: [], contracts: [] },
+    config: { files: [], flags: [], keys: [] },
+    legacy: { languages: {} },
+  };
+
+  for (const [name, data] of Object.entries(unversioned)) {
+    it(`${name}: accepts the file without schemaVersion, keeps it when present, and refuses a non-string`, () => {
+      expect(validateModule(name, data).ok).toBe(true);
+
+      const versioned = validateModule(name, { ...data, schemaVersion: "1.0.0" });
+      expect(versioned.ok).toBe(true);
+      if (versioned.ok) expect((versioned.data as { schemaVersion?: string }).schemaVersion).toBe("1.0.0");
+
+      expect(validateModule(name, { ...data, schemaVersion: 1 }).ok).toBe(false);
+    });
+  }
+});

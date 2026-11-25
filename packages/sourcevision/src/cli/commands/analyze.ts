@@ -15,6 +15,7 @@ import {
   deduplicateFindings,
   enforceSeverityRules,
   toCanonicalJSON,
+  toFactFileJSON,
   emptyAnalyzeTokenUsage,
   formatTokenUsage,
   detectSubAnalyses,
@@ -847,7 +848,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // Compute architectural risk scoring and attach metrics to zones
     if (zonesData.zones.length > 0) {
       applyZoneRisks(zonesData, { justifications: riskJustifications, zoneTypes });
-      writeFileSync(zonesPath, toCanonicalJSON(zonesData));
+      writeFileSync(zonesPath, toFactFileJSON(zonesData));
     }
 
     // Project profile — primary language, frameworks, release/build/CI surfaces
@@ -876,7 +877,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
         suggest: (id) => suggestPack(ctx, id),
       },
     );
-    writeFileSync(join(ctx.svDir, DATA_FILES.infrastructure), toCanonicalJSON(infrastructure));
+    writeFileSync(join(ctx.svDir, DATA_FILES.infrastructure), toFactFileJSON(infrastructure));
 
     // SDLC readiness — commands, CI, deployment, quality gates and the rest,
     // each claim carrying the file that proves it. Its own bounded walk,
@@ -906,7 +907,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // weight change shows up without a re-analysis.
     writeFileSync(
       join(ctx.svDir, DATA_FILES.readiness),
-      toCanonicalJSON(computeReadinessScore(sdlcProfile)),
+      toFactFileJSON(computeReadinessScore(sdlcProfile)),
     );
 
     // Outbound dependencies and declared contracts — the consumer half of the
@@ -915,7 +916,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // `--fast`, and is written canonically for the same reason as the file
     // above it. Language packs' outbound calls join the detectors' entries.
     const outbound = applicationOutbound(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, packFacts), inventory);
-    writeFileSync(join(ctx.svDir, DATA_FILES.outbound), toCanonicalJSON(outbound));
+    writeFileSync(join(ctx.svDir, DATA_FILES.outbound), toFactFileJSON(outbound));
     const targetsLine = describeOutboundTargets(outbound.dependencies);
     if (targetsLine) info(targetsLine);
 

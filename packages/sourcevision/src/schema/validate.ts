@@ -1,6 +1,12 @@
 import { z } from "zod";
 import type * as V1 from "./v1.js";
 
+/**
+ * `V1.FactFile`: every fact file's top-level version. Optional, so analyses
+ * written before the field existed still validate.
+ */
+const FactFileVersion = { schemaVersion: z.string().optional() };
+
 // ── Manifest ────────────────────────────────────────────────────────────────
 
 const ModuleStatusSchema = z.enum(["pending", "running", "complete", "error"]);
@@ -159,6 +165,7 @@ const InventorySummarySchema = z.object({
 });
 
 export const InventorySchema = z.object({
+  ...FactFileVersion,
   files: z.array(FileEntrySchema),
   summary: InventorySummarySchema,
 });
@@ -222,6 +229,7 @@ const ImportsSummarySchema = z.object({
 });
 
 export const ImportsSchema = z.object({
+  ...FactFileVersion,
   edges: z.array(ImportEdgeSchema),
   external: z.array(ExternalImportSchema),
   summary: ImportsSummarySchema,
@@ -268,6 +276,7 @@ const ClassificationsSummarySchema = z.object({
 });
 
 export const ClassificationsSchema = z.object({
+  ...FactFileVersion,
   archetypes: z.array(ArchetypeDefinitionSchema),
   files: z.array(FileClassificationSchema),
   summary: ClassificationsSummarySchema,
@@ -327,6 +336,7 @@ const ZoneCrossingSchema = z.object({
 });
 
 export const ZonesSchema = z.object({
+  ...FactFileVersion,
   zones: z.array(ZoneSchema),
   crossings: z.array(ZoneCrossingSchema),
   unzoned: z.array(z.string()),
@@ -433,6 +443,7 @@ const ComponentsSummarySchema = z.object({
 });
 
 export const ComponentsSchema = z.object({
+  ...FactFileVersion,
   components: z.array(ComponentDefinitionSchema),
   usageEdges: z.array(ComponentUsageEdgeSchema),
   routeModules: z.array(RouteModuleSchema),
@@ -486,6 +497,7 @@ const CallGraphSummarySchema = z.object({
 });
 
 export const CallGraphSchema = z.object({
+  ...FactFileVersion,
   functions: z.array(FunctionNodeSchema),
   edges: z.array(CallEdgeSchema),
   summary: CallGraphSummarySchema,
@@ -775,6 +787,7 @@ const LegacyFileEntrySchema = z.object({
 }).refine((f) => f.floor !== undefined || f.constructs.length > 0, { message: "a file needs a floor or a construct use" });
 
 export const LegacySchema = z.object({
+  ...FactFileVersion,
   languages: z.record(z.string().min(1), z.object({
     files: z.array(LegacyFileEntrySchema),
     thirdParty: z.array(LegacyFileEntrySchema).min(1).optional(),
@@ -825,6 +838,7 @@ const DeclaredContractSchema = z.object({
 });
 
 export const OutboundSchema = z.object({
+  ...FactFileVersion,
   dependencies: z.array(OutboundDependencySchema),
   contracts: z.array(DeclaredContractSchema),
 });
@@ -857,6 +871,7 @@ const FlagCheckSchema = z.object({
 });
 
 export const ConfigSchema = z.object({
+  ...FactFileVersion,
   files: z.array(z.object({
     file: z.string().min(1),
     configReads: z.array(ConfigReadSchema),

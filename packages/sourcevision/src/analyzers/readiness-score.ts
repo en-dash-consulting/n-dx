@@ -36,7 +36,7 @@ import {
   type RepoTrustFinding,
 } from "@n-dx/llm-client";
 
-import type { SdlcDetection, SdlcEvidence, SdlcProfile } from "../schema/v1.js";
+import type { FactFile, SdlcDetection, SdlcEvidence, SdlcProfile } from "../schema/v1.js";
 import { hasAutomaticTrigger } from "./sdlc-profile.js";
 
 // ── Weights ─────────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export interface ReadinessDimensionScore {
  * Mirrors `StructureHealthScore` in rex: an overall 0-100, per-dimension
  * detail, and suggestions aimed at the weakest dimensions.
  */
-export interface ReadinessScore {
+export interface ReadinessScore extends FactFile {
   /** Weighted sum of the dimension scores, rounded. 0-100. */
   overall: number;
   dimensions: Record<ReadinessDimensionName, ReadinessDimensionScore>;

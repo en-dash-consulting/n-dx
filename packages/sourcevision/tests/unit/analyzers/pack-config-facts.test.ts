@@ -13,7 +13,7 @@ import type { ConfigReadFact, FlagCheckFact } from "@n-dx/lang-kit";
 import { packConfigData, writeConfigData } from "../../../src/analyzers/pack-config-facts.js";
 import type { PackFrameworkFacts } from "../../../src/analyzers/pack-framework-facts.js";
 import { DATA_FILES } from "../../../src/schema/data-files.js";
-import type { ConfigData, Inventory } from "../../../src/schema/v1.js";
+import { SCHEMA_VERSION, type ConfigData, type Inventory } from "../../../src/schema/v1.js";
 import { ConfigSchema, validateModule } from "../../../src/schema/validate.js";
 
 const inventory = (...paths: string[]): Inventory =>
@@ -178,7 +178,9 @@ describe("writeConfigData", () => {
 
     const data = packConfigData([{ path: "a.php", flagChecks: [check("X", 1)] }], inventory("a.php"));
     writeConfigData(dir, data);
-    expect(validateModule("config", JSON.parse(readFileSync(join(dir, DATA_FILES.config), "utf-8"))).ok).toBe(true);
+    const written = JSON.parse(readFileSync(join(dir, DATA_FILES.config), "utf-8"));
+    expect(validateModule("config", written).ok).toBe(true);
+    expect(written.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
   it("removes a config.json an earlier run left when this one has no data", () => {

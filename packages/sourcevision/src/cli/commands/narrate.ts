@@ -16,7 +16,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { terminateTreeByPidSync } from "@n-dx/llm-client";
 import type { Finding, Manifest, NarrationState, Zone, Zones } from "../../schema/index.js";
-import { DATA_FILES, readManifest, writeManifest, toCanonicalJSON, deduplicateFindings, enforceSeverityRules } from "../sourcevision-core.js";
+import { DATA_FILES, readManifest, writeManifest, toFactFileJSON, deduplicateFindings, enforceSeverityRules } from "../sourcevision-core.js";
 import { narrateZones } from "../../analyzers/enrich-multiplex.js";
 import { nameZonesBySelection } from "../../analyzers/zone-naming.js";
 import { routeLayoutFor } from "../../analyzers/route-convention.js";
@@ -271,7 +271,7 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
         return;
       }
       stored = { ...stored, areas: applied.areas };
-      writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(stored));
+      writeFileSync(join(svDir, DATA_FILES.zones), toFactFileJSON(stored));
       info(`  ${applied.renamed.length} area(s) renamed → ${dim(join(svDir, DATA_FILES.zones))}`);
     }
   }
@@ -294,7 +294,7 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
         return;
       }
       stored = { ...stored, zones: subZoneIdsFollowNames(revertEchoedNames(applied.zones, new Set(applied.renamed))) };
-      writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(stored));
+      writeFileSync(join(svDir, DATA_FILES.zones), toFactFileJSON(stored));
       info(`  ${applied.renamed.length} sub-zone(s) renamed → ${dim(join(svDir, DATA_FILES.zones))}`);
     }
   }
@@ -317,7 +317,7 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
         return;
       }
       stored = applied.zones;
-      writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(stored));
+      writeFileSync(join(svDir, DATA_FILES.zones), toFactFileJSON(stored));
       info(`  ${applied.renamed.length} zone(s) renamed → ${dim(join(svDir, DATA_FILES.zones))}`);
     }
   }
@@ -368,7 +368,7 @@ export async function cmdNarrate(targetDir: string, opts: NarrateOptions): Promi
   }
 
   const merged = mergeNarration(stored, narrated.zones, judged.findings);
-  writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(merged.zones));
+  writeFileSync(join(svDir, DATA_FILES.zones), toFactFileJSON(merged.zones));
   info(`  ${merged.narratedIds.length} zone(s) narrated, ${merged.newFindings} finding(s) judged and merged → ${dim(join(svDir, DATA_FILES.zones))}`);
 
   if (!opts.inline) {

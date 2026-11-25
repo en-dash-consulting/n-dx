@@ -2,6 +2,20 @@
 
 export const SCHEMA_VERSION = "1.0.0";
 
+// ── Fact files ──────────────────────────────────────────────────────────────
+
+/**
+ * The version every fact file under the analysis directory carries at its top
+ * level. Optional on read, because analyses written before the field existed
+ * leave it out; {@link WrittenFactFile} makes it required on write.
+ */
+export interface FactFile {
+  schemaVersion?: string;
+}
+
+/** A fact file as written: `schemaVersion` always present. */
+export type WrittenFactFile<T extends FactFile> = T & { schemaVersion: string };
+
 // ── Manifest ────────────────────────────────────────────────────────────────
 
 export type ModuleStatus = "pending" | "running" | "complete" | "error";
@@ -351,7 +365,7 @@ export interface InventorySummary {
   mirrored?: InventoryExcludedSummary;
 }
 
-export interface Inventory {
+export interface Inventory extends FactFile {
   files: FileEntry[];
   summary: InventorySummary;
 }
@@ -434,7 +448,7 @@ export interface PackParseIssues {
 /** How many example paths {@link ParseIssueSample} keeps. */
 export const MAX_PARSE_ISSUE_EXAMPLES = 50;
 
-export interface Imports {
+export interface Imports extends FactFile {
   edges: ImportEdge[];
   external: ExternalImport[];
   summary: ImportsSummary;
@@ -655,7 +669,7 @@ export interface ZoneCrossing {
   evidence?: string;
 }
 
-export interface Zones {
+export interface Zones extends FactFile {
   zones: Zone[];
   crossings: ZoneCrossing[];
   unzoned: string[];
@@ -877,7 +891,7 @@ export interface ComponentsSummary {
   layoutDepth: number;
 }
 
-export interface Components {
+export interface Components extends FactFile {
   components: ComponentDefinition[];
   usageEdges: ComponentUsageEdge[];
   routeModules: RouteModule[];
@@ -939,7 +953,7 @@ export interface CallGraphSummary {
   cycleCount: number;
 }
 
-export interface CallGraph {
+export interface CallGraph extends FactFile {
   /** All function/method definitions discovered */
   functions: FunctionNode[];
   /** All call edges between functions */
@@ -1001,7 +1015,7 @@ export interface ClassificationsSummary {
   bySource: Record<string, number>;
 }
 
-export interface Classifications {
+export interface Classifications extends FactFile {
   archetypes: ArchetypeDefinition[];
   files: FileClassification[];
   summary: ClassificationsSummary;
@@ -1296,7 +1310,7 @@ export interface InfraLink {
 }
 
 /** `infrastructure.json` — the full discovery for one analysis. */
-export interface InfrastructureData {
+export interface InfrastructureData extends FactFile {
   resources: InfraResource[];
   seams: InfraSeam[];
   links: InfraLink[];
@@ -1745,7 +1759,7 @@ export interface LegacyLanguageFiles {
 }
 
 /** `legacy.json` — per language (the inventory's, lower-cased), each file's floor and legacy-construct uses. */
-export interface LegacyData {
+export interface LegacyData extends FactFile {
   languages: Record<string, LegacyLanguageFiles>;
 }
 
@@ -1864,7 +1878,7 @@ export interface DeclaredContract {
 }
 
 /** `outbound.json` — the full outbound picture for one analysis. */
-export interface OutboundData {
+export interface OutboundData extends FactFile {
   dependencies: OutboundDependency[];
   contracts: DeclaredContract[];
 }
@@ -1952,7 +1966,7 @@ export interface ConfigKeyEntry {
 }
 
 /** `config.json` — config reads and flag checks for one analysis. */
-export interface ConfigData {
+export interface ConfigData extends FactFile {
   /** Files with at least one read or check, sorted by path. */
   files: ConfigFileEntry[];
   /** Sorted by `normalized`. */
