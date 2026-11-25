@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +16,7 @@ import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
 import { toolRunCommand } from "../../../src/tools/shell.js";
 import { detectSandboxBackend } from "../../../src/prd/llm-gateway.js";
 import { execRepoShellCmd } from "../../../src/guard/sandbox.js";
+import { exec } from "../../../src/process/exec.js";
 import { execArgv } from "../../../src/tools/exec-shell.js";
 
 const seatbelt = { name: "seatbelt" as const, available: true };
@@ -297,6 +299,88 @@ posixOnly("createVendorCliSandbox", () => {
       expect(deny).toContain(join(project, ".hench", "config.json"));
       expect(deny).not.toContain(`"${join(project, ".rex")}"`);
       expect(deny).toContain(join(home, ".ssh"));
+    } finally {
+      sandbox.dispose();
+    }
+  });
+});
+
+/** The `(allow file-read* file-write* …)` line holding the profile's read-write roots. */
+function readWriteLine(profile: string): string {
+  return profile.split("\n").find((l) => l.startsWith("(allow file-read* file-write* (subpath "))!;
+}
+
+/**
+ * Every `(subpath …)` under /private/var/folders on a line other than
+ * `expected` (the test's temp project and the sandbox's scratch dir live there).
+ */
+function otherVarFolders(line: string, ...expected: string[]): string[] {
+  return [...line.matchAll(/\(subpath "(\/private\/var\/folders\/[^"]*)"\)/g)]
+    .map((m) => m[1])
+    .filter((p) => !expected.includes(p));
+}
+
+/**
+ * The host's real Security MDS cache folder, or null. llm-client's profile
+ * builder resolves it (and unit-tests that lookup, failures included); this
+ * reads it independently so these tests check the profile hench builds.
+ */
+function hostMdsCacheDir(): string | null {
+  try {
+    const cache = execFileSync("/usr/bin/getconf", ["DARWIN_USER_CACHE_DIR"], { encoding: "utf-8" }).trim();
+    return cache && existsSync(join(cache, "mds")) ? realpathSync(join(cache, "mds")) : null;
+  } catch {
+    return null; // getconf missing or failed: the profile is built without the folder.
+  }
+}
+
+describe.skipIf(process.platform !== "darwin")("macOS Security MDS cache", () => {
+  it("is read-write to the vendor CLI, and the only path opened under /private/var/folders besides its scratch dir", () => {
+    const mds = hostMdsCacheDir();
+    const project = tempProject();
+    const sandbox = createVendorCliSandbox(project, "claude", { cliBinary: process.execPath, setting: on, backend: seatbelt })!;
+    try {
+      const profile = sandbox.wrap("claude", ["-p"]).args[1];
+      const rw = readWriteLine(profile);
+      if (mds) expect(rw).toContain(`(subpath "${mds}")`);
+      expect(otherVarFolders(rw, project, sandbox.tmpDir, ...(mds ? [mds] : []))).toEqual([]);
+      // The keychain directory stays read-only.
+      const keychains = `(subpath "${join(realpathSync(homedir()), "Library", "Keychains")}")`;
+      expect(profile.split("\n").some((l) => l.startsWith("(allow") && l.includes("file-write*") && l.includes(keychains))).toBe(false);
+    } finally {
+      sandbox.dispose();
+    }
+  });
+
+  it("is not opened to the tool sandbox", () => {
+    const mds = hostMdsCacheDir();
+    const project = tempProject();
+    const sandbox = createToolSandbox(project, { setting: on, backend: seatbelt })!;
+    try {
+      const profile = sandbox.wrap("sh", ["-c", "true"]).args[1];
+      if (mds) expect(profile).not.toContain(mds);
+      expect(otherVarFolders(readWriteLine(profile), project, sandbox.tmpDir)).toEqual([]);
+    } finally {
+      sandbox.dispose();
+    }
+  });
+});
+
+/**
+ * Live: a keychain lookup inside the vendor-cli profile reaches securityd and
+ * gets an ordinary "not found", not a Module Directory Service error. Needs a
+ * usable Seatbelt (skipped when nested inside another sandbox).
+ */
+describe.skipIf(process.platform !== "darwin" || !live.available)("live vendor-cli keychain lookup", () => {
+  it("answers without a Module Directory Service error", async () => {
+    const project = tempProject();
+    const sandbox = createVendorCliSandbox(project, "claude", { cliBinary: process.execPath, setting: on })!;
+    try {
+      const inv = sandbox.wrap("/usr/bin/security", ["find-generic-password", "-s", `n-dx-absent-${process.pid}-${Date.now()}`]);
+      const base = await sandbox.prepareSpawn(process.env);
+      const result = await exec(inv.file, inv.args, { cwd: project, timeout: 30_000, env: { ...base, ...inv.env } });
+      expect(result.stderr).not.toMatch(/Module Directory Service/i);
+      expect(result.stderr).toMatch(/could not be found/i);
     } finally {
       sandbox.dispose();
     }

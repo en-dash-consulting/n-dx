@@ -1814,6 +1814,14 @@ export interface RunRecord {
    */
   trust?: RunTrustRecord;
   /**
+   * Whether hench's OS sandbox confined the vendor CLI it spawned (the Claude
+   * CLI). Absent when hench does not confine the vendor process: the API loop,
+   * and a Codex run, which brings its own sandbox. The run classifier reads it
+   * to tell a login the sandbox hid from a login that is really gone.
+   * v1 additive field.
+   */
+  vendorCliSandbox?: "confined" | "off" | "unavailable";
+  /**
    * n-dx's own config files the run changed — by whichever vendor, provider or
    * tool — and whether each was put back. Present only when there were any;
    * the run is failed when it is. Paths only, never content.
@@ -2244,6 +2252,7 @@ export type RunVerdictActionKind =
   | "raise-tier"
   | "retry-later"
   | "re-authenticate"
+  | "sandbox-login"
   | "tighten-done-when";
 
 /** One ranked next action. */

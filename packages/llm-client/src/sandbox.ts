@@ -45,7 +45,7 @@
 
 import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
-import { buildShellInvocation, execFileSyncCli, isExecutableOnPath } from "./exec.js";
+import { buildShellInvocation, execFileSyncCli, execFileSyncNoShell, isExecutableOnPath } from "./exec.js";
 import { NDX_CONTAINER_DIRNAME, detectLayoutMode, resolveLayout, resolveNdxHome } from "./layout.js";
 import { AUTH_TOKEN_FILENAME } from "./auth-token.js";
 import { isLocalConfigTracked } from "./repo-trust.js";
@@ -542,6 +542,60 @@ export const SANDBOX_MACH_SERVICES_VENDOR: readonly string[] = [
   "com.apple.trustd",
 ];
 
+/** `getconf` answers at once; a hang must not hold up the spawn. */
+const GETCONF_TIMEOUT_MS = 2_000;
+
+/** `getconf DARWIN_USER_CACHE_DIR` output, read once per process: it does not change. */
+let darwinUserCacheDir: string | undefined;
+
+function readDarwinUserCacheDir(): string {
+  darwinUserCacheDir ??= execFileSyncNoShell("/usr/bin/getconf", ["DARWIN_USER_CACHE_DIR"], {
+    encoding: "utf-8",
+    timeout: GETCONF_TIMEOUT_MS,
+    stdio: ["ignore", "pipe", "ignore"],
+  }).toString();
+  return darwinUserCacheDir;
+}
+
+/**
+ * The real path of the Security framework's per-user MDS cache,
+ * `$(getconf DARWIN_USER_CACHE_DIR)mds` (under `/private/var/folders/…/C/mds`),
+ * or undefined off macOS, when `getconf` fails, or when the folder does not
+ * exist. Every keychain lookup (`security`, SecItem) opens `mds.lock` and
+ * `mdsDirectory.db` there read-write; with the folder read-only it fails with
+ * "A Module Directory Service error has occurred" and the vendor CLI reports
+ * it is not logged in.
+ */
+export function darwinUserSecurityCacheDir(
+  platform: NodeJS.Platform = process.platform,
+  getconf: () => string = readDarwinUserCacheDir,
+): string | undefined {
+  if (platform !== "darwin") return undefined;
+  let cacheDir: string;
+  try {
+    cacheDir = getconf().trim();
+  } catch {
+    return undefined; // getconf missing, failed or timed out: no folder to open.
+  }
+  if (!cacheDir) return undefined;
+  try {
+    return realpathSync(join(cacheDir, "mds"));
+  } catch {
+    return undefined; // The folder does not exist: nothing to open.
+  }
+}
+
+/**
+ * Read-write roots the profile adds on its own: for the vendor CLI only, the
+ * MDS cache its keychain login needs. Only that folder is opened; the rest of
+ * /private/var/folders, and `~/Library/Keychains` (read-only), stay as they are.
+ */
+function seatbeltReadWriteExtras(policy: SandboxPolicy, securityCacheDir: () => string | undefined): string[] {
+  if (policy.kind !== "vendor-cli") return [];
+  const mds = securityCacheDir();
+  return mds ? [mds] : [];
+}
+
 /** The system resolver's socket; with it, the vendor profile needs no UDP 53. */
 const MDNS_RESPONDER_SOCKET = "/private/var/run/mDNSResponder";
 
@@ -557,9 +611,13 @@ function machServicesFor(policy: SandboxPolicy): string[] {
  * The Seatbelt profile for a policy. Later rules win in SBPL, so the denies
  * for masked project state and credential directories come last and hold
  * even when a read-only root (an nvm install under the home, say) would
- * otherwise reach them.
+ * otherwise reach them. A vendor-cli profile also opens the macOS Security MDS
+ * cache read-write ({@link darwinUserSecurityCacheDir}; injectable for tests).
  */
-export function buildSeatbeltProfile(policy: SandboxPolicy): string {
+export function buildSeatbeltProfile(
+  policy: SandboxPolicy,
+  securityCacheDir: () => string | undefined = darwinUserSecurityCacheDir,
+): string {
   const lines: string[] = [
     "(version 1)",
     "(deny default)",
@@ -579,7 +637,12 @@ export function buildSeatbeltProfile(policy: SandboxPolicy): string {
   const roRoots = [...SYSTEM_READ_ROOTS_DARWIN, ...readOnlyRootsFor(policy)];
   lines.push(`(allow file-read* ${roRoots.map((r) => `(subpath ${sbplString(r)})`).join(" ")})`);
   lines.push("; project and scratch");
-  const rwRoots = [policy.projectDir, policy.tmpDir, ...(policy.readWriteRoots ?? [])];
+  const rwRoots = [
+    policy.projectDir,
+    policy.tmpDir,
+    ...(policy.readWriteRoots ?? []),
+    ...seatbeltReadWriteExtras(policy, securityCacheDir),
+  ];
   lines.push(`(allow file-read* file-write* ${rwRoots.map((r) => `(subpath ${sbplString(r)})`).join(" ")})`);
   if (policy.readWritePrefixes?.length) {
     lines.push(`(allow file-read* file-write* ${policy.readWritePrefixes.map(sbplPrefixRegex).join(" ")})`);

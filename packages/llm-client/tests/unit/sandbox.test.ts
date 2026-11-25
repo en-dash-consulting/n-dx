@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBwrapArgs,
   buildSeatbeltProfile,
+  darwinUserSecurityCacheDir,
   detectSandboxBackend,
   gitControlPathsFor,
   maskedProjectPathsFor,
@@ -698,5 +699,50 @@ describe("resolveSandboxSetting and a committed local config", () => {
   it("still honours an untracked one inside a git work tree", () => {
     const { dir, home } = repoWithLocal();
     expect(resolveSandboxSetting(dir, { env: {}, ndxHome: home })).toMatchObject({ mode: "off", toolNetwork: "allow", source: "local-config" });
+  });
+});
+
+describe("darwinUserSecurityCacheDir", () => {
+  it("returns the real path of <cache>/mds on macOS", () => {
+    const cache = mkdtempSync(join(tmpdir(), "sbx-mds-"));
+    mkdirSync(join(cache, "mds"));
+    expect(darwinUserSecurityCacheDir("darwin", () => `${cache}/\n`)).toBe(realpathSync(join(cache, "mds")));
+  });
+
+  it("returns undefined when getconf fails, answers nothing, or the folder is missing", () => {
+    expect(darwinUserSecurityCacheDir("darwin", () => { throw new Error("getconf: not found"); })).toBeUndefined();
+    expect(darwinUserSecurityCacheDir("darwin", () => "\n")).toBeUndefined();
+    expect(darwinUserSecurityCacheDir("darwin", () => mkdtempSync(join(tmpdir(), "sbx-mds-")))).toBeUndefined();
+  });
+
+  it("returns undefined off macOS without running getconf", () => {
+    let ran = false;
+    expect(darwinUserSecurityCacheDir("linux", () => { ran = true; return "/x"; })).toBeUndefined();
+    expect(ran).toBe(false);
+  });
+});
+
+posixOnly("buildSeatbeltProfile: macOS Security MDS cache", () => {
+  const mds = "/private/var/folders/xy/abc/C/mds";
+  const vendor: SandboxPolicy = { ...policy, kind: "vendor-cli", network: "vendor", readWriteRoots: ["/Users/op/.claude"] };
+  const readWriteLine = (profile: string) => profile.split("\n").find((l) => l.startsWith("(allow file-read* file-write* (subpath "))!;
+
+  it("is read-write to the vendor CLI", () => {
+    expect(readWriteLine(buildSeatbeltProfile(vendor, () => mds))).toContain(`(subpath "${mds}")`);
+  });
+
+  it("is never opened to a tool child or a git hook", () => {
+    expect(buildSeatbeltProfile(policy, () => mds)).not.toContain(mds);
+    expect(buildSeatbeltProfile({ ...policy, kind: "git-hook" }, () => mds)).not.toContain(mds);
+  });
+
+  it("leaves the vendor profile without it when the folder cannot be resolved", () => {
+    expect(readWriteLine(buildSeatbeltProfile(vendor, () => undefined))).not.toContain("/private/var/folders");
+  });
+
+  it("keeps the keychain directory read-only", () => {
+    const keychains = '(subpath "/Users/op/Library/Keychains")';
+    const profile = buildSeatbeltProfile({ ...vendor, readOnlyRoots: ["/Users/op/Library/Keychains"] }, () => mds);
+    expect(profile.split("\n").some((l) => l.startsWith("(allow") && l.includes("file-write*") && l.includes(keychains))).toBe(false);
   });
 });

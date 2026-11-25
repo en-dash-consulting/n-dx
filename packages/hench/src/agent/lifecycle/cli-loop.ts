@@ -2609,12 +2609,14 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   // turns and cascades the same failure. Detect it first — before the
   // transient check that would otherwise treat a bare "claude exited with
   // code N" as retryable — and fail immediately with re-auth guidance.
+  // The task stays pending: it did nothing wrong, and is runnable once the
+  // vendor CLI can sign in.
   if (isAuthError(result.error!)) {
     syncRunFromAccumulated(run, accumulated, attempt);
     run.status = "failed";
     run.summary = result.summary;
     run.error = `${diagnosis.message} ${diagnosis.suggestion}`;
-    await handleRunFailure(store, taskId, "deferred", "auth_error", run.error);
+    await handleRunFailure(store, taskId, "pending", "auth_error", run.error);
     return "break";
   }
 
@@ -2724,8 +2726,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Confinement: Codex runs inside its own sandbox; the Claude CLI runs
   // inside ours, and an autonomous run never runs it unconfined by accident.
   // Checked before the task is claimed, so a refusal leaves the PRD untouched.
+  let vendorCliSandbox: RunRecord["vendorCliSandbox"];
   if (vendor === LLM_VENDOR.CLAUDE) {
     const sandboxPosture = resolveSandboxPosture(projectDir).posture;
+    vendorCliSandbox = sandboxPosture.state;
     assertSandboxReady(sandboxPosture, autonomous);
     stream("Guard", formatSandboxPosture(sandboxPosture));
     // Read on the host now, so the confined CLI is handed the slot directory.
@@ -2779,6 +2783,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     projectDir,
     vendor,
     sandbox: policy.sandbox,
+    ...(vendorCliSandbox ? { vendorCliSandbox } : {}),
     approvals: policy.approvals,
     parseMode: adapter.parseMode,
     invocationContext: "cli",

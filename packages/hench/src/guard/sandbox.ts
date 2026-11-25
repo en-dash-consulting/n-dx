@@ -290,7 +290,8 @@ export function isSelfConfinedVendorSession(
  * its config directory and `~/.claude.json`, the git common directory when
  * the project is a linked worktree, read-only access to the toolchain, the
  * n-dx install its MCP servers start from and (macOS) the keychain
- * directory, the vendor network profile, and no access to the operator's
+ * directory, read-write to (macOS) the Security MDS cache every keychain
+ * lookup opens, the vendor network profile, and no access to the operator's
  * other credential directories.
  */
 export function createVendorCliSandbox(
@@ -332,6 +333,10 @@ export function createVendorCliSandbox(
   // file permissions. Keep such tokens out of the login keychain, or run
   // with a vendor that confines itself, where that matters. SECURITY.md
   // states the same.
+  //
+  // Every keychain lookup also opens the Security MDS cache read-write; the
+  // vendor-cli Seatbelt profile opens that one folder itself
+  // (llm-client's darwinUserSecurityCacheDir).
   if (process.platform === "darwin") readOnlyRoots.push(join(home, "Library", "Keychains"));
   const ndxCli = env.NDX_CLI_PATH ?? env.N_DX_CLI_PATH;
   if (ndxCli) readOnlyRoots.push(installRoot(realOr(ndxCli), home));

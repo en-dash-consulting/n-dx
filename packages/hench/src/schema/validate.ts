@@ -465,6 +465,7 @@ export const RunRecordSchema = z.object({
     restricted: z.boolean(),
     findings: z.array(z.string()),
   }).optional(),
+  vendorCliSandbox: z.enum(["confined", "off", "unavailable"]).optional(),
   protectedConfigWrites: z.array(z.object({
     path: z.string(),
     change: z.enum(["created", "modified", "deleted", "replaced"]),

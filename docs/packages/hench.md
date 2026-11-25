@@ -269,7 +269,7 @@ process may be alive, is refused.
 | `review-blocked` | The review left a must-fix finding unrepaired | Follow-up run with the findings |
 | `claim-lost` | `claimLost`: another worktree took the task. A `readOnlyRefusal` (the forked attempt made no edits and the task re-ran cold) is never a class; it is one evidence line on the class the rest of the record gives | Release the claim, then re-run |
 | `budget-timeout` | `budget_exceeded`, `timeout`, or a brief too large for the context window | Split the task, or raise its tier |
-| `vendor-transient` | `error_transient`, or an auth, rate-limit (a CLI session limit included) or transient failure, read from failure events or from `run.error`, so it fires with the event pipeline off | Retry later; for auth, re-authenticate the vendor CLI and re-run |
+| `vendor-transient` | `error_transient`, or an auth, rate-limit (a CLI session limit included) or transient failure, read from failure events or from `run.error`, so it fires with the event pipeline off | Retry later; for auth, re-authenticate the vendor CLI and re-run. Under hench's sandbox (`vendorCliSandbox: confined`) an auth failure is a login the confined CLI cannot read: set `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, or run with `NDX_SANDBOX=off`. An auth failure leaves the task pending, not deferred |
 | `no-changes` | The agent made at least one tool call, and made no commits or changed only PRD files. A run that dies before its first tool call is not `no-changes` | Tighten the done-when |
 | `unclassified` | None of the above; never guessed | Read the run log |
 
