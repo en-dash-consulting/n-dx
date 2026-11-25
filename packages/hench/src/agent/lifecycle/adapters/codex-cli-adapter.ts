@@ -97,8 +97,11 @@ export const codexCliAdapter: VendorAdapter = {
         codex: {
           forkSupported: opts.codexForkSupported,
           effort: opts.effort,
-          // Orientation must not reach write-capable MCP tools outside the sandbox.
-          configFlags: opts.codexOrientationFlags,
+          // With a verified binding, orientation disables MCP at the native
+          // preflight too. Keep user/provider/organizational configuration.
+          configFlags: opts.mcpConfigPath
+            ? opts.codexOrientationFlags?.filter(flag => flag !== "--ignore-user-config")
+            : opts.codexOrientationFlags,
           policyFlags: compileCodexPolicyFlags(policy, { scratchDir }),
           resumePolicyFlags: compileCodexPolicyFlags(policy, { resume: true, scratchDir }),
         },
@@ -106,6 +109,9 @@ export const codexCliAdapter: VendorAdapter = {
 
       return {
         binary,
+        ...(opts.mcpConfigPath ? { codexMcpBinding: {
+          path: opts.mcpConfigPath, disabled: opts.codexOrientationFlags !== undefined,
+        } } : {}),
         usageResumeSessionId: opts.resumeSessionId,
         args,
         env: scratchDir ? { TMPDIR: scratchDir, TMP: scratchDir, TEMP: scratchDir } : {},

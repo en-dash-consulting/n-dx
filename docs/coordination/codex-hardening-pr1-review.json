@@ -1,0 +1,134 @@
+{
+  "disposition": "BLOCKED",
+  "taskId": "25270990-b5b0-413c-9719-6f70e9c3d38f",
+  "runId": "00f60dfe-59c8-4af7-a902-3783f3c2c784",
+  "base": "fe5d8b5714f8f0503f40e8d5ba51b20b5973a77e",
+  "reviewedStartingHead": "a8638a5acf9cd53d0ca92ea0efbf0330744a929c",
+  "automaticRepairCommit": "f3e6d690ac3bf1b158a79babc389c2bf90e38c16",
+  "sessions": [
+    {
+      "id": "01a21031-319a-7132-a752-7ab1426dace1",
+      "timestamp": "2026-11-25T00:53:09.155Z",
+      "cwd": "/private/tmp/ndx-codex-hardening-pr1",
+      "cli_version": "0.167.0-alpha.3.2",
+      "originator": "Codex Desktop",
+      "model": "gpt-6-astra",
+      "approval_policy": "never"
+    },
+    {
+      "id": "01a21044-833b-70c3-a47d-1e797d77fe1b",
+      "timestamp": "2026-11-25T01:14:16.060Z",
+      "cwd": "/private/tmp/ndx-codex-hardening-pr1",
+      "cli_version": "0.167.0-alpha.3.2",
+      "originator": "Codex Desktop",
+      "model": "gpt-6.2-astra",
+      "approval_policy": "never"
+    }
+  ],
+  "distinctSessions": true,
+  "report": {
+    "taskId": "25270990-b5b0-413c-9719-6f70e9c3d38f",
+    "fixesApplied": true,
+    "summary": "Reviewed the working tree at a8638a5a; the specified committed range was empty. The managed approval policy blocked Rex get_item, verify_criteria and SourceVision reads, so the task's five criteria and parent change were recovered from the checkout's v2 PRD. Checked executor launch paths, conflicting native registrations, redirected paths, malformed or missing bindings, retries, cancellation, and fixture portability. Six must-fixes were applied and one concurrency follow-up could not be captured. After fixes, 309 hench, 26 llm-client and 242 root tests passed, including three selected-CLI configuration and direct stdio cases on macOS. Both affected packages built and typechecked; dependency drift and diff whitespace checks passed. The full pnpm test suite, outer affected gate, Windows runtime, authenticated model execution, sibling claim attribution and fresh reviewer isolation were not exercised.",
+    "findings": [
+      {
+        "title": "Preparing the binding can prune a different directory before checking its location",
+        "location": "packages/hench/src/process/agent-mcp-config.ts:360",
+        "severity": "critical",
+        "verdict": "must-fix",
+        "scenario": "With the assigned checkout's MCP directory linked to a sibling directory, run preparation followed the link, swept JSON files older than seven days and wrote the new binding there. Executor validation ran afterwards.",
+        "action": "fixed",
+        "note": "The writer verifies the worktree and each state-directory component before sweeping or writing, and creates the binding exclusively. A regression checks refusal and an untouched destination.",
+        "disposition": "fixed"
+      },
+      {
+        "title": "Disabling apps leaves plugin-provided MCP servers enabled",
+        "location": "packages/hench/src/agent/lifecycle/codex-mcp-binding.ts:76",
+        "severity": "high",
+        "verdict": "must-fix",
+        "scenario": "An enabled operator plugin that contributes an MCP server can supply tools outside the two assigned registrations. The checks enumerated mcp_servers and disabled apps. On the selected CLI, features list still reported plugins enabled with apps disabled.",
+        "action": "fixed",
+        "note": "Executors disable the native plugins feature for the invocation and refuse a config that retains it. The opt-in native tests check both feature settings on fresh, resume and fork argv.",
+        "disposition": "fixed"
+      },
+      {
+        "title": "Cancellation during the final config read can be lost at executor startup",
+        "location": "packages/hench/src/agent/lifecycle/cli-loop.ts:1009",
+        "severity": "high",
+        "verdict": "must-fix",
+        "scenario": "If SIGINT arrives during a native read, a cancellation can be reported as a binding failure. If it arrives after a valid reply while the config-reader process is being reaped, the previous abort check has passed and the executor can start after the signal has fired.",
+        "action": "fixed",
+        "note": "The launch path checks cancellation after the last asynchronous preflight and returns the original abort reason. Two regressions cover interruption before and after a native reply.",
+        "disposition": "fixed"
+      },
+      {
+        "title": "Self-heal tests depend on a launcher variable inherited from the test runner",
+        "location": "packages/hench/tests/integration/self-heal-codex-batch.test.ts:186",
+        "severity": "high",
+        "verdict": "must-fix",
+        "scenario": "Running the self-heal batch and tag-scoping tests without either launcher environment variable caused ten failures with 'Codex MCP binding refused: no NDX_CLI_PATH in the environment'. They stopped before exercising self-heal.",
+        "action": "fixed",
+        "note": "Both suites supply and restore the checkout's launcher. All ten cases passed with both variables unset in the parent.",
+        "disposition": "fixed"
+      },
+      {
+        "title": "The scripted CLI contract fails with the new config response",
+        "location": "packages/hench/tests/unit/helpers/scripted-claude-cli.test.ts:45",
+        "severity": "medium",
+        "verdict": "must-fix",
+        "scenario": "Both the POSIX and Windows fixture cases failed strict equality because config/read now returned features and mcp_servers in addition to shell_environment_policy.",
+        "action": "fixed",
+        "note": "The fixture contract exercises actual MCP and feature overrides, checks their decoded values, and still verifies that config reads leave the model-response queue intact.",
+        "disposition": "fixed"
+      },
+      {
+        "title": "The wrong-workspace fixture leaves JSON-escaped paths unchanged",
+        "location": "packages/hench/tests/unit/agent/codex-mcp-binding.test.ts:52",
+        "severity": "medium",
+        "verdict": "must-fix",
+        "scenario": "When the assigned path contains backslashes, replacing its unescaped spelling in serialized JSON leaves the assigned root intact. On Windows the test consequently enters native verification and fails the zero-calls assertion.",
+        "action": "fixed",
+        "note": "The fixture updates the decoded server argument and serializes it. The POSIX case uses a path containing a literal backslash to exercise the same escaping condition.",
+        "disposition": "fixed"
+      },
+      {
+        "title": "A native settings change between verification and launch can add an unrelated MCP server",
+        "location": "packages/hench/src/agent/lifecycle/codex-mcp-binding.ts:114",
+        "severity": "medium",
+        "verdict": "should-fix",
+        "scenario": "An operator adds a new registration after the final config/read reply but before exec loads its config. The verified argv disables only previously enumerated names. The executor merges the new name from disk, and the remaining file check reads only the run-owned binding.",
+        "expected": "Execute against the verified configuration snapshot or enforce the admitted server set in the executor itself.",
+        "action": "failed",
+        "disposition": "deferred",
+        "note": "Native config-only probes confirmed that table overrides merge with existing names. A lasting fix requires a native allowlist or a launch interface sharing the verified snapshot. No matching change was found. Rex add_item required approval, which this managed run cannot grant. No item was created or placed.",
+        "reason": "Rex MCP refused capture under the run's approval policy."
+      }
+    ]
+  },
+  "ownerDisposition": "Six must-fixes repaired. The should-fix verification/exec settings race is recorded on the existing assigned task and remains open; no follow-up task was created and no successor may start.",
+  "postReviewChanges": "Added readCodexEffectiveConfig to both gateway contract symbol inventories; tests/integration/cross-package-contracts.test.js then passed all 340 tests after building missing baseline graview dist. No production source changed after review.",
+  "affectedGate": {
+    "command": "node /private/tmp/ndx-codex-hardening-pr1/scripts/run-all-tests.mjs affected a8638a5acf9cd53d0ca92ea0efbf0330744a929c",
+    "ran": true,
+    "passed": false,
+    "interrupted": true,
+    "executionMs": 504819,
+    "selectedSuites": 16,
+    "executedSuites": 1,
+    "observed": "Root suite failures included inaccessible shared Git metadata, the fixed gateway contract inventory, and missing baseline graview dist. Other root failures were not exhaustively classified. Stopped by SIGINT; the attempted root rerun did not start.",
+    "notRun": 15
+  },
+  "postGateDiagnostics": {
+    "sourceNulBytes": "3 passed outside gate sandbox",
+    "crossPackageContracts": "340 passed after inventory repair and baseline graview build"
+  },
+  "claimCount": 0,
+  "ci": "absent before draft publication",
+  "limits": [
+    "Reviewer binding implementation not started",
+    "Model-driven two-worktree executor/reviewer proof not run",
+    "Sibling claim and log-attribution negative probes incomplete",
+    "Hashes were compared by native-config/direct-MCP fixtures; full model-driven before/after evidence remains open",
+    "No shell/filesystem/network enforcement claim; PR 2 remains separate"
+  ]
+}

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+import { fixtureSystemLayer } from "./codex-system-layer.js";
 
 /**
  * Split a command line built by `buildWindowsCliCommandLine` back into its
@@ -55,18 +56,42 @@ export function decodeWindowsCommandLine(line: string): string[] {
  */
 export function configReadChild(args: string[]): EventEmitter {
   const proc = Object.assign(new EventEmitter(), {
-    pid: undefined, exitCode: null, signalCode: null,
+    pid: undefined, exitCode: null as number | null, signalCode: null,
     stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), kill: () => true,
   });
+  proc.stdin.on("finish", () => {
+    proc.exitCode = 0;
+    proc.emit("close", 0);
+  });
   const set: Record<string, string> = {};
+  const mcp_servers: Record<string, Record<string, unknown>> = {};
+  const features: Record<string, boolean> = {};
+  const config: Record<string, unknown> = { shell_environment_policy: { set }, mcp_servers, features };
   for (const arg of args) {
-    const match = /^shell_environment_policy\.set\.(TMPDIR|TMP|TEMP)=(.*)$/.exec(arg);
-    if (match) set[match[1]] = JSON.parse(match[2]);
+    const match = /^shell_environment_policy\.set\.([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(arg);
+    if (match) set[match[1]] = match[2] === "''" ? "" : JSON.parse(match[2]);
+    const mcp = /^mcp_servers\.([A-Za-z0-9_-]+)\.([a-z_]+)=(.*)$/.exec(arg);
+    if (mcp) (mcp_servers[mcp[1]] ??= {})[mcp[2]] = JSON.parse(mcp[3]);
+    const feature = /^features\.([a-z_]+)=(true|false)$/.exec(arg);
+    if (feature) features[feature[1]] = JSON.parse(feature[2]);
+    const scalar = /^(sandbox_mode|approval_policy|model_reasoning_effort)=(.*)$/.exec(arg);
+    if (scalar) config[scalar[1]] = scalar[2].startsWith('"') ? JSON.parse(scalar[2]) : scalar[2];
+    if (arg.startsWith("sandbox_workspace_write=")) {
+      const roots = /writable_roots=(\[[^\]]*\])/.exec(arg);
+      config.sandbox_workspace_write = {
+        writable_roots: roots ? JSON.parse(roots[1]) : [], network_access: arg.includes("network_access=true"),
+        exclude_tmpdir_env_var: arg.includes("exclude_tmpdir_env_var=true"), exclude_slash_tmp: arg.includes("exclude_slash_tmp=true"),
+      };
+    }
   }
   proc.stdin.on("data", chunk => {
     const message = JSON.parse(String(chunk));
     if (message.id) queueMicrotask(() => proc.stdout.write(JSON.stringify({ id: message.id,
-      result: message.method === "initialize" ? {} : { config: { shell_environment_policy: { set } } },
+      result: message.method === "initialize" ? { userAgent: "fixture/0.167.0-alpha.3.2" }
+        : message.method === "configRequirements/read" ? { requirements: null }
+        : { config, ...(message.params?.includeLayers ? {
+          layers: [{ name: { type: "user", file: "/fixture/config.toml", profile: null }, version: "fixture", config: {} }, fixtureSystemLayer],
+        } : {}) },
     }) + "\n"));
   });
   return proc;

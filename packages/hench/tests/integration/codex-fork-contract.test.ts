@@ -1,8 +1,8 @@
 /** Mocked protocol coverage; installed-CLI observations are documented separately. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { serializeDocument } from "@n-dx/rex";
 import { cleanupProjectDir } from "../helpers/index.js";
 import { createScriptedClaudeCli, setupScriptedProject, type ScriptedClaudeCli, type ScriptedTurn } from "../helpers/scripted-claude-cli.js";
@@ -25,6 +25,7 @@ describe("Codex warm-parent loop contract", () => {
   let reusable: boolean;
 
   beforeEach(async () => {
+    vi.stubEnv("NDX_CLI_PATH", resolve(import.meta.dirname, "../../../core/cli.js"));
     vi.resetModules();
     ({ projectDir, henchDir, rexDir } = await setupScriptedProject("hench-codex-fork-"));
     writeFileSync(join(rexDir, "prd.md"), serializeDocument({ schema: "rex/v1", title: "Fork fixture", items: [
@@ -50,8 +51,8 @@ describe("Codex warm-parent loop contract", () => {
   });
 
   afterEach(async () => {
-    vi.doUnmock("node:child_process");
     vi.unstubAllEnvs();
+    vi.doUnmock("node:child_process");
     vi.restoreAllMocks();
     await cleanupProjectDir(projectDir);
   });
@@ -82,7 +83,8 @@ describe("Codex warm-parent loop contract", () => {
     expect(second.run.parentSessionId).toBe("parent");
     expect(second.run.session?.outcome).toBe("hit");
     expect(cli.invocations).toHaveLength(3);
-    expect(cli.invocations[0].args).toEqual(expect.arrayContaining(["--sandbox", "read-only", "--ignore-user-config"]));
+    expect(cli.invocations[0].args).toEqual(expect.arrayContaining(["--sandbox", "read-only", "mcp_servers.rex.enabled=false", "mcp_servers.sourcevision.enabled=false"]));
+    expect(cli.invocations[0].args).toContain("--ignore-user-config");
     for (const call of cli.invocations.slice(1)) {
       expect(call.args.slice(0, 3)).toEqual(["exec", "fork", "parent"]);
       expect(call.args).toEqual(expect.arrayContaining(['sandbox_mode="workspace-write"', 'approval_policy="never"', "gpt-6-astra"]));
@@ -98,6 +100,17 @@ describe("Codex warm-parent loop contract", () => {
     expect(cli.invocations).toHaveLength(2);
     expect(cli.invocations[1].args).not.toContain("fork");
     expect(cli.invocations[1].args).not.toContain("parent");
+  });
+
+  it("refuses a fork when its required binding disappears after orientation", async () => {
+    cli.script(() => {
+      const dir = join(henchDir, "mcp");
+      for (const name of readdirSync(dir)) rmSync(join(dir, name));
+      return result("parent");
+    });
+    const outcome = await run("task-1");
+    expect(cli.invocations).toHaveLength(1);
+    expect(outcome.run.error).toContain("Codex MCP binding refused");
   });
 
   it("reorients Codex when the sanitized child environment changes", async () => {

@@ -562,6 +562,8 @@ export async function transitionToInProgress(
 // ---------------------------------------------------------------------------
 
 export interface InitRunOptions {
+  /** Reserved by a CLI preflight whose per-run artifacts must exist first. */
+  runId?: string;
   taskId: string;
   taskTitle: string;
   model: string;
@@ -784,7 +786,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
   const gitOrigin = captureRunGitOrigin(opts.projectDir ?? ".");
 
   const run: RunRecord = {
-    id: randomUUID(),
+    id: opts.runId ?? randomUUID(),
     taskId: opts.taskId,
     taskTitle: opts.taskTitle,
     startedAt: new Date().toISOString(),

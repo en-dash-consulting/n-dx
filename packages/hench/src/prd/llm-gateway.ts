@@ -292,6 +292,7 @@ export {
   compileCodexPolicyFlags,
   createCodexScratch,
   assertCodexScratchEnvironment,
+  readCodexEffectiveConfig,
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
 } from "@n-dx/llm-client";

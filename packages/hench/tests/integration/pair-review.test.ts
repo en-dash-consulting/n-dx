@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { cleanupProjectDir } from "../helpers/index.js";
 import {
   createScriptedClaudeCli,
@@ -65,6 +65,7 @@ describe("cliLoop — pair review", () => {
   let validateLog: string;
 
   beforeEach(async () => {
+    vi.stubEnv("NDX_CLI_PATH", resolve(import.meta.dirname, "../../../core/cli.js"));
     vi.resetModules();
     ({ projectDir, henchDir, rexDir } = await setupScriptedProject("hench-pair-review-"));
     // The reviewer's model comes from llm.<reviewer>.reviewModel.
@@ -125,6 +126,7 @@ describe("cliLoop — pair review", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     vi.doUnmock("node:child_process");
     vi.restoreAllMocks();
     await cleanupProjectDir(projectDir);

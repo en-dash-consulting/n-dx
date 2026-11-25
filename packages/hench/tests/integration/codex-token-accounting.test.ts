@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { RunRecord } from "../../src/schema/v1.js";
 import { initConfig, saveConfig } from "../../src/store/config.js";
@@ -117,12 +117,14 @@ describe("codex token accounting integration", () => {
   let rexDir: string;
 
   beforeEach(async () => {
+    vi.stubEnv("NDX_CLI_PATH", resolve(import.meta.dirname, "../../../core/cli.js"));
     vi.clearAllMocks();
     vi.resetModules();
     ({ projectDir, henchDir, rexDir } = await setupProjectDir());
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     await rm(projectDir, { recursive: true, force: true });
   });

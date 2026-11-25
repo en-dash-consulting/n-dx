@@ -53,6 +53,8 @@ import type { PermissionMode } from "../../schema/index.js";
  *   is portable and doesn't depend on Node.js typings.
  */
 export interface SpawnConfig {
+  /** Revalidated against the actual spawn cwd immediately before Codex runs. */
+  readonly codexMcpBinding?: { readonly path: string; readonly disabled: boolean };
   /** Bind a private scratch directory at spawn time. The caller owns cleanup. */
   readonly withScratchDir?: (dir: string) => SpawnConfig;
   /** Codex cumulative usage boundary, including inherited fork history. */
@@ -141,10 +143,8 @@ export interface VendorSpawnOptions {
    * run is executing in, rather than to whichever checkout an inherited
    * local-scope registration happens to pin.
    *
-   * Only honored by the Claude CLI adapter (`--mcp-config <file>
-   * --strict-mcp-config`). Other adapters ignore it and keep inheriting the
-   * session's ambient registrations, so the run pre-flight still warns for
-   * them.
+   * Claude uses `--mcp-config <file> --strict-mcp-config`. Codex validates
+   * this file and the native effective registration on every executor launch.
    *
    * @see packages/hench/src/process/agent-mcp-config.ts — builds the file
    */
