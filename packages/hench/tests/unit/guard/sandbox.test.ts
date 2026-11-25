@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ import type { ToolSandbox } from "../../../src/guard/index.js";
 import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
 import { toolRunCommand } from "../../../src/tools/shell.js";
 import { detectSandboxBackend } from "../../../src/prd/llm-gateway.js";
-import { execRepoShellCmd, resolveMdsCacheDir } from "../../../src/guard/sandbox.js";
+import { execRepoShellCmd } from "../../../src/guard/sandbox.js";
 import { exec } from "../../../src/process/exec.js";
 import { execArgv } from "../../../src/tools/exec-shell.js";
 
@@ -319,47 +320,31 @@ function otherVarFolders(line: string, ...expected: string[]): string[] {
     .filter((p) => !expected.includes(p));
 }
 
-describe("resolveMdsCacheDir", () => {
-  it("returns the real path of <cache>/mds", () => {
-    const cache = tempProject();
-    mkdirSync(join(cache, "mds"));
-    expect(resolveMdsCacheDir(() => `${cache}/\n`)).toBe(realpathSync(join(cache, "mds")));
-  });
-
-  it("returns null when getconf fails, answers nothing, or the folder is missing", () => {
-    expect(resolveMdsCacheDir(() => { throw new Error("getconf: not found"); })).toBeNull();
-    expect(resolveMdsCacheDir(() => "\n")).toBeNull();
-    expect(resolveMdsCacheDir(() => tempProject())).toBeNull();
-  });
-});
+/**
+ * The host's real Security MDS cache folder, or null. llm-client's profile
+ * builder resolves it (and unit-tests that lookup, failures included); this
+ * reads it independently so these tests check the profile hench builds.
+ */
+function hostMdsCacheDir(): string | null {
+  try {
+    const cache = execFileSync("/usr/bin/getconf", ["DARWIN_USER_CACHE_DIR"], { encoding: "utf-8" }).trim();
+    return cache && existsSync(join(cache, "mds")) ? realpathSync(join(cache, "mds")) : null;
+  } catch {
+    return null; // getconf missing or failed: the profile is built without the folder.
+  }
+}
 
 describe.skipIf(process.platform !== "darwin")("macOS Security MDS cache", () => {
   it("is read-write to the vendor CLI, and the only path opened under /private/var/folders besides its scratch dir", () => {
-    const cache = tempProject();
-    mkdirSync(join(cache, "mds"));
-    const mds = realpathSync(join(cache, "mds"));
+    const mds = hostMdsCacheDir();
     const project = tempProject();
-    const sandbox = createVendorCliSandbox(project, "claude", {
-      cliBinary: process.execPath, setting: on, backend: seatbelt, mdsCacheDir: () => mds,
-    })!;
-    try {
-      const rw = readWriteLine(sandbox.wrap("claude", ["-p"]).args[1]);
-      expect(rw).toContain(`(subpath "${mds}")`);
-      expect(otherVarFolders(rw, project, sandbox.tmpDir, mds)).toEqual([]);
-    } finally {
-      sandbox.dispose();
-    }
-  });
-
-  it("builds the profile as before when the folder cannot be resolved", () => {
-    const project = tempProject();
-    const sandbox = createVendorCliSandbox(project, "claude", {
-      cliBinary: process.execPath, setting: on, backend: seatbelt, mdsCacheDir: () => null,
-    })!;
+    const sandbox = createVendorCliSandbox(project, "claude", { cliBinary: process.execPath, setting: on, backend: seatbelt })!;
     try {
       const profile = sandbox.wrap("claude", ["-p"]).args[1];
-      expect(otherVarFolders(readWriteLine(profile), project, sandbox.tmpDir)).toEqual([]);
-      // The keychain directory stays read-only either way.
+      const rw = readWriteLine(profile);
+      if (mds) expect(rw).toContain(`(subpath "${mds}")`);
+      expect(otherVarFolders(rw, project, sandbox.tmpDir, ...(mds ? [mds] : []))).toEqual([]);
+      // The keychain directory stays read-only.
       const keychains = `(subpath "${join(realpathSync(homedir()), "Library", "Keychains")}")`;
       expect(profile.split("\n").some((l) => l.startsWith("(allow") && l.includes("file-write*") && l.includes(keychains))).toBe(false);
     } finally {
@@ -368,7 +353,7 @@ describe.skipIf(process.platform !== "darwin")("macOS Security MDS cache", () =>
   });
 
   it("is not opened to the tool sandbox", () => {
-    const mds = resolveMdsCacheDir();
+    const mds = hostMdsCacheDir();
     const project = tempProject();
     const sandbox = createToolSandbox(project, { setting: on, backend: seatbelt })!;
     try {

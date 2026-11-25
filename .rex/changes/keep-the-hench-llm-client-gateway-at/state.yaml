@@ -1,9 +1,23 @@
 schema: "rex/v2"
 items:
   "8507899d-67e7-4621-bc67-4c673b76edaa":
-    lastModified: "2026-11-25T05:48:55.390Z"
+    status: "completed"
+    startedAt: "2026-11-25T05:49:09.503Z"
+    completedAt: "2026-11-25T05:52:51.598Z"
+    endedAt: "2026-11-25T05:52:51.598Z"
+    activeIntervals: [{"end":"2026-11-25T05:52:51.598Z","start":"2026-11-25T05:49:09.503Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client's buildSeatbeltProfile opens the MDS cache (darwinUserSecurityCacheDir) for kind vendor-cli; hench passes nothing, execFileSyncNoShell dropped from hench gateway and llm-client public.ts; cap back to 250."
+    lastModified: "2026-11-25T05:52:51.598Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed05500c-db2a-4a67-861c-4e4dbc0463ee":
+    status: "completed"
+    startedAt: "2026-11-25T05:52:51.598Z"
+    completedAt: "2026-11-25T05:52:51.598Z"
+    endedAt: "2026-11-25T05:52:51.598Z"
+    activeIntervals: [{"end":"2026-11-25T05:52:51.598Z","start":"2026-11-25T05:52:51.598Z"}]
+    appliedAt: "2026-11-25T05:52:51.598Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-25T05:48:45.267Z"
-    lastModified: "2026-11-25T05:48:55.390Z"
+    lastModified: "2026-11-25T05:52:51.598Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

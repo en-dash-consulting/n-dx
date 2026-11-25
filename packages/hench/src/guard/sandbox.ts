@@ -22,7 +22,6 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import {
   LLM_VENDOR,
-  execFileSyncNoShell,
   getGitCommonDir,
   detectSandboxBackend,
   nodeToolchainRoots,
@@ -259,39 +258,6 @@ function installRoot(path: string, home: string): string {
 export interface CreateVendorCliSandboxOptions extends CreateToolSandboxOptions {
   /** Path the vendor CLI was resolved to; its install directory is made readable. */
   cliBinary: string;
-  /** Injected for tests; defaults to {@link resolveMdsCacheDir}. Consulted on macOS only. */
-  mdsCacheDir?: () => string | null;
-}
-
-/** `getconf` answers at once; a hang must not hold up the run. */
-const GETCONF_TIMEOUT_MS = 2_000;
-
-/**
- * The real path of the Security framework's per-user MDS cache,
- * `$(getconf DARWIN_USER_CACHE_DIR)mds` (under `/private/var/folders/…/C/mds`),
- * or null when `getconf` fails or the folder does not exist — the sandbox is
- * then built without it.
- */
-export function resolveMdsCacheDir(
-  getconf: () => string = () =>
-    execFileSyncNoShell("getconf", ["DARWIN_USER_CACHE_DIR"], {
-      encoding: "utf-8",
-      timeout: GETCONF_TIMEOUT_MS,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).toString(),
-): string | null {
-  let cacheDir: string;
-  try {
-    cacheDir = getconf().trim();
-  } catch {
-    return null; // getconf missing, failed or timed out: no folder to open.
-  }
-  if (!cacheDir) return null;
-  try {
-    return realpathSync(join(cacheDir, "mds"));
-  } catch {
-    return null; // The folder does not exist: nothing to open.
-  }
 }
 
 /**
@@ -368,17 +334,10 @@ export function createVendorCliSandbox(
   // with a vendor that confines itself, where that matters. SECURITY.md
   // states the same.
   //
-  // Every keychain lookup (`security`, SecItem) also opens the Security
-  // framework's per-user MDS cache — `mds.lock` and `mdsDirectory.db` under
-  // `$(getconf DARWIN_USER_CACHE_DIR)mds` — read-write. With that folder
-  // read-only the lookup fails with "A Module Directory Service error has
-  // occurred" and the CLI reports it is not logged in. Only that folder is
-  // opened; the rest of /private/var/folders stays as it was.
-  if (process.platform === "darwin") {
-    readOnlyRoots.push(join(home, "Library", "Keychains"));
-    const mds = (options.mdsCacheDir ?? resolveMdsCacheDir)();
-    if (mds) readWriteRoots.push(mds);
-  }
+  // Every keychain lookup also opens the Security MDS cache read-write; the
+  // vendor-cli Seatbelt profile opens that one folder itself
+  // (llm-client's darwinUserSecurityCacheDir).
+  if (process.platform === "darwin") readOnlyRoots.push(join(home, "Library", "Keychains"));
   const ndxCli = env.NDX_CLI_PATH ?? env.N_DX_CLI_PATH;
   if (ndxCli) readOnlyRoots.push(installRoot(realOr(ndxCli), home));
 
