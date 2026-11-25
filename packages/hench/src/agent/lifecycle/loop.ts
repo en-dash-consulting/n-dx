@@ -25,7 +25,7 @@ import {
   resolveLLMVendor,
   withVendorOverride,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, createOpenAiApiProvider, supportsOpenAiTurns, resolveTaskModel, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, createOpenAiApiProvider, supportsOpenAiTurns, resolveTaskModel, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError, isAuthError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -2349,8 +2349,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       run.error = signal.aborted ? "Run interrupted by user" : (err as Error).message;
       console.error(`[Error] ${run.error}`);
 
-      await handleRunFailure(store, taskId, signal.aborted || openAi ? "pending" : "deferred",
-        signal.aborted ? "task_cancelled" : "task_failed", run.error);
+      // A vendor that refused the credentials is not the task's failure: it stays pending.
+      const auth = !signal.aborted && isAuthError(run.error);
+      await handleRunFailure(store, taskId, signal.aborted || openAi || auth ? "pending" : "deferred",
+        signal.aborted ? "task_cancelled" : auth ? "auth_error" : "task_failed", run.error);
     }
   } finally {
     // Remove SIGINT handler to restore default behavior

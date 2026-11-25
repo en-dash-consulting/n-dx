@@ -22,6 +22,9 @@ const messagesProto = Object.getPrototypeOf(
   new Anthropic({ apiKey: "test" }).messages,
 );
 
+/** A non-transient, non-auth API failure: the task is deferred, not left in_progress. */
+const REQUEST_ERROR = Object.assign(new Error("Invalid tool schema in request"), { status: 400 });
+
 /**
  * Tests that both agentLoop and cliLoop atomically transition
  * the task to in_progress before starting work.
@@ -46,9 +49,9 @@ describe("atomic task state transitions", () => {
     });
 
     it("transitions pending task to in_progress before API calls, then deferred on failure", async () => {
-      // Mock Anthropic SDK to throw an auth error (avoids real network calls)
-      const authError = Object.assign(new Error("Authentication error"), { status: 401 });
-      vi.spyOn(messagesProto, "create").mockRejectedValue(authError);
+      // Mock Anthropic SDK to throw a non-auth request error (avoids real network
+      // calls; an auth error would leave the task pending, not deferred)
+      vi.spyOn(messagesProto, "create").mockRejectedValue(REQUEST_ERROR);
 
       await writePRDToMarkdown(rexDir, {
           schema: "rex/v1",
@@ -76,7 +79,7 @@ describe("atomic task state transitions", () => {
       process.env.ANTHROPIC_API_KEY = "test-key-fake";
 
       try {
-        // The API call will fail with auth error — task should be deferred (not left in_progress)
+        // The API call will fail — task should be deferred (not left in_progress)
         const result = await agentLoop({ config, store, projectDir, henchDir });
 
         expect(result.run.status).toBe("failed");
@@ -96,9 +99,7 @@ describe("atomic task state transitions", () => {
     });
 
     it("preserves startedAt for already in_progress task that fails", async () => {
-      // Mock Anthropic SDK to throw an auth error (avoids real network calls)
-      const authError = Object.assign(new Error("Authentication error"), { status: 401 });
-      vi.spyOn(messagesProto, "create").mockRejectedValue(authError);
+      vi.spyOn(messagesProto, "create").mockRejectedValue(REQUEST_ERROR);
 
       const existingStartedAt = "2025-06-01T00:00:00.000Z";
       await writePRDToMarkdown(rexDir, {

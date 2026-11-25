@@ -458,6 +458,12 @@ describe("Codex self-heal batch pipeline — integration", () => {
       .map((line) => JSON.parse(line) as { event: string });
     expect(events.some((e) => e.event === "auth_error")).toBe(true);
     expect(events.some((e) => e.event === "transient_error")).toBe(false);
+
+    // The task did nothing wrong: it stays runnable, and the verdict blames the vendor.
+    expect(result.run.diagnosis?.class).toBe("vendor-transient");
+    const task = await store.getItem("task-1");
+    expect(task?.status).toBe("pending");
+    if (task?.failureReason) expect(task.failureReason).toContain("not the task");
   });
 
   // ── AC-2: Rate-limit error triggers retry; pipeline continues ──────────────

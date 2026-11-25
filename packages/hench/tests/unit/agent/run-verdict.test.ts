@@ -300,6 +300,50 @@ describe("classifyRun — one fixture per class", () => {
     expect(d.actions.map((a) => a.kind)).toEqual(["re-authenticate"]);
   });
 
+  // The Claude CLI's own wording, and the headline the CLI loop writes to
+  // run.error when it stops on an auth failure.
+  const CLI_AUTH_ERRORS = [
+    "Not logged in · Please run /login",
+    "Authentication failed for Claude — Invalid or expired credentials. Run claude login.  Verify credentials: ndx auth",
+  ];
+
+  it("vendor-transient: the Claude CLI's sign-in failures classify as auth, not unclassified", () => {
+    for (const error of CLI_AUTH_ERRORS) {
+      const d = classify(run({ error, toolCalls: [], commits: [] }));
+      expect(d.class, error).toBe("vendor-transient");
+      expect(d.evidence, error).toContain("failure category: auth");
+    }
+  });
+
+  it("an unconfined run's sign-in failure keeps the re-authenticate action", () => {
+    for (const vendorCliSandbox of [undefined, "off", "unavailable"] as const) {
+      const d = classify(run({ error: CLI_AUTH_ERRORS[0], vendorCliSandbox }));
+      expect(d.actions.map((a) => a.kind)).toEqual(["re-authenticate"]);
+      expect(d.summary).not.toContain("sandbox");
+    }
+  });
+
+  it("a confined run's sign-in failure names the sandbox and the operator's two ways out, not re-authenticate", () => {
+    for (const error of CLI_AUTH_ERRORS) {
+      for (const attempt of [1, 2]) {
+        const d = classify(run({ error, vendorCliSandbox: "confined" }), { attempt });
+        expect(d.class).toBe("vendor-transient");
+        expect(d.summary).toMatch(/sandboxed vendor CLI could not read its login/);
+        expect(d.summary).toContain("CLAUDE_CODE_OAUTH_TOKEN");
+        expect(d.summary).toContain("claude setup-token");
+        expect(d.summary).toContain("NDX_SANDBOX=off");
+        expect(d.evidence).toContain("vendorCliSandbox: confined");
+        expect(d.actions.map((a) => a.kind)).toEqual(["sandbox-login"]);
+      }
+    }
+  });
+
+  it("a confined run that failed on rate limits is not blamed on the sandbox", () => {
+    const d = classify(run({ error: "429 Too Many Requests", vendorCliSandbox: "confined" }));
+    expect(d.summary).not.toContain("sandbox");
+    expect(d.actions.map((a) => a.kind)).toEqual(["retry-later"]);
+  });
+
   it("only run.error's first line is read as a vendor error, so a review refusal's detail does not shadow review-blocked", () => {
     const record = { failed: "must-fix-unresolved", detail: "must-fix: rate limit 429 handling is missing", reportPath: "/r.json" } as const;
     const d = classify(run({ error: formatUnresolvedMustFixRefusal(record), review: record }));

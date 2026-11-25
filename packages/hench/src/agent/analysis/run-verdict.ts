@@ -18,7 +18,7 @@ import type {
   RunVerdictClass,
 } from "../../schema/index.js";
 import type { RunEvent } from "../../store/run-events.js";
-import { classifyVendorError } from "../../prd/llm-gateway.js";
+import { classifyVendorError, isAuthError } from "../../prd/llm-gateway.js";
 import { classifyUnresolved, type ReviewReport } from "./adversarial-review.js";
 
 /** How many attempts a task gets before the verdict stops recommending a re-run. */
@@ -135,10 +135,18 @@ function isTestFile(path: string): boolean {
  * is the failure: later lines hold free text appended after it (a review
  * refusal's detail, the protected-config finding), which must not read as a
  * vendor error.
+ *
+ * Auth is decided by `isAuthError`, the predicate the CLI loop stops on, so
+ * the canonical auth headline it writes ("Authentication failed for Claude —
+ * Invalid or expired credentials.") and the CLI's own "Not logged in" both
+ * classify as auth here too.
  */
 function vendorFailureCategories(run: RunRecord): string[] {
   const categories = (run.events ?? []).map((e) => e.failure?.category);
-  if (run.error) categories.push(classifyVendorError(run.error.split("\n")[0]));
+  if (run.error) {
+    const line = run.error.split("\n")[0];
+    categories.push(isAuthError(line) ? "auth" : classifyVendorError(line));
+  }
   return [...new Set(categories.filter((c): c is string => !!c && VENDOR_CATEGORIES.has(c)))];
 }
 
@@ -202,25 +210,37 @@ const uncommittedRefusal: Rule = ({ run }) => {
 
 /**
  * The vendor, not the task. An auth failure does not pass with time: its
- * action is to log the vendor CLI back in, not to wait.
+ * action is to log the vendor CLI back in, not to wait. Under hench's sandbox
+ * the likelier cause is a login the confined CLI cannot read (the same binary
+ * signs in outside it), so logging in again would not help.
  */
 const vendorTransient: Rule = ({ run }) => {
   const categories = vendorFailureCategories(run);
   if (run.status !== "error_transient" && categories.length === 0) return null;
   const auth = categories.includes("auth");
+  const confined = auth && run.vendorCliSandbox === "confined";
   return {
     class: "vendor-transient",
-    summary: categories.length > 0
-      ? `The vendor failed (${categories.join(", ")}), not the task.`
-      : "The vendor kept failing transiently; retries ran out.",
+    summary: confined
+      ? "The sandboxed vendor CLI could not read its login, not the task: set CLAUDE_CODE_OAUTH_TOKEN " +
+        "from `claude setup-token`, or run unconfined with NDX_SANDBOX=off."
+      : categories.length > 0
+        ? `The vendor failed (${categories.join(", ")}), not the task.`
+        : "The vendor kept failing transiently; retries ran out.",
     evidence: [
       ...(run.status === "error_transient" ? ["status: error_transient"] : []),
       ...categories.map((c) => `failure category: ${c}`),
+      ...(confined ? ["vendorCliSandbox: confined"] : []),
       ...(run.error ? [`error: ${run.error.split("\n")[0]}`] : []),
     ],
-    actions: auth
-      ? [{ kind: "re-authenticate", label: "Re-authenticate the vendor CLI, then re-run the task" }]
-      : [{ kind: "retry-later", label: "Retry later, once the vendor recovers" }],
+    actions: confined
+      ? [{
+        kind: "sandbox-login",
+        label: "Export CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) or set NDX_SANDBOX=off, then re-run the task",
+      }]
+      : auth
+        ? [{ kind: "re-authenticate", label: "Re-authenticate the vendor CLI, then re-run the task" }]
+        : [{ kind: "retry-later", label: "Retry later, once the vendor recovers" }],
   };
 };
 
@@ -359,7 +379,7 @@ function lastAttemptActions(actions: RunVerdictAction[]): RunVerdictAction[] {
   const kept = actions.filter((a) => !RERUN_KINDS.has(a.kind));
   const first = kept[0]?.kind;
   // A logged-out vendor CLI fails every attempt alike; no follow-up fixes it.
-  if (first === "follow-up-run" || first === "split-task" || first === "re-authenticate") return kept;
+  if (first === "follow-up-run" || first === "split-task" || first === "re-authenticate" || first === "sandbox-login") return kept;
   return [{ kind: "follow-up-run", label: "Follow-up run that fixes the cause above; do not re-run as is" }, ...kept];
 }
 

@@ -575,6 +575,8 @@ export interface InitRunOptions {
   vendor?: string;
   /** Sandbox mode in effect (e.g. "workspace-write"). Captured in diagnostics. */
   sandbox?: string;
+  /** See {@link RunRecord.vendorCliSandbox}. Only a loop that confines the vendor CLI passes it. */
+  vendorCliSandbox?: RunRecord["vendorCliSandbox"];
   /** Approval policy in effect (e.g. "never"). Captured in diagnostics. */
   approvals?: string;
   /** Output parse mode (e.g. "stream-json", "api-sdk"). Captured in diagnostics. */
@@ -809,6 +811,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     cliPath: resolveCliPath(),
     ...gitOrigin,
     trust: captureRunTrust(opts.projectDir ?? "."),
+    ...(opts.vendorCliSandbox ? { vendorCliSandbox: opts.vendorCliSandbox } : {}),
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility

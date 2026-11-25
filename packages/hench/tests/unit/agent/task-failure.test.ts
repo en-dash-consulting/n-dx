@@ -94,49 +94,51 @@ describe("API loop task failure handling", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("marks task as deferred on uncaught exception and logs error", async () => {
-    // Mock Anthropic SDK to throw an auth error (non-transient)
-    const authError = Object.assign(new Error("Authentication error"), { status: 401 });
-    vi.spyOn(messagesProto, "create").mockRejectedValue(authError);
-
+  /** Run the API loop against an SDK that rejects with `error`; returns the task and the matching log event. */
+  async function runFailingApiLoop(error: Error, event: string) {
+    vi.spyOn(messagesProto, "create").mockRejectedValue(error);
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
-
     const config = await loadConfig(henchDir);
     const store = createStore("file", rexDir);
-
-    // Set a fake API key so we get past the env check
     const origKey = process.env.ANTHROPIC_API_KEY;
     process.env.ANTHROPIC_API_KEY = "test-key-fake";
-
     try {
       const result = await agentLoop({ config, store, projectDir, henchDir });
-
-      // Run should be marked failed
-      expect(result.run.status).toBe("failed");
-      expect(result.run.error).toBeDefined();
-
-      // Task must NOT be left in_progress — should be deferred
-      const task = await readPrdTask(rexDir);
-      expect(task.status).toBe("deferred");
-
-      // Error should be logged
       const events = await readLogEvents(rexDir);
-      const failEvent = events.find(
-        (e: { event: string; itemId: string }) =>
-          e.event === "task_failed" && e.itemId === "task-1",
-      );
-      expect(failEvent).toBeDefined();
-      expect(failEvent.detail).toBeDefined();
-      expect(failEvent.detail.length).toBeGreaterThan(0);
+      return {
+        result,
+        task: await readPrdTask(rexDir),
+        logged: events.find((e: { event: string; itemId: string }) => e.event === event && e.itemId === "task-1"),
+      };
     } finally {
-      if (origKey) {
-        process.env.ANTHROPIC_API_KEY = origKey;
-      } else {
-        delete process.env.ANTHROPIC_API_KEY;
-      }
+      if (origKey) process.env.ANTHROPIC_API_KEY = origKey;
+      else delete process.env.ANTHROPIC_API_KEY;
     }
+  }
+
+  it("leaves the task pending when the vendor refuses the credentials, and logs auth_error", async () => {
+    const { result, task, logged } = await runFailingApiLoop(
+      Object.assign(new Error("Authentication error"), { status: 401 }),
+      "auth_error",
+    );
+    expect(result.run.status).toBe("failed");
+    // The task did nothing wrong: not left in_progress, and not deferred.
+    expect(task.status).toBe("pending");
+    expect(logged?.detail.length).toBeGreaterThan(0);
+  });
+
+  it("marks task as deferred on uncaught exception and logs error", async () => {
+    // A non-auth, non-transient error
+    const { result, task, logged } = await runFailingApiLoop(
+      Object.assign(new Error("Invalid tool schema in request"), { status: 400 }),
+      "task_failed",
+    );
+    expect(result.run.status).toBe("failed");
+    // Task must NOT be left in_progress — should be deferred
+    expect(task.status).toBe("deferred");
+    expect(logged?.detail.length).toBeGreaterThan(0);
   });
 
   it("marks task as deferred on timeout and logs error", async () => {
