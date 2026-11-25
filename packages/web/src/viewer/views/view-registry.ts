@@ -77,6 +77,7 @@ import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
 import { analyzeTileSummary } from "./tile-summaries.js";
 import { SpendSummary } from "./spend-summary.js";
+import { ShippedTimeline } from "./shipped-timeline.js";
 import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 import { areaCapabilityOfTab, areaSlugOfTab, placeChangeOfTab } from "../route-state.js";
@@ -208,6 +209,8 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
     case "plan-health": return opened ? h(ValidationView, { navigateTo: ctx.navigateTo }) : h(PlanHealth, null);
     case "outcomes": return h(OutcomesPanel, null);
     case "tooling": return h(ToolingPanel, { navigateTo: ctx.navigateTo });
+    // Tune's Shipped: the PRD's timeline, in the tile and opened.
+    case "shipped-timeline": return h(ShippedTimeline, { navigateTo: ctx.navigateTo });
   }
 }
 

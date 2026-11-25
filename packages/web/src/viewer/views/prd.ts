@@ -27,6 +27,7 @@ import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js"
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
 import { BrandedHeader, WorkspaceWriteStrip, InfoTip, FloatingNotice } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
+import { TimelineGraph } from "../components/prd-tree/timeline-graph.js";
 import type { PRDDocumentData, ItemStatus } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
 import {
@@ -71,7 +72,23 @@ export function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string>
 
 const NO_INBOX: ReadonlySet<string> = new Set();
 
+/** The PRD's two arrangements: the hierarchy, or completions laid out along a time axis. */
+export type PRDArrangement = "tree" | "timeline";
+
+const ARRANGEMENT_KEY = "ndx.prd.layout";
+
+function readArrangement(): PRDArrangement {
+  try { return localStorage.getItem(ARRANGEMENT_KEY) === "timeline" ? "timeline" : "tree"; } catch { return "tree"; }
+}
+
 export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo, onSelectedItemChange }: PRDViewProps) {
+  // ── Arrangement (tree or timeline; remembered per browser) ─────
+  const [arrangement, setArrangementState] = useState<PRDArrangement>(readArrangement);
+  const setArrangement = useCallback((next: PRDArrangement) => {
+    setArrangementState(next);
+    try { localStorage.setItem(ARRANGEMENT_KEY, next); } catch { /* storage unavailable: the choice lasts for the page */ }
+  }, []);
+
   // ── Toast notifications ────────────────────────────────────────
   const { toast, toastType, showToast } = useToast();
 
@@ -323,8 +340,31 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         })
       : null,
 
+    // Arrangement switch: the tree, or the same items along a time axis.
+    h("div", { class: "prd-layout-bar" },
+      h("div", { class: "prd-layout-toggle", role: "group", "aria-label": "PRD layout" },
+        (["tree", "timeline"] as const).map((a) =>
+          h("button", {
+            key: a,
+            type: "button",
+            class: `prd-layout-btn${arrangement === a ? " active" : ""}`,
+            "aria-pressed": String(arrangement === a),
+            onClick: () => setArrangement(a),
+          }, a === "tree" ? "Tree" : "Timeline"),
+        ),
+      ),
+    ),
+
+    arrangement === "timeline"
+      ? h(TimelineGraph, {
+          items: data.items,
+          onSelectItem: actions.handleSelectItem,
+          onShowTree: () => setArrangement("tree"),
+        })
+      : null,
+
     // PRD tree — starts fully collapsed; the user expands what they need.
-    h(PRDTree, {
+    arrangement === "timeline" ? null : h(PRDTree, {
       key: "prd",
       document: data,
       claimsById,
@@ -435,8 +475,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       onMerge: actions.handleOpenMerge,
     }),
 
-    // Completion timeline
-    h(CompletionTimeline, { items: data.items }),
+    // Completion timeline — the timeline arrangement already shows the same completions.
+    arrangement === "timeline" ? null : h(CompletionTimeline, { items: data.items }),
 
     // Toast notification (success = green, error = red)
     toast

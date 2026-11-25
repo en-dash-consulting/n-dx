@@ -64,3 +64,33 @@ describe("PRDView selection report", () => {
     expect(vnode.props.onSelectedItemChange).toBe(setOpenTask);
   });
 });
+
+describe("PRDView arrangement", () => {
+  it("switches between the tree and the timeline, and remembers the choice", async () => {
+    localStorage.clear();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })));
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    const mountView = async () => {
+      await act(async () => {
+        render(h(PRDView, { prdData: doc, onSelectItem: vi.fn(), onDetailContent: vi.fn() }), root!);
+      });
+      await settle();
+    };
+    await mountView();
+    const button = (label: string) => [...root!.querySelectorAll<HTMLButtonElement>(".prd-layout-btn")].find((b) => b.textContent === label)!;
+    expect(button("Tree").getAttribute("aria-pressed")).toBe("true");
+    expect(root.querySelector(".tlg-scroller")).toBeNull();
+    await act(async () => { button("Timeline").click(); });
+    await settle();
+    expect(button("Timeline").getAttribute("aria-pressed")).toBe("true");
+    expect(root.querySelector(".tlg-scroller")).not.toBeNull();
+    // The tree and the old completion list give way to the timeline.
+    expect([...root.querySelectorAll("[role='treeitem']")]).toHaveLength(0);
+    expect(localStorage.getItem("ndx.prd.layout")).toBe("timeline");
+    await act(async () => { render(null, root!); });
+    await mountView();
+    expect(button("Timeline").getAttribute("aria-pressed")).toBe("true");
+    localStorage.clear();
+  });
+});

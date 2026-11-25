@@ -117,16 +117,16 @@ describe("views moved into Tune", () => {
     for (const view of MOVED) expect(listed).not.toContain(view);
   });
 
-  it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Shipped, Outcomes by tier and Your tooling", () => {
+  it("Tune's tiles are Runs (Execution Log tab), Spend, Suggestions (Optimization, Adaptive), Outcomes by tier, Your tooling and Shipped", () => {
     const tiles = STAGES.tune.tiles!;
-    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Runs", "Spend", "Suggestions", "Shipped", "Outcomes by tier", "Your tooling"]);
+    expect(tiles.map((t) => tileTitle(t, "v1"))).toEqual(["Runs", "Spend", "Suggestions", "Outcomes by tier", "Your tooling", "Shipped"]);
     expect(tiles.map((t) => (t.tabs ?? []).map((x) => x.view))).toEqual([["activity"], [], ["hench-adaptive"], [], [], []]);
     expect(tiles[0]).toMatchObject({ cols: 8, rows: 2 });
-    // Outcomes is a 4×2 panel tile whose "Open" goes to the Runs view.
-    expect(tiles[4]).toMatchObject({ view: "hench-runs", panel: "outcomes", rows: 2 });
-    expect(tiles[4].cols ?? 4).toBe(4);
-    // Your tooling is a 4×2 read-only panel; its lines link to Settings, which cannot be a stage view.
-    expect(tiles[5]).toMatchObject({ view: "hench-optimization", panel: "tooling", rows: 2 });
-    expect(tiles[5].cols ?? 4).toBe(4);
+    // Outcomes and Your tooling share a row: 6×2 panel tiles. Outcomes' "Open" goes to the Runs view.
+    expect(tiles[3]).toMatchObject({ view: "hench-runs", panel: "outcomes", cols: 6, rows: 2 });
+    // Your tooling is read-only; its lines link to Settings, which cannot be a stage view.
+    expect(tiles[4]).toMatchObject({ view: "hench-optimization", panel: "tooling", cols: 6, rows: 2 });
+    // Shipped is the PRD's timeline, full width; "Open" still goes to the Merge Graph.
+    expect(tiles[5]).toMatchObject({ view: "merge-graph", panel: "shipped-timeline", cols: 12, rows: 2 });
   });
 });

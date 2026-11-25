@@ -13,6 +13,8 @@ import { itemTypeOf } from "../../external.js";
 // ── Data source ──────────────────────────────────────────────────────
 
 export interface TimelineEntry {
+  /** The item itself, so a timeline row can open the same detail panel the tree does. */
+  item: PRDItemData;
   id: string;
   title: string;
   itemType: string;
@@ -28,6 +30,7 @@ export function buildTimeline(items: PRDItemData[], parentChain: string[] = []):
   for (const item of items) {
     if (item.status === "completed" && item.completedAt) {
       entries.push({
+        item,
         id: item.id,
         title: item.title,
         itemType: itemTypeOf(item),

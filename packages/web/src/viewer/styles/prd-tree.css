@@ -6660,3 +6660,406 @@ a.tracker-link {
   border-radius: 3px;
 }
 .prd-ghost-duplicate { font-size: 11px; color: var(--text-muted); }
+/* ── PRD layout switch (tree / timeline) ───────────────────────────── */
+.prd-layout-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+
+.prd-layout-toggle,
+.tlg-scale {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.prd-layout-btn,
+.tlg-scale-btn {
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.prd-layout-btn:last-child,
+.tlg-scale-btn:last-child {
+  border-right: none;
+}
+
+.prd-layout-btn:hover,
+.tlg-scale-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.prd-layout-btn.active,
+.tlg-scale-btn.active {
+  color: var(--accent);
+  background: var(--bg-hover);
+  font-weight: var(--weight-medium);
+}
+
+/* ── Timeline graph ────────────────────────────────────────────────── */
+
+.timeline-graph {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tlg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.tlg-months {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1;
+  scrollbar-width: thin;
+}
+
+.tlg-month-btn {
+  flex: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tlg-month-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.tlg-month-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.tlg-count {
+  flex: none;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+.tlg-scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.tlg-scroller:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tlg-canvas {
+  position: relative;
+}
+
+/* Month bands run the full height; alternate shading marks where each starts. */
+.tlg-month-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--border-strong);
+  pointer-events: none;
+}
+
+.tlg-month-band.odd {
+  background: color-mix(in srgb, var(--bg-hover) 45%, transparent);
+}
+
+.tlg-month-name {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.tlg-month-band.active .tlg-month-name {
+  color: var(--accent);
+}
+
+.tlg-axis {
+  position: absolute;
+  height: 2px;
+  background: var(--border-strong);
+}
+
+.tlg-tick {
+  position: absolute;
+  bottom: 0;
+  box-sizing: border-box;
+  height: 30px;
+  padding-top: 10px;
+  border-left: 1px solid var(--border);
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A major tick (a month's start) reads by its height and label, the line itself staying a neutral hairline. */
+.tlg-tick.major {
+  height: 36px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.tlg-stem {
+  position: absolute;
+  width: 1px;
+  background: var(--text-muted);
+  opacity: 0.7;
+}
+
+.tlg-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: 0 0 -5px -5px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--bg-surface);
+}
+
+/* A zero-size anchor at the stem's turn; the label hangs up-left of it. */
+.tlg-joint {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.tlg-label {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: block;
+  box-sizing: border-box;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px 1px var(--space-2);
+  border: none;
+  border-bottom: 1px solid var(--text-muted);
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--font-xs);
+  line-height: 14px;
+  color: var(--text);
+  text-decoration: none;
+  transform-origin: 100% 100%;
+  transform: rotate(45deg);
+  cursor: pointer;
+}
+
+.tlg-label:hover,
+.tlg-label:focus-visible {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  outline: none;
+}
+
+.tlg-type-epic,
+.tlg-type-change,
+.tlg-type-feature,
+.tlg-type-capability {
+  font-weight: var(--weight-semibold);
+}
+
+.tlg-more {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.tlg-more.active {
+  color: var(--accent);
+}
+
+.tlg-empty {
+  position: absolute;
+  bottom: 60px;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+/* Today: a drawn 2px line, not a border on a card. */
+.tlg-today {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+}
+
+.tlg-today-label {
+  position: absolute;
+  bottom: -22px;
+  left: -20px;
+  width: 40px;
+  text-align: center;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--accent);
+}
+
+.tlg-open {
+  position: absolute;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.tlg-open-heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.tlg-open-list,
+.tlg-expanded-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tlg-open-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 0;
+  font-size: var(--font-sm);
+  min-width: 0;
+}
+
+.tlg-open-status {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+}
+
+.tlg-status-in_progress .tlg-open-status { background: var(--accent); border-color: var(--accent); }
+.tlg-status-failing .tlg-open-status { background: var(--red); border-color: var(--red); }
+.tlg-status-blocked .tlg-open-status { border-color: var(--orange); }
+.tlg-status-deferred .tlg-open-status { border-style: dashed; }
+
+.tlg-open-title,
+.tlg-expanded-title {
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tlg-open-title {
+  flex: 1;
+}
+
+.tlg-open-title:hover,
+.tlg-expanded-title:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.tlg-open-progress {
+  flex: none;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tlg-open-empty,
+.tlg-open-more {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+button.tlg-open-more {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.tlg-expanded {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.tlg-expanded-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-dim);
+  margin-bottom: var(--space-1);
+}
+
+.tlg-expanded-close {
+  background: none;
+  border: none;
+  font-size: var(--font-lg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tlg-expanded-list li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: 2px 0;
+  font-size: var(--font-sm);
+  min-width: 0;
+}
+
+.tlg-expanded-crumb {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
