@@ -629,6 +629,33 @@ describe("n-dx config", () => {
     });
   });
 
+  // ── rex.attribution ──────────────────────────────────────────────────────
+
+  describe("rex.attribution", () => {
+    it("shows the default, full, before it is set", () => {
+      expect(run(["rex.attribution", tmpDir])).toContain("full  (default, not set in config)");
+    });
+
+    it.each(["full", "name", "none"])("sets and shows %s in .rex/config.json", async (value) => {
+      run(["rex.attribution", value, tmpDir]);
+      expect(run(["rex.attribution", tmpDir]).trim()).toBe(value);
+      const config = JSON.parse(await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"));
+      expect(config.attribution).toBe(value);
+    });
+
+    it("rejects any other value", async () => {
+      expect(runFail(["rex.attribution", "anonymous", tmpDir])).toMatch(/Invalid attribution "anonymous"\. Expected one of: full, name, none/);
+      const config = JSON.parse(await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"));
+      expect(config.attribution).toBeUndefined();
+    });
+
+    it("is documented in --help with its values and default", () => {
+      const entry = helpOutput.slice(helpOutput.indexOf("rex.attribution"));
+      expect(entry).toMatch(/^rex\.attribution\s+string\s+Who PRD writes stamp as lastModifiedBy/);
+      for (const word of ['"full"', '"name"', '"none"', '(default: "full")']) expect(entry.slice(0, 400)).toContain(word);
+    });
+  });
+
   // ── Project-level .n-dx.json ─────────────────────────────────────────────
 
   describe(".n-dx.json project config", () => {

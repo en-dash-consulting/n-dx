@@ -236,26 +236,36 @@ export function conflictToLogEntry(conflict: ConflictRecord): LogEntry {
   };
 }
 
-/** The two fields stamped by {@link stampModified}. */
+/** The fields stamped by {@link stampModified}; `lastModifiedBy` is absent when the write stamps no author. */
 export interface ModifiedFields {
   lastModified: string;
-  lastModifiedBy: string;
+  lastModifiedBy?: string;
 }
+
+/**
+ * Who a stamp names: an identity, `null` for nobody (the `attribution`
+ * setting is `none`, or `name` with no git user name — `resolveStampActor`
+ * in core/identity.ts), or `undefined` to resolve the full identity with
+ * {@link resolveActor}.
+ */
+export type StampActor = string | null | undefined;
 
 /**
  * Resolve the `lastModified` / `lastModifiedBy` field values without
  * requiring a full {@link PRDItem}. Used by store adapters that apply a
  * partial update (e.g. `Object.assign`-style merges) rather than
  * constructing the full merged item up front.
+ *
+ * A `null` actor leaves `lastModifiedBy` out, so spreading the result over an
+ * item keeps whatever author it already had.
  */
 export async function stampModifiedFields(
   timestamp?: string,
-  actor?: string,
+  actor?: StampActor,
 ): Promise<ModifiedFields> {
-  return {
-    lastModified: timestamp ?? new Date().toISOString(),
-    lastModifiedBy: actor ?? (await resolveActor()),
-  };
+  const lastModified = timestamp ?? new Date().toISOString();
+  if (actor === null) return { lastModified };
+  return { lastModified, lastModifiedBy: actor ?? (await resolveActor()) };
 }
 
 /**
@@ -266,7 +276,7 @@ export async function stampModifiedFields(
 export async function stampModified(
   item: PRDItem,
   timestamp?: string,
-  actor?: string,
+  actor?: StampActor,
 ): Promise<PRDItem> {
   return {
     ...item,
@@ -287,15 +297,15 @@ export interface StampUpdateOptions {
 
 /**
  * The actor an update should be stamped with: the item's existing author when
- * `preserveModifiedBy` is set (a cascade must not claim authorship of somebody
- * else's item — `WriteOptions.preserveModifiedBy`, GitHub #368), otherwise
- * `undefined` so {@link stampModifiedFields} resolves the current one.
+ * `preserveModifiedBy` is set and it has one (a cascade must not claim
+ * authorship of somebody else's item — `WriteOptions.preserveModifiedBy`,
+ * GitHub #368), otherwise the current `actor`.
  *
  * `existing` is optional because one caller looks the item up inside the
  * transaction and may not find it; an absent item has no author to preserve.
  */
-function updateActor(existing: PRDItem | undefined, options?: StampUpdateOptions): string | undefined {
-  return options?.preserveModifiedBy ? existing?.lastModifiedBy : undefined;
+function updateActor(existing: PRDItem | undefined, options: StampUpdateOptions | undefined, actor: StampActor): StampActor {
+  return options?.preserveModifiedBy ? (existing?.lastModifiedBy ?? actor) : actor;
 }
 
 /**
@@ -311,8 +321,9 @@ export async function stampUpdatedItem(
   existing: PRDItem,
   updates: Partial<PRDItem>,
   options?: StampUpdateOptions,
+  actor?: StampActor,
 ): Promise<PRDItem> {
-  return stampModified({ ...existing, ...updates } as PRDItem, undefined, updateActor(existing, options));
+  return stampModified({ ...existing, ...updates } as PRDItem, undefined, updateActor(existing, options, actor));
 }
 
 /**
@@ -326,10 +337,11 @@ export async function stampUpdatedFields(
   existing: PRDItem | undefined,
   updates: Partial<PRDItem>,
   options?: StampUpdateOptions,
+  actor?: StampActor,
 ): Promise<Partial<PRDItem>> {
   return {
     ...updates,
-    ...(await stampModifiedFields(undefined, updateActor(existing, options))),
+    ...(await stampModifiedFields(undefined, updateActor(existing, options, actor))),
   };
 }
 
@@ -473,7 +485,7 @@ export function stampChangedItems(
     if (item.lastModified) continue;
 
     item.lastModified = stamp.lastModified;
-    if (!item.lastModifiedBy) item.lastModifiedBy = stamp.lastModifiedBy;
+    if (!item.lastModifiedBy && stamp.lastModifiedBy) item.lastModifiedBy = stamp.lastModifiedBy;
     stamped.push(item.id);
   }
   return stamped;

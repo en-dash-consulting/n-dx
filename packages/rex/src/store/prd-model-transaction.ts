@@ -13,7 +13,9 @@
  * and writes nothing. A tree returned unchanged writes nothing. A mutation
  * that throws writes nothing. Every node the mutation changed, created or
  * moved is stamped with `lastModified` / `lastModifiedBy`, as v1's store
- * stamps its items; an unchanged node keeps its stamp.
+ * stamps its items; an unchanged node keeps its stamp. The `attribution`
+ * setting narrows the author (`resolveStampActor`); with none to stamp, a
+ * changed node keeps the author it had and a new one gets none.
  *
  * A v1 tree is refused before the mutation runs: it is written by
  * `store.withTransaction`. A tree past a schema refusal is never read for a
@@ -28,7 +30,7 @@ import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "./prd-model-reader.js";
 import { writePrdModel, type WritePrdModelResult } from "./prd-model-writer.js";
 import { canonicalJson } from "./state-writer.js";
-import { resolveActor } from "../core/identity.js";
+import { resolveStampActor } from "../core/identity.js";
 import { ITEM_BOOKKEEPING_FIELDS } from "../core/sync.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 
@@ -78,7 +80,7 @@ export async function withPrdModelTransaction<T>(
   options: PrdModelTransactionOptions = {},
 ): Promise<PrdModelTransactionResult<T>> {
   // Resolved before the lock: the first call in a process shells out to git.
-  const actor = await resolveActor();
+  const actor = await resolveStampActor(rexDir);
   return withLock(
     prdLockPath(rexDir),
     async () => {
@@ -147,20 +149,21 @@ function signTree(tree: V2Tree): Map<string, string> {
 function stampChangedNodes(
   tree: V2Tree,
   before: ReadonlyMap<string, string>,
-  stamp: { lastModified: string; lastModifiedBy: string },
+  stamp: { lastModified: string; lastModifiedBy: string | null },
   preserveAuthorFor?: ReadonlySet<string>,
 ): void {
+  const author = stamp.lastModifiedBy;
   for (const { node, parentId } of walkNodes(tree)) {
     const previous = before.get(node.id);
     if (previous !== undefined) {
       if (previous === nodeSignature(node, parentId)) continue;
       node.lastModified = stamp.lastModified;
-      if (!(preserveAuthorFor?.has(node.id) && node.lastModifiedBy)) node.lastModifiedBy = stamp.lastModifiedBy;
+      if (author !== null && !(preserveAuthorFor?.has(node.id) && node.lastModifiedBy)) node.lastModifiedBy = author;
       continue;
     }
     if (node.type === "change") node.createdAt ??= node.lastModified ?? stamp.lastModified;
     if (node.lastModified) continue;
     node.lastModified = stamp.lastModified;
-    if (!node.lastModifiedBy) node.lastModifiedBy = stamp.lastModifiedBy;
+    if (author !== null && !node.lastModifiedBy) node.lastModifiedBy = author;
   }
 }

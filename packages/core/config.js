@@ -1284,6 +1284,7 @@ function getValidator(pkg, settingPath) {
   }
   if (pkg === "selfHeal") return SELF_HEAL_VALIDATORS[settingPath] ?? null;
   if (pkg === "hench") return HENCH_VALIDATORS[settingPath] ?? null;
+  if (pkg === "rex") return REX_VALIDATORS[settingPath] ?? null;
   if (pkg === "graview" && settingPath === "allowNpx") return validateBooleanSetting;
   return null;
 }
@@ -1403,6 +1404,20 @@ function requirePositiveInteger(key, value) {
     throw new Error(`Invalid ${key} "${value}". Expected a whole number of at least 1.`);
   }
 }
+
+/** Mirrors rex's `ATTRIBUTION_MODES` (core/identity.ts); core imports no package. */
+const REX_ATTRIBUTION_MODES = ["full", "name", "none"];
+/** Mirrors rex's `DEFAULT_ATTRIBUTION`. */
+const DEFAULT_REX_ATTRIBUTION = "full";
+
+/** Validators for specific rex config keys. */
+const REX_VALIDATORS = {
+  attribution: (value) => {
+    if (!REX_ATTRIBUTION_MODES.includes(value)) {
+      throw new Error(`Invalid attribution "${value}". Expected one of: ${REX_ATTRIBUTION_MODES.join(", ")}.`);
+    }
+  },
+};
 
 /**
  * Validators for specific claude config keys.
@@ -2226,6 +2241,11 @@ Rex settings (.rex/config.json):
   rex.test                 string    Test command to run (optional)
   rex.sourcevision         string    Sourcevision integration mode (default: "auto")
   rex.model                string    LLM model for analysis (optional)
+  rex.attribution          string    Who PRD writes stamp as lastModifiedBy: "full"
+                                     (git "Name <email>"), "name" (git user.name
+                                     only) or "none" (no author; lastModified is
+                                     still stamped). Existing stamps are left as
+                                     they are (default: "full")
 
 Rex performance settings (both default false — the previous path stays the
 default until the faster one is chosen deliberately; override either for a
@@ -2962,6 +2982,7 @@ Examples:
   n-dx config rex.budget.tokens 500000         Set token budget to 500k
   n-dx config rex.budget.cost 10               Set cost budget to $10
   n-dx config rex.budget.abort true            Abort operations when exceeded
+  n-dx config rex.attribution none             Stamp PRD writes with no author
   n-dx config claude.cli_path /usr/local/bin/claude
                                                Set Claude CLI binary path (validates path)
   n-dx config claude.cli_path /path --force    Set without validation
@@ -3875,6 +3896,7 @@ function getProjectKeyDefault(pkg, settingPath) {
   if (pkg === "cli" && settingPath in CLI_TIMEOUT_DEFAULTS) {
     return CLI_TIMEOUT_DEFAULTS[settingPath];
   }
+  if (pkg === "rex" && settingPath === "attribution") return DEFAULT_REX_ATTRIBUTION;
   return null;
 }
 

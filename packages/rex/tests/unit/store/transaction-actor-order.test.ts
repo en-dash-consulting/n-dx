@@ -2,7 +2,7 @@
  * `withTransaction` must resolve the actor identity *before* taking the PRD
  * lock.
  *
- * `resolveActor` shells out to `git config` on its first call in a process
+ * `resolveStampActor` shells out to `git config` on its first call in a process
  * (packages/rex/src/core/identity.ts). Doing that inside the locked span puts
  * a 5-second-timeout subprocess between every other writer and the PRD —
  * `withTransaction` holds the lock across load, mutate and write, and any
@@ -21,13 +21,16 @@ import { tmpdir } from "node:os";
 
 const events = vi.hoisted(() => ({ order: [] as string[] }));
 
-vi.mock("../../../src/core/identity.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../src/core/identity.js")>();
+// The git lookup itself is what must stay off the locked span, so it is the
+// call recorded: `resolveStampActor` reaches it through identity.ts's own
+// cache, which a mock of an exported function would not intercept.
+vi.mock("@n-dx/llm-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
   return {
     ...actual,
-    resolveActor: vi.fn(async () => {
-      events.order.push("resolveActor");
-      return "Ordering Test <ordering@example.com>";
+    execStdout: vi.fn(async (_cmd: string, args: string[]) => {
+      events.order.push("git");
+      return ({ "user.name": "Ordering Test", "user.email": "ordering@example.com" } as Record<string, string>)[args[args.length - 1]] ?? "";
     }),
   };
 });
@@ -52,6 +55,7 @@ const { FileStore } = await import("../../../src/store/file-adapter.js");
 const { SCHEMA_VERSION } = await import("../../../src/schema/index.js");
 const { toCanonicalJSON } = await import("../../../src/core/canonical.js");
 const { updateInTree } = await import("../../../src/core/tree.js");
+const { _resetActorCacheForTests } = await import("../../../src/core/identity.js");
 import type { PRDStore } from "../../../src/store/contracts.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
@@ -65,6 +69,7 @@ describe.each(STORES)("$name withTransaction actor resolution", ({ create }) => 
   let store: PRDStore;
 
   beforeEach(async () => {
+    _resetActorCacheForTests();
     events.order.length = 0;
     tmpDir = await mkdtemp(join(tmpdir(), "rex-txn-actor-"));
     const rexDir = join(tmpDir, ".rex");
@@ -97,7 +102,8 @@ describe.each(STORES)("$name withTransaction actor resolution", ({ create }) => 
       updateInTree(doc.items, "task-a", { description: "Changed." });
     });
 
-    expect(events.order).toEqual(["resolveActor", "withLock"]);
+    // user.name and user.email, both read before the lock and never inside it.
+    expect(events.order).toEqual(["git", "git", "withLock"]);
   });
 
   it("uses the resolved actor for the stamp", async () => {

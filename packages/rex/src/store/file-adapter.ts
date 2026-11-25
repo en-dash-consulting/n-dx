@@ -14,7 +14,7 @@ import {
   snapshotItemContent,
   stampChangedItems,
 } from "../core/sync.js";
-import { resolveActor } from "../core/identity.js";
+import { resolveStampActor } from "../core/identity.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
@@ -718,7 +718,7 @@ export class FileStore implements PRDStore {
     // out to git, and that is not work to do while holding the PRD lock. The
     // result is cached process-wide, so warming it here also keeps any
     // `stampModified` inside `fn` off the locked span.
-    const actor = await resolveActor();
+    const actor = await resolveStampActor(this.rexDir);
     return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
       // Signatured before `fn` runs, so the stamp below covers whatever it
@@ -749,7 +749,7 @@ export class FileStore implements PRDStore {
     // Self-heal tagging runs on creation only so that self-heal runs never
     // rewrite tags on previously-authored items (see updateItem).
     const tagged = withSelfHealTag(item);
-    const stamped = await stampModified(tagged);
+    const stamped = await stampModified(tagged, undefined, await resolveStampActor(this.rexDir));
 
     if (parentId) {
       let owner: string;
@@ -786,7 +786,7 @@ export class FileStore implements PRDStore {
       // transaction because `preserveModifiedBy` needs the item's current
       // author (see WriteOptions).
       const existing = findItem(doc.items, id);
-      const stampedUpdates = await stampUpdatedFields(existing?.item, attributedUpdates, options);
+      const stampedUpdates = await stampUpdatedFields(existing?.item, attributedUpdates, options, await resolveStampActor(this.rexDir));
       if (!updateInTree(doc.items, id, stampedUpdates)) {
         throw new Error(`Item "${id}" not found`);
       }
@@ -809,7 +809,7 @@ export class FileStore implements PRDStore {
       // modification, mirroring FolderTreeStore.removeItem.
       const parent = entry.parents[entry.parents.length - 1];
       if (parent) {
-        Object.assign(parent, await stampModified(parent));
+        Object.assign(parent, await stampModified(parent, undefined, await resolveStampActor(this.rexDir)));
       }
     });
     this.itemToFile.delete(id);

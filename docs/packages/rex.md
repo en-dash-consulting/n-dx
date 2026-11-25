@@ -135,6 +135,22 @@ When scanning an existing codebase for the first time (empty v1 PRD), Rex detect
 
 This prevents existing code from appearing as a wall of pending tasks. On a v2 PRD, functionality the code already has belongs in the product layer as capabilities that read *met*.
 
+## Attribution
+
+Every PRD write stamps the nodes it changes with `lastModified` and `lastModifiedBy` in the committed `state.yaml` (v2) or item files (v1). The `attribution` setting decides what `lastModifiedBy` holds:
+
+| Value | `lastModifiedBy` |
+|-------|------------------|
+| `full` (default) | git `user.name <user.email>`, falling back to either alone, then the OS user |
+| `name` | git `user.name` only; nothing when git has only an email |
+| `none` | nothing; `lastModified` is still stamped |
+
+```sh
+ndx config rex.attribution none .
+```
+
+It is read like other rex settings: `.rex/config.json`, then the `rex` section of `.n-dx.json`, then `.n-dx.local.json` (each later one wins), so one machine can turn it off without changing the repository. It applies to every writer (CLI, MCP, the dashboard). Stamps already written are left as they are, and a node edited under `none` keeps the author it had. The setting does not change the `actor` on `execution-log.jsonl` entries.
+
 ## Files
 
 Rex's directory is `.ndx/rex/` on the `.ndx/` layout and `.rex/` on the older one; paths below use `.rex/`.

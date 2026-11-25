@@ -282,6 +282,7 @@ export const RexConfigSchema = z
     }).optional(),
     titleCollisionSimilarityThreshold: z.number().min(0).max(1).optional(),
     codeOwners: z.boolean().optional(),
+    attribution: z.enum(["full", "name", "none"]).optional(),
     future: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
