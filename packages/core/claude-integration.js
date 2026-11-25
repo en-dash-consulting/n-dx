@@ -34,6 +34,7 @@ import {
   getMcpServers,
   writeVendorSkills,
   renderClaudeMd,
+  writeManagedBlock,
 } from "./assistant-assets.js";
 import { getCliName } from "./cli-identity.js";
 import { localConfigStatus } from "./local-config-status.js";
@@ -161,20 +162,17 @@ function writeSkills(dir) {
 // ── CLAUDE.md writing ─────────────────────────────────────────────────────────
 
 /**
- * Write `CLAUDE.md` to the project root.
+ * Write n-dx's managed block into the project's `CLAUDE.md`.
  *
- * The content is generated from the shared project guidance template plus
- * the Claude-specific addendum, so that CLAUDE.md stays in sync with
- * AGENTS.md's shared sections automatically.
+ * The block is generated from the shared project guidance template plus the
+ * Claude-specific addendum, so it stays in sync with AGENTS.md's shared
+ * sections. Text outside the block belongs to the project and is kept.
  *
  * @param {string} dir  Absolute project root directory
- * @returns {{ written: boolean, path: string }}
+ * @returns {{ written: boolean, path: string, changed: boolean }}
  */
 function writeClaudeMd(dir) {
-  const claudePath = join(dir, "CLAUDE.md");
-  const content = renderClaudeMd(dir);
-  writeFileSync(claudePath, content);
-  return { written: true, path: claudePath };
+  return writeManagedBlock(join(dir, "CLAUDE.md"), renderClaudeMd(dir));
 }
 
 // ── MCP registration ──────────────────────────────────────────────────────────

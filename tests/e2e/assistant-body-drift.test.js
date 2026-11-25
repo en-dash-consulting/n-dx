@@ -34,6 +34,7 @@ import {
   renderSkill,
   renderClaudeMd,
   renderAgentsMd,
+  extractManagedBlock,
 } from "../../packages/core/assistant-assets.js";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -96,9 +97,12 @@ describe("assistant body-drift: committed instruction files match the generator"
       ).toBe(true);
     });
 
-    it(`${relPath} matches the canonical generator output`, () => {
+    // Only the managed block is generated; text outside the markers belongs
+    // to the project and is not compared.
+    it(`${relPath}'s managed block matches the canonical generator output`, () => {
       if (!existsSync(absPath)) return; // presence asserted above
-      const committed = norm(readFileSync(absPath, "utf-8"));
+      const committed = extractManagedBlock(readFileSync(absPath, "utf-8"));
+      expect(committed, `${relPath} has no ndx:begin/ndx:end managed block.`).not.toBeNull();
       const generated = norm(renderInstruction(vendor));
       expect(
         committed,

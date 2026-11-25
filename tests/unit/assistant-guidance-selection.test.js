@@ -14,6 +14,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "nod
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
+  extractManagedBlock,
   renderAgentsMd,
   renderClaudeMd,
   usesNdxGuidance,
@@ -36,9 +37,10 @@ describe("guidance selection", () => {
     expect(usesNdxGuidance(ROOT)).toBe(true);
   });
 
-  it("renders this repository's committed CLAUDE.md and AGENTS.md unchanged", () => {
-    expect(renderClaudeMd(ROOT)).toBe(readFileSync(join(ROOT, "CLAUDE.md"), "utf-8"));
-    expect(renderAgentsMd(ROOT)).toBe(readFileSync(join(ROOT, "AGENTS.md"), "utf-8"));
+  it("renders this repository's committed CLAUDE.md and AGENTS.md blocks unchanged", () => {
+    const block = (name) => extractManagedBlock(readFileSync(join(ROOT, name), "utf-8"));
+    expect(renderClaudeMd(ROOT)).toBe(block("CLAUDE.md"));
+    expect(renderAgentsMd(ROOT)).toBe(block("AGENTS.md"));
   });
 
   it("treats any other project as a consumer", () => {

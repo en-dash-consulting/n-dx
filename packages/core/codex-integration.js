@@ -25,6 +25,7 @@ import {
   writeVendorSkills,
   renderCodexConfigToml,
   renderAgentsMd,
+  writeManagedBlock,
 } from "./assistant-assets.js";
 import { getCliName } from "./cli-identity.js";
 
@@ -239,19 +240,17 @@ function writeCodexConfig(dir) {
 // ── AGENTS.md writing ───────────────────────────────────────────────────────────
 
 /**
- * Write `AGENTS.md` to the project root.
+ * Write n-dx's managed block into the project's `AGENTS.md`.
  *
- * The content is generated from the shared assistant asset layer so that it
- * stays in sync with the manifest's skill and MCP definitions automatically.
+ * The block is generated from the shared assistant asset layer so it stays in
+ * sync with the manifest's skill and MCP definitions. Text outside the block
+ * belongs to the project and is kept.
  *
  * @param {string} dir  Absolute project root directory
- * @returns {{ written: boolean, path: string }}
+ * @returns {{ written: boolean, path: string, changed: boolean }}
  */
 function writeAgentsMd(dir) {
-  const agentsPath = join(dir, "AGENTS.md");
-  const content = renderAgentsMd(dir);
-  writeFileSync(agentsPath, content);
-  return { written: true, path: agentsPath };
+  return writeManagedBlock(join(dir, "AGENTS.md"), renderAgentsMd(dir));
 }
 
 // ── Skill writing ──────────────────────────────────────────────────────────────
