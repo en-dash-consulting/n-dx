@@ -1,0 +1,53 @@
+schema: "rex/v2"
+items:
+  "044b9de7-6f19-401c-b094-291a2ad11dad":
+    status: "completed"
+    startedAt: "2026-11-25T02:33:16.364Z"
+    completedAt: "2026-11-25T02:36:04.441Z"
+    endedAt: "2026-11-25T02:36:04.441Z"
+    activeIntervals: [{"end":"2026-11-25T02:36:04.441Z","start":"2026-11-25T02:33:16.364Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Validate changesets now runs scripts/changeset-pr-checks.mjs validate: content-based version-PR detection (deletes ≥1 changeset, adds none, none remain vs origin/main) skips with a log line; otherwise runs changeset status --since=origin/main."
+    lastModified: "2026-11-25T02:36:04.441Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2c091a65-08aa-4a78-a118-e12ce22ff80c":
+    status: "completed"
+    startedAt: "2026-11-25T02:38:16.666Z"
+    completedAt: "2026-11-25T02:39:59.100Z"
+    endedAt: "2026-11-25T02:39:59.100Z"
+    activeIntervals: [{"end":"2026-11-25T02:39:59.100Z","start":"2026-11-25T02:38:16.666Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "git diffs and changeset status moved into the ci.yml step; script is pure (env-fed is-version-pr); allowlist restored to origin/main."
+    lastModified: "2026-11-25T02:39:59.100Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "52db514f-8426-4fe7-83b5-339de35c3007":
+    status: "completed"
+    startedAt: "2026-11-25T04:41:02.484Z"
+    completedAt: "2026-11-25T04:43:00.629Z"
+    endedAt: "2026-11-25T04:43:00.629Z"
+    activeIntervals: [{"end":"2026-11-25T04:43:00.629Z","start":"2026-11-25T04:41:02.484Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added tests/unit/changeset-pr-checks.test.js and tests/e2e/ci-changeset-checks.test.js (with mutation checks); skill paragraph logged for the operator to apply."
+    lastModified: "2026-11-25T04:43:00.629Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bbe2e8e7-cdc3-467a-a8a7-90ee8e90978b":
+    status: "completed"
+    startedAt: "2026-11-25T02:40:50.877Z"
+    completedAt: "2026-11-25T02:42:53.495Z"
+    endedAt: "2026-11-25T02:42:53.495Z"
+    activeIntervals: [{"end":"2026-11-25T02:42:53.495Z","start":"2026-11-25T02:40:50.877Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ci.yml \"Forbid edits to existing changesets\" step (Linux, every event) runs git diff --find-renames --diff-filter=MR --name-status against origin/main and passes it to a new no-changeset-edits subcommand backed by pure findEditedChangesets in scripts/changeset-pr-checks.mjs."
+    lastModified: "2026-11-25T02:42:53.495Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c3ee8669-70a0-444a-957f-d61c0b401dbb":
+    status: "completed"
+    startedAt: "2026-11-25T04:43:00.629Z"
+    completedAt: "2026-11-25T04:43:00.629Z"
+    endedAt: "2026-11-25T04:43:00.629Z"
+    activeIntervals: [{"end":"2026-11-25T04:43:00.629Z","start":"2026-11-25T04:43:00.629Z"}]
+    appliedAt: "2026-11-25T04:43:00.629Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    createdAt: "2026-11-25T01:19:13.547Z"
+    lastModified: "2026-11-25T04:43:00.629Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

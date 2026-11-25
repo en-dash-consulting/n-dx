@@ -1,0 +1,24 @@
+---
+id: "52db514f-8426-4fe7-83b5-339de35c3007"
+type: "task"
+title: "Test the changeset CI steps and document the never-edit-a-changeset rule"
+slug: "test-the-changeset-ci-steps-and"
+summary: "Add tests that break if either CI fix is removed, and write the rule \"add a new changeset; never edit one already on main\" where people and assistants who write changesets will read it."
+description: "Tests:\n- The logic lives in scripts/changeset-pr-checks.mjs as exported pure functions: isChangesetFile, classifyVersionPr({ added, deleted, remaining }) and findEditedChangesets(statusLines). The ci.yml steps \"Forbid edits to existing changesets\" and \"Validate changesets\" run `git diff` in their shell and call the script's `no-changeset-edits` and `is-version-pr` commands.\n- Unit-test the pure functions in a new root test (for example tests/e2e/changeset-pr-checks.test.js, or tests/unit/ if root unit tests live there; check how root tests are discovered in scripts/run-all-tests.mjs and the vitest config so the file actually runs in the root suite). Cover: version PR detected (deletes, adds none, none left); not a version PR when it adds a changeset, when changesets remain, or when it deletes none; README.md and config.json ignored; findEditedChangesets reports an `M` line and an `R<score>` line (by old path, naming the new path), ignores README.md and non-changeset paths, and returns an empty message when nothing is edited. Import the functions directly; spawn nothing.\n- Add a thin text test of .github/workflows/ci.yml in the style of tests/e2e/ci-draft-pr-gate.test.js and tests/e2e/ci-merge-queue-trigger.test.js (read as text, normalise CRLF to LF, no YAML dependency), e.g. tests/e2e/ci-changeset-checks.test.js. Find each step by its `- name:` line and take its block up to the next step. Assert: the guard step exists, runs `git diff` with `--diff-filter=MR` against `origin/main...HEAD` and calls `no-changeset-edits`; Validate changesets calls `is-version-pr` before `changeset status --since=origin/main`; neither step's `if:` uses github.head_ref unless the same condition has `github.event_name == 'pull_request'`. Write the checks as pure functions over the YAML text and also run them on in-memory mutated copies of ci.yml (guard step removed; `is-version-pr` call removed; an `if:` with a bare `github.head_ref != 'changeset-release/main'` added) to prove each copy is rejected. No files written.\n\nDocs (skill only, decided by Ryan 2026-11-24), applied by the operator:\n- The rule \"add a new changeset; never edit one already on main\" goes in .claude/skills/ndx-release-notes/SKILL.md, section 1 (Writing a changeset). You cannot write under .claude/ (Claude Code blocks it), so do NOT try to edit, copy or move that file. Instead read the skill, draft the exact Markdown to insert (one short paragraph or bullet: why — the next release may consume and delete a changeset already on main, so an edit is lost or conflicts, as PR #1094's modify/delete conflict on .changeset/hench-php-guards.md showed — and that the Build & Validate step \"Forbid edits to existing changesets\" now enforces it), and record it with the rex MCP append_log tool on this task: event \"skill-paragraph\", detail = the line it goes after (quoted exactly) followed by the Markdown to insert. Say in your final summary that the skill edit is left to the operator.\n- Do NOT edit packages/core/assistant-assets/project-guidance.md, AGENTS.md, CLAUDE.md or anything under packages/, and do not run `ndx init`: project-guidance.md ships in @n-dx/core, so editing it would make this PR need a changeset. AGENTS.md already tells every assistant to read the ndx-release-notes skill before writing a changeset.\n\nDo not add a changeset. `git diff --name-only origin/main...HEAD -- packages/` must stay empty."
+acceptanceCriteria:
+  - "Unit tests import the pure functions from scripts/changeset-pr-checks.mjs and cover the version PR, normal PR, added, deleted, modified, renamed, README.md and config.json cases, spawning nothing"
+  - "The ci.yml text test fails on in-memory copies of ci.yml with the guard step removed, with the is-version-pr call removed, and with a bare github.head_ref condition added without an event_name == 'pull_request' guard"
+  - "Both new test files run in the root suite and pass"
+  - "An append_log entry with event skill-paragraph on this task holds the exact Markdown for section 1 of .claude/skills/ndx-release-notes/SKILL.md stating the rule and its reason, and where it goes"
+  - "No file under packages/, and neither AGENTS.md nor CLAUDE.md, is changed on the branch, and no changeset is added"
+  - "tests/e2e/instruction-alignment.test.js and tests/e2e/agents-md-size-budget.test.js pass"
+priority: "high"
+tags:
+  - "ci"
+  - "release"
+  - "docs"
+blockedBy:
+  - "044b9de7-6f19-401c-b094-291a2ad11dad"
+  - "bbe2e8e7-cdc3-467a-a8a7-90ee8e90978b"
+  - "2c091a65-08aa-4a78-a118-e12ce22ff80c"
+---

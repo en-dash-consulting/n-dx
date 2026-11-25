@@ -290,14 +290,52 @@ jobs:
             exit 1
           fi
 
+      - name: Forbid edits to existing changesets
+        # A PR adds its own changeset files and never modifies or renames one
+        # already on main: the next release may consume and delete that file,
+        # so the edit is lost or conflicts (PR #1094, .changeset/hench-php-guards.md).
+        # Additions pass, and so do deletions, which is all the version PR does.
+        # Runs in every event, not gated to pull_request: the three-dot diff
+        # against origin/main (fetch-depth 0 on this leg) is the PR's diff under
+        # pull_request and merge_group (HEAD is the queue's merge commit) and
+        # empty on push to main. Rename detection stays on so a renamed
+        # changeset is not read as a delete plus an add.
+        # scripts/changeset-pr-checks.mjs classifies the lines and spawns
+        # nothing; it exits non-zero on an edit or a crash.
+        if: runner.os == 'Linux'
+        run: |
+          CHANGESET_EDITED=$(git diff --find-renames --diff-filter=MR --name-status origin/main...HEAD -- '.changeset/*.md')
+          export CHANGESET_EDITED
+          node scripts/changeset-pr-checks.mjs no-changeset-edits
+
       - name: Validate changesets
         # Validates every changeset's front matter against the workspace
         # (catches stale package names like "rex" vs "@n-dx/rex" that would
         # otherwise only fail in the Release workflow after merge to main).
         # --since=origin/main is required because PR checkouts are detached
         # HEAD with no local "main" branch for changeset to diff against.
+        #
+        # Skipped on the Changesets version PR, which consumes every changeset
+        # while bumping package.json, so `changeset status` would exit 1. It is
+        # detected by content, not branch name: against origin/main the branch
+        # deletes a changeset, adds none and leaves none. git runs here, in the
+        # step; scripts/changeset-pr-checks.mjs only classifies the path lists
+        # it is given, so it spawns nothing. A bare
+        # `github.head_ref != 'changeset-release/main'` would not do: in the
+        # merge queue (merge_group) head_ref is empty, so that test is true and
+        # the step would still run and fail the queued version PR. The content
+        # check holds in pull_request and merge_group alike (fetch-depth 0 gives
+        # both origin/main); on push to main the diff is empty, so it runs.
         if: runner.os == 'Linux'
-        run: pnpm exec changeset status --since=origin/main
+        run: |
+          CHANGESET_ADDED=$(git diff --no-renames --diff-filter=A --name-only origin/main...HEAD -- '.changeset/*.md')
+          CHANGESET_DELETED=$(git diff --no-renames --diff-filter=D --name-only origin/main...HEAD -- '.changeset/*.md')
+          export CHANGESET_ADDED CHANGESET_DELETED
+          if node scripts/changeset-pr-checks.mjs is-version-pr; then
+            echo "Changesets version PR — skipping changeset status."
+            exit 0
+          fi
+          pnpm exec changeset status --since=origin/main
 
   # THE TEST SUITES: FOUR GROUPS PER OS, TWELVE JOBS, ALL IN PARALLEL.
   #
