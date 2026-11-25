@@ -52,14 +52,15 @@ describe.each(LAYOUTS)("sourcevision file access on the $name layout", ({ contai
     expect(existsSync(join(projectDir, svDir, "manifest.json"))).toBe(true);
   });
 
-  it("gitignores the layout's machine-local cache, once, even on re-init", () => {
+  it("gitignores the machine-local cache inside the output folder, once, even on re-init", () => {
     writeFileSync(join(projectDir, ".gitignore"), "node_modules/");
     cmdInit(projectDir);
     cmdInit(projectDir);
 
-    const lines = readFileSync(join(projectDir, ".gitignore"), "utf-8").split("\n");
-    expect(lines).toContain("node_modules/");
-    expect(lines.filter((l) => l === `${svDir.split("\\").join("/")}/.cache/`)).toHaveLength(1);
+    // The project's own .gitignore is never edited.
+    expect(readFileSync(join(projectDir, ".gitignore"), "utf-8")).toBe("node_modules/");
+    const lines = readFileSync(join(projectDir, svDir, ".gitignore"), "utf-8").split("\n");
+    expect(lines.filter((l) => l === ".cache/")).toHaveLength(1);
   });
 
   it("does not create the other layout's directory", () => {
@@ -85,6 +86,9 @@ describe.each(LAYOUTS)("sourcevision file access on the $name layout", ({ contai
     cmdReset(projectDir);
 
     expect(existsSync(join(projectDir, svDir, ".backup"))).toBe(true);
+    // Reset adds its entry beside init's instead of replacing the file.
+    const lines = readFileSync(join(projectDir, svDir, ".gitignore"), "utf-8").split("\n");
+    expect(lines).toEqual(expect.arrayContaining([".cache/", ".backup/"]));
   });
 
   // `export/` bundles into the dependency-free standalone skill and cannot

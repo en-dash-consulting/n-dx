@@ -151,7 +151,7 @@ try {
       break;
     case "workspace":
       // Parses its own arguments: an --add/--remove value is never the root.
-      cmdWorkspace(args.slice(1));
+      await cmdWorkspace(args.slice(1));
       break;
     case "mcp":
       await cmdMcp(targetArg || ".");

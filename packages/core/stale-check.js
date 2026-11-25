@@ -66,6 +66,20 @@ export function checkProjectStaleness(dir) {
   return details;
 }
 
+/**
+ * Whether `dir` is only analysed, never initialized: no rex and no hench state.
+ * `ndx analyze` runs in such a repository — often one the operator does not
+ * own — so it is not an incomplete setup, and analysis keeps everything it
+ * writes inside its own output folder there.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {boolean}
+ */
+export function isAnalyzeOnlyProject(dir) {
+  const layout = resolveLayout(dir);
+  return !existsSync(layout.rexDir) && !existsSync(layout.henchDir);
+}
+
 // ── Formatting ────────────────────────────────────────────────────────────────
 
 /**

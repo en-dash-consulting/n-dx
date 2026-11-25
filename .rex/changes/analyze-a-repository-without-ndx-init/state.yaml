@@ -1,12 +1,33 @@
 schema: "rex/v2"
 items:
   "3ca52f0b-a6e6-4453-bc38-3f768c0a386e":
-    lastModified: "2026-11-25T04:54:05.518Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:50:09.010Z"
+    completedAt: "2026-11-25T06:57:27.230Z"
+    endedAt: "2026-11-25T06:57:27.230Z"
+    activeIntervals: [{"end":"2026-11-25T06:57:27.230Z","start":"2026-11-25T06:50:09.010Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sv workspace --discover <dir> [--jobs=<n>] [--timeout=<s>] [--json]: walks for .git/.svn roots (no descent into a root, no symlink following, outside symlinked repos reported), runs sv analyze --fast via spawnTool with credentials stripped and bounded concurrency, keeps analyses whose gitSha matches HEAD, registers and aggregates, reports skips with reasons."
+    lastModified: "2026-11-25T06:57:27.230Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ac9a2ba2-c37a-48cb-b7ef-9a968c7392b1":
-    lastModified: "2026-11-25T04:53:55.622Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:41:54.321Z"
+    completedAt: "2026-11-25T06:49:59.359Z"
+    endedAt: "2026-11-25T06:49:59.359Z"
+    activeIntervals: [{"end":"2026-11-25T06:49:59.359Z","start":"2026-11-25T06:41:54.321Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx analyze creates its output folder via init's layout rule instead of requireInit. sv init and reset ignore .cache/ and .backup/ in <svDir>/.gitignore and never edit the repo's. In analyze-only repos the vendor-CLI log goes to <svDir>/.cache and the setup-incomplete notice is skipped. Verified by real --fast and model runs on a fresh repo, and by a new integration test."
+    lastModified: "2026-11-25T06:49:59.359Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dda019c0-eadb-447b-a175-d13cf3198851":
+    status: "completed"
+    startedAt: "2026-11-25T06:57:27.230Z"
+    completedAt: "2026-11-25T06:57:27.230Z"
+    endedAt: "2026-11-25T06:57:27.230Z"
+    activeIntervals: [{"end":"2026-11-25T06:57:27.230Z","start":"2026-11-25T06:57:27.230Z"}]
+    appliedAt: "2026-11-25T06:57:27.230Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-25T04:53:45.866Z"
-    lastModified: "2026-11-25T04:54:05.518Z"
+    lastModified: "2026-11-25T06:57:27.230Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

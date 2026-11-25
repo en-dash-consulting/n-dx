@@ -29,6 +29,7 @@ sourcevision pr-markdown .                # regenerate PR markdown summary
 sourcevision git-credential-helper .      # interactive GitHub credential setup
 sourcevision reset .                      # clear analysis data
 sourcevision workspace .                  # aggregate multiple repos into unified view
+sourcevision workspace --discover ~/clones   # find, analyse (--fast) and aggregate every repo under a folder
 sourcevision mcp .                        # start MCP server (stdio)
 sourcevision pack add java                # install a language pack (java, go, sql, terraform)
 sourcevision pack add                     # install every pack the project lists (sourcevision.packs)
