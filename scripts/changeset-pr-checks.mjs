@@ -13,7 +13,14 @@
  * queue's merge_group run has no head_ref: the branch deletes at least one
  * changeset, adds none, and leaves none in the tree.
  *
+ * `no-changeset-edits` (CHANGESET_EDITED, the output of
+ * `git diff --name-status --diff-filter=MR`): whether the branch leaves every
+ * changeset already on main untouched. A release consumes and deletes those
+ * files, so an edit to one is lost or conflicts; a PR adds its own instead.
+ * Answers no (exit 1) when it modifies or renames one, so a crash fails too.
+ *
  * Usage: CHANGESET_ADDED=… CHANGESET_DELETED=… node scripts/changeset-pr-checks.mjs is-version-pr
+ *        CHANGESET_EDITED=… node scripts/changeset-pr-checks.mjs no-changeset-edits
  */
 
 import { readdirSync } from "node:fs";
@@ -48,7 +55,31 @@ export function classifyVersionPr({ added, deleted, remaining }) {
   };
 }
 
-/** Newline-separated paths from an environment variable; unset is empty. */
+/**
+ * The changesets on main a branch edits, from `git diff --name-status
+ * --diff-filter=MR` lines (`M\t<path>` or `R<score>\t<old>\t<new>`). A rename
+ * is reported by its old path, the file on main. Non-changeset paths
+ * (README.md) are ignored. Returns `{ edited, message }`; `message` is the
+ * failure text, empty when nothing is edited.
+ */
+export function findEditedChangesets(statusLines) {
+  const edited = [];
+  for (const line of statusLines) {
+    const [status, path, renamedTo] = line.split("\t");
+    if (!path || !isChangesetFile(path)) continue;
+    if (status === "M") edited.push(path);
+    else if (status.startsWith("R")) edited.push(`${path} (renamed to ${renamedTo})`);
+  }
+  if (edited.length === 0) return { edited, message: "" };
+  const message = [
+    `This branch edits ${edited.length} changeset(s) already on main:`,
+    ...edited.map((file) => `  ${file}`),
+    "Restore them and add a new changeset instead (pnpm changeset): a changeset already on main may be consumed by the next release, which deletes it and loses the edit.",
+  ].join("\n");
+  return { edited, message };
+}
+
+/** Newline-separated lines from an environment variable; unset is empty. */
 function envPaths(name) {
   return (process.env[name] ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
 }
@@ -66,6 +97,10 @@ const COMMANDS = {
       remaining: remainingPaths(),
     });
     return { yes: versionPr, line: `Branch ${reason}.` };
+  },
+  "no-changeset-edits": () => {
+    const { edited, message } = findEditedChangesets(envPaths("CHANGESET_EDITED"));
+    return { yes: edited.length === 0, line: message || "Branch edits no changeset already on main." };
   },
 };
 

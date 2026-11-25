@@ -24,7 +24,14 @@ items:
     lastModified: "2026-11-25T02:37:39.741Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bbe2e8e7-cdc3-467a-a8a7-90ee8e90978b":
-    lastModified: "2026-11-25T02:37:35.458Z"
+    status: "completed"
+    startedAt: "2026-11-25T02:40:50.877Z"
+    completedAt: "2026-11-25T02:42:53.495Z"
+    endedAt: "2026-11-25T02:42:53.495Z"
+    activeIntervals: [{"end":"2026-11-25T02:42:53.495Z","start":"2026-11-25T02:40:50.877Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ci.yml \"Forbid edits to existing changesets\" step (Linux, every event) runs git diff --find-renames --diff-filter=MR --name-status against origin/main and passes it to a new no-changeset-edits subcommand backed by pure findEditedChangesets in scripts/changeset-pr-checks.mjs."
+    lastModified: "2026-11-25T02:42:53.495Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c3ee8669-70a0-444a-957f-d61c0b401dbb":
     createdAt: "2026-11-25T01:19:13.547Z"

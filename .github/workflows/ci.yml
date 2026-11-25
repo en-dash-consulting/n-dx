@@ -290,6 +290,24 @@ jobs:
             exit 1
           fi
 
+      - name: Forbid edits to existing changesets
+        # A PR adds its own changeset files and never modifies or renames one
+        # already on main: the next release may consume and delete that file,
+        # so the edit is lost or conflicts (PR #1094, .changeset/hench-php-guards.md).
+        # Additions pass, and so do deletions, which is all the version PR does.
+        # Runs in every event, not gated to pull_request: the three-dot diff
+        # against origin/main (fetch-depth 0 on this leg) is the PR's diff under
+        # pull_request and merge_group (HEAD is the queue's merge commit) and
+        # empty on push to main. Rename detection stays on so a renamed
+        # changeset is not read as a delete plus an add.
+        # scripts/changeset-pr-checks.mjs classifies the lines and spawns
+        # nothing; it exits non-zero on an edit or a crash.
+        if: runner.os == 'Linux'
+        run: |
+          CHANGESET_EDITED=$(git diff --find-renames --diff-filter=MR --name-status origin/main...HEAD -- '.changeset/*.md')
+          export CHANGESET_EDITED
+          node scripts/changeset-pr-checks.mjs no-changeset-edits
+
       - name: Validate changesets
         # Validates every changeset's front matter against the workspace
         # (catches stale package names like "rex" vs "@n-dx/rex" that would
