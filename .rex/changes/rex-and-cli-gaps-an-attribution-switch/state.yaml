@@ -38,5 +38,12 @@ items:
     lastModified: "2026-11-25T06:24:06.285Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b91027c2-36de-420b-976d-a02f1ee0331b":
-    lastModified: "2026-11-25T04:53:10.072Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:33:58.140Z"
+    completedAt: "2026-11-25T06:36:33.955Z"
+    endedAt: "2026-11-25T06:36:33.955Z"
+    activeIntervals: [{"end":"2026-11-25T06:36:33.955Z","start":"2026-11-25T06:33:58.140Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sv workspace parses its own args: --add/--remove/--root values consumed in both spellings, the one leftover positional is the root; --root added; two positionals or a disagreeing --root refused before any write; help updated."
+    lastModified: "2026-11-25T06:36:33.955Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -275,20 +275,28 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     tool: "sourcevision",
     command: "workspace",
     summary: "aggregate multiple analyzed repos into a unified view",
-    usage: "sourcevision workspace [options] [dir]",
+    usage: "sourcevision workspace [--add <dir>]... [--remove <dir>]... [--status] [--root=<dir> | <root>]",
     description:
       "Aggregates pre-analyzed repositories into a unified .sourcevision/ output.\n" +
       "Each member repo must already have .sourcevision/ from a prior analysis run.\n" +
       "Members are configured in .n-dx.json or auto-detected from nested\n" +
-      ".sourcevision/ directories.",
+      ".sourcevision/ directories.\n" +
+      "\n" +
+      "The root is the workspace whose config is read and written. Flag values\n" +
+      "(--add <dir>, --add=<dir>) are consumed first; the root is --root=<dir> or\n" +
+      "the one argument left over, and defaults to the current directory. Two\n" +
+      "leftover arguments, or --root naming a different directory from the\n" +
+      "leftover argument, are an error and nothing is written.",
     options: [
-      { flag: "--add <dir>", description: "Add a directory as a workspace member (persists to .n-dx.json)" },
-      { flag: "--remove <dir>", description: "Remove a workspace member" },
+      { flag: "--add <dir>", description: "Add a directory as a workspace member (persists to .n-dx.json); repeatable" },
+      { flag: "--remove <dir>", description: "Remove a workspace member; repeatable" },
+      { flag: "--root=<dir>", description: "The workspace root (default: the leftover argument, else .)" },
       { flag: "--status", description: "List members with analysis freshness, zone counts, file counts" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
     examples: [
       { command: "sourcevision workspace --add packages/api --add packages/web .", description: "Add workspace members" },
+      { command: "sourcevision workspace --status --root=../ws", description: "Name the root explicitly" },
       { command: "sourcevision workspace .", description: "Run workspace aggregation" },
       { command: "sourcevision workspace --status .", description: "Check member status" },
       { command: "sv workspace .", description: "Using the 'sv' alias" },
