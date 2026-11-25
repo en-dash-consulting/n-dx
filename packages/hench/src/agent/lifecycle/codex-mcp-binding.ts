@@ -1,20 +1,14 @@
-/** Executor MCP routing. Keep native auth, profiles and organizational policy;
- * override only MCP registrations, then verify the effective native result.
- * A table override MERGES in Codex, so it cannot by itself exclude user servers.
- */
+/** Executor MCP routing: admit a bounded native snapshot, then ignore mutable
+ * user/project config during exec. A table override alone merges foreign names. */
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import { isAbsolute, relative } from "node:path";
+import { projectCodexExecConfig } from "./codex-exec-config.js";
 import { readCodexEffectiveConfig } from "../../prd/llm-gateway.js";
 import { buildAgentMcpServers, resolveLauncherCli, LAUNCHER_REJECTION_DETAIL } from "../../process/agent-mcp-config.js";
 
 function refusal(detail: string): Error {
   return new Error(`Codex MCP binding refused: ${detail}. Restart n-dx work from the assigned checkout with its original n-dx launcher; repair the named configuration before retrying. No executor was started.`);
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown> : undefined;
 }
 
 /** Re-read on EVERY launch, including retries. Do not regenerate a lost or
@@ -53,31 +47,26 @@ export interface CodexMcpBindingOptions {
   disabled?: boolean;
 }
 
-/** Returns exec argv with a verified binding; never changes CODEX_HOME, auth,
- * trust, native provider/model selection or any config file. Unsupported
- * native config/read and unaddressable server names refuse without fallback.
- */
+/** Every launch inspects policy through the original home, without loading a
+ * model or evaluating helpers. Only admitted values cross into ignored exec.
+ * HOME/CODEX_HOME/auth stay unchanged. Unsupported configurations refuse. */
 export async function bindCodexMcp(options: CodexMcpBindingOptions): Promise<string[]> {
   const binding = readExecutorMcpBinding(options.path, options.cwd);
-  const read = async (args: readonly string[]) => {
-    let config;
-    try { config = await readCodexEffectiveConfig({ ...options, args }); }
-    catch { throw refusal("the selected CLI cannot verify effective MCP configuration via app-server config/read --strict-config"); }
+  let snapshot;
+  try {
+    snapshot = await readCodexEffectiveConfig({ ...options, includeLayersAndRequirements: true });
+  } catch {
     options.signal?.throwIfAborted();
-    return config;
-  };
-  const initial = await read(options.args);
-  if (!initial) throw refusal("configuration verification was cancelled");
-  const inherited = record(initial.mcp_servers) ?? {};
-  const flags: string[] = [];
+    throw refusal("the selected CLI cannot verify config/read layers and configRequirements/read via app-server --strict-config");
+  }
+  options.signal?.throwIfAborted();
+  if (!snapshot) throw refusal("configuration verification was cancelled");
+  const flags = await projectCodexExecConfig(snapshot, options.env);
+  options.signal?.throwIfAborted();
   const set = (key: string, value: unknown) => flags.push("-c", `${key}=${JSON.stringify(value)}`);
   set("features.apps", false);
-  // Plugin-provided MCP servers are loaded separately from mcp_servers.
   set("features.plugins", false);
-  for (const name of Object.keys(inherited)) {
-    if (!/^[A-Za-z0-9_-]+$/.test(name)) throw refusal("an MCP registration has a name that cannot be safely overridden");
-    if (!Object.hasOwn(binding.servers, name)) set(`mcp_servers.${name}.enabled`, false);
-  }
+  set("features.shell_snapshot", false);
   for (const [name, server] of Object.entries(binding.servers)) {
     const prefix = `mcp_servers.${name}`;
     set(`${prefix}.command`, server.command);
@@ -86,31 +75,23 @@ export async function bindCodexMcp(options: CodexMcpBindingOptions): Promise<str
     set(`${prefix}.enabled`, options.disabled !== true);
     set(`${prefix}.required`, true);
   }
-  // Config flags are global to exec/resume/fork, before the stdin positional.
-  const args = [...options.args];
-  const exec = args.indexOf("exec");
+  // Drop original config selectors after their effective values were admitted.
+  // Keeping them would reintroduce profiles or transport/env fields on Rex.
+  const exec = options.args.indexOf("exec");
   if (exec < 0) throw refusal("missing exec command");
-  args.splice(args.at(-1) === "-" ? args.length - 1 : args.length, 0, ...flags);
-  const effective = await read(args);
-  const servers = record(effective?.mcp_servers);
-  if (!servers) throw refusal("native configuration omitted the required MCP servers");
-  if (record(effective?.features)?.apps !== false) throw refusal("native configuration did not disable unrelated app tools");
-  if (record(effective?.features)?.plugins !== false) throw refusal("native configuration did not disable plugin tools");
-  for (const [name, value] of Object.entries(servers)) {
-    const server = record(value);
-    if (!Object.hasOwn(binding.servers, name) && server?.enabled !== false) throw refusal("native configuration retained an unrelated MCP server");
+  if (exec !== 0) throw refusal("wrapper prefixes cannot be verified for isolated exec");
+  const args = ["exec"];
+  for (let i = 1; i < options.args.length; i++) {
+    const arg = options.args[i];
+    if (arg === "--strict-config") continue; // Emitted once below for every launch.
+    if (["-p", "--profile"].includes(arg) || /^(--profile=|-p.)/.test(arg)) throw refusal("native profile selection is not verified for isolated exec");
+    if (["-c", "--config", "--enable", "--disable"].includes(arg)) { i++; continue; }
+    if (/^(--config=|--enable=|--disable=|-c.)/.test(arg)) continue;
+    args.push(arg);
   }
-  for (const [name, expected] of Object.entries(binding.servers)) {
-    const server = record(servers[name]);
-    if (!server || server.command !== expected.command || !isDeepStrictEqual(server.args, expected.args) ||
-        server.cwd !== binding.root || server.enabled !== (options.disabled !== true) || server.required !== true ||
-        server.url != null || (server.env != null && Object.keys(record(server.env) ?? { unsafe: true }).length > 0) ||
-        (server.env_vars != null && !isDeepStrictEqual(server.env_vars, [])) ||
-        (server.environment_id != null && server.environment_id !== "local")) {
-      throw refusal(`native ${name} registration is unsafe or bound to another workspace`);
-    }
-  }
-  // Catch replacement during either native read, before the executor spawn.
+  args.splice(args.at(-1) === "-" ? args.length - 1 : args.length, 0, "--ignore-user-config", "--strict-config", ...flags);
+  // The file is still checked after the asynchronous read. Exec consumes only
+  // the in-memory commands above, never the mutable run-owned document.
   readExecutorMcpBinding(options.path, options.cwd);
   return args;
 }

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { writeAgentMcpConfig } from "../../../src/process/agent-mcp-config.js";
 import { bindCodexMcp } from "../../../src/agent/lifecycle/codex-mcp-binding.js";
+import { fixtureSystemLayer } from "../../helpers/codex-system-layer.js";
 
 const native = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock("../../../src/prd/llm-gateway.js", async original => ({
@@ -27,23 +28,27 @@ beforeEach(async () => {
 afterEach(() => { vi.unstubAllEnvs(); rmSync(root, { recursive: true, force: true }); });
 
 function options() { return { binary: "selected-codex", args: ["exec", "resume", "session", "-"], env: {}, cwd, path }; }
-function expected() {
-  const doc = JSON.parse(readFileSync(path, "utf8"));
-  return Object.fromEntries(Object.entries(doc.mcpServers).map(([name, value]) => {
-    const server = value as { command: string; args: string[] };
-    return [name, { command: server.command, args: server.args, cwd, enabled: true, required: true }];
-  }));
+function snapshot(config: Record<string, unknown> = {}) {
+  return { config, requirements: null, userAgent: "n-dx/0.167.0-alpha.3.2",
+    layers: [{ name: { type: "user", file: "/fixture/config.toml", profile: null }, version: "fixture", config }, fixtureSystemLayer] };
 }
 describe("Codex executor MCP binding", () => {
-  it("disables unrelated registrations and verifies canonical required servers without dropping user config", async () => {
-    native.read.mockResolvedValueOnce({ mcp_servers: { rex: { command: "wrong" }, unrelated: { command: "never" } } })
-      .mockResolvedValueOnce({ features: { apps: false, plugins: false }, mcp_servers: { ...expected(), unrelated: { enabled: false } } });
+  it("excludes mutable operator configuration while retaining selected pins", async () => {
+    native.read.mockResolvedValue(snapshot({ model: "operator-model", mcp_servers: { rex: { command: "wrong" }, unrelated: { command: "never" } } }));
     const args = await bindCodexMcp(options());
-    expect(args).toContain("mcp_servers.unrelated.enabled=false");
+    expect(args).not.toContain("mcp_servers.unrelated.enabled=false");
     expect(args).toContain("features.plugins=false");
-    expect(args).not.toContain("--ignore-user-config");
+    expect(args).toContain("--ignore-user-config");
+    expect(args).toContain('model="operator-model"');
     expect(args).toContain(`mcp_servers.rex.args=${JSON.stringify([cliPath, "rex", "mcp", cwd])}`);
-    expect(native.read).toHaveBeenCalledTimes(2);
+    expect(native.read).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ includeLayersAndRequirements: true }));
+  });
+
+  it("drops inherited transport/env and original config selectors instead of merging them", async () => {
+    native.read.mockResolvedValue(snapshot({ mcp_servers: { rex: { url: "https://foreign.invalid", env: { CANARY: "private" } } } }));
+    const args = await bindCodexMcp({ ...options(), args: ["exec", "-c", 'mcp_servers.rex.url="https://foreign.invalid"', "-"] });
+    expect(args.join(" ")).not.toMatch(/foreign|CANARY/);
+    expect(args).toContain("--ignore-user-config");
   });
 
   it.each(["missing", "malformed", "wrong-workspace", "unsafe", "unreadable"])("refuses %s binding before any native launch", async kind => {
@@ -60,32 +65,22 @@ describe("Codex executor MCP binding", () => {
     expect(native.read).not.toHaveBeenCalled();
   });
 
-  it.each(["extra-server", "wrong-workspace", "env", "url", "missing", "disabled"])("rejects an unsafe native result: %s", async kind => {
-    const servers = expected();
-    if (kind === "extra-server") Object.assign(servers, { surprise: { enabled: true } });
-    if (kind === "wrong-workspace") servers.rex.args[3] = join(root, "anchor");
-    if (kind === "env") Object.assign(servers.rex, { env: { NODE_OPTIONS: "--require=foreign" } });
-    if (kind === "url") Object.assign(servers.rex, { url: "http://foreign.invalid" });
-    if (kind === "missing") delete servers.sourcevision;
-    if (kind === "disabled") servers.rex.enabled = false;
-    native.read.mockResolvedValueOnce({ mcp_servers: {} }).mockResolvedValueOnce({ features: { apps: false, plugins: false }, mcp_servers: servers });
-    await expect(bindCodexMcp(options())).rejects.toThrow(/Codex MCP binding/);
-  });
-
-  it("refuses a native config that keeps plugin tools enabled", async () => {
-    native.read.mockResolvedValueOnce({}).mockResolvedValueOnce({
-      features: { apps: false, plugins: true }, mcp_servers: expected(),
+  it.each(["missing", "malformed", "foreign"])("revalidates a binding changed during native admission: %s", async kind => {
+    native.read.mockImplementationOnce(() => {
+      if (kind === "missing") rmSync(path);
+      else writeFileSync(path, kind === "malformed" ? "not-json" : "{}");
+      return snapshot();
     });
-    await expect(bindCodexMcp(options())).rejects.toThrow(/plugin tools/);
+    await expect(bindCodexMcp(options())).rejects.toThrow(/Codex MCP binding/);
   });
 
   it.each(["during read", "during cleanup"])("preserves cancellation %s of final native verification", async when => {
     const { spawnWithAdapter } = await import("../../../src/agent/lifecycle/cli-loop.js");
     const { codexCliAdapter } = await import("../../../src/agent/lifecycle/adapters/codex-cli-adapter.js");
     const abort = new AbortController();
-    native.read.mockResolvedValueOnce({}).mockImplementationOnce(() => {
+    native.read.mockImplementationOnce(() => {
       abort.abort(new Error("interrupted during verification"));
-      if (when === "during cleanup") return { features: { apps: false, plugins: false }, mcp_servers: expected() };
+      if (when === "during cleanup") return snapshot();
     });
     const result = await spawnWithAdapter({
       adapter: codexCliAdapter, cliBinary: join(root, "absent-executor"), cwd, cliEnv: { CODEX_HOME: root },
@@ -93,7 +88,7 @@ describe("Codex executor MCP binding", () => {
         codexMcpBinding: { path, disabled: false } },
       abortSignal: abort.signal, tokenMetadata: { vendor: "codex", model: "fixture" },
     });
-    expect(native.read).toHaveBeenCalledTimes(2);
+    expect(native.read).toHaveBeenCalledTimes(1);
     expect(result.aborted?.reason).toBe("interrupted during verification");
   });
 });

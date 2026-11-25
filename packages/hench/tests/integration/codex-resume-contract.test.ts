@@ -198,9 +198,8 @@ describe("codex batch resume — contract", () => {
     // Exact, not "contains": a resume that also carried `-s`/`--approve-for-me`
     // dies on codex's own argument parsing, and one that carried `--last` would
     // capture whichever session the machine touched most recently. The first
-    // two `-c` overrides re-apply the run's policy, which a resumed thread
-    // does not keep; the rest keep the Codex credentials out of the resumed
-    // agent's commands.
+    // admitted `-c` overrides re-apply the run's policy, which a resumed thread
+    // does not keep; ignored user config excludes late MCP registrations.
     const tmpFlag = cli.invocations[0]!.args.find(arg => arg.startsWith("shell_environment_policy.set.TMPDIR="));
     const scratch = JSON.parse(tmpFlag!.slice("shell_environment_policy.set.TMPDIR=".length));
     expect(scratch).toMatch(/ndx-codex-scratch-/);
@@ -211,18 +210,21 @@ describe("codex batch resume — contract", () => {
       THREAD,
       "--json",
       "--skip-git-repo-check",
-      "-c", 'sandbox_mode="workspace-write"',
-      "-c", 'approval_policy="never"',
+      "--ignore-user-config",
       "--strict-config",
-      "-c", `sandbox_workspace_write={network_access=false,writable_roots=[${JSON.stringify(scratch)}],exclude_tmpdir_env_var=true,exclude_slash_tmp=true}`,
+      "-c", 'approval_policy="never"',
+      "-c", 'sandbox_mode="workspace-write"',
+      "-c", `sandbox_workspace_write={"writable_roots"=[${JSON.stringify(scratch)}],"network_access"=false,"exclude_tmpdir_env_var"=true,"exclude_slash_tmp"=true}`,
       "-c", `shell_environment_policy.set.TMPDIR=${JSON.stringify(scratch)}`,
       "-c", `shell_environment_policy.set.TMP=${JSON.stringify(scratch)}`,
       "-c", `shell_environment_policy.set.TEMP=${JSON.stringify(scratch)}`,
-      "-c", "shell_environment_policy.set.OPENAI_API_KEY=''",
-      "-c", "shell_environment_policy.set.CODEX_API_KEY=''",
-      "-c", "shell_environment_policy.set.CODEX_ACCESS_TOKEN=''",
+      "-c", 'shell_environment_policy.set.OPENAI_API_KEY=""',
+      "-c", 'shell_environment_policy.set.CODEX_API_KEY=""',
+      "-c", 'shell_environment_policy.set.CODEX_ACCESS_TOKEN=""',
+      "-c", 'model_provider="openai"',
       "-c", "features.apps=false",
       "-c", "features.plugins=false",
+      "-c", "features.shell_snapshot=false",
       ...[["rex", "rex"], ["sourcevision", "sv"]].flatMap(([name, command]) => [
         "-c", `mcp_servers.${name}.command=${JSON.stringify(process.execPath)}`,
         "-c", `mcp_servers.${name}.args=${JSON.stringify([realpathSync(process.env.NDX_CLI_PATH!), command, "mcp", realpathSync(projectDir)])}`,

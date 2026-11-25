@@ -15,6 +15,9 @@ interface ScratchEnvironmentOptions {
   scratchDir: string;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** Return { config, layers, requirements } after the separate requirements RPC.
+   * Missing metadata is an error, never evidence of an unmanaged installation. */
+  includeLayersAndRequirements?: boolean;
 }
 
 const TEMP_NAMES = ["TMPDIR", "TMP", "TEMP"];
@@ -100,6 +103,7 @@ export async function readCodexEffectiveConfig(
     let stderrTail = "";
     let rejectedSelector: string | undefined;
     let config: Record<string, unknown> | undefined;
+    let userAgent: unknown;
     const finish = (error?: Error, reason: "unknown" | "not-found" = "unknown"): void => {
       if (done) return;
       done = true;
@@ -111,7 +115,10 @@ export async function readCodexEffectiveConfig(
       void terminateProcessTree(child, { forceKillTimeoutMs: 250, scanTimeoutMs: 500 })
         .then(settle, () => reject(new ClaudeClientError(UNVERIFIED, "unknown", false)));
     };
-    const abort = () => finish(); // The caller owns cancellation's original result.
+    const abort = () => {
+      config = undefined; // A pending requirements read has only a partial snapshot.
+      finish();
+    };
     const timer = setTimeout(() => finish(new Error(UNVERIFIED)), options.timeoutMs ?? 5000);
     options.signal?.addEventListener("abort", abort, { once: true });
     const send = (message: unknown) => child?.stdin?.write(`${JSON.stringify(message)}\n`);
@@ -155,16 +162,25 @@ export async function readCodexEffectiveConfig(
         buffer = buffer.slice(newline + 1);
         try {
           const message = record(JSON.parse(line));
-          if (message?.id !== (initialized ? 2 : 1)) continue;
+          if (message?.id !== (initialized ? (config ? 3 : 2) : 1)) continue;
           const result = record(message.result);
           if (message.error || !result) throw new Error(UNVERIFIED);
           if (!initialized) {
             initialized = true;
+            userAgent = result.userAgent;
             send({ method: "initialized", params: {} });
-            send({ id: 2, method: "config/read", params: { cwd: options.cwd, includeLayers: false } });
-          } else {
+            send({ id: 2, method: "config/read", params: { cwd: options.cwd, includeLayers: options.includeLayersAndRequirements === true } });
+          } else if (!config) {
             config = record(result.config);
             if (!config) throw new Error(UNVERIFIED);
+            if (options.includeLayersAndRequirements) {
+              if (!Array.isArray(result.layers)) throw new Error(UNVERIFIED);
+              config = { config, layers: result.layers, userAgent };
+              send({ id: 3, method: "configRequirements/read", params: {} });
+            } else finish();
+          } else {
+            if (!Object.hasOwn(result, "requirements")) throw new Error(UNVERIFIED);
+            config.requirements = result.requirements;
             finish();
           }
         } catch (error) {

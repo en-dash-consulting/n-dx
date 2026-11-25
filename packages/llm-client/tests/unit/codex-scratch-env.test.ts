@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { assertCodexScratchEnvironment } from "../../src/codex-scratch-env.js";
+import { assertCodexScratchEnvironment, readCodexEffectiveConfig } from "../../src/codex-scratch-env.js";
 
 const mocks = vi.hoisted(() => ({ spawn: vi.fn(), stop: vi.fn() }));
 vi.mock("../../src/exec.js", async importOriginal => ({
@@ -10,7 +10,7 @@ vi.mock("../../src/exec.js", async importOriginal => ({
 vi.mock("../../src/process-tree.js", () => ({ terminateProcessTree: mocks.stop }));
 afterEach(() => vi.restoreAllMocks());
 
-function fixture(config: unknown) {
+function fixture(config: unknown, requirements: unknown = { requirements: null }) {
   const child = Object.assign(new EventEmitter(), {
     stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(),
   });
@@ -19,7 +19,8 @@ function fixture(config: unknown) {
     const message = JSON.parse(String(chunk));
     messages.push(message);
     if (message.id) queueMicrotask(() => child.stdout.write(JSON.stringify({ id: message.id,
-      result: message.method === "initialize" ? {} : { config },
+      result: message.method === "initialize" ? { userAgent: "fixture/0.167.0-alpha.3.2" }
+        : message.method === "configRequirements/read" ? requirements : { config, layers: [] },
     }) + "\n"));
   });
   mocks.spawn.mockReset().mockReturnValue(child);
@@ -33,6 +34,48 @@ const options = { binary: "selected-codex", cwd: "/project", env: { PATH: "/trus
   scratchDir: temp.TMPDIR, timeoutMs: 100 };
 
 describe("Codex effective scratch environment preflight", () => {
+  it("reads actual requirements separately with layers enabled, never a model thread", async () => {
+    const { messages } = fixture({ model: "fixture" });
+    const result = await readCodexEffectiveConfig({ ...options, includeLayersAndRequirements: true });
+    expect(result).toEqual({ config: { model: "fixture" }, layers: [], requirements: null, userAgent: "fixture/0.167.0-alpha.3.2" });
+    expect(messages.map(m => [m.method, m.params])).toContainEqual(["config/read", { cwd: options.cwd, includeLayers: true }]);
+    expect(messages.at(-1)).toMatchObject({ method: "configRequirements/read", params: {} });
+  });
+
+  it("does not normalize absent requirements to unmanaged", async () => {
+    fixture({}, { supportsIndependentSpeedModes: true });
+    await expect(readCodexEffectiveConfig({ ...options, includeLayersAndRequirements: true })).rejects.toThrow(/Cannot verify/);
+  });
+
+  it("returns no snapshot when cancelled between config/read and the requirements reply", async () => {
+    const { child } = fixture({});
+    child.stdin.removeAllListeners("data");
+    const controller = new AbortController();
+    const pending = readCodexEffectiveConfig({ ...options, includeLayersAndRequirements: true, signal: controller.signal });
+    child.stdout.write('{"id":1,"result":{}}\n');
+    child.stdout.write('{"id":2,"result":{"config":{},"layers":[]}}\n');
+    controller.abort();
+    await expect(pending).resolves.toBeUndefined();
+    expect(mocks.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["unsupported", "malformed", "exit"])("refuses a %s requirements RPC without exposing its diagnostic", async kind => {
+    const { child } = fixture({});
+    child.stdin.removeAllListeners("data");
+    child.stdin.on("data", chunk => {
+      const message = JSON.parse(String(chunk));
+      if (!message.id) return;
+      queueMicrotask(() => {
+        if (message.id === 1) child.stdout.write('{"id":1,"result":{}}\n');
+        if (message.id === 2) child.stdout.write('{"id":2,"result":{"config":{},"layers":[]}}\n');
+        if (message.id === 3) {
+          if (kind === "exit") child.emit("close", 1);
+          else child.stdout.write(kind === "unsupported" ? '{"id":3,"error":{"message":"private-canary"}}\n' : 'private-canary\n');
+        }
+      });
+    });
+    await expect(readCodexEffectiveConfig({ ...options, includeLayersAndRequirements: true })).rejects.toThrow(UNVERIFIED_PATTERN);
+  });
   it.each([undefined, [], ["PATH", "TMPDIR", "TMP", "TEMP"], ["*"]].map(include_only => ({ include_only })))("accepts usable temp with $include_only", async ({ include_only }) => {
     const config = { shell_environment_policy: { set: temp, include_only, exclude: ["PRIVATE_VALUE"] } };
     const before = JSON.stringify(config);
