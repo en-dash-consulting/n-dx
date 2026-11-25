@@ -11,7 +11,7 @@ items:
     activeIntervals: [{"end":"2026-11-25T01:13:45.768Z","start":"2026-11-25T00:51:55.458Z"},{"end":"2026-11-25T05:44:52.796Z","start":"2026-11-25T05:42:34.976Z"},{"end":"2026-11-25T06:09:57.258Z","start":"2026-11-25T05:47:51.963Z"},{"end":"2026-11-25T06:52:57.990Z","start":"2026-11-25T06:15:17.706Z"}]
     failureReason: "Run 36892404-a0d4-4e86-889d-c669957dc4e4 failed its enabled gate under confinement. Required fresh distinct gpt-6.2-astra review fixed system authority, duplicate strict-config and partial cancellation metadata; repair commit a1644dc6485fd14d118dd67b19b6137e4b1ca399. Stable host native fixture passed all11 (scripted provider/direct MCP; no actual-account or reviewer/proof acceptance). Actual selected-production-config preflight refuses explicit user-layer desktop setting; values not exposed. No fallback/userconfig change allowed. Whole-owned-diff hostgate and actual compatibility remediation remain required; reviewer/proof tasks stay pending."
     assignee: "codex-hardening-pr-1"
-    lastModified: "2026-11-25T06:54:52.441Z"
+    lastModified: "2026-11-25T07:00:47.320Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5d599339-5a76-42db-a124-5d816c4161b8":
     assignee: "codex-hardening-pr-1"
