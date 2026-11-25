@@ -958,14 +958,28 @@ const ORCHESTRATOR_HELP_DEFS = {
       'ndx add "<description>" ["<desc2>"]',
       "ndx add --file=<path> [dir]",
       "echo \"desc\" | ndx add [dir]",
+      'ndx add <level> --title="..." [--parent=<id>] [--criterion="..."] [--blocked-by=<id,...>] [dir]',
+    ],
+    sections: [
+      {
+        title: "Manual mode",
+        content:
+          "--title adds one item exactly as written and skips the smart-add model call.\n" +
+          "--parent, --criterion and --blocked-by apply only in manual mode.",
+      },
     ],
     options: [
       { flag: "--file=<path>", description: "Import ideas from a freeform text file (repeatable)" },
       { flag: "--model=<name>", description: "Override LLM model for smart-add" },
+      { flag: "--title=\"...\"", description: "Manual mode: the item's title (no model call)" },
+      { flag: "--parent=<id>", description: "Manual mode: parent item ID to nest under" },
+      { flag: "--criterion=\"...\"", description: "Manual mode: acceptance criterion (repeatable, one per flag)" },
+      { flag: "--blocked-by=<id,...>", description: "Manual mode: IDs this item waits on (comma-separated or repeated)" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
     examples: [
       { command: 'ndx add "Add user authentication"', description: "Smart-add from description" },
+      { command: 'ndx add task --title="Login form" --parent=abc --criterion="Rejects an empty password" --blocked-by=t1', description: "Manually add a task with no model call" },
       { command: "ndx add epic", description: "Manually add an epic" },
       { command: "ndx add --file=ideas.md .", description: "Import from a text file" },
       { command: 'echo "dark mode" | ndx add', description: "Pipe description via stdin" },

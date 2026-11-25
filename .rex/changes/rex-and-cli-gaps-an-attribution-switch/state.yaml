@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "1ce411dd-e1a5-4039-936d-bea861c3fc76":
-    lastModified: "2026-11-25T04:53:06.613Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:24:15.974Z"
+    completedAt: "2026-11-25T06:28:53.791Z"
+    endedAt: "2026-11-25T06:28:53.791Z"
+    activeIntervals: [{"end":"2026-11-25T06:28:53.791Z","start":"2026-11-25T06:24:15.974Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "--blocked-by alias in a new rex cli/parse-args.ts (repeatable and comma-separated; empty value clears on update); rex add/update help and ndx add --help manual mode documented. Commit fc1a6ceb8."
+    lastModified: "2026-11-25T06:28:53.791Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "62ca04e7-cd6b-45fc-aacc-b206c0d217d2":
     createdAt: "2026-11-25T04:52:23.431Z"

@@ -138,6 +138,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--summarize", description: "v2 JSON preview of a description add: draft each change's plain-language summary with the light-tier model" },
       { flag: "--description=\"...\"", description: "Item description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion (done when) for this item, manual mode only (repeatable, one per flag); not a capability criterion" },
+      { flag: "--blocked-by=<id,...>", description: "IDs this item waits on, manual mode only (comma-separated or repeated; --blockedBy also accepted)" },
       { flag: "--type=<type>", description: "v2 only: change (default), task or subtask" },
       { flag: "--area=<id|slug>", description: "v2 only: suggest placement among this area's capabilities and constraints only" },
       { flag: "--source=\"...\"", description: "Item source, manual mode only (e.g. ndx-capture)" },
@@ -149,6 +150,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex add epic --title=\"User auth\"", description: "Add an epic manually" },
       { command: "rex add task --title=\"Login form\" --parent=abc", description: "Add a task under a parent" },
       { command: "rex add task --title=\"Login form\" --parent=abc --criterion=\"Rejects an empty password\" --criterion=\"Locks after 5 failures\" --source=ndx-capture", description: "Add a task with acceptance criteria and a source" },
+      { command: "rex add task --title=\"Checkout page\" --parent=abc --blocked-by=t1,t2", description: "Add a task that waits on two others" },
       { command: "rex add \"Add dark mode support\"", description: "Smart add from description" },
       { command: "rex add --file=ideas.txt --file=notes.md .", description: "Import from multiple files" },
       { command: "rex add --title=\"Refund card payments\" --criterion=\"A refund reaches the card\"", description: "v2: add a change to the Inbox with acceptance criteria" },
@@ -256,7 +258,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "update an existing PRD item",
     usage: "rex update <id> [options] [dir]",
     description:
-      "Modify the status, priority, title, summary, description, acceptance criteria, source, or assignee of a PRD item.\n" +
+      "Modify the status, priority, title, summary, description, acceptance criteria, dependencies, source, or assignee of a PRD item.\n" +
       "Status transitions are validated (e.g. completed → pending requires --force).",
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },
@@ -265,6 +267,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--summary=\"...\"", description: "New plain-language summary (what the work does and why it is worth doing); --summary= removes it" },
       { flag: "--description=\"...\"", description: "New description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion; repeat per criterion. Replaces the whole list; --criterion= on its own clears it" },
+      { flag: "--blocked-by=<id,...>", description: "IDs this item waits on (comma-separated or repeated; replaces the list); --blocked-by= clears it. --blockedBy also accepted" },
       { flag: "--source=\"...\"", description: "Where the item came from; --source= removes it" },
       { flag: "--assignee=\"...\"", description: "Who the item belongs to, matched by 'ndx work --mine' and inherited by children; --assignee= removes it" },
       { flag: "--reason=\"...\"", description: "Failure reason (when setting status to failing)" },
@@ -275,6 +278,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex update abc123 --run='{\"tier\":\"heavy\",\"review\":true}'", description: "Save a portable model tier and review on a task" },
       { command: "rex update abc123 --run='{\"tier\":\"heavy\",\"models\":{\"claude\":\"claude-opus-5-5\",\"codex\":\"gpt-6-astra\"}}'", description: "Also pin an exact model per vendor" },
       { command: "rex update abc123 --criterion=\"Rejects an empty password\" --criterion=\"Locks after 5 failures\"", description: "Replace a task's acceptance criteria" },
+      { command: "rex update abc123 --blocked-by=t1,t2", description: "Make a task wait on two others" },
+      { command: "rex update abc123 --blocked-by=", description: "Clear a task's dependencies" },
       { command: "rex update abc123 --run=null", description: "Remove a task's saved run settings" },
       { command: "rex update abc123 --status=completed", description: "Mark a task as done" },
       { command: "rex update abc123 --status=in_progress", description: "Start working on a task" },

@@ -41,6 +41,8 @@ rex add task --title="..." --criterion="..." --criterion="..." --source="..." . 
 rex update <id> --status=completed . # update item
 rex update <id> --criterion="..." --criterion="..." .  # replace acceptance criteria
 rex update <id> --criterion= .       # clear acceptance criteria
+rex add task --title="..." --blocked-by=<id>,<id> .  # add a task that waits on others (repeatable)
+rex update <id> --blocked-by= .      # clear dependencies (--blockedBy is also accepted)
 rex update <id> --run='{"tier":"heavy","models":{"claude":"claude-opus-5-5"},"review":true}' .  # save run settings (replaces the whole block)
 rex update <id> --run=null .         # clear saved run settings (--run= does the same)
 rex move <id> --parent=<parent-id> . # reparent item
