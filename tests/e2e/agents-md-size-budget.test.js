@@ -35,10 +35,11 @@
  * @see packages/core/assistant-assets.js — `renderAgentsMd`
  */
 
-import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { describe, it, expect, afterAll } from "vitest";
+import { readFileSync, existsSync, readdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { renderAgentsMd } from "../../packages/core/assistant-assets.js";
+import { tmpdir } from "node:os";
+import { renderAgentsMd, renderClaudeMd } from "../../packages/core/assistant-assets.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -155,5 +156,38 @@ describe("AGENTS.md stays inside Codex's project-doc budget", () => {
     const nested = nestedAgentsFiles(bytes(renderAgentsMd(ROOT)));
     expect(nested.length).toBeGreaterThanOrEqual(4);
     for (const pkg of nested) expect(pkg.size, pkg.name).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * A consumer project (anything that is not an n-dx checkout) gets
+ * consumer-guidance.md, which its assistant pays for on every turn. It is a
+ * short "how to use n-dx here" block, not a codebase guide; these budgets keep
+ * it one, far below Codex's ceiling, so the project's own guidance has room.
+ */
+describe("consumer projects get short instruction files", () => {
+  const CONSUMER_CLAUDE_BUDGET = 4 * 1024;
+  const CONSUMER_AGENTS_BUDGET = 8 * 1024;
+  const dir = mkdtempSync(join(tmpdir(), "ndx-consumer-budget-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("renders a consumer CLAUDE.md under its budget", () => {
+    const text = renderClaudeMd(dir);
+    expect(text).toContain("# Working with n-dx in this repository");
+    expect(
+      bytes(text),
+      `The consumer CLAUDE.md is ${bytes(text)} bytes, over ${CONSUMER_CLAUDE_BUDGET}. ` +
+        "Shorten packages/core/assistant-assets/consumer-guidance.md or consumer-claude-addendum.md.",
+    ).toBeLessThanOrEqual(CONSUMER_CLAUDE_BUDGET);
+  });
+
+  it("renders a consumer AGENTS.md under its budget", () => {
+    const text = renderAgentsMd(dir);
+    expect(text).toContain("# Working with n-dx in this repository");
+    expect(
+      bytes(text),
+      `The consumer AGENTS.md is ${bytes(text)} bytes, over ${CONSUMER_AGENTS_BUDGET}. ` +
+        "Shorten packages/core/assistant-assets/consumer-guidance.md or the manifest-derived sections.",
+    ).toBeLessThanOrEqual(CONSUMER_AGENTS_BUDGET);
   });
 });

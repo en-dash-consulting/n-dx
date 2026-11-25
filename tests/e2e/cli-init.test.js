@@ -543,8 +543,9 @@ describe("ndx init --no-llm", () => {
    * Fake `claude` and `codex` record any spawn; every node process records any
    * fetch; a fresh TMPDIR leaves the update check no cache to answer from.
    */
-  async function initNoLlm(prefix, extraArgs) {
+  async function initNoLlm(prefix, extraArgs, { git = false } = {}) {
     const projectDir = await mkdtemp(join(tmpdir(), `${prefix}-`));
+    if (git) execFileSync("git", ["init", "-q"], { cwd: projectDir, stdio: "ignore" });
     const binDir = await mkdtemp(join(tmpdir(), `${prefix}-bin-`));
     const tmp = await mkdtemp(join(tmpdir(), `${prefix}-tmp-`));
     const fakes = [join(binDir, "claude"), join(binDir, "codex")];
@@ -638,6 +639,33 @@ describe("ndx init --no-llm", () => {
       expect(recordedVendor(init.projectDir)).toBeUndefined();
       expect(init.result.stdout).toMatch(/Model features\s+not checked \(--no-llm\)/);
     });
+  });
+
+  describe("in a git repository that is not an n-dx checkout", () => {
+    // n-dx's own guidance (package list, tiers, gateways, policy suites) is
+    // for the n-dx monorepo only; any other project gets consumer-guidance.md.
+    const NDX_ONLY = ["Three packages that chain together", "Gateway modules", "four-tier", "tests/e2e/"];
+    let init;
+    beforeAll(async () => {
+      init = await initNoLlm("ndx-init-nollm-consumer", ["--no-commit"], { git: true });
+    });
+    afterAll(async () => {
+      await init.cleanup();
+    });
+
+    it("succeeds", () => {
+      expect(init.result.status, init.result.stderr).toBe(0);
+    });
+
+    for (const file of ["CLAUDE.md", "AGENTS.md"]) {
+      it(`writes the consumer guidance to ${file}, filled with the project's layout`, () => {
+        const text = readFileSync(join(init.projectDir, file), "utf-8");
+        expect(text).toContain("# Working with n-dx in this repository");
+        expect(text).toContain("`.ndx/rex/product/`");
+        expect(text).not.toMatch(/\{\{\w+\}\}/);
+        for (const phrase of NDX_ONLY) expect(text, `${file} contains "${phrase}"`).not.toContain(phrase);
+      });
+    }
   });
 
   it("is documented in ndx init --help", () => {

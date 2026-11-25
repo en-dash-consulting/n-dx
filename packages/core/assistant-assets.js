@@ -316,6 +316,69 @@ export function getCodexTroubleshooting() {
   return readFileSync(join(ASSET_DIR, "codex-troubleshooting.md"), "utf-8").replace(/\r\n/g, "\n");
 }
 
+/**
+ * The project-neutral guidance every project gets unless it is an n-dx
+ * checkout (see {@link usesNdxGuidance}). Its `{{rexDir}}`-style placeholders are filled from the project layout.
+ *
+ * @returns {string}
+ */
+export function getConsumerGuidance() {
+  return readFileSync(join(ASSET_DIR, "consumer-guidance.md"), "utf-8").replace(/\r\n/g, "\n");
+}
+
+/**
+ * @returns {string}
+ */
+export function getConsumerClaudeAddendum() {
+  return readFileSync(join(ASSET_DIR, "consumer-claude-addendum.md"), "utf-8").replace(/\r\n/g, "\n");
+}
+
+/**
+ * Whether a project is an n-dx checkout, and so gets n-dx's own guidance
+ * (`project-guidance.md`) rather than the consumer guidance. Detected from
+ * the checkout's files, not from config: the guidance source itself is
+ * present at `packages/core/assistant-assets/project-guidance.md`. No config
+ * key is read, so a run never has to write one, and every clone and worktree
+ * of n-dx renders the same files.
+ *
+ * @param {string} projectDir
+ * @returns {boolean}
+ */
+export function usesNdxGuidance(projectDir) {
+  return existsSync(
+    join(projectDir, "packages", "core", "assistant-assets", "project-guidance.md"),
+  );
+}
+
+/**
+ * The guidance, Claude addendum and Codex troubleshooting text for a project.
+ * Consumer projects get no troubleshooting section: it points into n-dx's
+ * sources.
+ *
+ * @param {string} projectDir
+ * @returns {{ guidance: string, addendum: string, troubleshooting: string }}
+ */
+function guidanceFor(projectDir) {
+  if (usesNdxGuidance(projectDir)) {
+    return {
+      guidance: getProjectGuidance(),
+      addendum: getClaudeAddendum(),
+      troubleshooting: getCodexTroubleshooting(),
+    };
+  }
+  const layout = resolveLayout(projectDir);
+  const paths = {
+    rexDir: relativeToRoot(layout, layout.rexDir),
+    sourcevisionDir: relativeToRoot(layout, layout.sourcevisionDir),
+    henchDir: relativeToRoot(layout, layout.henchDir),
+    configFile: relativeToRoot(layout, layout.configFile),
+  };
+  const guidance = getConsumerGuidance().replace(/\{\{(\w+)\}\}/g, (match, key) =>
+    Object.hasOwn(paths, key) ? paths[key] : match,
+  );
+  return { guidance, addendum: getConsumerClaudeAddendum(), troubleshooting: "" };
+}
+
 // ── Section filtering ────────────────────────────────────────────────────────
 
 /**
@@ -341,21 +404,127 @@ function filterSections(content, exclude) {
   return result.join("\n");
 }
 
+// ── Managed block ────────────────────────────────────────────────────────────
+//
+// `ndx init` owns only the text between these markers in CLAUDE.md and
+// AGENTS.md. Everything outside them belongs to the project and is never
+// rewritten, so a project can keep its own guidance beside n-dx's.
+
+/** First line of the block `ndx init` owns in an instruction file. */
+// Short on purpose: it counts against Codex's AGENTS.md byte budget
+// (tests/e2e/agents-md-size-budget.test.js).
+export const MANAGED_BLOCK_BEGIN = "<!-- ndx:begin — do not edit manually; re-run ndx init to update -->";
+
+/** Last line of the block `ndx init` owns in an instruction file. */
+export const MANAGED_BLOCK_END = "<!-- ndx:end -->";
+
+/**
+ * Wrap generated content in the managed-block markers. The result ends with
+ * the end marker and no newline, so splicing it in leaves the bytes after the
+ * old block untouched.
+ *
+ * @param {string} body
+ * @returns {string}
+ */
+function wrapManagedBlock(body) {
+  return `${MANAGED_BLOCK_BEGIN}\n${body.replace(/\s*$/, "\n")}${MANAGED_BLOCK_END}`;
+}
+
+/**
+ * Locate the managed block in `text`: the first end marker that follows a
+ * begin marker (at the start of a line), paired with the nearest begin marker
+ * before it. Pairing from the end means a stray begin marker the project left
+ * above the block is never swallowed into it.
+ *
+ * @param {string} text
+ * @returns {{ start: number, end: number } | null}  `end` is exclusive and
+ *   stops after the end marker.
+ */
+function findManagedBlock(text) {
+  const beginRe = /^<!-- ndx:begin\b[^\n]*?-->/gm;
+  let start = -1;
+  let from = 0;
+  for (let m = beginRe.exec(text); m; m = beginRe.exec(text)) {
+    const endAt = text.indexOf(MANAGED_BLOCK_END, m.index + m[0].length);
+    if (endAt === -1) break;
+    const nextBegin = beginRe.exec(text);
+    if (!nextBegin || nextBegin.index > endAt) {
+      start = m.index;
+      from = endAt;
+      break;
+    }
+    beginRe.lastIndex = nextBegin.index;
+  }
+  if (start === -1) return null;
+  return { start, end: from + MANAGED_BLOCK_END.length };
+}
+
+/**
+ * The managed block in an instruction file, markers included, or `null` when
+ * the file has none. Line endings are normalised to LF.
+ *
+ * @param {string} text
+ * @returns {string | null}
+ */
+export function extractManagedBlock(text) {
+  const normalised = text.replace(/\r\n/g, "\n");
+  const span = findManagedBlock(normalised);
+  return span ? normalised.slice(span.start, span.end) : null;
+}
+
+/**
+ * Put `block` into an instruction file's existing text.
+ *
+ * - No file (`existing` null): the block alone.
+ * - A file with markers: only the old block is replaced; the bytes before
+ *   and after it are kept as they are.
+ * - A file without markers: its text is kept and the block follows it.
+ *
+ * @param {string | null} existing  Current file content, or null when absent.
+ * @param {string} block  Output of a render function (markers included).
+ * @returns {string}
+ */
+export function spliceManagedBlock(existing, block) {
+  if (existing == null || existing.trim() === "") return `${block}\n`;
+  const span = findManagedBlock(existing);
+  if (span) return existing.slice(0, span.start) + block + existing.slice(span.end);
+  const separator = existing.endsWith("\n") ? "\n" : "\n\n";
+  return `${existing}${separator}${block}\n`;
+}
+
+/**
+ * Write `block` into the instruction file at `path` with
+ * {@link spliceManagedBlock}, leaving the project's own text alone. The file is
+ * not rewritten when the result is unchanged.
+ *
+ * @param {string} path
+ * @param {string} block
+ * @returns {{ written: boolean, path: string, changed: boolean }}
+ */
+export function writeManagedBlock(path, block) {
+  const existing = existsSync(path) ? readFileSync(path, "utf-8") : null;
+  const next = spliceManagedBlock(existing, block);
+  const changed = next !== existing;
+  if (changed) writeFileSync(path, next);
+  return { written: true, path, changed };
+}
+
 // ── CLAUDE.md rendering ──────────────────────────────────────────────────────
 
 /**
+ * Render `CLAUDE.md` for a project: its guidance (see {@link usesNdxGuidance})
+ * with the matching Claude addendum at the `<!-- ADDENDUM -->` marker.
+ *
+ * @param {string} [projectDir]  Project root; defaults to the working directory
+ *   like {@link renderAgentsMd}.
  * @returns {string}
  */
-export function renderClaudeMd() {
-  const guidance = getProjectGuidance();
-  const addendum = getClaudeAddendum();
+export function renderClaudeMd(projectDir = process.cwd()) {
+  const { guidance, addendum } = guidanceFor(projectDir);
 
   const body = guidance.replace(/<!-- ADDENDUM -->\r?\n/, addendum + "\n");
 
-  return (
-    "<!-- Generated by ndx init — do not edit manually. Re-run `ndx init` to regenerate. -->\n" +
-    body
-  );
+  return wrapManagedBlock(body);
 }
 
 // ── AGENTS.md rendering ─────────────────────────────────────────────────────
@@ -381,18 +550,13 @@ export function renderAgentsMd(projectDir = process.cwd()) {
   const skills = manifest.skills;
   const servers = manifest.mcpServers;
 
-  const guidance = getProjectGuidance();
+  const { guidance, troubleshooting } = guidanceFor(projectDir);
   const filteredGuidance = filterSections(
     guidance.replace(/<!-- ADDENDUM -->\r?\n/, ""),
     new Set(["MCP Servers", "Development Workflow"]),
   );
 
   const sections = [];
-
-  sections.push(
-    "<!-- Generated by ndx init — do not edit manually. Re-run `ndx init` to regenerate. -->",
-    "",
-  );
 
   sections.push(filteredGuidance.trim(), "");
 
@@ -486,10 +650,9 @@ export function renderAgentsMd(projectDir = process.cwd()) {
     "",
   );
 
-  const troubleshooting = getCodexTroubleshooting();
-  sections.push(troubleshooting.trim(), "");
+  if (troubleshooting) sections.push(troubleshooting.trim(), "");
 
-  return sections.join("\n");
+  return wrapManagedBlock(sections.join("\n"));
 }
 
 // ── File-system discovery (for test validation) ─────────────────────────────

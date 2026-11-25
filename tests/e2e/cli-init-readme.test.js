@@ -2,6 +2,8 @@
  * Regression tests for target-repo README generation during `ndx init`.
  *
  * These tests pin the contract for the README generation feature:
+ *   0. Generation is opt-in: without `--readme` init writes no README.md
+ *      and no README.proposed.md, and its summary says nothing about one.
  *   1. When no README variant exists, init writes README.md for the *target*
  *      repo — referencing its manifest name and free of n-dx-flavored
  *      strings.
@@ -10,11 +12,12 @@
  *      instead writes the synthesized content to README.proposed.md.
  *   3. README.proposed.md is overwritten on rerun; the original is still
  *      untouched.
- *   4. The synthesized content (in either output path) contains the four
- *      required sections — Overview, Quick Start, Testing, License — in
- *      that order, with non-empty stubs when their backing manifest fields
- *      are absent. Pinned by the "README section template" describe block
- *      below.
+ *   4. The synthesized content (in either output path) contains Overview,
+ *      Quick Start and Testing — in that order, with non-empty stubs when
+ *      their backing manifest fields are absent — then License, which names
+ *      the declared license, links a license file only when one exists, and
+ *      is omitted when there is neither. Pinned by the "README section
+ *      template" describe block below.
  *
  * The tests run `ndx init` against synthetic target repos in throwaway
  * temp dirs so the assertions stay isolated from the n-dx repo itself.
@@ -115,9 +118,36 @@ describe("ndx init: target-repo README generation", () => {
     );
   }
 
-  function ndxInit() {
-    return run(["init", "--provider=codex", "--no-claude", tmpDir], { env: initEnv });
+  function ndxInit({ readme = true } = {}) {
+    const flags = readme ? ["--readme"] : [];
+    return run(["init", "--provider=codex", "--no-claude", ...flags, tmpDir], { env: initEnv });
   }
+
+  it("writes no README.md and no README.proposed.md without --readme", async () => {
+    await writeManifest("synthetic-target-app");
+
+    const out = ndxInit({ readme: false });
+
+    expect(existsSync(join(tmpDir, "README.md"))).toBe(false);
+    expect(existsSync(join(tmpDir, "README.proposed.md"))).toBe(false);
+    expect(out).not.toMatch(/README/);
+  });
+
+  it("writes no README.proposed.md beside an existing README without --readme", async () => {
+    await writeManifest("synthetic-target-app");
+    const originalBytes = "# Mine\n";
+    await writeFile(join(tmpDir, "README.md"), originalBytes);
+
+    const out = ndxInit({ readme: false });
+
+    expect(await readFile(join(tmpDir, "README.md"), "utf-8")).toBe(originalBytes);
+    expect(existsSync(join(tmpDir, "README.proposed.md"))).toBe(false);
+    expect(out).not.toMatch(/README/);
+  });
+
+  it("lists --readme in ndx init --help", () => {
+    expect(run(["init", "--help"])).toContain("--readme");
+  });
 
   it("writes README.md referencing the target project when no README exists", async () => {
     const projectName = "synthetic-target-app";
@@ -292,7 +322,7 @@ describe("ndx init: README section template", () => {
   }
 
   function ndxInit() {
-    return run(["init", "--provider=codex", "--no-claude", tmpDir], { env: initEnv });
+    return run(["init", "--provider=codex", "--no-claude", "--readme", tmpDir], { env: initEnv });
   }
 
   it("primary README.md contains Overview, Quick Start, Testing, and License sections in order", async () => {
@@ -321,7 +351,7 @@ describe("ndx init: README section template", () => {
     expectNoNdxFlavor(proposed);
   });
 
-  it("emits a non-empty ## License stub when package.json lacks a license field", async () => {
+  it("omits ## License when there is neither a license field nor a license file", async () => {
     await writeRichManifest({ license: undefined });
     // Sanity-check the manifest we wrote actually has no license key.
     const manifest = JSON.parse(
@@ -332,12 +362,40 @@ describe("ndx init: README section template", () => {
     ndxInit();
 
     const readme = await readFile(join(tmpDir, "README.md"), "utf-8");
-    expect(readme).toContain("## License");
-    const body = extractSectionBody(readme, "## License");
-    expect(
-      body.length,
-      "License stub must be non-empty when no license is declared",
-    ).toBeGreaterThan(0);
+    expect(readme).not.toContain("## License");
+    expect(readme).not.toMatch(/see license/i);
+  });
+
+  it("names the declared license without pointing at a missing LICENSE file", async () => {
+    await writeRichManifest({ license: "Apache-2.0" });
+
+    ndxInit();
+
+    const readme = await readFile(join(tmpDir, "README.md"), "utf-8");
+    expect(extractSectionBody(readme, "## License")).toBe("Apache-2.0.");
+    expect(readme).not.toMatch(/see license/i);
+  });
+
+  for (const fileName of ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"]) {
+    it(`links ${fileName} when it exists`, async () => {
+      await writeRichManifest({ license: undefined });
+      await writeFile(join(tmpDir, fileName), "license text\n");
+
+      ndxInit();
+
+      const readme = await readFile(join(tmpDir, "README.md"), "utf-8");
+      expect(extractSectionBody(readme, "## License")).toBe(`See [${fileName}](./${fileName}).`);
+    });
+  }
+
+  it("names the declared license and links the license file when both exist", async () => {
+    await writeRichManifest({ license: "MIT" });
+    await writeFile(join(tmpDir, "LICENSE"), "MIT License\n");
+
+    ndxInit();
+
+    const readme = await readFile(join(tmpDir, "README.md"), "utf-8");
+    expect(extractSectionBody(readme, "## License")).toBe("MIT — see [LICENSE](./LICENSE) for the full text.");
   });
 
   it("emits a non-empty ## Testing stub when no test command is detected", async () => {

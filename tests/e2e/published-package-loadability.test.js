@@ -266,6 +266,16 @@ describe("published-package loadability (pack + extract + import)", () => {
           m.getCodexTroubleshooting();
           m.renderClaudeMd();
           m.renderAgentsMd();
+          // The consumer templates: the extracted package is not an n-dx
+          // checkout, so rendering for it reads them from the tarball.
+          m.getConsumerGuidance();
+          m.getConsumerClaudeAddendum();
+          const consumerDir = ${JSON.stringify(extractDir)};
+          for (const text of [m.renderClaudeMd(consumerDir), m.renderAgentsMd(consumerDir)]) {
+            if (!text.includes("# Working with n-dx in this repository")) {
+              throw new Error("consumer guidance missing from a consumer render");
+            }
+          }
           for (const name of m.getSkillNames()) m.getSkillBody(name);
           process.stdout.write("ok:" + Object.keys(manifest.skills).length);
         `,

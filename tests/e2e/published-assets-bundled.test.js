@@ -26,6 +26,8 @@ describe("@n-dx/core publishes assistant-assets/", () => {
     expect(existsSync(join(ASSET_DIR, "project-guidance.md"))).toBe(true);
     expect(existsSync(join(ASSET_DIR, "claude-addendum.md"))).toBe(true);
     expect(existsSync(join(ASSET_DIR, "codex-troubleshooting.md"))).toBe(true);
+    expect(existsSync(join(ASSET_DIR, "consumer-guidance.md"))).toBe(true);
+    expect(existsSync(join(ASSET_DIR, "consumer-claude-addendum.md"))).toBe(true);
   });
 
   it("package.json `files` array includes the asset directory", () => {
@@ -54,6 +56,8 @@ describe("@n-dx/core publishes assistant-assets/", () => {
     expect(shipped.has("assistant-assets/project-guidance.md")).toBe(true);
     expect(shipped.has("assistant-assets/claude-addendum.md")).toBe(true);
     expect(shipped.has("assistant-assets/codex-troubleshooting.md")).toBe(true);
+    expect(shipped.has("assistant-assets/consumer-guidance.md")).toBe(true);
+    expect(shipped.has("assistant-assets/consumer-claude-addendum.md")).toBe(true);
   });
 
   it("ASSET_DIR resolves to a path inside the core package", () => {

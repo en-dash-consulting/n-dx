@@ -678,6 +678,13 @@ function stripInitGitFlags(args) {
  */
 const INIT_NO_LLM_FLAG = "--no-llm";
 
+/**
+ * `ndx init --readme`: generate a README for the project (README.md, or
+ * README.proposed.md beside an existing one). Without it init writes neither.
+ * The flag is init's, never forwarded.
+ */
+const INIT_README_FLAG = "--readme";
+
 /** The one line `ndx init --no-llm` prints about what it left out. */
 const INIT_NO_LLM_NOTICE =
   "--no-llm: skipped the vendor auth check, the claude CLI lookup for MCP registration and the update check.";
@@ -1332,7 +1339,7 @@ function parseInitFlagSet(rest) {
 function buildInitArgs(rest) {
   return stripInitGitFlags(
     stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest)))),
-  ).filter((a) => a !== INIT_NO_LLM_FLAG);
+  ).filter((a) => a !== INIT_NO_LLM_FLAG && a !== INIT_README_FLAG);
 }
 
 /**
@@ -1701,6 +1708,7 @@ async function handleInit(rest) {
 
   const gitConsent = extractInitGitConsent(rest);
   const commitInit = !rest.includes("--no-commit");
+  const readme = rest.includes(INIT_README_FLAG);
   const initArgs = buildInitArgs(rest);
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
@@ -1778,6 +1786,7 @@ async function handleInit(rest) {
         gitResult,
         gitBefore,
         commitInit,
+        readme,
         // Runs before the init commit, so the identity it writes to the
         // config file is part of that commit rather than left dirty.
         recordIdentity: () => recordInitIdentity(dir),
@@ -1835,14 +1844,17 @@ async function handleInit(rest) {
 
   recordInitIdentity(dir);
 
-  // Generate a target-repo README before assistant artifacts so the user's
-  // project documentation reflects only their own manifest/structure — not
-  // the n-dx tooling files written later in this phase.
+  // `--readme` only: generate a target-repo README before assistant artifacts
+  // so the user's project documentation reflects only their own
+  // manifest/structure — not the n-dx tooling files written later in this phase.
   let readmeResult = null;
-  try {
-    readmeResult = generateTargetReadme(dir);
-  } catch {
-    // Non-fatal — README generation is a best-effort convenience.
+  if (readme) {
+    try {
+      readmeResult = generateTargetReadme(dir);
+    } catch (err) {
+      // Non-fatal — the rest of init does not depend on the README.
+      console.error(`Warning: README generation failed: ${err?.message || err}`);
+    }
   }
 
   const assistantResults = setupAssistantIntegrations(dir, assistantEnabled, { mcpScope: extractInitMcpScope(flags), noVendorCli: noLlm });
@@ -1855,7 +1867,7 @@ async function handleInit(rest) {
   // Commit what init wrote — the baseline in a repository the preflight just
   // created, otherwise only the paths init changed — so the first `ndx work`
   // starts on a clean tree. Done AFTER all writes so the snapshot is complete.
-  const gitCommitResult = finishInitCommit(dir, { gitResult, before: gitBefore, commit: commitInit });
+  const gitCommitResult = finishInitCommit(dir, { gitResult, before: gitBefore, commit: commitInit, readme });
 
   printStaticInitSummary({
     dirLabel, svExists, rexExists, henchExists, llmSkipped, selectedProvider,

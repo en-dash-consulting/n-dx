@@ -1,15 +1,43 @@
 schema: "rex/v2"
 items:
   "0219ad8c-a6a0-4dbd-a721-c24c48b7364f":
-    lastModified: "2026-11-25T04:48:59.497Z"
+    status: "completed"
+    startedAt: "2026-11-25T05:48:21.233Z"
+    completedAt: "2026-11-25T05:54:44.809Z"
+    endedAt: "2026-11-25T05:54:44.809Z"
+    activeIntervals: [{"end":"2026-11-25T05:54:44.809Z","start":"2026-11-25T05:48:21.233Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "init writes CLAUDE.md/AGENTS.md as an ndx:begin/ndx:end managed block via a shared splice helper; project text outside the markers is kept; drift/alignment tests compare the block."
+    lastModified: "2026-11-25T05:54:44.809Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4e51e54c-2da5-46d0-9728-f15f67685c7e":
+    status: "completed"
+    startedAt: "2026-11-25T06:11:41.290Z"
+    completedAt: "2026-11-25T06:11:41.290Z"
+    endedAt: "2026-11-25T06:11:41.290Z"
+    activeIntervals: [{"end":"2026-11-25T06:11:41.290Z","start":"2026-11-25T06:11:41.290Z"}]
+    appliedAt: "2026-11-25T06:11:41.290Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     createdAt: "2026-11-25T04:48:19.914Z"
-    lastModified: "2026-11-25T04:49:01.259Z"
+    lastModified: "2026-11-25T06:11:41.290Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "828e4baa-879a-4674-8420-a7fde376e508":
-    lastModified: "2026-11-25T04:48:32.919Z"
+    status: "completed"
+    startedAt: "2026-11-25T05:33:26.569Z"
+    completedAt: "2026-11-25T05:48:09.367Z"
+    endedAt: "2026-11-25T05:48:09.367Z"
+    activeIntervals: [{"end":"2026-11-25T05:36:23.945Z","start":"2026-11-25T05:33:26.569Z"},{"end":"2026-11-25T05:48:09.367Z","start":"2026-11-25T05:38:07.549Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "usesNdxGuidance detects an n-dx checkout from packages/core/assistant-assets/project-guidance.md instead of a .n-dx.json key; tests added for selection, init --no-llm --no-commit, consumer size budgets and published assets."
+    lastModified: "2026-11-25T05:48:12.495Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a0f3e3b7-2d4c-4727-90ff-410765cb9087":
-    lastModified: "2026-11-25T04:49:01.259Z"
+    status: "completed"
+    startedAt: "2026-11-25T05:54:54.436Z"
+    completedAt: "2026-11-25T06:11:41.290Z"
+    endedAt: "2026-11-25T06:11:41.290Z"
+    activeIntervals: [{"end":"2026-11-25T06:11:41.290Z","start":"2026-11-25T05:54:54.436Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "README generation on ndx init is now opt-in behind --readme (static and TUI paths). The License section names the manifest license, links a LICENSE/LICENCE/COPYING file only when one exists, and is omitted otherwise. Help, the command-effects table, docs/cli-ui-gap.md and the git-preflight commit paths were updated to match."
+    lastModified: "2026-11-25T06:11:41.290Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
