@@ -300,15 +300,24 @@ jobs:
         # Skipped on the Changesets version PR, which consumes every changeset
         # while bumping package.json, so `changeset status` would exit 1. It is
         # detected by content, not branch name: against origin/main the branch
-        # deletes a changeset, adds none and leaves none
-        # (scripts/changeset-pr-checks.mjs). A bare
+        # deletes a changeset, adds none and leaves none. git runs here, in the
+        # step; scripts/changeset-pr-checks.mjs only classifies the path lists
+        # it is given, so it spawns nothing. A bare
         # `github.head_ref != 'changeset-release/main'` would not do: in the
         # merge queue (merge_group) head_ref is empty, so that test is true and
         # the step would still run and fail the queued version PR. The content
         # check holds in pull_request and merge_group alike (fetch-depth 0 gives
         # both origin/main); on push to main the diff is empty, so it runs.
         if: runner.os == 'Linux'
-        run: node scripts/changeset-pr-checks.mjs validate --base=origin/main
+        run: |
+          CHANGESET_ADDED=$(git diff --no-renames --diff-filter=A --name-only origin/main...HEAD -- '.changeset/*.md')
+          CHANGESET_DELETED=$(git diff --no-renames --diff-filter=D --name-only origin/main...HEAD -- '.changeset/*.md')
+          export CHANGESET_ADDED CHANGESET_DELETED
+          if node scripts/changeset-pr-checks.mjs is-version-pr; then
+            echo "Changesets version PR — skipping changeset status."
+            exit 0
+          fi
+          pnpm exec changeset status --since=origin/main
 
   # THE TEST SUITES: FOUR GROUPS PER OS, TWELVE JOBS, ALL IN PARALLEL.
   #

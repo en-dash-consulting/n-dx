@@ -1,17 +1,21 @@
 /**
- * Changeset checks ci.yml runs on a branch against its base (origin/main).
+ * Pure changeset checks for ci.yml. The workflow step runs `git diff` against
+ * origin/main itself and hands the path lists in through environment variables
+ * (newline-separated), so this script spawns nothing.
  *
- * `validate`: runs `changeset status --since=<base>`, except on the Changesets
- * version PR. That PR consumes every changeset and bumps each package.json, so
- * `changeset status` sees changed packages and no changesets and exits 1. The
- * version PR is recognised by its content, not its branch name, because the
- * merge queue's merge_group run has no head_ref: the branch deletes at least
- * one changeset, adds none, and leaves none in the tree.
+ * Each command prints one reason line and exits 0 when its answer is yes, 1
+ * when it is no, 2 on a usage error.
  *
- * Usage: node scripts/changeset-pr-checks.mjs validate [--base=origin/main]
+ * `is-version-pr` (CHANGESET_ADDED, CHANGESET_DELETED): whether the branch is
+ * the Changesets version PR. That PR consumes every changeset and bumps each
+ * package.json, so `changeset status` sees changed packages and no changesets
+ * and exits 1. It is recognised by content, not branch name, because the merge
+ * queue's merge_group run has no head_ref: the branch deletes at least one
+ * changeset, adds none, and leaves none in the tree.
+ *
+ * Usage: CHANGESET_ADDED=… CHANGESET_DELETED=… node scripts/changeset-pr-checks.mjs is-version-pr
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -44,47 +48,34 @@ export function classifyVersionPr({ added, deleted, remaining }) {
   };
 }
 
-/** Changeset-directory paths the branch changed against `base`, by git diff filter (A, D). */
-function diffPaths(base, filter) {
-  const out = execFileSync(
-    "git",
-    ["diff", "--no-renames", `--diff-filter=${filter}`, "--name-only", `${base}...HEAD`, "--", `${CHANGESET_DIR}/*.md`],
-    { cwd: ROOT, encoding: "utf-8", windowsHide: true },
-  );
-  return out.split("\n").map((line) => line.trim()).filter(Boolean);
+/** Newline-separated paths from an environment variable; unset is empty. */
+function envPaths(name) {
+  return (process.env[name] ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
 }
 
 function remainingPaths() {
   return readdirSync(join(ROOT, CHANGESET_DIR)).map((name) => `${CHANGESET_DIR}/${name}`);
 }
 
-function validate(base) {
-  const verdict = classifyVersionPr({
-    added: diffPaths(base, "A"),
-    deleted: diffPaths(base, "D"),
-    remaining: remainingPaths(),
-  });
-  if (verdict.versionPr) {
-    console.log(`Skipping changeset status: branch ${verdict.reason}.`);
-    return 0;
-  }
-  console.log(`Running changeset status (branch ${verdict.reason}; not a version PR).`);
-  const result = spawnSync("pnpm", ["exec", "changeset", "status", `--since=${base}`], {
-    cwd: ROOT,
-    stdio: "inherit",
-    windowsHide: true,
-  });
-  if (result.error) throw result.error;
-  return result.status ?? 1;
-}
+/** CLI commands: each returns `{ yes, line }`; exit 0 for yes, 1 for no. */
+const COMMANDS = {
+  "is-version-pr": () => {
+    const { versionPr, reason } = classifyVersionPr({
+      added: envPaths("CHANGESET_ADDED"),
+      deleted: envPaths("CHANGESET_DELETED"),
+      remaining: remainingPaths(),
+    });
+    return { yes: versionPr, line: `Branch ${reason}.` };
+  },
+};
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [command, ...rest] = process.argv.slice(2);
-  const baseArg = rest.find((arg) => arg.startsWith("--base="));
-  const base = baseArg ? baseArg.slice("--base=".length) : "origin/main";
-  if (command !== "validate") {
-    console.error("usage: node scripts/changeset-pr-checks.mjs validate [--base=origin/main]");
+  const run = COMMANDS[process.argv[2]];
+  if (!run) {
+    console.error(`usage: node scripts/changeset-pr-checks.mjs <${Object.keys(COMMANDS).join("|")}>`);
     process.exit(2);
   }
-  process.exit(validate(base));
+  const { yes, line } = run();
+  console.log(line);
+  process.exit(yes ? 0 : 1);
 }

@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-25T02:36:04.441Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2c091a65-08aa-4a78-a118-e12ce22ff80c":
-    lastModified: "2026-11-25T02:37:19.778Z"
+    status: "completed"
+    startedAt: "2026-11-25T02:38:16.666Z"
+    completedAt: "2026-11-25T02:39:59.100Z"
+    endedAt: "2026-11-25T02:39:59.100Z"
+    activeIntervals: [{"end":"2026-11-25T02:39:59.100Z","start":"2026-11-25T02:38:16.666Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "git diffs and changeset status moved into the ci.yml step; script is pure (env-fed is-version-pr); allowlist restored to origin/main."
+    lastModified: "2026-11-25T02:39:59.100Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "52db514f-8426-4fe7-83b5-339de35c3007":
     lastModified: "2026-11-25T02:37:39.741Z"
