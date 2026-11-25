@@ -91,12 +91,12 @@ describe("php parse report", () => {
     expect(legacyFacts.filter((f) => f.rule === "short-open-tag")).toHaveLength(1);
   });
 
-  it("has no parse report when every file parses cleanly", async (ctx) => {
+  it("reports every list empty when every file parses cleanly", async (ctx) => {
     skipUnlessGrammar(ctx, phpGrammarPath());
     writeFileSync(join(dir, "a.php"), "<?php\nrequire 'b.php';\n");
     writeFileSync(join(dir, "b.php"), "<?php\n// café, valid UTF-8\nfunction b() {}\n");
     const result = await pack.analyzeProject({ projectDir: dir, files: ["a.php", "b.php"] });
     expect(result.degraded).toBeUndefined();
-    expect(result).not.toHaveProperty("parse");
+    expect(result.parse).toEqual({ files: 2, sizeLimitBytes: 1024 * 1024, syntaxErrors: [], oversized: [], unreadable: [], notUtf8: [] });
   });
 });

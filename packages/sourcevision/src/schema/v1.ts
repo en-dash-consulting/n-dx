@@ -407,8 +407,12 @@ export interface ImportsSummary {
   mostImported: Array<{ path: string; count: number }>;
   avgImportsPerFile: number;
   /**
-   * Pack id → the files of that language that did not parse cleanly. Absent
-   * when every pack-parsed file parsed cleanly.
+   * Pack id → how that pack's files parsed, one entry for every pack that ran.
+   * - Field absent: an analysis made before the field existed, or one in which
+   *   no pack ran.
+   * - Pack absent: that pack did not run (no files of its language, or missing
+   *   or degraded).
+   * - Zero counts and empty `examples`: the pack parsed every file cleanly.
    */
   parseIssues?: Record<string, PackParseIssues>;
 }

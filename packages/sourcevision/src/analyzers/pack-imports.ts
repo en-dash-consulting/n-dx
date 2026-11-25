@@ -111,7 +111,7 @@ export interface PackImportGraph {
    * language (Go's regex parser) can run it on them.
    */
   readonly unparsed: string[];
-  /** Pack id → how its files parsed, for each pack that ran and had a file that did not parse cleanly. */
+  /** Pack id → how its files parsed, for each pack that ran and reported a parse (zero counts when every file parsed cleanly). */
   readonly parseIssues: Record<string, PackParseIssues>;
 }
 
@@ -280,7 +280,7 @@ export async function buildPackImportGraph(
     if (result.parse) {
       const issues = parseIssuesOf(result.parse);
       parseIssues[pack.id] = issues;
-      warn(parseIssuesNotice(pack.id, issues));
+      if (issues.clean < issues.files || issues.legacySyntax !== undefined) warn(parseIssuesNotice(pack.id, issues));
     }
     if (framework.length > 0) options.framework?.(result.facts, framework);
 

@@ -4,7 +4,8 @@
  * parser's size limit (generated here), a latin-1 file, one with invalid
  * UTF-8 bytes and a clean file; `sv analyze --fast` exits 0, prints one
  * `[php-parse]` line and writes the counts and example paths to imports.json
- * `summary.parseIssues`. A clean project's imports.json has no such field.
+ * `summary.parseIssues`. A clean PHP project gets zero counts and no notice;
+ * a project with no PHP gets no `php` entry.
  * Skips when the PHP grammar is not built.
  */
 
@@ -73,17 +74,26 @@ describe("sv analyze --fast reports PHP files that do not parse cleanly", { time
     ]);
   });
 
-  it("writes no parseIssues when every file parses cleanly", async (ctx) => {
+  it("writes zero counts, and prints no notice, when every file parses cleanly", async (ctx) => {
     await skipUnlessPackRuns(ctx, "php");
-    const dir = project({
-      "index.php": "<?php\nrequire_once 'lib.php';\necho ok();\n",
-      "lib.php": "<?php\n// café\nfunction ok() { return 1; }\n",
-    });
+    const dir = project({ "index.php": "<?php\n// café\nfunction ok() { return 1; }\n" });
 
     const { status, output, summary } = analyze(dir);
 
     expect(status).toBe(0);
-    expect(summary).not.toHaveProperty("parseIssues");
+    const none = { count: 0, examples: [] };
+    expect(summary.parseIssues).toEqual({
+      php: { files: 1, clean: 1, sizeLimitBytes: MIB, syntaxErrors: none, oversized: none, unreadable: none, notUtf8: none },
+    });
     expect(output).not.toContain("[php-parse]");
+  });
+
+  it("writes no php entry for a project with no PHP", () => {
+    const dir = project({ "index.ts": "export const ok = 1;\n" });
+
+    const { status, summary } = analyze(dir);
+
+    expect(status).toBe(0);
+    expect(summary.parseIssues?.php).toBeUndefined();
   });
 });

@@ -17,7 +17,7 @@
  * each is reported as a notice, so imports never depend on them. A file that cannot be read or is over the
  * runner's size limit is listed in `unparsed`. Every file that does not parse
  * cleanly (syntax errors, oversized, unreadable, not valid UTF-8) is listed in
- * `parse`, which is absent when all of them do; facts from a file with syntax
+ * `parse`, which is returned with empty lists when all of them do; facts from a file with syntax
  * errors are still read from its partial tree.
  *
  * @module lang-runtime/pack-entry
@@ -208,15 +208,13 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       if (result.status === "parsed") parsed.push(rewrites === undefined ? { path, captures: result.captures } : { path, captures: result.captures, rewrites });
       else unparsed.push(path);
     }
-    const parse: PackParseReport | undefined =
-      Object.values(issues).every((paths) => paths.length === 0) && legacySyntax.length === 0
-        ? undefined
-        : {
-            files: request.files.length,
-            sizeLimitBytes: options.runner?.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES,
-            ...issues,
-            ...(legacySyntax.length === 0 ? {} : { legacySyntax }),
-          };
+    // Reported even when every file parsed cleanly, so a clean parse reads as zero counts, not as no report.
+    const parse: PackParseReport = {
+      files: request.files.length,
+      sizeLimitBytes: options.runner?.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES,
+      ...issues,
+      ...(legacySyntax.length === 0 ? {} : { legacySyntax }),
+    };
 
     // Prepared for imports, or on a framework's first lookup: a framework that never follows a reference costs nothing.
     let preparedOnce: PreparedResolver | undefined;
@@ -249,7 +247,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       ...(options.projectNotices ? readProjectNotices(options.projectNotices, pack, structural, kinds) : []),
       ...(prepared?.notices?.() ?? []),
     ];
-    return { facts, unparsed, ...(notices.length === 0 ? {} : { notices }), ...(parse ? { parse } : {}) };
+    return { facts, unparsed, ...(notices.length === 0 ? {} : { notices }), parse };
   } finally {
     runner.dispose();
   }
