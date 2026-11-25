@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "171c2786-68a5-45ce-9c93-6f1322b76121":
-    lastModified: "2026-11-25T04:47:47.353Z"
+    status: "completed"
+    startedAt: "2026-11-25T05:33:26.088Z"
+    completedAt: "2026-11-25T05:37:50.701Z"
+    endedAt: "2026-11-25T05:37:50.701Z"
+    activeIntervals: [{"end":"2026-11-25T05:37:50.701Z","start":"2026-11-25T05:33:26.088Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "createVendorCliSandbox adds realpath of $(getconf DARWIN_USER_CACHE_DIR)mds to readWriteRoots on darwin via execFileSyncNoShell (re-exported through llm-gateway, ceiling 251); tests cover resolution, fallback, tool-sandbox absence and a live security lookup."
+    lastModified: "2026-11-25T05:37:50.701Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "68ddc78a-5fd2-4103-a739-63b00aeea890":
     lastModified: "2026-11-25T04:47:49.151Z"

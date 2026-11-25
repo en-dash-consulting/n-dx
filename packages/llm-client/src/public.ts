@@ -388,6 +388,7 @@ export {
   buildWindowsCliCommandLine,
   spawnCli,
   execFileSyncCli,
+  execFileSyncNoShell,
   diagnoseCliInvocation,
   isCliNotFoundError,
   diagnoseCliNotFound,
