@@ -766,6 +766,73 @@ describe("cmdStatus", () => {
     });
   });
 
+  describe("pending items show what they wait on", () => {
+    const sibling = (id: string, title: string, extra: Partial<PRDItem> = {}): PRDItem => ({
+      id, title, level: "task", status: "pending", ...extra,
+    });
+    const epic = (children: PRDItem[]): PRDDocument => ({
+      schema: "rex/v1",
+      title: "Test",
+      items: [{ id: "e1", title: "Epic", level: "epic", status: "pending", children }],
+    });
+
+    it("names an open sibling blocker by title", async () => {
+      writePRD(tmp, epic([
+        sibling("t1", "Build schema"),
+        sibling("t2", "Write migration", { blockedBy: ["t1"] }),
+      ]));
+      await cmdStatus(tmp, { tokens: "false" });
+      expect(output()).toContain("Write migration (waiting on: Build schema)");
+    });
+
+    it("drops the marker once the blocker completes, even when completed items are hidden", async () => {
+      writePRD(tmp, epic([
+        sibling("t1", "Build schema", { status: "completed" }),
+        sibling("t2", "Write migration", { blockedBy: ["t1"] }),
+      ]));
+      await cmdStatus(tmp, { tokens: "false" });
+      expect(output()).toContain("Write migration");
+      expect(output()).not.toContain("waiting on");
+    });
+
+    it("lists a dependency chain in order regardless of titles", async () => {
+      writePRD(tmp, epic([
+        sibling("c", "Alpha", { blockedBy: ["b"] }),
+        sibling("b", "Bravo", { blockedBy: ["a"] }),
+        sibling("a", "Charlie"),
+      ]));
+      await cmdStatus(tmp, { tokens: "false" });
+      const out = output();
+      expect(out.indexOf("Charlie")).toBeLessThan(out.indexOf("Bravo"));
+      expect(out.indexOf("Bravo")).toBeLessThan(out.indexOf("Alpha"));
+    });
+
+    it("renders every item of a cycle", async () => {
+      writePRD(tmp, epic([
+        sibling("a", "Alpha", { blockedBy: ["b"] }),
+        sibling("b", "Bravo", { blockedBy: ["a"] }),
+      ]));
+      await cmdStatus(tmp, { tokens: "false" });
+      expect(output()).toContain("Alpha (waiting on: Bravo)");
+      expect(output()).toContain("Bravo (waiting on: Alpha)");
+    });
+
+    it("adds waitingOn to JSON output and leaves existing fields unchanged", async () => {
+      const prd = epic([
+        sibling("t1", "Build schema"),
+        sibling("t2", "Write migration", { blockedBy: ["t1"] }),
+      ]);
+      writePRD(tmp, prd);
+      await cmdStatus(tmp, { format: "json", tokens: "false" });
+      const children = JSON.parse(output()).items[0].children;
+      expect(children[0]).not.toHaveProperty("waitingOn");
+      const { waitingOn, ...rest } = children[1];
+      expect(waitingOn).toEqual(["t1"]);
+      expect(rest).toMatchObject(prd.items[0].children![1]);
+      expect(Object.keys(rest).sort()).toEqual([...Object.keys(children[0]), "blockedBy"].sort());
+    });
+  });
+
   describe("default format matches tree format", () => {
     it("produces same output as --format=tree", async () => {
       writePRD(tmp, POPULATED_PRD);

@@ -63,6 +63,10 @@ rex health .                         # PRD structure health score
 rex mcp .                            # start MCP server (stdio)
 ```
 
+## Dependencies in status
+
+`rex status`, `rex status --tree` and `rex tree` list each item after the siblings it waits on (its `blockedBy`); unrelated siblings, and siblings in a cycle, keep their stored order. A pending or in-progress item whose blockers are not all completed shows `(waiting on: <titles>)`; a `blocked` item keeps `(blocked by: <ids>)`. `rex status --format=json` adds `waitingOn`, the open blockers' ids, to each such item and changes no other field.
+
 ## Stale release plans (v2)
 
 `rex validate`, `rex health` and the MCP `health` tool share one rule: an open change whose `plannedRelease` has shipped (some change carries `shippedIn` for it) or is older than the newest shipped release is stale. Validate reports it as a warning named `release plans`, which never fails CI, and each finding names the change and says to plan it for a coming release or clear `plannedRelease`. A change with no planned release is never flagged. The dashboard's Plan health panel reads the same check.

@@ -15,7 +15,14 @@ items:
     lastModified: "2026-11-25T04:53:11.803Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "667a5c44-92bb-410f-b10b-b2f30b4defed":
-    lastModified: "2026-11-25T04:53:08.320Z"
+    status: "completed"
+    startedAt: "2026-11-25T06:29:07.630Z"
+    completedAt: "2026-11-25T06:33:48.479Z"
+    endedAt: "2026-11-25T06:33:48.479Z"
+    activeIntervals: [{"end":"2026-11-25T06:33:48.479Z","start":"2026-11-25T06:29:07.630Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New core/waiting-on.ts (open blockers, stable sibling topo order, JSON waitingOn); wired into status tree, --tree, rex tree and status JSON."
+    lastModified: "2026-11-25T06:33:48.479Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "90239cd3-5e2e-4223-bb91-43bae889384c":
     lastModified: "2026-11-25T04:53:11.803Z"

@@ -12,6 +12,11 @@ import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../st
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { computeStats } from "../../core/stats.js";
 import { isRootLevel } from "../../schema/index.js";
+import {
+  buildDependencyIndex,
+  orderSiblingsByDependencies,
+  type DependencyIndex,
+} from "../../core/waiting-on.js";
 
 import { result } from "../output.js";
 import { emitMigrationNotification } from "../migration-notification.js";
@@ -26,6 +31,7 @@ import {
   renderProgressBar,
   timestampSuffix,
   blockedBySuffix,
+  waitingOnSuffix,
   coverageSuffix,
   overrideSuffix,
   filterDeleted,
@@ -47,17 +53,18 @@ function renderTreeWithColorScheme(
   items: PRDItem[],
   indent: number = 0,
   coverage?: CoverageMap,
+  deps: DependencyIndex = buildDependencyIndex(items),
 ): string[] {
   const lines: string[] = [];
 
-  for (const item of items) {
+  for (const item of orderSiblingsByDependencies(items)) {
     const icon = STATUS_ICONS[item.status] ?? "?";
     const prefix = "  ".repeat(indent);
     const override = overrideSuffix(item);
     const priority = item.priority ? ` [${item.priority}]` : "";
     const ts = timestampSuffix(item);
     const cov = coverageSuffix(item.id, coverage);
-    const blocked = blockedBySuffix(item);
+    const blocked = blockedBySuffix(item) + waitingOnSuffix(item, deps);
 
     // Construct title with status-specific formatting
     let titlePart: string;
@@ -87,7 +94,7 @@ function renderTreeWithColorScheme(
       }
 
       // Recursively render children
-      lines.push(...renderTreeWithColorScheme(item.children, indent + 1, coverage));
+      lines.push(...renderTreeWithColorScheme(item.children, indent + 1, coverage, deps));
     } else {
       // Leaf item: no children
       const line = `${prefix}${icon} ${titlePart}${override}${priority}${cov}${ts}${blocked}`;
