@@ -317,8 +317,8 @@ export function getCodexTroubleshooting() {
 }
 
 /**
- * The project-neutral guidance every project gets unless it opts into n-dx's
- * own. Its `{{rexDir}}`-style placeholders are filled from the project layout.
+ * The project-neutral guidance every project gets unless it is an n-dx
+ * checkout (see {@link usesNdxGuidance}). Its `{{rexDir}}`-style placeholders are filled from the project layout.
  *
  * @returns {string}
  */
@@ -333,29 +333,21 @@ export function getConsumerClaudeAddendum() {
   return readFileSync(join(ASSET_DIR, "consumer-claude-addendum.md"), "utf-8").replace(/\r\n/g, "\n");
 }
 
-/** The `assistant.guidance` value that selects n-dx's own guidance. */
-export const NDX_GUIDANCE_OPT_IN = "n-dx";
-
 /**
- * Whether a project opts into n-dx's own guidance (`project-guidance.md`) by
- * setting `assistant.guidance: "n-dx"` in its tracked config. Only the tracked
- * file counts: the choice is the repository's, so every clone renders the same
- * files. An absent or unparseable file selects the consumer guidance; `ndx
- * config` reports a broken file, so this does not.
+ * Whether a project is an n-dx checkout, and so gets n-dx's own guidance
+ * (`project-guidance.md`) rather than the consumer guidance. Detected from
+ * the checkout's files, not from config: the guidance source itself is
+ * present at `packages/core/assistant-assets/project-guidance.md`. No config
+ * key is read, so a run never has to write one, and every clone and worktree
+ * of n-dx renders the same files.
  *
  * @param {string} projectDir
  * @returns {boolean}
  */
 export function usesNdxGuidance(projectDir) {
-  const { configFile } = resolveLayout(projectDir);
-  if (!existsSync(configFile)) return false;
-  let data;
-  try {
-    data = JSON.parse(readFileSync(configFile, "utf-8"));
-  } catch {
-    return false;
-  }
-  return data?.assistant?.guidance === NDX_GUIDANCE_OPT_IN;
+  return existsSync(
+    join(projectDir, "packages", "core", "assistant-assets", "project-guidance.md"),
+  );
 }
 
 /**

@@ -20,10 +20,13 @@ import {
   getSkillNames,
   getVendorTarget,
   listSkillFiles,
+  renderAgentsMd,
 } from "../../packages/core/assistant-assets.js";
 import { setupCodexIntegration } from "../../packages/core/codex-integration.js";
 
 // ── Shared setup: generate all artifacts once ───────────────────────────────
+
+const ROOT = join(import.meta.dirname, "../..");
 
 let tmpDir;
 let tomlContent;
@@ -289,27 +292,57 @@ describe("config.toml structural validity", () => {
 // ── AGENTS.md format stability ──────────────────────────────────────────────
 
 describe("AGENTS.md format stability", () => {
+  // `tmpDir` is a consumer project, so init writes consumer-guidance.md there.
+  // n-dx's own guidance (project-guidance.md and the Codex troubleshooting that
+  // points into n-dx's sources) is rendered only for an n-dx checkout, which
+  // this repository is.
+  const ndxAgentsContent = renderAgentsMd(ROOT);
+
   // Shared guidance sections come first, then manifest-derived operational sections
-  const expectedSections = [
-    "# n-dx",
-    "## Packages",
-    "## n-dx Orchestration Commands",
-    "## Key Files",
+  const operationalSections = [
     "## Workflow",
     "## Available Skills",
     "## MCP Servers",
     "## When to Use Each Server",
+  ];
+  const expectedNdxSections = [
+    "# n-dx",
+    "## Packages",
+    "## n-dx Orchestration Commands",
+    "## Key Files",
+    ...operationalSections,
     "## Codex Troubleshooting",
   ];
+  const expectedConsumerSections = [
+    "# Working with n-dx in this repository",
+    "## n-dx tools",
+    "## Where things live",
+    "## Commands",
+    ...operationalSections,
+  ];
 
-  it("contains all required sections in order", () => {
+  function expectInOrder(content, headings) {
     let lastIndex = -1;
-    for (const heading of expectedSections) {
-      const index = agentsContent.indexOf(heading);
+    for (const heading of headings) {
+      const index = content.indexOf(heading);
       expect(index, `Missing section: ${heading}`).toBeGreaterThan(-1);
       expect(index, `Section "${heading}" out of order`).toBeGreaterThan(lastIndex);
       lastIndex = index;
     }
+  }
+
+  it("contains all required sections in order (consumer project)", () => {
+    expectInOrder(agentsContent, expectedConsumerSections);
+  });
+
+  it("contains all required sections in order (n-dx checkout)", () => {
+    expectInOrder(ndxAgentsContent, expectedNdxSections);
+  });
+
+  it("gives a consumer project none of n-dx's own guidance", () => {
+    expect(agentsContent).not.toContain("## Packages");
+    expect(agentsContent).not.toContain("Four-tier dependency hierarchy");
+    expect(agentsContent).not.toContain("## Codex Troubleshooting");
   });
 
   it("has a generated-file header comment", () => {
@@ -317,21 +350,27 @@ describe("AGENTS.md format stability", () => {
     expect(agentsContent).toContain("do not edit manually");
   });
 
-  it("includes shared project guidance (Packages, Architecture)", () => {
-    expect(agentsContent).toContain("sourcevision");
-    expect(agentsContent).toContain("rex");
-    expect(agentsContent).toContain("hench");
-    expect(agentsContent).toContain("Four-tier dependency hierarchy");
+  it("includes shared project guidance (Packages, Architecture) for an n-dx checkout", () => {
+    expect(ndxAgentsContent).toContain("sourcevision");
+    expect(ndxAgentsContent).toContain("rex");
+    expect(ndxAgentsContent).toContain("hench");
+    expect(ndxAgentsContent).toContain("Four-tier dependency hierarchy");
   });
 
-  it("includes the architecture governance sections", () => {
+  it("describes the n-dx tools to a consumer project", () => {
+    expect(agentsContent).toContain("**rex**");
+    expect(agentsContent).toContain("**sourcevision**");
+    expect(agentsContent).toContain("**hench**");
+  });
+
+  it("includes the architecture governance sections for an n-dx checkout", () => {
     // Formerly asserted absent, back when these lived in claude-addendum.md
     // and Codex ran without the gateway rules or the PRD write invariant.
     // See tests/e2e/instruction-alignment.test.js for the guard that keeps
     // vendor-neutral sections out of the Claude-only addendum.
-    expect(agentsContent).toContain("zone fragility governance");
-    expect(agentsContent).toContain("### Gateway modules");
-    expect(agentsContent).toContain("### Concurrency contract");
+    expect(ndxAgentsContent).toContain("zone fragility governance");
+    expect(ndxAgentsContent).toContain("### Gateway modules");
+    expect(ndxAgentsContent).toContain("### Concurrency contract");
   });
 
   it("excludes Claude-specific content", () => {
@@ -365,10 +404,10 @@ describe("AGENTS.md format stability", () => {
     expect(agentsContent).toContain(".codex/config.toml");
   });
 
-  it("includes Codex Troubleshooting section", () => {
-    expect(agentsContent).toContain("## Codex Troubleshooting");
-    expect(agentsContent).toContain("Malformed Codex output");
-    expect(agentsContent).toContain("Missing usage fields");
+  it("includes Codex Troubleshooting section for an n-dx checkout", () => {
+    expect(ndxAgentsContent).toContain("## Codex Troubleshooting");
+    expect(ndxAgentsContent).toContain("Malformed Codex output");
+    expect(ndxAgentsContent).toContain("Missing usage fields");
   });
 });
 

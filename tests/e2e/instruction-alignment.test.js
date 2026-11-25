@@ -405,14 +405,16 @@ describe("init writes both instruction files", () => {
     expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(true);
   });
 
+  // Rendered for the same project: the guidance is chosen per project, and a
+  // temp dir is a consumer project, not an n-dx checkout.
   it("CLAUDE.md content matches renderClaudeMd() output", () => {
     const written = readFileSync(join(tmpDir, "CLAUDE.md"), "utf-8");
-    expect(written).toBe(claudeContent);
+    expect(written).toBe(renderClaudeMd(tmpDir));
   });
 
   it("AGENTS.md content matches renderAgentsMd() output", () => {
     const written = readFileSync(join(tmpDir, "AGENTS.md"), "utf-8");
-    expect(written).toBe(agentsContent);
+    expect(written).toBe(renderAgentsMd(tmpDir));
   });
 
   it("both files have generated-file headers", () => {
