@@ -188,6 +188,7 @@
   "standingProductChanged": false,
   "changeset": "Not required: CI package-source rule; no publishable package source changed.",
   "featureEvidence": "Not run: no models, native enforcement, actual accounts or browser flows in PR 0",
-  "CI": "Not yet observed; draft PR creation pending",
-  "independentReview": "No feature review claimed; required fresh distinct reviews are saved on implementation work units."
+  "CI": "Not yet observed on final head; draft CI may skip jobs. Local validation is not a CI pass.",
+  "independentReview": "No feature review claimed; required fresh distinct reviews are saved on implementation work units.",
+  "draftPR": "https://github.com/en-dash-consulting/n-dx/pull/1104"
 }

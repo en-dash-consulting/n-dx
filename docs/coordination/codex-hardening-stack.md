@@ -1,6 +1,7 @@
 # Codex hardening follow-up coordinator
 
 Captured 2026-11-24 from the approved PR 0 brief. Implementation has not started.
+Draft root: [PR 0 #1104](https://github.com/en-dash-consulting/n-dx/pull/1104), base `main`, branch `codex/codex-hardening-pr0`.
 The coordinator stops after the draft PRD root and launch-ready first-owner handoff.
 
 ## Baseline and scope
