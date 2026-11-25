@@ -172,7 +172,7 @@ function writeSkills(dir) {
  */
 function writeClaudeMd(dir) {
   const claudePath = join(dir, "CLAUDE.md");
-  const content = renderClaudeMd();
+  const content = renderClaudeMd(dir);
   writeFileSync(claudePath, content);
   return { written: true, path: claudePath };
 }
