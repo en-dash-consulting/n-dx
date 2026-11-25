@@ -8,7 +8,10 @@ items:
     lastModified: "2026-11-25T04:49:01.259Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "828e4baa-879a-4674-8420-a7fde376e508":
-    lastModified: "2026-11-25T04:48:32.919Z"
+    startedAt: "2026-11-25T05:33:26.569Z"
+    activeIntervals: [{"end":"2026-11-25T05:36:23.945Z","start":"2026-11-25T05:33:26.569Z"}]
+    failureReason: "Blocked on the repository opt-in. Writing `\"assistant\": { \"guidance\": \"n-dx\" }` to the tracked .n-dx.json is denied by this session's permission settings, and the concurrency contract reverts .n-dx.json saves during `ndx work`. Without it, this repo's CLAUDE.md/AGENTS.md would render the consumer template and the drift tests (instruction-alignment, assistant-body-drift) would fail. The implementation is complete but uncommitted in the worktree: consumer-guidance.md, consumer-claude-addendum.md, and usesNdxGuidance/guidanceFor/renderClaudeMd(dir) in assistant-assets.js. To finish: add the key outside a hench run, then add the tests (init e2e, size budget, loadability/bundled checks) and commit."
+    lastModified: "2026-11-25T05:37:51.291Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a0f3e3b7-2d4c-4727-90ff-410765cb9087":
     lastModified: "2026-11-25T04:49:01.259Z"
