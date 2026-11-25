@@ -116,6 +116,27 @@ describe.skipIf(!binary)("native Codex worktree MCP binding", () => {
   });
   afterEach(() => { vi.unstubAllEnvs(); if (root) rmSync(root, { recursive: true, force: true }); });
 
+  it.each(["fresh", "resume", "fork"])("excludes registrations added after %s binding verification", async mode => {
+    const spawn = codexCliAdapter.buildSpawnConfig(createPromptEnvelope([]), DEFAULT_EXECUTION_POLICY, {
+      mcpConfigPath: binding, ...(mode !== "fresh" ? { resumeSessionId: "fixture-thread" } : {}),
+      ...(mode === "fork" ? { forkSession: true, codexForkSupported: true } : {}),
+    });
+    const args = await bindCodexMcp({ path: spawn.codexMcpBinding!.path, binary: binary!, args: spawn.args, cwd: assigned, env });
+    const operatorConfig = join(env.CODEX_HOME!, "config.toml");
+    // Simulate an operator save after the final verification but before exec
+    // loads its configuration. This name was absent from both preflight reads.
+    writeFileSync(operatorConfig, readFileSync(operatorConfig, "utf8") +
+      '\n[mcp_servers.added_after_verification]\ncommand="must-never-start"\nenabled=true\n');
+    const effective = await readCodexEffectiveConfig({ binary: binary!, args, cwd: assigned, env });
+    expect(effective?.model).toBe("operator-model-pin");
+    expect(effective?.model_provider).toBe("operator-provider");
+    const servers = effective!.mcp_servers as Record<string, Record<string, unknown>>;
+    expect(Object.entries(servers).filter(([, server]) => server.enabled !== false)
+      .map(([name]) => name).sort()).toEqual(["rex", "sourcevision"]);
+    expect(servers.rex.args).toEqual([launcher, "rex", "mcp", assigned]);
+    expect(servers.sourcevision.args).toEqual([launcher, "sv", "mcp", assigned]);
+  });
+
   it.each(["fresh", "resume", "fork"])("binds %s to assigned sentinels and confines PRD mutation there", async mode => {
     const before = [anchor, assigned, sibling].map(hashPrd);
     const configBefore = readFileSync(join(env.CODEX_HOME!, "config.toml"), "utf8");

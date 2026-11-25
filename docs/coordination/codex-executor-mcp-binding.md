@@ -128,3 +128,97 @@ still open. Work units `722f0341-7454-4ac9-bd16-cf97cd090e24` and
 unit. PRs 2 and 3 must not assume this provisional interface is complete. The
 owner made no restack, merge or successor dispatch. CI is reported separately
 on the draft PR.
+
+## Bounded continuation cf8abe6a — native race still reproduced
+
+Starting HEAD: `5328b05ea` (the exact assigned predecessor is already integrated
+by `31311c75c8261a70ab4211c00ef4a28d8fa45cf6`). No production fix or successful
+completion is claimed by this continuation. The six earlier repairs remain
+untouched; reviewer and model-driven proof work remain separate and open.
+
+The selected macOS CLI again reports `0.167.0-alpha.3.2`. The new regression in
+`packages/hench/tests/integration/codex-worktree-mcp.test.ts` calls the production
+adapter and `bindCodexMcp`, then adds a previously absent registration to a
+disposable operator config **after binding returns**. Native `config/read` with
+the returned executor arguments still enables that registration. Fresh, resume
+and fork cases all fail the exact enabled-server-set assertion. No model,
+authentication, unrelated MCP process or actual executor was started by this
+probe; it demonstrates the configuration race, not model-side tool use.
+
+Three additional disposable native probes retained the foreign registration:
+
+- A complete `mcp_servers` table override containing only the intended server.
+- `mcp_servers=false` followed by dotted intended-server overrides.
+- `mcp_servers=[]` followed by a complete intended-server table override.
+
+All three retained the disposable operator model pin. Neither a table override
+nor a scalar/array reset followed by a table creates a native allowlist on this
+binary. Repeating preflight reads cannot close the remaining interval. The
+selected CLI's help and generated thread start/resume/fork protocol schema did
+not establish a supported exact-set launch mechanism. No replacement binary,
+user-config suppression, credential copy, managed-policy override or trust change
+was introduced to make the regression pass.
+
+Checks in this continuation (temporary files confined to `.local_testing/`):
+
+```sh
+node scripts/check-dependency-drift.mjs
+TMPDIR="$PWD/.local_testing/pr1-race-tmp" pnpm --filter @n-dx/hench exec vitest run tests/unit/agent/codex-mcp-binding.test.ts
+TMPDIR="$PWD/.local_testing/pr1-race-tmp" NDX_TEST_CODEX_BINARY=<selected-binary> pnpm --filter @n-dx/hench exec vitest run tests/integration/codex-worktree-mcp.test.ts --testNamePattern 'excludes registrations added'
+pnpm --filter @n-dx/hench typecheck
+TMPDIR="$PWD/.local_testing/pr1-race-tmp" node_modules/.bin/vitest run tests/e2e/cli-dev.test.js tests/integration/scheduler-startup.test.js
+git diff --check
+```
+
+Dependency drift, typechecking and whitespace passed. Existing binding unit tests
+passed 15/15; required startup tests passed 14/14. The new native regression is
+**red: 3 failed**, with the three existing native mutation cases unselected.
+There is no changed production package to rebuild. The affected gate and fresh
+distinct review have not run for this continuation; the known failing regression
+is not a passing implementation or a substitute for either requirement.
+
+Owned uncommitted paths are this evidence file and the native regression file.
+No commit is attempted with a known failing regression. Rex `get_item` and
+`get_capabilities` both refused because approval is required and the policy is
+`never`; checkout-local intent supplied context, not successful MCP evidence.
+No direct PRD edit or alternate mutation route was used. Outer Hench/coordinator
+must retain the executor task as failing and record this continuation's blocker.
+Resolving the race still requires an exact-set native launch mechanism or a
+verified configuration snapshot consumed by execution that preserves native
+authentication and managed restrictions. No safe implementation of that mechanism
+was established here. Overall disposition remains **BLOCKED**.
+
+### Outer run outcome and continuation checkpoint
+
+Run `cf8abe6a-abe5-426c-84bf-1bb182ea1799` ended failed after its required fresh
+`gpt-6.2-astra` review. The reviewer did not resume the executor, found no new
+defect in the characterization edits, and explicitly retained the unresolved
+executor acceptance blocker. Its "out-of-scope" verdict refers to this narrow
+invocation base, not PR ownership: the race remains owned by executor task
+`25270990-b5b0-413c-9719-6f70e9c3d38f` and is not accepted or deferred.
+
+The enabled affected gate selected sixteen suites. Root was attempted and failed
+on external shared-Git metadata access and confined package operations; fifteen
+suites remained unrun. After repeated timeouts the coordinator authorized a
+graceful interruption; a queued root retry also failed/interrupted. The recorded
+gate is **failed**, not a pass. No source fix, completed task, model-driven
+isolation proof or full-owned-diff passing gate is claimed.
+
+Separate bounded coordinator research subsequently found a viable **fresh-exec
+candidate**, so the earlier absence of an identified primitive is not a blanket
+unsupported conclusion. On the same selected native binary,
+`exec --ignore-user-config` excluded operator and positively verified trusted
+project MCP servers, including registrations added after inspection; a control
+without that flag started all foreign registrations. Explicit synthetic
+provider/model settings were retained. This is local scripted-provider evidence,
+not actual-account, managed-policy, resume or fork evidence. Ordinary app-server
+rejects that flag and cannot certify the exact ignored exec configuration.
+
+The coordinator authorized one bounded implementation continuation in an
+independent local clone at this checkpoint so Git metadata remains inside the
+same native project boundary. Native confinement stays unchanged. Admission
+must preserve original HOME/CODEX_HOME/auth, exact model/provider pins and
+provable organizational restrictions, and specifically refuse unknown mechanisms.
+Managed requirements require the separate `configRequirements/read` response
+with an explicit own `requirements` field; absence/error is unknown, not an
+unmanaged result. Full lifecycle and model-driven evidence remain required.
