@@ -6,12 +6,11 @@ items:
     lastModified: "2026-11-25T00:26:30.750Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "25270990-b5b0-413c-9719-6f70e9c3d38f":
-    status: "failing"
     startedAt: "2026-11-25T00:51:55.458Z"
-    activeIntervals: [{"end":"2026-11-25T01:13:45.768Z","start":"2026-11-25T00:51:55.458Z"}]
+    activeIntervals: [{"end":"2026-11-25T01:13:45.768Z","start":"2026-11-25T00:51:55.458Z"},{"end":"2026-11-25T05:44:52.796Z","start":"2026-11-25T05:42:34.976Z"}]
     failureReason: "PR 1 incomplete. Fresh distinct gpt-6.2-astra review repaired six must-fixes; the should-fix native-settings verification/exec race remains open. Required affected gate failed/interrupted after root suite shared-Git access errors; 15 selected suites did not run. Model-driven two-worktree and reviewer binding evidence remains unavailable. See docs/coordination/codex-executor-mcp-binding.md and codex-hardening-pr1-review.json. No confinement bypass or task completion was applied."
     assignee: "codex-hardening-pr-1"
-    lastModified: "2026-11-25T02:19:48.152Z"
+    lastModified: "2026-11-25T05:46:25.725Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5d599339-5a76-42db-a124-5d816c4161b8":
     assignee: "codex-hardening-pr-1"
