@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Opened tile is an inset modal with a back trail"
     appliedAt: "2026-10-15T05:11:36.124Z"
+    shippedIn: "0.10.5"
     lastModified: "2026-11-19T15:36:20.751Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

@@ -10,6 +10,7 @@ items:
     resolutionDetail: "Fixed by d1e4224a0 (task dec010f7): transient machine-id lookups are not cached and never fall back to the hostname; that validation runs unslotted with a slotWarning and the next call retries. Lookup timeout 10 s."
     appliedAt: "2026-11-14T05:48:49.249Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.5"
     createdAt: "2026-11-14T05:42:48.614Z"
     lastModified: "2026-11-14T05:48:49.249Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -151,6 +151,7 @@ items:
     completedAt: "2026-10-09T15:04:19.464Z"
     endedAt: "2026-10-09T15:04:19.464Z"
     appliedAt: "2026-10-09T15:04:19.464Z"
+    shippedIn: "0.10.5"
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-11-19T15:36:20.751Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

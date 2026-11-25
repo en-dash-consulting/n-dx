@@ -11,6 +11,7 @@ items:
     resolutionDetail: "Review findings repaired in actual sequential ndx work runs with mandatory distinct fresh review. 819 scoped tests, required startup checks, builds/typechecks passed. Final native macOS fresh/resume/fork verified private temp API, cleanup, never approval, network/outside-write denial and credential masking; core reviewer kernel read-only passed. PATH-only filters refused before model work. Optional workspace-write --ignore-user-config is explicitly unsupported on this CLI because app-server rejects its selector; no weaker retry. Native command/read confinement remains unsupported and hub admission stays refused. No Windows/browser claim."
     appliedAt: "2026-11-19T17:18:47.550Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.5"
     createdAt: "2026-11-19T16:53:02.152Z"
     lastModified: "2026-11-19T18:00:49.575Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
