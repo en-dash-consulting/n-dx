@@ -38,7 +38,7 @@ jobs:
       # exactly the contributions this check exists for. The findings appear
       # in the job log and in the check's annotations instead.
       - name: Review dependency changes
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           # `high` rather than `moderate`: this gate is new, and one that
           # blocks a PR over a moderate advisory in a transitive dev
